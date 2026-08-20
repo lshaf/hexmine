@@ -26,6 +26,7 @@ import {
   worldParams,
 } from '@/game/worldgen'
 import type { SettlementMark } from '@/game/worldgen'
+import { ACTION_PATHS } from '@/icons/actions'
 import { BIOME_COLOR, BIOME_LABEL } from '@/theme/palette'
 import type { SettlementTier } from '@/game/types'
 
@@ -533,10 +534,41 @@ onBeforeUnmount(() => {
 
     <div class="controls">
       <span class="label scale">{{ level.label }}</span>
-      <button type="button" :disabled="zoom >= ZOOMS.length - 1" @click="setZoom(zoom + 1)">−</button>
-      <button type="button" :disabled="zoom <= 0" @click="setZoom(zoom - 1)">+</button>
-      <button type="button" class="home" title="Centre on your prospector" @click="centreOnCharacter">
-        ◎
+      <button
+        type="button"
+        :disabled="zoom >= ZOOMS.length - 1"
+        title="Zoom out"
+        aria-label="Zoom out"
+        @click="setZoom(zoom + 1)"
+      >
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
+             stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path :d="ACTION_PATHS.zoomOut" />
+        </svg>
+      </button>
+      <button
+        type="button"
+        :disabled="zoom <= 0"
+        title="Zoom in"
+        aria-label="Zoom in"
+        @click="setZoom(zoom - 1)"
+      >
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
+             stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path :d="ACTION_PATHS.zoomIn" />
+        </svg>
+      </button>
+      <button
+        type="button"
+        class="home"
+        title="Centre on your prospector"
+        aria-label="Centre on your prospector"
+        @click="centreOnCharacter"
+      >
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
+             stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path :d="ACTION_PATHS.locate" />
+        </svg>
       </button>
     </div>
 
@@ -616,8 +648,7 @@ onBeforeUnmount(() => {
   height: 26px;
   display: grid;
   place-items: center;
-  font-size: 15px;
-  line-height: 1;
+  line-height: 0;
   color: var(--vellum);
   background: var(--ink-raised);
   clip-path: var(--hex-clip);
