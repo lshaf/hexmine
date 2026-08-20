@@ -51,7 +51,7 @@ const SILHOUETTE: Record<EquipSlot, (fill: string, edge: string) => string> = {
     <path d="M20 5 L23 12 L23 26 L17 26 L17 12 Z" fill="${fill}" stroke="${edge}" stroke-width="1.1"/>
     <rect x="12.5" y="26" width="15" height="2.6" rx="1.2" fill="${edge}"/>
     <rect x="18.6" y="28.6" width="2.8" height="6" rx="1.2" fill="${edge}"/>
-    <circle cx="20" cy="35" r="1.9" fill="${edge}"/>`,
+    <circle cx="20" cy="34" r="1.9" fill="${edge}"/>`,
 }
 
 // -------------------------------------------------------------- hex framing
@@ -60,20 +60,20 @@ const SILHOUETTE: Record<EquipSlot, (fill: string, edge: string) => string> = {
 function hexFrame(stroke: string, ornate: boolean): string {
   const r = 18.6
   const points = Array.from({ length: 6 }, (_, i) => {
-    const angle = (Math.PI / 3) * i - Math.PI / 2
+    const angle = (Math.PI / 3) * i
     return `${(C + r * Math.cos(angle)).toFixed(2)},${(C + r * Math.sin(angle)).toFixed(2)}`
   }).join(' ')
 
   let out = `<polygon points="${points}" fill="none" stroke="${stroke}" stroke-width="1.4"/>`
   if (ornate) {
     const inner = Array.from({ length: 6 }, (_, i) => {
-      const angle = (Math.PI / 3) * i - Math.PI / 2
+      const angle = (Math.PI / 3) * i
       return `${(C + (r - 3) * Math.cos(angle)).toFixed(2)},${(C + (r - 3) * Math.sin(angle)).toFixed(2)}`
     }).join(' ')
     out += `<polygon points="${inner}" fill="none" stroke="${stroke}" stroke-width="0.7"/>`
     // Corner pips, the top-tier tell.
     for (let i = 0; i < 6; i++) {
-      const angle = (Math.PI / 3) * i - Math.PI / 2
+      const angle = (Math.PI / 3) * i
       const x = C + r * Math.cos(angle)
       const y = C + r * Math.sin(angle)
       out += `<circle cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="1.5" fill="${stroke}"/>`

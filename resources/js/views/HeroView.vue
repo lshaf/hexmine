@@ -100,7 +100,7 @@ const statKeys: StatKey[] = ['yield', 'tripReduction', 'travelSpeed', 'processin
               </span>
             </div>
           </div>
-          <div class="row" style="gap: 5px">
+          <div class="row-actions">
             <button
               class="btn btn-sm"
               type="button"
@@ -121,13 +121,17 @@ const statKeys: StatKey[] = ['yield', 'tripReduction', 'travelSpeed', 'processin
         </template>
 
         <template v-else>
-          <div class="icon-box empty-slot" style="width: 42px; height: 42px">
-            <span class="tiny muted">—</span>
-          </div>
+          <span class="icon-box slot-icon empty-slot">
+            <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor"
+                 stroke-width="1.1" stroke-dasharray="3 2.6" stroke-linejoin="round" aria-hidden="true">
+              <path d="M23 12 17.5 21.5h-11L1 12l5.5-9.5h11Z" />
+            </svg>
+          </span>
           <div class="grow">
             <strong class="tiny muted">{{ slot.label }}</strong>
             <div class="tiny muted">Empty</div>
           </div>
+          <div class="row-actions"></div>
         </template>
       </div>
     </section>
@@ -135,11 +139,11 @@ const statKeys: StatKey[] = ['yield', 'tripReduction', 'travelSpeed', 'processin
     <!-- --------------------------------------------------------- stowed -->
     <section v-if="stowed.length" class="section">
       <h3 class="head" style="margin-bottom: 8px">Stowed</h3>
-      <div v-for="item in stowed" :key="item.id" class="inset row-item">
+      <div v-for="item in stowed" :key="item.id" class="slot-row">
         <SvgIcon
-          :svg="itemIcon({ slot: def(item).slot, tier: def(item).tier, palette: def(item).palette, size: 26 })"
+          :svg="itemIcon({ slot: def(item).slot, tier: def(item).tier, palette: def(item).palette, size: 30 })"
           boxed
-          :size="26"
+          :size="30"
         />
         <div class="grow">
           <div class="row-between">
@@ -153,7 +157,7 @@ const statKeys: StatKey[] = ['yield', 'tripReduction', 'travelSpeed', 'processin
             <template v-else>{{ formatPercent(def(item).value) }} {{ STAT_LABEL[def(item).stat] }}</template>
           </div>
         </div>
-        <div class="row" style="gap: 5px">
+        <div class="row-actions">
           <button
             class="btn btn-sm"
             type="button"
@@ -270,6 +274,7 @@ const statKeys: StatKey[] = ['yield', 'tripReduction', 'travelSpeed', 'processin
   display: flex;
   align-items: center;
   gap: 11px;
+  min-height: 60px;
   padding: 9px 11px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--line);
@@ -280,8 +285,22 @@ const statKeys: StatKey[] = ['yield', 'tripReduction', 'travelSpeed', 'processin
   margin-top: 7px;
 }
 
+.slot-icon {
+  width: 42px;
+  height: 42px;
+}
+
 .empty-slot {
-  border-style: dashed;
+  color: var(--vellum-dim);
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.row-actions {
+  display: flex;
+  flex: 0 0 auto;
+  justify-content: flex-end;
+  gap: 5px;
+  min-width: 126px;
 }
 
 .skill-glyph {
