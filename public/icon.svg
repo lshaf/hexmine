@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="HexMine">
+  <rect width="512" height="512" fill="#1d2622"/>
+  <polygon points="82,303 169,201 343,201 430,303 343,405 169,405" fill="#141b18"/>
+  <polygon points="82,223 169,325 169,391 82,289" fill="#435a3e"/>
+  <polygon points="169,325 343,325 343,391 169,391" fill="#344630"/>
+  <polygon points="343,325 430,223 430,289 343,391" fill="#283625"/>
+  <polygon points="82,223 169,121 343,121 430,223 343,325 169,325" fill="#5f8058"/>
+  <polygon points="82,223 169,121 343,121 343,128 172,128 87,228" fill="#75926f"/>
+  <polygon points="180,283 214,243 282,243 316,283 282,323 214,323" fill="#344630"/>
+  <polygon points="188,158 218,193 218,293 188,258" fill="#a1652f"/>
+  <polygon points="218,193 278,193 278,293 218,293" fill="#8b572d"/>
+  <polygon points="278,193 308,158 308,258 278,293" fill="#6f4523"/>
+  <polygon points="188,158 218,123 268,84" fill="#d8b34a"/>
+  <polygon points="218,193 188,158 268,84" fill="#d8b34a"/>
+  <polygon points="218,123 278,123 268,84" fill="#c1793f"/>
+  <polygon points="278,193 218,193 268,84" fill="#c1793f"/>
+  <polygon points="278,123 308,158 268,84" fill="#8b572d"/>
+  <polygon points="308,158 278,193 268,84" fill="#8b572d"/>
+</svg>

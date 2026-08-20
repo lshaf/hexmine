@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="HexMine">
+  <rect width="512" height="512" fill="#1d2622"/>
+  <polygon points="46,216 151,339 361,339 466,216 466,296 361,419 151,419 46,296" fill="#435a3e"/>
+  <polygon points="46,216 151,93 361,93 466,216 361,339 151,339" fill="#5f8058"/>
+  <polygon points="46,216 151,93 361,93 361,105 158,105 58,224" fill="#75926f"/>
+  <polygon points="178,150 217,196 217,306 178,260" fill="#a1652f"/>
+  <polygon points="217,196 295,196 295,306 217,306" fill="#8b572d"/>
+  <polygon points="295,196 334,150 334,260 295,306" fill="#6f4523"/>
+  <polygon points="178,150 217,104 270,50" fill="#d8b34a"/>
+  <polygon points="217,196 178,150 270,50" fill="#d8b34a"/>
+  <polygon points="217,104 295,104 270,50" fill="#c1793f"/>
+  <polygon points="295,196 217,196 270,50" fill="#c1793f"/>
+  <polygon points="295,104 334,150 270,50" fill="#8b572d"/>
+  <polygon points="334,150 295,196 270,50" fill="#8b572d"/>
+</svg>
