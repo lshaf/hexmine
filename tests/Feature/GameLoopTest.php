@@ -37,6 +37,109 @@ final class GameLoopTest extends TestCase
         $this->character = $this->game->createCharacter($player);
     }
 
+    /** Wind a journey's clock back so it has already landed, then settle it. */
+    private function arrive(Character $character): void
+    {
+        $span = (int) $character->travel_ends_at - (int) $character->travel_started_at;
+        $character->travel_started_at = (int) $character->travel_started_at - $span;
+        $character->travel_ends_at = (int) $character->travel_ends_at - $span;
+        $character->save();
+
+        $this->game->settle($character);
+    }
+
+    /** Pretend the walker has been going for this many whole hexes. */
+    private function walkFor(Character $character, int $hexes): void
+    {
+        $perHex = Balance::scaled(Balance::TRAVEL_MS_PER_HEX);
+        $character->travel_started_at = (int) $character->travel_started_at - ($hexes * $perHex + 5);
+        $character->save();
+    }
+
+    /** §5 -- ten minutes of ground per hex, and the map is crossed on foot. */
+    public function test_travel_takes_ten_minutes_a_hex_and_lands_at_the_destination(): void
+    {
+        $from = ['col' => $this->character->col, 'row' => $this->character->row];
+        $to = ['col' => $from['col'] + 6, 'row' => $from['row']];
+
+        $distance = \App\Game\HexGeometry::distance($from['col'], $from['row'], $to['col'], $to['row']);
+        $travel = $this->game->travelTo($this->character, $to['col'], $to['row']);
+
+        $this->assertSame($distance, $travel['hexes']);
+        $this->assertSame($distance + 1, count($travel['path']), 'the road includes both ends');
+        $this->assertSame(
+            $distance * Balance::scaled(Balance::TRAVEL_MS_PER_HEX),
+            $travel['endsAt'] - $travel['startedAt'],
+        );
+
+        // Still standing where the journey began: you are not there yet.
+        $this->assertSame($from['col'], $this->character->col);
+        $this->assertSame($from['row'], $this->character->row);
+        $this->assertNull($this->game->currentSettlement($this->character));
+
+        $this->arrive($this->character);
+
+        $this->assertSame($to['col'], $this->character->col);
+        $this->assertSame($to['row'], $this->character->row);
+        $this->assertNull($this->game->travelState($this->character));
+    }
+
+    /**
+     * Stopping halfway keeps only whole hexes. Half a hex is not a place, so
+     * the part-crossed leg is forfeit rather than rounded up.
+     */
+    public function test_stopping_short_keeps_only_the_whole_hexes_walked(): void
+    {
+        $target = ['col' => $this->character->col + 6, 'row' => $this->character->row];
+        $travel = $this->game->travelTo($this->character, $target['col'], $target['row']);
+        $path = $travel['path'];
+
+        // Three hexes of walking, plus most of a fourth that buys nothing.
+        $perHex = Balance::scaled(Balance::TRAVEL_MS_PER_HEX);
+        $this->character->travel_started_at = (int) $this->character->travel_started_at - (3 * $perHex + (int) ($perHex * 0.9));
+        $this->character->save();
+
+        $stop = $this->game->cancelTravel($this->character);
+
+        $this->assertSame(3, $stop['hexes']);
+        $this->assertSame($path[3][0], $this->character->col);
+        $this->assertSame($path[3][1], $this->character->row);
+        $this->assertNull($this->game->travelState($this->character));
+    }
+
+    /** A journey abandoned before the first hex lands leaves you where you began. */
+    public function test_stopping_inside_the_first_hex_moves_nobody(): void
+    {
+        $from = ['col' => $this->character->col, 'row' => $this->character->row];
+        $this->game->travelTo($this->character, $from['col'] + 4, $from['row']);
+
+        $stop = $this->game->cancelTravel($this->character);
+
+        $this->assertSame(0, $stop['hexes']);
+        $this->assertSame($from['col'], $this->character->col);
+        $this->assertSame($from['row'], $this->character->row);
+    }
+
+    /** You cannot work a hex from the road, §5. */
+    public function test_the_road_blocks_mining_and_trading(): void
+    {
+        $col = $this->character->col;
+        $row = $this->character->row;
+
+        $this->game->travelTo($this->character, $col + 3, $row);
+
+        $preview = $this->game->previewTile($this->character, $col, $row);
+        $this->assertFalse($preview['canMine']);
+        $this->assertStringContainsString('on the road', $preview['reason']);
+
+        try {
+            $this->game->travelTo($this->character, $col + 1, $row);
+            $this->fail('set a second course while already walking');
+        } catch (\App\Game\GameException $e) {
+            $this->assertSame('travelling', $e->errorCode);
+        }
+    }
+
     /** §12 -- the spawn must make the tutorial completable. */
     public function test_spawn_is_forest_with_a_reachable_woodcutting_village(): void
     {
@@ -123,8 +226,9 @@ final class GameLoopTest extends TestCase
             $this->assertSame('blocked', $e->errorCode);
         }
 
-        // Walk there, and the same hex becomes workable.
+        // Walk there, and once the journey lands the same hex becomes workable.
         $this->game->travelTo($this->character, $col, $row);
+        $this->arrive($this->character);
         $this->assertTrue($this->game->previewTile($this->character->fresh(), $col, $row)['canMine']);
     }
 
@@ -292,8 +396,9 @@ final class GameLoopTest extends TestCase
 
         $this->assertSame([], $this->game->mapMutations($this->character)['occupied']);
 
-        // Walk toward them and the same hex becomes knowable.
+        // Walk toward them and the same hex becomes knowable -- once you get there.
         $this->game->travelTo($this->character, $this->character->col + $range, $this->character->row);
+        $this->arrive($this->character);
         $seen = $this->game->mapMutations($this->character->fresh())['occupied'];
         $this->assertSame([[(int) $far->col, (int) $far->row, 1]], $seen);
     }
@@ -390,6 +495,7 @@ final class GameLoopTest extends TestCase
         // Dropping the trip forfeits the haul (§11.1) and frees you to move.
         $this->game->abandonJob($this->character, $job->id);
         $this->game->travelTo($this->character, $col + 1, $row);
+        $this->arrive($this->character);
         $this->assertSame($col + 1, $this->character->fresh()->col);
     }
 
@@ -416,7 +522,12 @@ final class GameLoopTest extends TestCase
     public function test_walking_away_gives_back_the_presence_bonus(): void
     {
         $settlement = $this->standAtWoodcuttingVillage();
+        $away = $this->openNeighbour($settlement['col'], $settlement['row']);
+
+        // Arrive properly: presence is picked up by landing, not by existing.
+        $this->character->update(['col' => $away['col'], 'row' => $away['row']]);
         $this->game->travelTo($this->character, $settlement['col'], $settlement['row']);
+        $this->arrive($this->character);
 
         $addMaterial = new \ReflectionMethod($this->game, 'addMaterial');
         $addMaterial->setAccessible(true);
@@ -426,9 +537,10 @@ final class GameLoopTest extends TestCase
         $this->assertTrue((bool) $job->presence, 'queued on site but not helping');
         $helped = $job->ends_at - $this->game->now();
 
-        // Step off the settlement: the NPC keeps working, just slower.
-        $away = $this->openNeighbour($settlement['col'], $settlement['row']);
-        $this->game->travelTo($this->character->fresh(), $away['col'], $away['row']);
+        // Setting out is enough to stop helping: the bonus covers time stood
+        // there, and you are not stood there once you start walking.
+        $walker = $this->character->fresh();
+        $this->game->travelTo($walker, $away['col'], $away['row']);
 
         $job->refresh();
         $this->assertFalse((bool) $job->presence);
@@ -436,7 +548,10 @@ final class GameLoopTest extends TestCase
         $this->assertGreaterThan($helped, $alone, 'kept the bonus after walking away');
 
         // Walking back picks it up again, on what is left.
-        $this->game->travelTo($this->character->fresh(), $settlement['col'], $settlement['row']);
+        $this->arrive($walker);
+        $returning = $this->character->fresh();
+        $this->game->travelTo($returning, $settlement['col'], $settlement['row']);
+        $this->arrive($returning);
         $job->refresh();
         $this->assertTrue((bool) $job->presence);
         $this->assertLessThan($alone, $job->ends_at - $this->game->now());

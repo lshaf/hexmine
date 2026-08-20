@@ -48,12 +48,32 @@ class SettlementController extends GameController
             'row' => ['required', 'integer', 'min:0', 'max:4999'],
         ]);
 
-        $settlement = $this->game->travelTo($character, (int) $validated['col'], (int) $validated['row']);
+        $travel = $this->game->travelTo($character, (int) $validated['col'], (int) $validated['row']);
+
+        $where = $travel['destinationName'] ?? "{$travel['toCol']}, {$travel['toRow']}";
 
         return $this->respond(
             $character,
-            null,
-            $settlement !== null ? "Arrived at {$settlement['name']}." : 'Moved.',
+            $travel,
+            "Setting out for {$where} — {$travel['hexes']} hexes.",
+        );
+    }
+
+    /** Stop short. The hexes already crossed are kept, the rest is not. */
+    public function cancelTravel(Request $request): JsonResponse
+    {
+        $character = $this->character($request);
+
+        $stop = $this->game->cancelTravel($character);
+
+        $where = $stop['settlement']['name'] ?? "{$stop['col']}, {$stop['row']}";
+
+        return $this->respond(
+            $character,
+            $stop,
+            $stop['hexes'] === 0
+                ? 'Turned back before covering a single hex.'
+                : "Stopped at {$where} after {$stop['hexes']} hexes.",
         );
     }
 }

@@ -64,11 +64,13 @@ const canTravel = computed(
     Boolean(tile.value) &&
     !onSelected.value &&
     !working.value &&
+    !game.travel &&
     distance.value <= game.travelRange,
 )
 
 const travelHint = computed(() => {
   if (onSelected.value) return 'You are already here'
+  if (game.travel) return 'You are on the road — stop before setting a new course'
   if (working.value) {
     return working.value.endsAt <= game.now
       ? 'Claim your haul before you move on'

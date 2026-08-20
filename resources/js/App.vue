@@ -87,6 +87,7 @@ onMounted(() => {
         :travel-range="game.travelRange"
         :selected="game.selected"
         :jobs="game.jobs"
+        :travel="game.travel"
         :now="game.now"
         @select="game.select"
         @recenter="onRecenter"

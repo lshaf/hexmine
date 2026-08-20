@@ -38,6 +38,7 @@ Route::middleware(ResolveCharacter::class)->group(function () {
     Route::get('/settlements/{settlement}', [SettlementController::class, 'show']);
     Route::post('/settlements/{settlement}/processing', [SettlementController::class, 'processing']);
     Route::post('/travel', [SettlementController::class, 'travel']);
+    Route::delete('/travel', [SettlementController::class, 'cancelTravel']);
 
     Route::post('/shop/purchases', [ShopController::class, 'purchase']);
     Route::post('/shop/sales', [ShopController::class, 'sell']);

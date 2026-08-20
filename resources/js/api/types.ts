@@ -10,7 +10,15 @@
  *  2. Every mutating call returns the full fresh PlayerState. Partial patches
  *     invite desync; an idle game with long timers cannot afford it.
  */
-import type { Job, MaterialKey, OwnedItem, Settlement, SkillKey, StatKey } from '@/game/types'
+import type {
+  Job,
+  MaterialKey,
+  OwnedItem,
+  Settlement,
+  SkillKey,
+  StatKey,
+  TravelState,
+} from '@/game/types'
 import type { WorldConfig } from '@/game/worldgen'
 
 export interface CharacterDto {
@@ -45,6 +53,14 @@ export interface SkillDto {
   xpToNext: number
 }
 
+/** Where a stopped journey actually left you, and how far that was. */
+export interface TravelStop {
+  col: number
+  row: number
+  hexes: number
+  settlement: Settlement | null
+}
+
 export interface PlayerState {
   /** Authoritative clock. The client renders countdowns against this, offset by
    *  its own drift measurement -- it never trusts Date.now() alone. */
@@ -62,6 +78,8 @@ export interface PlayerState {
   jobs: Job[]
   /** Settlement the player is currently present at, §6.2. */
   presenceAt: string | null
+  /** The journey under way, or null when standing still. */
+  travel: TravelState | null
   /**
    * The settlement the character is standing on, or null out in the field.
    * Trading, crafting and processing all require one -- there is no trader in
@@ -155,7 +173,8 @@ export interface GameApi {
   getStation(settlementId: string): Promise<StationState>
   startProcessing(settlementId: string, recipeKey: string, batches: number): Promise<ActionResult<Job>>
 
-  travelTo(col: number, row: number): Promise<ActionResult<null>>
+  travelTo(col: number, row: number): Promise<ActionResult<TravelState>>
+  cancelTravel(): Promise<ActionResult<TravelStop>>
 
   buyItem(itemKey: string): Promise<ActionResult<OwnedItem>>
   sellMaterial(material: MaterialKey, quantity: number): Promise<ActionResult<{ gold: number }>>

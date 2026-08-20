@@ -12,6 +12,7 @@ import { useGame } from '@/stores/game'
 import { MATERIALS } from '@/game/catalog'
 import { formatDuration } from '@/game/formulas'
 import { materialIcon } from '@/icons/procedural'
+import { ACTION_PATHS } from '@/icons/actions'
 import SvgIcon from '@/components/SvgIcon.vue'
 import type { Job } from '@/game/types'
 
@@ -24,9 +25,45 @@ const ordered = computed(() =>
 const output = (job: Job) => (job.kind === 'mining' ? job.material : job.output)
 
 const ready = (job: Job) => job.endsAt <= game.now
+
+/** Where a stop right now would leave you -- whole hexes only. */
+const walked = computed(() => game.travelHexesWalked)
+
+const heading = computed(() => {
+  const journey = game.travel
+  if (!journey) return ''
+
+  return journey.destinationName ?? `${journey.toCol}, ${journey.toRow}`
+})
 </script>
 
 <template>
+  <div v-if="game.travel" class="stack road">
+    <div class="trip plate">
+      <div class="inner">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
+             stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path :d="ACTION_PATHS.travel" />
+        </svg>
+        <span class="grow body">
+          <span class="qty readout">To {{ heading }}</span>
+          <span class="label when">
+            {{ walked }}/{{ game.travel.hexes }} hexes · {{ formatDuration(game.travelRemainingMs) }}
+          </span>
+        </span>
+        <button
+          class="btn btn-sm btn-danger"
+          type="button"
+          :disabled="game.busy"
+          title="Stops on the last hex you crossed — part of a hex counts for nothing"
+          @click="game.cancelTravel()"
+        >
+          Stop
+        </button>
+      </div>
+    </div>
+  </div>
+
   <TransitionGroup v-if="ordered.length" name="rise" tag="div" class="stack">
     <div v-for="job in ordered" :key="job.id" class="trip plate" :class="{ ready: ready(job) }">
       <div class="inner">
@@ -67,6 +104,16 @@ const ready = (job: Job) => job.endsAt <= game.now
   flex-direction: column;
   gap: 6px;
   width: 232px;
+}
+
+.road {
+  margin-bottom: 6px;
+  color: var(--copper);
+}
+
+.road .qty,
+.road .when {
+  color: var(--vellum);
 }
 
 .inner {

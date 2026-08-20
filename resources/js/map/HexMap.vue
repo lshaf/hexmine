@@ -26,7 +26,7 @@ import {
 } from './hexGeometry'
 import { herdProp, tileProps } from './props'
 import { BIOME_COLOR, GOLD, VELLUM, depletedColor, shade } from '@/theme/palette'
-import type { Job, Tile } from '@/game/types'
+import type { Job, Tile, TravelState } from '@/game/types'
 
 const props = defineProps<{
   tiles: Tile[]
@@ -37,6 +37,7 @@ const props = defineProps<{
   travelRange: number
   selected: { col: number; row: number } | null
   jobs: Job[]
+  travel: TravelState | null
   now: number
 }>()
 
@@ -261,7 +262,58 @@ const renderTiles = computed<RenderTile[]>(() =>
   }),
 )
 
-const characterScreen = computed(() => tileToScreen(props.characterCol, props.characterRow))
+/**
+ * Where the walker actually is.
+ *
+ * Standing still that is the tile underfoot. On the road it is a point between
+ * two hexes: the server publishes the road and the clock, and the marker is
+ * interpolated against them, so the walk needs no per-step message and survives
+ * a reload mid-journey.
+ */
+const characterScreen = computed(() => {
+  const journey = props.travel
+
+  if (!journey || journey.path.length < 2) {
+    return tileToScreen(props.characterCol, props.characterRow)
+  }
+
+  const walked = Math.max(
+    0,
+    Math.min(journey.hexes, (props.now - journey.startedAt) / journey.perHexMs),
+  )
+  const leg = Math.min(journey.path.length - 2, Math.floor(walked))
+  const within = walked - leg
+
+  const from = tileToScreen(journey.path[leg]![0], journey.path[leg]![1])
+  const to = tileToScreen(journey.path[leg + 1]![0], journey.path[leg + 1]![1])
+
+  return {
+    x: from.x + (to.x - from.x) * within,
+    y: from.y + (to.y - from.y) * within,
+  }
+})
+
+const destinationScreen = computed(() =>
+  props.travel ? tileToScreen(props.travel.toCol, props.travel.toRow) : { x: 0, y: 0 },
+)
+
+/** The ground still to cover, as a line the walker is visibly eating into. */
+const roadAhead = computed(() => {
+  const journey = props.travel
+  if (!journey || journey.path.length < 2) return ''
+
+  const rest = journey.path
+    .slice(Math.min(journey.path.length - 1, Math.floor(
+      Math.max(0, Math.min(journey.hexes, (props.now - journey.startedAt) / journey.perHexMs)),
+    ) + 1))
+    .map(([col, row]) => {
+      const at = tileToScreen(col, row)
+      return `L${at.x.toFixed(1)},${(at.y + 3).toFixed(1)}`
+    })
+    .join(' ')
+
+  return `M${characterScreen.value.x.toFixed(1)},${(characterScreen.value.y + 3).toFixed(1)} ${rest}`
+})
 
 const SLOT_PIP_Y = HEX_H / 2 - 4
 </script>
@@ -376,6 +428,28 @@ const SLOT_PIP_Y = HEX_H / 2 - 4
           {{ t.label }}
         </text>
       </g>
+
+      <!-- The road ahead, drawn under the marker so the walker eats into it. -->
+      <template v-if="travel">
+        <path
+          :d="roadAhead"
+          fill="none"
+          stroke="#c1793f"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-dasharray="5 5"
+        />
+        <g :transform="`translate(${destinationScreen.x},${destinationScreen.y + 3})`">
+          <path
+            d="M0,-11 L9,-5.5 L9,5.5 L0,11 L-9,5.5 L-9,-5.5 Z"
+            fill="none"
+            stroke="#c1793f"
+            stroke-width="2"
+            stroke-linejoin="round"
+          />
+        </g>
+      </template>
 
       <!-- The player marker draws last so nothing occludes it, but it sits ON
            the tile rather than floating above it -- hovering put it straight

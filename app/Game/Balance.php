@@ -121,6 +121,14 @@ final class Balance
     /** Tier 3 materials are capped per wallet, §2. */
     public const RARE_WALLET_CAP = 40;
 
+    // ------------------------------------------------------------------ travel
+
+    /**
+     * §5 -- one hex of ground, on foot. Distance is what makes a destination a
+     * decision rather than a click, so the cost is paid per hex crossed.
+     */
+    public const TRAVEL_MS_PER_HEX = 10 * self::MINUTE;
+
     // ------------------------------------------------------------------ curves
 
     public static function xpForLevel(int $level): int

@@ -15,7 +15,15 @@ import { computed, ref, shallowRef, watch } from 'vue'
 import { api } from '@/api/client'
 import { ApiError } from '@/api/types'
 import type { MapMutations, PlayerState, StationState, TilePreview } from '@/api/types'
-import type { Job, MaterialKey, MiningJob, ProcessingJob, Settlement, Tile } from '@/game/types'
+import type {
+  Job,
+  MaterialKey,
+  MiningJob,
+  ProcessingJob,
+  Settlement,
+  Tile,
+  TravelState,
+} from '@/game/types'
 import { TUTORIAL, TUTORIAL_OUTRO, tutorialStep } from '@/game/tutorial'
 import { configureWorld, generateTile } from '@/game/worldgen'
 import { hexDistance, visibleTiles } from '@/map/hexGeometry'
@@ -203,6 +211,44 @@ export const useGame = defineStore('game', () => {
   /** §7.1 -- level-gated reach, straight from the server. */
   const travelRange = computed(() => character.value?.travelRange ?? 0)
 
+  /** The journey under way, §5. Null whenever the character is standing still. */
+  const travel = computed<TravelState | null>(() => state.value?.travel ?? null)
+
+  /**
+   * How far along the road the walker is, in hexes, as a fraction.
+   *
+   * The map interpolates the marker against this, so it is deliberately not
+   * rounded: the whole-hex figure that a stop would keep is the floor of it,
+   * which is the same arithmetic the server does when it lands you.
+   */
+  const travelProgress = computed(() => {
+    const journey = travel.value
+    if (!journey) return 0
+
+    return Math.max(0, Math.min(journey.hexes, (now.value - journey.startedAt) / journey.perHexMs))
+  })
+
+  /** Whole hexes already banked -- what stopping right now would keep. */
+  const travelHexesWalked = computed(() => Math.floor(travelProgress.value))
+
+  const travelRemainingMs = computed(() =>
+    travel.value ? Math.max(0, travel.value.endsAt - now.value) : 0,
+  )
+
+  /**
+   * A journey lands on the server's clock, not on a request, and nothing pushes
+   * that news down. So when the countdown runs out the client asks -- once, on
+   * the edge, because the answer clears `travel` and the edge cannot repeat.
+   */
+  watch(
+    () => travel.value !== null && travelRemainingMs.value === 0,
+    async (landed) => {
+      if (!landed) return
+      await refreshState()
+      await refreshMutations()
+    },
+  )
+
   const currentStep = computed(() =>
     character.value ? tutorialStep(character.value.tutorialStep) : null,
   )
@@ -331,6 +377,18 @@ export const useGame = defineStore('game', () => {
     if (ok !== null) await select(col, row)
   }
 
+  /**
+   * Stop where you stand. The server floors the journey to whole hexes, so
+   * this reports back where it actually left you rather than assuming.
+   */
+  async function cancelTravel(): Promise<void> {
+    const stop = await act(() => api.cancelTravel(), 'bad')
+    if (stop !== null) {
+      await refreshMutations()
+      await select(stop.col, stop.row)
+    }
+  }
+
   async function startProcessing(
     settlementId: string,
     recipeKey: string,
@@ -383,13 +441,14 @@ export const useGame = defineStore('game', () => {
     character, timeScale, inventory, equipment, skills, bonuses, jobs, readyJobs,
     activeJobs, miningJob, processingJob, underfoot, selectedTile,
     currentSettlement, shopStock, travelRange,
+    travel, travelProgress, travelHexesWalked, travelRemainingMs,
     currentStep, tutorialDone, tutorialProgress, TUTORIAL_OUTRO,
     // helpers
     tileAt, held, note,
     // actions
     boot, setView, setViewport, centreOnCharacter, refreshMutations, refreshState,
     select, clearSelection,
-    startMining, collect, abandon, travelTo, startProcessing, buy,
+    startMining, collect, abandon, travelTo, cancelTravel, startProcessing, buy,
     sell, craft, equip, unequip, repair, discard, openPanel, closePanel,
     openStation, closeStation,
   }

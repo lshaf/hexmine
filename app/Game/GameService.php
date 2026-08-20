@@ -151,6 +151,8 @@ class GameService
     {
         $now = $this->now();
 
+        $dirtyTravel = $this->arriveIfDue($character, $now);
+
         $regen = Formulas::regenerateAp(
             $character->ap,
             $character->ap_updated_at,
@@ -159,7 +161,7 @@ class GameService
             Balance::scaled(Balance::AP_REGEN_MS),
         );
 
-        $dirty = false;
+        $dirty = $dirtyTravel;
         if ($regen['ap'] !== $character->ap || $regen['apUpdatedAt'] !== $character->ap_updated_at) {
             $character->ap = $regen['ap'];
             $character->ap_updated_at = $regen['apUpdatedAt'];
@@ -613,7 +615,9 @@ class GameService
         $reason = null;
         $working = $this->miningTrip($character);
 
-        if ($working !== null) {
+        if ($this->isTravelling($character)) {
+            $reason = 'You are on the road. Stop the journey, or wait until you arrive.';
+        } elseif ($working !== null) {
             $reason = $working->isReady($now)
                 ? 'Your haul is waiting. Claim it before working anything else.'
                 : 'You are already working a hex. One trip at a time.';
@@ -827,7 +831,7 @@ class GameService
             if (! in_array($recipe['skill'], $settlement['lines'], true)) {
                 throw new GameException("{$settlement['name']} does not run that line.", 'no_line');
             }
-            if ($character->col !== $settlement['col'] || $character->row !== $settlement['row']) {
+            if ($this->isTravelling($character) || $character->col !== $settlement['col'] || $character->row !== $settlement['row']) {
                 throw new GameException('You have to be at the settlement.', 'not_present');
             }
 
@@ -933,7 +937,7 @@ class GameService
         }
     }
 
-    public function travelTo(Character $character, int $col, int $row): ?array
+    public function travelTo(Character $character, int $col, int $row): array
     {
         // A trip pins you to the hex you are working. Dropping it is the way out,
         // and it forfeits the haul (§11.1) -- say so, or the lock reads as a bug.
@@ -947,7 +951,17 @@ class GameService
             );
         }
 
+        if ($this->isTravelling($character)) {
+            throw new GameException(
+                'You are already on the road. Stop where you are before setting a new course.',
+                'travelling',
+            );
+        }
+
         $distance = HexGeometry::distance($character->col, $character->row, $col, $row);
+        if ($distance === 0) {
+            throw new GameException('You are already standing here.', 'blocked');
+        }
         if ($distance > $this->travelRange($character)) {
             throw new GameException(
                 'Out of travel range. Move in shorter hops, or level up to reach further.',
@@ -958,17 +972,128 @@ class GameService
         // Whatever you were helping with, you are not helping with it any more.
         $this->leavePresence($character);
 
-        $character->col = $col;
-        $character->row = $row;
+        $now = $this->now();
+        $character->travel_to_col = $col;
+        $character->travel_to_row = $row;
+        $character->travel_started_at = $now;
+        $character->travel_ends_at = $now + $distance * Balance::scaled(Balance::TRAVEL_MS_PER_HEX);
+        $character->save();
 
-        $settlement = WorldGen::settlementAt($col, $row);
+        return $this->travelState($character);
+    }
+
+    /**
+     * Stop where you stand -- which is the last hex you actually set foot on.
+     *
+     * Part of a hex is not a place. Time spent inside the current leg buys
+     * nothing, so the walk back down to whole hexes is a floor, and a journey
+     * abandoned before the first hex lands leaves you exactly where you began.
+     *
+     * @return array{col:int,row:int,hexes:int,settlement:array<string,mixed>|null}
+     */
+    public function cancelTravel(Character $character): array
+    {
+        if (! $this->isTravelling($character)) {
+            throw new GameException('You are not going anywhere.', 'not_travelling');
+        }
+
+        $perHex = Balance::scaled(Balance::TRAVEL_MS_PER_HEX);
+        $path = $this->travelPath($character);
+        $elapsed = max(0, $this->now() - (int) $character->travel_started_at);
+
+        $steps = min(count($path) - 1, intdiv($elapsed, $perHex));
+        $stop = $path[$steps];
+
+        $character->col = $stop['col'];
+        $character->row = $stop['row'];
+        $this->clearTravel($character);
+
+        $settlement = WorldGen::settlementAt($character->col, $character->row);
         if ($settlement !== null) {
             $this->joinPresence($character, $settlement['id']);
             $this->fireTutorial($character, 'travel');
         }
         $character->save();
 
-        return $settlement;
+        return [
+            'col' => $character->col,
+            'row' => $character->row,
+            'hexes' => $steps,
+            'settlement' => $settlement,
+        ];
+    }
+
+    /** True while the character is somewhere between two hexes. */
+    public function isTravelling(Character $character): bool
+    {
+        return $character->travel_ends_at !== null;
+    }
+
+    /**
+     * The road, derived rather than stored. The client draws the same hexes
+     * from the same endpoints, so the marker it animates and the hex a stop
+     * would land on are the same list.
+     *
+     * @return array<int,array{col:int,row:int}>
+     */
+    private function travelPath(Character $character): array
+    {
+        return HexGeometry::line(
+            (int) $character->col,
+            (int) $character->row,
+            (int) $character->travel_to_col,
+            (int) $character->travel_to_row,
+        );
+    }
+
+    /** @return array<string,mixed>|null */
+    public function travelState(Character $character): ?array
+    {
+        if (! $this->isTravelling($character)) {
+            return null;
+        }
+
+        $path = $this->travelPath($character);
+        $settlement = WorldGen::settlementAt((int) $character->travel_to_col, (int) $character->travel_to_row);
+
+        return [
+            'toCol' => (int) $character->travel_to_col,
+            'toRow' => (int) $character->travel_to_row,
+            'startedAt' => (int) $character->travel_started_at,
+            'endsAt' => (int) $character->travel_ends_at,
+            'perHexMs' => Balance::scaled(Balance::TRAVEL_MS_PER_HEX),
+            'hexes' => count($path) - 1,
+            'path' => array_map(fn (array $hex) => [$hex['col'], $hex['row']], $path),
+            'destinationName' => $settlement['name'] ?? null,
+        ];
+    }
+
+    /** Land a journey whose clock has run out. Called from settle, never directly. */
+    private function arriveIfDue(Character $character, int $now): bool
+    {
+        if (! $this->isTravelling($character) || $now < (int) $character->travel_ends_at) {
+            return false;
+        }
+
+        $character->col = (int) $character->travel_to_col;
+        $character->row = (int) $character->travel_to_row;
+        $this->clearTravel($character);
+
+        $settlement = WorldGen::settlementAt($character->col, $character->row);
+        if ($settlement !== null) {
+            $this->joinPresence($character, $settlement['id']);
+            $this->fireTutorial($character, 'travel');
+        }
+
+        return true;
+    }
+
+    private function clearTravel(Character $character): void
+    {
+        $character->travel_to_col = null;
+        $character->travel_to_row = null;
+        $character->travel_started_at = null;
+        $character->travel_ends_at = null;
     }
 
     // ------------------------------------------------------------- location
@@ -976,6 +1101,12 @@ class GameService
     /** The settlement the character is standing on, if any. */
     public function currentSettlement(Character $character): ?array
     {
+        // Mid-journey you are between hexes, so you are at nothing: the trader
+        // you left is behind you and the one ahead is not in earshot yet.
+        if ($this->isTravelling($character)) {
+            return null;
+        }
+
         return WorldGen::settlementAt($character->col, $character->row);
     }
 
@@ -1329,6 +1460,9 @@ class GameService
             ])->values()->all(),
             'jobs' => $character->jobs->map(fn (GameJob $j) => $this->jobPayload($j))->values()->all(),
             'presenceAt' => $character->presence_settlement_id,
+            // The journey in progress, §5: where it ends, when, and the hexes
+            // it crosses. The client animates against this and nothing else.
+            'travel' => $this->travelState($character),
             // Where the character is standing. The client gates trade, crafting
             // and processing on this rather than deriving it, so the UI and the
             // server can never disagree about what is possible here.

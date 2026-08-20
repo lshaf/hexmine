@@ -19,6 +19,7 @@
  *   GET    /api/settlements/{settlement}
  *   POST   /api/settlements/{settlement}/processing   {recipe,batches}
  *   POST   /api/travel                        {col,row}
+ *   DELETE /api/travel
  *   POST   /api/shop/purchases                {item}
  *   POST   /api/shop/sales                    {material,quantity}
  *   POST   /api/crafting                      {item}
@@ -35,10 +36,11 @@ import type {
   PlayerState,
   StationState,
   TilePreview,
+  TravelStop,
 } from './types'
 import type { WorldConfig } from '@/game/worldgen'
 import { ApiError } from './types'
-import type { Job, MaterialKey, OwnedItem } from '@/game/types'
+import type { Job, MaterialKey, OwnedItem, TravelState } from '@/game/types'
 
 const BASE = '/api'
 
@@ -134,8 +136,12 @@ export class HttpDriver implements GameApi {
     })
   }
 
-  travelTo(col: number, row: number): Promise<ActionResult<null>> {
-    return post<ActionResult<null>>('/travel', { col, row })
+  travelTo(col: number, row: number): Promise<ActionResult<TravelState>> {
+    return post<ActionResult<TravelState>>('/travel', { col, row })
+  }
+
+  cancelTravel(): Promise<ActionResult<TravelStop>> {
+    return del<ActionResult<TravelStop>>('/travel')
   }
 
   buyItem(itemKey: string): Promise<ActionResult<OwnedItem>> {

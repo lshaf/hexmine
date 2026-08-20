@@ -178,6 +178,28 @@ export interface ProcessingJob {
 
 export type Job = MiningJob | ProcessingJob
 
+// --------------------------------------------------------------- travelling
+
+/**
+ * A journey in progress, §5. Ten minutes of ground per hex, and the hexes
+ * between here and there are a straight hex line the server derives from the
+ * same endpoints -- so the marker the client walks and the hex a stop lands on
+ * are never two different opinions.
+ */
+export interface TravelState {
+  toCol: number
+  toRow: number
+  startedAt: number
+  endsAt: number
+  /** Millis per hex crossed, already scaled to this environment's clock. */
+  perHexMs: number
+  /** Hexes between the two ends, so `path.length` is this plus one. */
+  hexes: number
+  /** Every hex crossed, from the departure tile to the destination. */
+  path: Array<[number, number]>
+  destinationName: string | null
+}
+
 // ---------------------------------------------------------------- tiles
 
 export interface Tile {
