@@ -1,0 +1,44 @@
+# Laravel
+/vendor
+/public/build
+/public/hot
+/public/storage
+/storage/*.key
+/storage/pail
+/bootstrap/cache/*.php
+.env
+.env.backup
+.env.production
+.phpunit.result.cache
+/.phpunit.cache
+_ide_helper.php
+Homestead.json
+Homestead.yaml
+auth.json
+
+# Database — SQLite is the dev default; the schema lives in migrations.
+/database/*.sqlite
+/database/*.sqlite-journal
+/database/*.sqlite-wal
+/database/*.sqlite-shm
+
+# Node / Vite
+/node_modules
+.vite/
+*.local
+
+# Editors / OS
+/.idea
+/.vscode
+/.zed
+/.nova
+/.cursor
+/.codex
+.phpactor.json
+.DS_Store
+Thumbs.db
+*.log
+
+# Local agent/editor state that is machine-specific, not project state.
+/.claude/settings.local.json
+desktop.ini

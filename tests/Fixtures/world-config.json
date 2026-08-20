@@ -1,0 +1,120 @@
+{
+    "seed": 1592597055,
+    "cols": 5000,
+    "rows": 5000,
+    "biomeCell": 9,
+    "biomeRegionCells": 5,
+    "rings": {
+        "center": 0.08,
+        "inner": 0.34,
+        "mid": 0.64
+    },
+    "baseMinSeconds": 1800,
+    "baseMaxSeconds": 3600,
+    "rareSpawnChance": 0.18,
+    "slotsPerTile": 2,
+    "herdLifetimeMs": 240000,
+    "herdChance": 0.06,
+    "biomes": [
+        "forest",
+        "mountain",
+        "plains",
+        "badlands",
+        "grassland"
+    ],
+    "biomeMaterial": {
+        "forest": "wood",
+        "mountain": "iron_ore",
+        "plains": "pelt",
+        "badlands": "stone",
+        "grassland": "fiber"
+    },
+    "biomeRare": {
+        "forest": "ironwood",
+        "mountain": "mythril_ore",
+        "plains": "beastfang_hide",
+        "badlands": "obsidian_shard",
+        "grassland": "silkweave_fiber"
+    },
+    "skills": [
+        "woodcutting",
+        "mining",
+        "hunting",
+        "quarrying",
+        "harvesting"
+    ],
+    "namePrefixes": [
+        "Ash",
+        "Kel",
+        "Thorn",
+        "Dun",
+        "Red",
+        "Stone",
+        "Var",
+        "Mill",
+        "Black",
+        "High",
+        "Ember",
+        "Grey",
+        "Oak",
+        "Iron",
+        "Cold",
+        "Sable",
+        "Wren",
+        "Marrow",
+        "Elder",
+        "Fern",
+        "Hollow",
+        "Brack"
+    ],
+    "nameSuffixes": [
+        "ford",
+        "grave",
+        "well",
+        "moor",
+        "hollow",
+        "brook",
+        "row",
+        "gate",
+        "fen",
+        "cross",
+        "ton",
+        "march",
+        "hurst",
+        "vale",
+        "water",
+        "ridge"
+    ],
+    "dungeonSites": [
+        {
+            "col": 2500,
+            "row": 2376,
+            "key": "rootvault",
+            "name": "Rootvault"
+        },
+        {
+            "col": 2618,
+            "row": 2462,
+            "key": "deepshaft",
+            "name": "Deepshaft"
+        },
+        {
+            "col": 2573,
+            "row": 2600,
+            "key": "beastwarren",
+            "name": "Beastwarren"
+        },
+        {
+            "col": 2427,
+            "row": 2600,
+            "key": "ashpit",
+            "name": "Ashpit"
+        },
+        {
+            "col": 2382,
+            "row": 2462,
+            "key": "windhollow",
+            "name": "Windhollow"
+        }
+    ]
+}

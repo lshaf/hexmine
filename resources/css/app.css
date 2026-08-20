@@ -1,0 +1,415 @@
+/*
+ * Hexmine HUD
+ *
+ * The whole viewport is map. Everything else floats above it as cut plates, so
+ * the visual system is geometric rather than boxy: flat-top hexagons for cells
+ * and gauges (matching the map's own tiling, §13.2), chamfered plates for panels.
+ * Nothing here uses a border-radius.
+ *
+ * Palette is §13.3 verbatim -- it is the game's identity, not a choice to make.
+ * Alpha is fine on this layer: the no-transparency rule in §13.2 is about tiles
+ * inside the map SVG ghosting through their neighbours, which does not apply to
+ * chrome sitting on top of it.
+ */
+
+:root {
+  /* §13.3 */
+  --ink: #141b18;
+  --ink-panel: #1d2622;
+  --ink-raised: #243029;
+  --line: #3a463f;
+  --vellum: #ece3cd;
+  --vellum-dim: #c9bd9e;
+  --copper: #c1793f;
+  --ember: #b8453f;
+  --gold: #d8b34a;
+  --violet: #7d5fa8;
+
+  --forest: #5f8058;
+  --mountain: #6d8399;
+  --plains: #b08a5a;
+  --badlands: #96604c;
+  --grassland: #a8a05c;
+
+  /* HUD surfaces. Near-opaque so labels survive a bright plains hex behind. */
+  --hud: rgba(18, 24, 21, 0.93);
+  --hud-solid: #121815;
+  --hud-line: #3f4d45;
+  --hud-line-soft: #2c3730;
+
+  --shadow-plate: 0 10px 30px rgba(0, 0, 0, 0.55);
+
+  /*
+   * Stacking order, in one place. Toasts sit above the panels on purpose: most
+   * failures happen inside a panel -- the trader refusing a sale, a craft short
+   * a material -- and the reason for a failure must never open behind the thing
+   * that caused it. Nothing in the app goes above a toast.
+   */
+  --z-hud: 20;
+  --z-panel: 40;
+  --z-toast: 60;
+
+  --font-display: 'Bitter', 'Iowan Old Style', Georgia, serif;
+  --font-ui: 'Archivo', ui-sans-serif, system-ui, 'Segoe UI', Roboto, sans-serif;
+
+  /* Flat-top hexagon: points left and right, flat edges top and bottom. */
+  --hex-clip: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+  /* Panels are chamfered on two opposing corners -- cut from the same stone,
+     but readable at any aspect ratio, which a stretched hexagon is not. */
+  --plate-clip: polygon(
+    16px 0,
+    100% 0,
+    100% calc(100% - 16px),
+    calc(100% - 16px) 100%,
+    0 100%,
+    0 16px
+  );
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overscroll-behavior: none;
+}
+
+body {
+  background: var(--ink);
+  color: var(--vellum);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#app {
+  height: 100%;
+}
+
+/* ------------------------------------------------------------- typography */
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  margin: 0;
+  letter-spacing: -0.005em;
+  line-height: 1.2;
+}
+
+/*
+ * Survey-map annotation: small, wide-tracked caps. Every label in the HUD is set
+ * this way, which is most of what makes the chrome feel like an instrument
+ * rather than an app.
+ */
+.label {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--vellum-dim);
+  line-height: 1;
+}
+
+.readout {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+.muted {
+  color: var(--vellum-dim);
+}
+
+.tiny {
+  font-size: 11.5px;
+}
+
+/* ------------------------------------------------------------------ shapes */
+
+/*
+ * Hairline borders on a clipped shape: the outer element is the border colour
+ * and the inner one, inset by a pixel, is the fill. `background-clip` tricks do
+ * not follow a clip-path, so this is the reliable way to get a crisp edge.
+ */
+.hex {
+  clip-path: var(--hex-clip);
+  background: var(--hud-line);
+  padding: 1px;
+}
+
+.hex > * {
+  clip-path: var(--hex-clip);
+  width: 100%;
+  height: 100%;
+}
+
+.plate {
+  clip-path: var(--plate-clip);
+  background: var(--hud-line-soft);
+  padding: 1px;
+  box-shadow: var(--shadow-plate);
+}
+
+.plate > * {
+  clip-path: var(--plate-clip);
+  background: var(--hud);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  width: 100%;
+  height: 100%;
+}
+
+/* ----------------------------------------------------------------- buttons */
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  border: 0;
+  background: none;
+  padding: 0;
+}
+
+button:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 9px 16px;
+  clip-path: polygon(9px 0, 100% 0, 100% calc(100% - 9px), calc(100% - 9px) 100%, 0 100%, 0 9px);
+  background: var(--ink-raised);
+  color: var(--vellum);
+  font-weight: 600;
+  font-size: 12.5px;
+  letter-spacing: 0.02em;
+  transition: background 0.14s ease, color 0.14s ease;
+}
+
+.btn:hover:not(:disabled) {
+  background: #2f3d35;
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--copper);
+  color: #17110c;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #d5884a;
+}
+
+.btn-danger {
+  background: #33211f;
+  color: #e58c86;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: #402825;
+}
+
+.btn-sm {
+  padding: 6px 12px;
+  font-size: 11.5px;
+  clip-path: polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px);
+}
+
+/* -------------------------------------------------------------------- chips */
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
+  background: var(--ink-raised);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.chip-gold {
+  color: var(--gold);
+  background: #241f12;
+}
+
+.chip-nft {
+  color: #c3a9e6;
+  background: #1f1a2a;
+}
+
+.chip-off {
+  color: #7b8580;
+  background: #1a201d;
+  text-decoration: line-through;
+}
+
+.chip-on {
+  color: #b7d6a4;
+  background: #1c2519;
+}
+
+/* --------------------------------------------------------------- utilities */
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.row-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.grow {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.scroll {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+
+.scroll::-webkit-scrollbar {
+  width: 7px;
+}
+
+.scroll::-webkit-scrollbar-thumb {
+  background: var(--line);
+}
+
+.divider {
+  height: 1px;
+  background: var(--hud-line-soft);
+  border: 0;
+  margin: 10px 0;
+}
+
+.grid-auto {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+}
+
+/* Small inset panel used inside overlays. */
+.inset {
+  padding: 9px 11px;
+  background: rgba(0, 0, 0, 0.28);
+  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+}
+
+/* ------------------------------------------------------------------ motion */
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.18s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+.rise-enter-active,
+.rise-leave-active {
+  transition: transform 0.22s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.18s ease;
+}
+
+.rise-enter-from,
+.rise-leave-to {
+  transform: translateY(14px);
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ----------------------------------------------------------- panel content */
+
+/*
+ * Rows inside an overlay. Same cut as the plates around them, one step darker so
+ * a list reads as recessed into the panel rather than stacked on top of it.
+ */
+.row-item {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 9px 11px;
+}
+
+.row-item + .row-item {
+  margin-top: 6px;
+}
+
+.icon-box {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  background: rgba(0, 0, 0, 0.35);
+  clip-path: var(--hex-clip);
+}
+
+.bar {
+  position: relative;
+  height: 5px;
+  background: rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+
+.bar > span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--copper);
+  transition: width 0.3s ease;
+}
+
+.bar-gold > span {
+  background: var(--gold);
+}
+
+.bar-violet > span {
+  background: var(--violet);
+}
+
+.bar-ember > span {
+  background: var(--ember);
+}

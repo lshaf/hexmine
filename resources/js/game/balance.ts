@@ -1,0 +1,122 @@
+/**
+ * Tuning constants. Every value here is a starting point for tuning, not a
+ * locked constant (CLAUDE.md preamble). Keep all magic numbers in this file so
+ * a balance pass never means grepping the codebase.
+ */
+
+export const MINUTE = 60_000
+export const HOUR = 60 * MINUTE
+
+/**
+ * NOTE ON TIME
+ *
+ * Durations below are the real, honest ones (§7.3). The server may compress them
+ * for development, but that factor is NOT duplicated here -- it arrives in
+ * PlayerState.timeScale so there is exactly one source of truth and no "these
+ * two env vars must match" footgun. Use `useGame().timeScale` when converting a
+ * predicted duration into a wall-clock countdown.
+ */
+
+export const MAP = {
+  /** ~5000x5000 tiles, §5.1. */
+  cols: 5000,
+  rows: 5000,
+  seed: 0x5eed_1a3f,
+  /** Biome lattice, §5.3. Cell size in tiles, and how many cells make up one
+   *  coherent region. Tuned against travel range: patches must be small enough
+   *  that a second biome is reachable from a low-level character. */
+  biomeCell: 9,
+  biomeRegionCells: 5,
+  /** Normalised radius boundaries for the ring layout, §5.2. */
+  rings: { center: 0.08, inner: 0.34, mid: 0.64 },
+} as const
+
+export const MINING = {
+  /** base_tile_time range, §7.3. */
+  baseMinSeconds: 30 * 60,
+  baseMaxSeconds: 60 * 60,
+  /** clamp() floor and ceiling. The floor is mandatory from day one, §7.3. */
+  floorSeconds: 30 * 60,
+  ceilingSeconds: 60 * 60,
+  /** Max reduction from a fully levelled relevant skill, §7.3. */
+  maxSkillReductionSeconds: 20 * 60,
+  /** Max reduction from best-in-slot equipment, §7.3. */
+  maxEquipReductionSeconds: 10 * 60,
+  /** Exactly two mining slots per hex, §5.1. */
+  slotsPerTile: 2,
+  /** Depleted tiles regrow after ~9h, §5.1. */
+  regrowMs: 9 * HOUR,
+  apCost: 2,
+  /** Leaving a hex mid-progress forfeits partial yield, §11.1. */
+  abandonRefund: 0,
+} as const
+
+export const HUNTING = {
+  /** Herd markers decay after ~4h, §5.5. */
+  markerLifetimeMs: 4 * HOUR,
+  baseSeconds: 25 * 60,
+  apCost: 1,
+  peltYield: [2, 5] as const,
+  essenceChance: 0.35,
+} as const
+
+export const PROCESSING = {
+  /** Five open slots per feature, first-come-first-served, §6.1. */
+  publicSlots: 5,
+  /** Speed multiplier by settlement tier -- lower is faster, §6. */
+  speed: { village: 1, city: 0.75, capital: 0.55 } as const,
+  /** Presence bonus, §6.2. Presence alone produces nothing; it only
+   *  accelerates an already-capped queue, so bot value is near zero. */
+  presenceSpeedBonus: 0.2,
+  presenceXpPerMinute: 4,
+} as const
+
+export const CHARACTER = {
+  startingGold: 25,
+  startingAp: 20,
+  /** Level unlocks capacity, never power, §7.1. */
+  apPerLevel: 4,
+  baseApMax: 20,
+  apRegenMs: 4 * MINUTE,
+  baseStorage: 120,
+  storagePerLevel: 40,
+  /** Levelling curve: xp needed for level n. */
+  xpForLevel: (level: number) => Math.round(80 * Math.pow(level, 1.55)),
+  maxLevel: 60,
+} as const
+
+export const SKILLS = {
+  maxLevel: 50,
+  /** Cap total points so characters specialise, §7.2. */
+  totalPointCap: 90,
+  xpForLevel: (level: number) => Math.round(45 * Math.pow(level, 1.4)),
+} as const
+
+export const STORAGE = {
+  /** Raw resources decay when over cap, §3.1 / §11.1. */
+  decayIntervalMs: 10 * MINUTE,
+  /** Fraction of the overflow lost per interval. */
+  decayRate: 0.05,
+} as const
+
+export const EQUIPMENT = {
+  /** Hard cap per slot regardless of rarity, §8.1 rule 1. */
+  statCap: { basic: 0.05, crafted: 0.08, nft: 0.15 } as const,
+  /** Diminishing returns on stacking, §8.1 rule 2: the nth item of the same
+   *  stat contributes value * falloff^(n-1). */
+  stackFalloff: 0.5,
+  /** Durability drain per use, §8.1 rule 3. Raiding drains faster than mining. */
+  drainPerMine: 1,
+  drainPerRaid: 4,
+  /** Discard returns a small % salvage, §8.2. */
+  salvageRate: 0.25,
+  /** Repair must be cheaper than crafting new, but not dramatically, §8.2. */
+  repairCostRate: 0.6,
+} as const
+
+export const ECONOMY = {
+  /** NPC buy-back is deliberately a bad rate, §3.2 / §12 step 2. */
+  npcSellMultiplier: 1,
+  /** Tier 3 materials are capped per wallet, §2. */
+  rareWalletCap: 40,
+} as const
