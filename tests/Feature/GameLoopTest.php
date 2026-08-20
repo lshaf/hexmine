@@ -249,15 +249,15 @@ final class GameLoopTest extends TestCase
     }
 
     /**
-     * §5 -- the viewport response carries no terrain.
+     * §5 -- the map response carries no terrain.
      *
-     * The client generates 25 million tiles from the world seed, so a pan must
+     * The client generates 25 million tiles from the world seed, so this must
      * cost only the two facts it cannot derive. Shipping generated tiles was
      * ~200KB per pan; this guards against that creeping back in.
      */
     public function test_the_map_endpoint_sends_mutations_only(): void
     {
-        $empty = $this->game->mapMutations($this->character->col, $this->character->row, 900, 620);
+        $empty = $this->game->mapMutations($this->character);
 
         $this->assertSame(['depleted', 'occupied'], array_keys($empty));
         $this->assertSame([], $empty['depleted']);
@@ -266,7 +266,7 @@ final class GameLoopTest extends TestCase
         // A live trip is the one thing that has to show up.
         $this->game->startMining($this->character, $this->character->col, $this->character->row);
 
-        $busy = $this->game->mapMutations($this->character->col, $this->character->row, 900, 620);
+        $busy = $this->game->mapMutations($this->character->fresh());
         $this->assertSame(
             [[$this->character->col, $this->character->row, 1]],
             $busy['occupied'],
@@ -274,6 +274,28 @@ final class GameLoopTest extends TestCase
 
         // Small enough that the whole window is a rounding error on the wire.
         $this->assertLessThan(200, strlen(json_encode($busy)));
+    }
+
+    /**
+     * Sight is the character's travel range, and it is a server rule rather than
+     * a rendering choice: a client that pans across the map must not be able to
+     * learn where everyone else is mining.
+     */
+    public function test_the_map_endpoint_sees_only_as_far_as_you_can_reach(): void
+    {
+        $range = $this->game->travelRange($this->character);
+
+        // Somebody working a hex well beyond sight.
+        $far = $this->game->createCharacter(Player::create(['wallet' => '0xfar']));
+        $far->update(['col' => $this->character->col + $range + 6, 'row' => $this->character->row]);
+        $this->game->startMining($far, (int) $far->col, (int) $far->row);
+
+        $this->assertSame([], $this->game->mapMutations($this->character)['occupied']);
+
+        // Walk toward them and the same hex becomes knowable.
+        $this->game->travelTo($this->character, $this->character->col + $range, $this->character->row);
+        $seen = $this->game->mapMutations($this->character->fresh())['occupied'];
+        $this->assertSame([[(int) $far->col, (int) $far->row, 1]], $seen);
     }
 
     /** The generation parameters the client needs, and nothing player-specific. */

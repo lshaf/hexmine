@@ -59,11 +59,14 @@ const jumpTo = computed<PanelKey | null>(() => {
     >
       <span class="label step">Step {{ game.tutorialProgress }}</span>
       <span v-if="collapsed" class="peek">{{ game.currentStep.title }}</span>
-      <span class="chevron" :class="{ open: !collapsed }" aria-hidden="true">
-        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor"
-             stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="m6 15 6-6 6 6" />
-        </svg>
+      <span class="toggle">
+        <span class="label word">{{ collapsed ? 'Show' : 'Hide' }}</span>
+        <span class="chevron" :class="{ open: !collapsed }" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor"
+               stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m6 15 6-6 6 6" />
+          </svg>
+        </span>
       </span>
     </button>
 
@@ -129,9 +132,31 @@ const jumpTo = computed<PanelKey | null>(() => {
   text-overflow: ellipsis;
 }
 
-.chevron {
+/*
+ * A word and an arrow, not a lone glyph. Nobody expects a quest card to fold,
+ * so the control has to say what it does -- a bare chevron on a plate reads as
+ * ornament, which is exactly how this was missed the first time.
+ */
+.toggle {
   flex: 0 0 auto;
   margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 5px 3px 7px;
+  color: var(--gold);
+  background: rgba(216, 179, 74, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(216, 179, 74, 0.3);
+  clip-path: polygon(5px 0, 100% 0, 100% calc(100% - 5px), calc(100% - 5px) 100%, 0 100%, 0 5px);
+  transition: background 0.14s ease;
+}
+
+.word {
+  color: inherit;
+  font-size: 8.5px;
+}
+
+.chevron {
   display: flex;
   transform: rotate(180deg);
   transition: transform 0.16s ease;
@@ -141,8 +166,14 @@ const jumpTo = computed<PanelKey | null>(() => {
   transform: rotate(0deg);
 }
 
-.head:hover {
-  color: var(--vellum);
+.head:hover .toggle {
+  background: rgba(216, 179, 74, 0.22);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chevron {
+    transition: none;
+  }
 }
 
 .outro {

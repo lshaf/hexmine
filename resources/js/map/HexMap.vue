@@ -21,6 +21,7 @@ import {
   hexDistance,
   paintersSort,
   pickTile,
+  screenToTile,
   tileToScreen,
 } from './hexGeometry'
 import { herdProp, tileProps } from './props'
@@ -41,6 +42,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'select', col: number, row: number): void
+  (e: 'recenter', col: number, row: number): void
   /** Measured viewport, so the parent can generate exactly the tiles it needs. */
   (e: 'resize', width: number, height: number): void
 }>()
@@ -48,22 +50,29 @@ const emit = defineEmits<{
 /*
  * ------------------------------------------------------------------ camera
  *
- * There isn't one. The play map is locked to the character and does not pan:
- * the window is always the same size and always centred on where you are, which
- * bounds every per-viewport cost -- tiles generated, mutations fetched, and any
- * realtime feed that later subscribes to what is on screen -- to a constant
- * instead of wherever a player happened to drag.
+ * Drag to look around. It costs nothing: terrain is a pure function of
+ * (col, row, seed) (§5), so panning generates tiles locally and never touches
+ * the network.
  *
- * Panning moved to the atlas (views/AtlasView.vue), which is derived purely from
- * the seed and talks to nothing.
+ * What the camera does not move is SIGHT. Live state -- worked-out tiles, who
+ * is mining where -- is scoped server-side to the character's travel range, so
+ * outside that radius there is genuinely nothing to draw but the land itself
+ * and whether anybody lives on it. The dashed ring is that boundary: the edge
+ * of what you can reach and, equally, of what you can see.
  */
 const viewport = ref({ w: 900, h: 620 })
+const pan = ref({ x: 0, y: 0 })
+const dragging = ref(false)
+let dragStart = { x: 0, y: 0, panX: 0, panY: 0 }
+let dragDistance = 0
 
 const origin = computed(() => tileToScreen(props.centerCol, props.centerRow))
 
 const viewBox = computed(() => {
   const { w, h } = viewport.value
-  return `${origin.value.x - w / 2} ${origin.value.y - h / 2} ${w} ${h}`
+  const x = origin.value.x - w / 2 + pan.value.x
+  const y = origin.value.y - h / 2 + pan.value.y
+  return `${x} ${y} ${w} ${h}`
 })
 
 function onResize(el: Element | null) {
@@ -94,16 +103,50 @@ function mountSvg(el: Element | ComponentPublicInstance | null) {
   onResize(svg)
 }
 
-/**
- * Selection is hit-tested from coordinates rather than handled by a click
- * listener on each tile group -- that drops several hundred DOM listeners, and
- * it kept working when the map still captured the pointer for dragging.
- */
+function onPointerDown(event: PointerEvent) {
+  dragging.value = true
+  dragDistance = 0
+  dragStart = { x: event.clientX, y: event.clientY, panX: pan.value.x, panY: pan.value.y }
+  ;(event.currentTarget as Element).setPointerCapture(event.pointerId)
+}
+
+function onPointerMove(event: PointerEvent) {
+  if (!dragging.value) return
+  const dx = event.clientX - dragStart.x
+  const dy = event.clientY - dragStart.y
+  dragDistance = Math.max(dragDistance, Math.hypot(dx, dy))
+  pan.value = { x: dragStart.panX - dx, y: dragStart.panY - dy }
+}
+
 function onPointerUp(event: PointerEvent) {
-  const point = toMapSpace(event.clientX, event.clientY)
-  if (!point) return
-  const target = pickTile(point.x, point.y)
-  emit('select', target.col, target.row)
+  if (!dragging.value) return
+  dragging.value = false
+  ;(event.currentTarget as Element).releasePointerCapture?.(event.pointerId)
+
+  // A tap, not a drag: resolve which tile is under the pointer.
+  //
+  // Selection is hit-tested from coordinates rather than by a click listener on
+  // each tile group. Two reasons: setPointerCapture above retargets pointer
+  // events to the <svg>, so the derived click never reaches the tile <g> at
+  // all; and this drops several hundred DOM listeners.
+  if (dragDistance <= 6) {
+    const point = toMapSpace(event.clientX, event.clientY)
+    if (point) {
+      const target = pickTile(point.x, point.y)
+      emit('select', target.col, target.row)
+    }
+    return
+  }
+
+  // Once the camera has drifted far enough, ask the parent to regenerate the
+  // window around wherever we now are. The new origin lands where the pan
+  // already put us, so the handover is invisible -- and it is free, because
+  // generating tiles is local.
+  if (Math.abs(pan.value.x) > 120 || Math.abs(pan.value.y) > 120) {
+    const target = screenToTile(origin.value.x + pan.value.x, origin.value.y + pan.value.y)
+    pan.value = { x: 0, y: 0 }
+    emit('recenter', target.col, target.row)
+  }
 }
 
 /** Client coordinates -> map space, honouring the current viewBox. */
@@ -135,6 +178,27 @@ interface RenderTile {
   label: string | null
   jobState: 'none' | 'active' | 'ready'
   rare: boolean
+  /** Out of sight: all a tile gets is whether somebody lives on it. */
+  mark: { fill: string; r: number; dungeon: boolean } | null
+}
+
+/*
+ * Beyond sight the map states two things and no more: the lie of the land, and
+ * whether anybody lives on it. Tier is the whole message -- no name, no size of
+ * settlement beyond the pip, nothing that needed asking the server. Colours are
+ * the atlas legend, so one vocabulary covers both maps.
+ */
+const MARK: Record<string, { fill: string; r: number; dungeon: boolean }> = {
+  village: { fill: VELLUM, r: 4, dungeon: false },
+  city: { fill: '#c1793f', r: 5.5, dungeon: false },
+  capital: { fill: GOLD, r: 7, dungeon: false },
+  dungeon: { fill: '#7d5fa8', r: 6, dungeon: true },
+}
+
+/** A flat-top hexagon of the given radius, centred on the origin. */
+function pip(r: number): string {
+  const h = r * 0.866
+  return `M${-r},0 L${-r / 2},${-h} L${r / 2},${-h} L${r},0 L${r / 2},${h} L${-r / 2},${h} Z`
 }
 
 /** Tier 3 keys, §4 -- the gold pip on the map means "contested ring payout". */
@@ -167,6 +231,12 @@ const renderTiles = computed<RenderTile[]>(() =>
       props.selected?.col === tile.col && props.selected?.row === tile.row
     const rare = tile.material !== undefined && RARE_KEYS.has(tile.material)
 
+    // Everything below the fill is either live state the server only sends for
+    // tiles in sight, or ornament that would bury the pips out there.
+    const mark = inRange
+      ? null
+      : (tile.dungeon ? MARK.dungeon : tile.settlement ? MARK[tile.settlement.tier] : null) ?? null
+
     return {
       key: `${tile.col},${tile.row}`,
       col: tile.col,
@@ -176,16 +246,17 @@ const renderTiles = computed<RenderTile[]>(() =>
       top,
       side: shade(top, -0.4),
       edge: shade(top, -0.2),
-      props: tileProps(tile, depleted),
-      herd: herdProp(tile),
+      props: inRange ? tileProps(tile, depleted) : '',
+      herd: inRange ? herdProp(tile) : '',
       depleted,
       inRange,
       onBoundary: distance === props.travelRange,
       isSelected,
-      slotsUsed: tile.slotsUsed,
-      label: tile.settlement?.name ?? tile.dungeon?.name ?? null,
+      slotsUsed: inRange ? tile.slotsUsed : 0,
+      label: inRange ? (tile.settlement?.name ?? tile.dungeon?.name ?? null) : null,
       jobState: jobsByTile.value.get(`${tile.col},${tile.row}`) ?? 'none',
-      rare,
+      rare: inRange && rare,
+      mark,
     }
   }),
 )
@@ -202,7 +273,11 @@ const SLOT_PIP_Y = HEX_H / 2 - 4
       class="map-svg"
       :viewBox="viewBox"
       preserveAspectRatio="xMidYMid slice"
+      :style="{ cursor: dragging ? 'grabbing' : 'grab' }"
+      @pointerdown="onPointerDown"
+      @pointermove="onPointerMove"
       @pointerup="onPointerUp"
+      @pointercancel="onPointerUp"
     >
       <!-- One SVG, every tile a translated group. Order is painter-sorted. -->
       <g
@@ -224,9 +299,20 @@ const SLOT_PIP_Y = HEX_H / 2 - 4
           stroke-dasharray="4 4"
         />
 
-        <!-- Terrain and settlement props stand above the tile. -->
-        <g v-html="t.props" />
+        <!-- Terrain and settlement props stand above the tile, in sight only. -->
+        <g v-if="t.props" v-html="t.props" />
         <g v-if="t.herd" v-html="t.herd" />
+
+        <!-- Beyond sight: is anybody there. Nothing else is knowable. -->
+        <path
+          v-if="t.mark"
+          :d="pip(t.mark.r)"
+          :fill="t.mark.fill"
+          stroke="#141b18"
+          stroke-width="1.4"
+          stroke-linejoin="round"
+          :transform="t.mark.dungeon ? 'rotate(90)' : undefined"
+        />
 
         <!-- Rare-material tell: a gold pip, only in the contested ring. -->
         <circle v-if="t.rare && !t.depleted" cx="0" :cy="-HEX_H / 2 + 5" r="2.6" :fill="GOLD" />
@@ -315,8 +401,8 @@ const SLOT_PIP_Y = HEX_H / 2 - 4
   display: block;
   width: 100%;
   height: 100%;
-  /* Taps only. Nothing here pans any more, so gestures belong to the browser. */
-  touch-action: manipulation;
+  /* The map owns the drag, so the browser must not claim the gesture. */
+  touch-action: none;
   user-select: none;
 }
 </style>

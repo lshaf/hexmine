@@ -145,7 +145,7 @@ export interface GameApi {
   getState(): Promise<PlayerState>
   /** Generation parameters. Fetched once at boot. */
   getWorld(): Promise<WorldConfig>
-  getMap(centerCol: number, centerRow: number, width: number, height: number): Promise<MapMutations>
+  getMap(): Promise<MapMutations>
   previewTile(col: number, row: number): Promise<TilePreview>
 
   startMining(col: number, row: number): Promise<ActionResult<Job>>

@@ -8,9 +8,11 @@
  *   top-left      instrument cluster (AP / storage / level) + village work
  *   top-right     the location-independent screens, and the tutorial
  *   bottom-centre what you are pointing at, and what you can do here
+ *   bottom-right  recentre
  *
- * The map does not pan, so there is no camera to put back and no recentre
- * control. It is always on the character. Free exploration is the atlas.
+ * The camera pans freely and costs nothing, so it needs a way back -- but sight
+ * does not pan with it. Beyond the character's travel range the map shows the
+ * land and who lives on it, and nothing that would have taken a request.
  *
  * §13.2 -- sizing is real CSS, not utility classes with arbitrary values, which
  * silently collapsed the viewport to zero height when tried.
@@ -33,6 +35,7 @@ import CraftView from '@/views/CraftView.vue'
 import ShopView from '@/views/ShopView.vue'
 import HeroView from '@/views/HeroView.vue'
 import AtlasView from '@/views/AtlasView.vue'
+import { ACTION_PATHS } from '@/icons/actions'
 
 const game = useGame()
 const { isWide } = useBreakpoint()
@@ -51,12 +54,17 @@ const panel = computed(() => (game.panel ? PANELS[game.panel] : null))
 const station = computed(() => game.station)
 
 /**
- * The map tells the store how much room it has; the store generates exactly that
- * window, centred on the character. visibleTiles() already pads by a couple of
- * tiles for props standing above their own hex, so no extra margin is needed.
+ * The map tells the store how much room it has, and where the camera has
+ * drifted to. Both are local: tiles are generated from the seed, so neither
+ * costs a request. visibleTiles() already pads by a couple of tiles for props
+ * standing above their own hex, so no extra margin is needed.
  */
-async function onMapResize(width: number, height: number) {
-  await game.setViewport(Math.min(2400, Math.round(width)), Math.min(2400, Math.round(height)))
+function onMapResize(width: number, height: number) {
+  game.setViewport(Math.min(2400, Math.round(width)), Math.min(2400, Math.round(height)))
+}
+
+function onRecenter(col: number, row: number) {
+  game.setView(col, row)
 }
 
 onMounted(() => {
@@ -81,6 +89,7 @@ onMounted(() => {
         :jobs="game.jobs"
         :now="game.now"
         @select="game.select"
+        @recenter="onRecenter"
         @resize="onMapResize"
       />
 
@@ -102,12 +111,45 @@ onMounted(() => {
 
       <!-- -------------------------------------------------- bottom centre -->
       <div class="corner bottom-centre">
+        <!-- The bottom stack grows and shrinks with context, so on phones the
+             recentre control rides inside it rather than fighting it for a
+             fixed corner. -->
+        <button
+          v-if="!isWide"
+          class="recentre inline"
+          type="button"
+          title="Centre on your prospector"
+          @click="game.centreOnCharacter()"
+        >
+          <span class="hex"><span class="face"><svg viewBox="0 0 24 24" width="17" height="17"
+            fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"
+            aria-hidden="true"><path :d="ACTION_PATHS.recenter" /></svg></span></span>
+        </button>
+
         <!-- No room beside the gauges on a phone, so the prompt sits where the
              acting happens instead. -->
         <TutorialCard v-if="!isWide" />
         <TileCard />
         <ActionDock />
       </div>
+
+      <!-- --------------------------------------------------- bottom right -->
+      <button
+        v-if="isWide"
+        class="recentre corner-fixed"
+        type="button"
+        title="Centre on your prospector"
+        @click="game.centreOnCharacter()"
+      >
+        <span class="hex">
+          <span class="face">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
+                 stroke-width="1.7" stroke-linecap="round" aria-hidden="true">
+              <path :d="ACTION_PATHS.recenter" />
+            </svg>
+          </span>
+        </span>
+      </button>
 
       <!-- ---------------------------------------------------------- panels -->
       <Transition name="fade">
@@ -191,6 +233,39 @@ onMounted(() => {
   bottom: 12px;
   transform: translateX(-50%);
   align-items: center;
+}
+
+.recentre {
+  color: var(--vellum-dim);
+}
+
+.recentre.corner-fixed {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: var(--z-hud);
+}
+
+.recentre.inline {
+  align-self: flex-end;
+}
+
+.recentre .hex {
+  display: block;
+  width: 46px;
+  height: 40px;
+}
+
+.recentre .face {
+  display: grid;
+  place-items: center;
+  background: var(--hud);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.recentre:hover {
+  color: var(--vellum);
 }
 
 /* ---------------------------------------------------------------- boot */

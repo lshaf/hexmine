@@ -503,20 +503,39 @@ class GameService
      *
      * @return array{depleted:list<array{int,int,int}>,occupied:list<array{int,int,int}>}
      */
-    public function mapMutations(int $centerCol, int $centerRow, float $width, float $height): array
+    /**
+     * Everything about the world a player is allowed to be told, beyond what the
+     * seed already gives them: which tiles are worked out, and who is standing
+     * on them.
+     *
+     * Scoped to sight, and sight is the character's travel range -- you see
+     * exactly as far as you can act. That is why this takes no coordinates. The
+     * camera can be dragged anywhere and costs nothing, because terrain is
+     * derived (§5); but live state follows the character, not the camera, so a
+     * client cannot walk a viewport parameter across the map to harvest where
+     * everyone is mining. Nothing outside sight is knowable, not merely undrawn.
+     *
+     * @return array{depleted:array<int,array{0:int,1:int,2:int}>,occupied:array<int,array{0:int,1:int,2:int}>}
+     */
+    public function mapMutations(Character $character): array
     {
         $now = $this->now();
-        $coords = HexGeometry::visibleTiles($centerCol, $centerRow, $width, $height);
+        $range = $this->travelRange($character);
+        $centerCol = (int) $character->col;
+        $centerRow = (int) $character->row;
 
-        $cols = array_column($coords, 'col');
-        $rows = array_column($coords, 'row');
-        [$minCol, $maxCol] = [min($cols), max($cols)];
-        [$minRow, $maxRow] = [min($rows), max($rows)];
+        [$minCol, $maxCol] = [$centerCol - $range, $centerCol + $range];
+        [$minRow, $maxRow] = [$centerRow - $range, $centerRow + $range];
+
+        // The box above is the cheap index scan; sight is a hex disc inside it.
+        $inSight = fn (int $col, int $row): bool =>
+            HexGeometry::distance($centerCol, $centerRow, $col, $row) <= $range;
 
         $depleted = TileState::whereBetween('col', [$minCol, $maxCol])
             ->whereBetween('row', [$minRow, $maxRow])
             ->where('regrows_at', '>', $now)
             ->get()
+            ->filter(fn ($tile) => $inSight((int) $tile->col, (int) $tile->row))
             ->map(fn ($tile) => [(int) $tile->col, (int) $tile->row, (int) $tile->regrows_at])
             ->values()
             ->all();
@@ -528,6 +547,7 @@ class GameService
             ->selectRaw('col, row, COUNT(*) as total')
             ->groupBy('col', 'row')
             ->get()
+            ->filter(fn ($job) => $inSight((int) $job->col, (int) $job->row))
             ->map(fn ($job) => [
                 (int) $job->col,
                 (int) $job->row,
@@ -1271,7 +1291,10 @@ class GameService
             'character' => [
                 'id' => (string) $character->id,
                 'name' => $character->name,
-                'wallet' => $this->maskWallet($character->player->wallet),
+                // The player's own address, in full. Abbreviating it here would
+                // only hide it from the one person it belongs to, and would make
+                // "copy address" impossible; the UI shortens it for display.
+                'wallet' => $character->player->wallet,
                 'level' => $character->level,
                 'xp' => $character->xp,
                 'xpToNext' => Balance::xpForLevel($character->level),
@@ -1317,14 +1340,5 @@ class GameService
             'shopStock' => $this->shopStock($character),
             'bonuses' => $this->bonuses($character),
         ];
-    }
-
-    private function maskWallet(string $wallet): string
-    {
-        if (strlen($wallet) <= 12) {
-            return $wallet;
-        }
-
-        return substr($wallet, 0, 10).'…'.substr($wallet, -4);
     }
 }

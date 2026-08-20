@@ -23,7 +23,7 @@ Node comes from `fnm` on this machine — have the default v22 active before npm
 ```bash
 npm run build         # typecheck + production assets into public/build
 npm run typecheck     # vue-tsc, no emit
-php artisan test      # 23 tests
+php artisan test      # 24 tests
 npm run parity        # the TS generator against the same frozen fixture
 composer parity       # re-verify world generation against the frozen fixture
 ```
@@ -58,37 +58,79 @@ anchored to corners, so nothing takes area from the thing the game is about.
 
 ```
                        ⬡ toast
-⬡AP ⬡STORE                          [⬡Atlas ⬡Bag ⬡Hero]
-   ⬡LVL                                        tutorial
+┌ seal  name        25g ┐        [⬡Atlas ⬡Bag ⬡Hero]
+│ AP    ━━━━┃──  13/20 │                 tutorial
+│ STORE ━━━━━━┃ 137/120 │
+│ LV 1  ━━━┃────  52/80 │
+└────────────────────┘
  ▸ village work
                         ( map )
                      ┌ selected hex ┐
                      │  + travel    │
-                     │ what I can   │
+                     │ what I can   │    ⬡recentre
                      │  do here     │
 ```
 
-**The play map does not pan.** It is locked to the character: same window size,
-always centred on where you are. That bounds every per-viewport cost — tiles
-generated, mutations fetched, and whatever a realtime feed later has to
-subscribe to — to a constant, rather than to wherever somebody dragged. A
-1440×900 window is 1365 tiles, every time. There is no recentre control because
-there is no camera to put back.
+**The camera pans; sight does not.** Drag the map as far as you like — terrain
+is a pure function of `(col, row, seed)`, so panning generates tiles locally and
+costs no request at all. Verified: 1 map call on boot, still 1 after dragging
+across the world.
 
-Nothing has a border-radius. Gauges and action cells are flat-top hexagons on
-the same lattice as the map; panels are chamfered plates. The signature is the
-gauges: progress travels around the six edges of a hexagon rather than along a
-bar, which is cheap to draw (side length is exactly 50, so the perimeter is 300
-units and the dash maths needs no measurement) and reads as an instrument.
+What the camera cannot move is what you are allowed to know. Live state — which
+tiles are worked out, who is standing on them — is scoped **server-side** to the
+character's travel range, and `GET /api/map` takes no coordinates precisely so
+there is nothing for a caller to widen. Beyond that radius the map draws the
+land and a pip for whoever lives on it, and nothing else: no props, no names, no
+slot counts. Not undrawn — unknowable. Selecting is bounded the same way, since
+a tap out there would be a query out there, and nothing beyond sight is
+actionable anyway: sight and travel range are the same radius, and the dashed
+ring is both.
 
-The cells tile exactly, as the map's own hexes do, so each gauge pads its viewBox
-rather than shrinking its hexagon: a stroke centred on a shared honeycomb edge
-puts half of itself in the neighbouring cell, which then paints over it. The gap
-that padding leaves is the wall between cells.
+That also bounds the cost of everything that scales with players: the mutation
+fetch, and whatever a realtime feed later has to subscribe to, follow one
+character rather than one viewport.
+
+Nothing has a border-radius. Action cells are flat-top hexagons on the same
+lattice as the map; panels are chamfered plates.
+
+The corner panel is one instrument, 238×144, carrying three readings. They are
+not progress bars — they are the graduated rules printed on a survey chart, read
+by a needle, and that distinction does real work:
+
+- A fresh character's storage is **0 of 120**. A fill of zero is invisible; a
+  needle parked at the origin is still a reading.
+- Quarter ticks sit *above* the fill, cutting it as notches, so the scale is
+  readable along its whole length. A scale you can only read where it is empty
+  is not a scale.
+- The needle overshoots the track, like the cursor on a slide rule, so the eye
+  lands on the position rather than on a coloured area.
+
+The level number is the XP row's label rather than a badge — the thing being
+measured names its own scale. Gold has no cap, so it gets no scale: it sits with
+the name as a plain count. Over cap, the whole storage row turns ember and the
+reading says `137/120`, which needs no sentence after it.
+
+The seal carries the hex language: seven flat-top cells in a honeycomb
+flower, lit or dark from a hash of the address, in one of five palette accents.
+An identicon built from the game's own atomic unit rather than a circle or a
+gradient blob — you recognise your account without reading a character of hex.
+The centre cell always burns so the mark reads as one object; the six around it
+carry the entropy.
+
+The address is shortened for display and copied in full. Masking is a display
+decision, so the server sends the player their own complete address and
+`shortWallet()` abbreviates it — abbreviating server-side would only hide it from
+the person it belongs to, and would make "copy address" impossible. The copy
+falls back to a scratch textarea wherever the Clipboard API refuses to run.
 
 Type is a slab serif (Bitter) for display and gauge numerals, and Archivo set in
 wide-tracked small caps for every label — the convention of survey-map
 annotation, which is what a HUD over a map is.
+
+Inside sight the map is the game: props, labels, depletion, slot pips, your own
+trips. Outside it, the tier pip is the whole message — vellum for a village,
+copper for a city, gold for a capital, violet for a dungeon. The same legend the
+atlas uses, so one vocabulary covers both.
 
 The dock reads the hex **under the character's feet**, never the one that
 happens to be selected, and changes shape as well as content: Mine in the field,
@@ -169,7 +211,7 @@ drop.
 ```
 GET    /api/state
 GET    /api/world                                 generation parameters, once
-GET    /api/map?col&row&w&h                       viewport mutations only
+GET    /api/map                                 mutations within sight
 GET    /api/tiles/{col}/{row}/preview
 POST   /api/mining                                {col,row}
 POST   /api/jobs/{job}/collect

@@ -18,7 +18,7 @@ import type { MapMutations, PlayerState, StationState, TilePreview } from '@/api
 import type { Job, MaterialKey, MiningJob, ProcessingJob, Settlement, Tile } from '@/game/types'
 import { TUTORIAL, TUTORIAL_OUTRO, tutorialStep } from '@/game/tutorial'
 import { configureWorld, generateTile } from '@/game/worldgen'
-import { visibleTiles } from '@/map/hexGeometry'
+import { hexDistance, visibleTiles } from '@/map/hexGeometry'
 
 /** Which overlay is open over the map, if any. */
 export type PanelKey = 'bag' | 'craft' | 'shop' | 'hero' | 'atlas'
@@ -63,23 +63,17 @@ export const useGame = defineStore('game', () => {
   // ---------------------------------------------------------------- map
 
   /**
-   * The play map does not pan. Its centre is the character, always, so the only
-   * thing this holds is how big the window is -- measured by the map itself.
+   * The camera. It pans freely and costs nothing to move, because terrain is a
+   * pure function of (col, row, seed) (§5) -- dragging generates tiles locally
+   * and asks the server for nothing.
    *
-   * That is what keeps the client cheap as this grows: the number of tiles
-   * generated, the size of a mutation fetch, and the area any future realtime
-   * feed has to cover are all bounded by the screen rather than by wherever
-   * somebody dragged to. Free exploration lives in the atlas, which is derived
-   * from the seed and asks the server for nothing.
+   * What it does NOT move is sight. Live state -- depletion, who is mining
+   * where -- is scoped server-side to the character's travel range, so the
+   * camera can wander and still learn nothing it should not. Out there the map
+   * shows what the seed says and no more: the lie of the land, and whether
+   * anybody lives on it.
    */
-  const viewport = ref({ w: 900, h: 620 })
-
-  const view = computed(() => ({
-    col: state.value?.character.col ?? 0,
-    row: state.value?.character.row ?? 0,
-    w: viewport.value.w,
-    h: viewport.value.h,
-  }))
+  const view = ref({ col: 0, row: 0, w: 900, h: 620 })
 
   const mutations = ref<MapMutations>({ depleted: [], occupied: [] })
 
@@ -108,30 +102,48 @@ export const useGame = defineStore('game', () => {
     tiles.value = built
   }
 
-  /** The map reports how much room it has. Tiles follow; mutations follow that. */
-  async function setViewport(w: number, h: number): Promise<void> {
-    if (Math.abs(w - viewport.value.w) < 1 && Math.abs(h - viewport.value.h) < 1) return
-    viewport.value = { w, h }
+  /** Move the camera. Local only -- tiles are generated, never fetched. */
+  function setView(col: number, row: number): void {
+    view.value = { ...view.value, col, row }
     rebuildTiles()
-    await refreshMutations()
+  }
+
+  /** The map reports how much room it has. Also local. */
+  function setViewport(w: number, h: number): void {
+    if (Math.abs(w - view.value.w) < 1 && Math.abs(h - view.value.h) < 1) return
+    view.value = { ...view.value, w, h }
+    rebuildTiles()
+  }
+
+  function centreOnCharacter(): void {
+    const char = state.value?.character
+    if (char) setView(char.col, char.row)
   }
 
   /*
-   * Moving is the only thing that recentres, and travel is the only thing that
-   * moves you -- but watching the position rather than patching travelTo means
-   * the drawn window can never disagree with where the server says you are.
+   * Sight belongs to the character, not the camera, so moving is the only thing
+   * that changes what can be known. Watching the position rather than patching
+   * travelTo means the two can never disagree about where you are.
    */
   watch(
-    () => `${view.value.col},${view.value.row}`,
+    // Reads the raw state rather than the `character` computed: this getter runs
+    // during setup, and that computed is declared further down the file.
     () => {
-      rebuildTiles()
+      const char = state.value?.character
+      return char ? `${char.col},${char.row}` : ''
+    },
+    (key, previous) => {
+      // An empty previous is the first state landing, which boot() already
+      // followed with a fetch of its own.
+      if (!key || !previous) return
+      centreOnCharacter()
       void refreshMutations()
     },
   )
 
+  /** Live state for the tiles in sight. Panning never calls this. */
   async function refreshMutations(): Promise<void> {
-    const { col, row, w, h } = view.value
-    mutations.value = await api.getMap(col, row, w, h)
+    mutations.value = await api.getMap()
     rebuildTiles()
   }
 
@@ -243,7 +255,7 @@ export const useGame = defineStore('game', () => {
     configureWorld(await api.getWorld())
 
     absorb(await api.getState())
-    rebuildTiles()
+    centreOnCharacter()
     await refreshMutations()
 
     booted.value = true
@@ -256,10 +268,21 @@ export const useGame = defineStore('game', () => {
     absorb(await api.getState())
   }
 
+  /**
+   * Selecting asks the server what a trip here would cost, so it is bounded by
+   * sight for the same reason the map is: a tap outside it would be a query
+   * outside it. Nothing out there is actionable anyway -- sight and travel range
+   * are the same radius -- so a stray tap just clears the selection.
+   */
   async function select(col: number, row: number): Promise<void> {
+    const char = state.value?.character
+    if (char && hexDistance(char.col, char.row, col, row) > travelRange.value) {
+      clearSelection()
+      return
+    }
+
     selected.value = { col, row }
     preview.value = await api.previewTile(col, row)
-
   }
 
   /** §6.1 -- the shared processing queue, for the settlement underfoot. */
@@ -364,7 +387,8 @@ export const useGame = defineStore('game', () => {
     // helpers
     tileAt, held, note,
     // actions
-    boot, setViewport, refreshMutations, refreshState, select, clearSelection,
+    boot, setView, setViewport, centreOnCharacter, refreshMutations, refreshState,
+    select, clearSelection,
     startMining, collect, abandon, travelTo, startProcessing, buy,
     sell, craft, equip, unequip, repair, discard, openPanel, closePanel,
     openStation, closeStation,

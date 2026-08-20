@@ -12,8 +12,7 @@
  *
  *   GET    /api/state
  *   GET    /api/world
- *   GET    /api/map?col&row&w&h
- *   GET    /api/tiles/{col}/{row}/preview
+ *   GET    /api/map                              mutations within sight
  *   POST   /api/mining                        {col,row}
  *   POST   /api/jobs/{job}/collect
  *   DELETE /api/jobs/{job}
@@ -104,8 +103,8 @@ export class HttpDriver implements GameApi {
     return request<WorldConfig>('/world')
   }
 
-  getMap(col: number, row: number, width: number, height: number): Promise<MapMutations> {
-    return request<MapMutations>(`/map?col=${col}&row=${row}&w=${width}&h=${height}`)
+  getMap(): Promise<MapMutations> {
+    return request<MapMutations>('/map')
   }
 
   previewTile(col: number, row: number): Promise<TilePreview> {

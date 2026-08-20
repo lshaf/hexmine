@@ -21,28 +21,17 @@ class MapController extends GameController
     }
 
     /**
-     * What the client cannot derive for a viewport: depletion timers and miner
-     * occupancy. Everything else about a tile is a pure function of its
-     * coordinates (§5), so this is all a pan needs to ask for.
+     * What the client cannot derive: depletion timers and miner occupancy, for
+     * the tiles within the character's sight.
+     *
+     * No parameters, deliberately. Sight is the character's travel range, which
+     * the server already knows, so there is nothing here for a caller to widen.
+     * Dragging the map asks for nothing at all -- terrain is derived from the
+     * seed (§5) -- and this fires only when the character moves or a job changes.
      */
     public function index(Request $request): JsonResponse
     {
-        $this->character($request);
-
-        $validated = $request->validate([
-            'col' => ['required', 'integer', 'min:0', 'max:4999'],
-            'row' => ['required', 'integer', 'min:0', 'max:4999'],
-            // Bounded so a caller cannot ask the server to scan the whole map.
-            'w' => ['nullable', 'numeric', 'min:100', 'max:2400'],
-            'h' => ['nullable', 'numeric', 'min:100', 'max:2400'],
-        ]);
-
-        return response()->json($this->game->mapMutations(
-            (int) $validated['col'],
-            (int) $validated['row'],
-            (float) ($validated['w'] ?? 900),
-            (float) ($validated['h'] ?? 620),
-        ));
+        return response()->json($this->game->mapMutations($this->character($request)));
     }
 
     /** What a trip on this tile would cost and give, computed server-side. */

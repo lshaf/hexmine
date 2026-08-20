@@ -194,7 +194,7 @@ const visible = computed(() =>
   }
 
   .toast {
-    max-width: min(270px, calc(100vw - 176px));
+    max-width: min(270px, calc(100vw - 244px));
   }
 }
 </style>
