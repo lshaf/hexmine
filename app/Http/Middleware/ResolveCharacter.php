@@ -78,10 +78,19 @@ class ResolveCharacter
 
         // Development stand-in for a wallet address. Derived from the session so
         // a reload keeps the same character.
-        return Player::create([
-            'wallet' => '0x'.substr(hash('sha256', $sessionId), 0, 40),
-            'session_id' => $sessionId,
-            'eligible_since' => null,
-        ]);
+        //
+        // Resolved by WALLET, not created blind. The wallet is a function of the
+        // session, so a row for it can already exist with session_id cleared --
+        // `game:demo` nulls other rows' session_id when it rebinds, and a plain
+        // create() then hits the unique index on players.wallet and 500s every
+        // request that session makes. Re-binding is the correct answer: same
+        // wallet, same character, new session cookie.
+        $wallet = '0x'.substr(hash('sha256', $sessionId), 0, 40);
+
+        $player = Player::firstOrNew(['wallet' => $wallet]);
+        $player->session_id = $sessionId;
+        $player->save();
+
+        return $player;
     }
 }

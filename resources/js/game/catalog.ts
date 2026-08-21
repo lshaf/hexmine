@@ -50,7 +50,7 @@ export const MATERIALS: Record<MaterialKey, Material> = {
     npcPrice: 1, description: 'Pulled up by the root and mostly broken. The trader takes it by the sack.',
   },
 
-  // Tier 1 -- Raw, biome-locked, decays over cap
+  // Tier 1 -- Raw, biome-locked, and the bulk of what fills a bag (§7.6)
   wood: {
     key: 'wood', name: 'Wood', tier: 1, biome: 'forest', palette: 'wood',
     npcPrice: 2, description: 'Green timber from the forest belt.',

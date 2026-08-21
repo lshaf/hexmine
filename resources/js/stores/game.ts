@@ -183,7 +183,8 @@ export const useGame = defineStore('game', () => {
   )
 
   /**
-   * Live state for the nineteen tiles in sight (§5.6). Panning never calls
+   * Live state for the handful of tiles in sight (§5.6) -- seven of them at
+   * the base radius. Panning never calls
    * this, and neither does walking -- only arriving and setting off do.
    */
   async function refreshMutations(): Promise<void> {
@@ -204,6 +205,20 @@ export const useGame = defineStore('game', () => {
    * countdown.
    */
   const timeScale = computed(() => state.value?.timeScale ?? 1)
+
+  /**
+   * §7.6 -- the bag, and the one thing about it that has to be visible from
+   * anywhere: it is full.
+   *
+   * Full is not the same as over. Rows can never go over -- a full bag turns a
+   * new kind away at the door -- while units can, and being over on units is
+   * what stops the road. Both are worth an ember cell in the corner, because
+   * both mean the next thing you pick up will not go the way you expect.
+   */
+  const bag = computed(() => state.value?.character.bag ?? null)
+  const bagFull = computed(
+    () => (bag.value ? bag.value.rows >= bag.value.rowCap || bag.value.units >= bag.value.unitCap : false),
+  )
 
   const inventory = computed(() => state.value?.inventory ?? {})
   const equipment = computed(() => state.value?.equipment ?? [])
@@ -443,10 +458,22 @@ export const useGame = defineStore('game', () => {
     }
   }
 
+  /**
+   * §5.5 -- a hunt takes no tile slot, so the occupancy map cannot have changed
+   * and refreshMutations() would be a wasted request. Only the hex re-reads.
+   */
+  async function startHunt(col: number, row: number): Promise<void> {
+    const job = await act(() => api.startHunt(col, row))
+    if (job) await select(col, row)
+  }
+
   async function collect(jobId: string): Promise<void> {
     const result = await act(() => api.collectJob(jobId))
     if (result?.lostToOverflow) {
-      note(`${result.lostToOverflow} units lost — storage is over cap.`, 'bad')
+      // §2 and §7.6 -- either the per-wallet cap on that material, or no strap
+      // free for a kind the bag was not already carrying. Both are "it did not
+      // fit", and naming which would need the server to say which.
+      note(`${result.lostToOverflow} units lost — they would not fit.`, 'bad')
     }
     if (result?.levelsGained) note(`Level up. You are now level ${character.value?.level}.`, 'good')
     await refreshMutations()
@@ -536,7 +563,7 @@ export const useGame = defineStore('game', () => {
     // state
     state, station, preview, panel, selected, busy, booted, log, now, view, tiles,
     // derived
-    character, timeScale, inventory, equipment, skills, bonuses, toolYield, jobs, readyJobs,
+    character, timeScale, bag, bagFull, inventory, equipment, skills, bonuses, toolYield, jobs, readyJobs,
     consumables, buffs,
     tree, skillPoints, jobLevels, ownedNodes,
     activeJobs, miningJob, processingJob, underfoot, selectedTile,
@@ -548,7 +575,7 @@ export const useGame = defineStore('game', () => {
     // actions
     boot, setView, setViewport, centreOnCharacter, refreshMutations, refreshState,
     select, clearSelection,
-    startMining, collect, abandon, travelTo, cancelTravel, startProcessing, buy,
+    startMining, startHunt, collect, abandon, travelTo, cancelTravel, startProcessing, buy,
     sell, craft, equip, unequip, repair, discard, discardMaterial, drink, openPanel, closePanel,
     loadTree, buyNode,
     openStation, closeStation,

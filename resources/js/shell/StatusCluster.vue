@@ -2,12 +2,12 @@
 /**
  * Top-left: who you are, and whether you can act.
  *
- * Three readings on three scales. They are not progress bars -- they are the
+ * Two readings on two scales. They are not progress bars -- they are the
  * graduated rules printed on a survey chart, read by a needle. That distinction
  * does real work here:
  *
- *  - A fresh character's storage is 0 of 120. A fill of zero is invisible; a
- *    needle parked at the origin is still a reading.
+ *  - A fresh character's AP is 0 of 20 after a dig. A fill of zero is
+ *    invisible; a needle parked at the origin is still a reading.
  *  - Quarter ticks say how full at a glance, without a second number.
  *  - The needle overshoots the track, like the cursor on a slide rule, so your
  *    eye lands on the position rather than on a coloured area.
@@ -15,6 +15,10 @@
  * The level number is the XP row's label, not a badge -- the thing being
  * measured names its own scale. Gold has no cap, so it gets no scale; it sits
  * with the name as a plain readout. Nothing here is a bar for the sake of it.
+ *
+ * §7.6 -- the bag is deliberately NOT here. It has a screen of its own, and its
+ * one urgent state -- full -- is said by the bag cell turning ember in the
+ * top-right rather than by two more needles competing with AP for the eye.
  */
 import { computed, onBeforeUnmount, ref } from 'vue'
 import { useGame } from '@/stores/game'
@@ -48,10 +52,6 @@ async function copyWallet(): Promise<void> {
 
 onBeforeUnmount(() => clearTimeout(resetCopied))
 
-const overCap = computed(() =>
-  char.value ? char.value.storageUsed > char.value.storageCap : false,
-)
-
 /**
  * Time until the next action point, against the server clock. Null once the
  * tick is due -- the number is about to move anyway.
@@ -67,8 +67,6 @@ interface Scale {
   at: number
   of: number
   accent: string
-  /** The reading has passed the cap. Only storage can, and it costs you. */
-  over?: boolean
 }
 
 const scales = computed<Scale[]>(() => {
@@ -77,13 +75,6 @@ const scales = computed<Scale[]>(() => {
 
   return [
     { key: 'AP', at: c.ap, of: c.apMax, accent: 'var(--copper)' },
-    {
-      key: 'Store',
-      at: c.storageUsed,
-      of: c.storageCap,
-      accent: overCap.value ? 'var(--ember)' : 'var(--violet)',
-      over: overCap.value,
-    },
     { key: `Lv ${c.level}`, at: c.xp, of: c.xpToNext, accent: 'var(--gold)' },
   ]
 })
@@ -152,10 +143,10 @@ const pct = (s: Scale) => `${Math.min(100, Math.max(0, (s.at / s.of) * 100))}%`
           <i class="tick" style="left: 25%" />
           <i class="tick" style="left: 50%" />
           <i class="tick" style="left: 75%" />
-          <i class="needle" :class="{ alert: s.over }" :style="{ left: pct(s) }" />
+          <i class="needle" :style="{ left: pct(s) }" />
         </span>
 
-        <span class="read readout" :class="{ over: s.over }">
+        <span class="read readout">
           {{ s.at }}<span class="of">/{{ s.of }}</span>
         </span>
       </div>
@@ -274,10 +265,6 @@ const pct = (s: Scale) => `${Math.min(100, Math.max(0, (s.at / s.of) * 100))}%`
   color: var(--vellum-dim);
 }
 
-.read.over {
-  color: #e8a49f;
-}
-
 /* The scale itself: a graduated rule, read by a needle. */
 .scale {
   position: relative;
@@ -318,21 +305,6 @@ const pct = (s: Scale) => `${Math.min(100, Math.max(0, (s.at / s.of) * 100))}%`
   transition: left 0.5s cubic-bezier(0.32, 0.72, 0, 1);
 }
 
-.needle.alert {
-  background: var(--ember);
-  animation: throb 1.4s ease-in-out infinite;
-}
-
-@keyframes throb {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.35;
-  }
-}
-
 .tick-in {
   margin: 8px 0 0;
   font-size: 8px;
@@ -344,10 +316,6 @@ const pct = (s: Scale) => `${Math.min(100, Math.max(0, (s.at / s.of) * 100))}%`
   .fill,
   .needle {
     transition: none;
-  }
-
-  .needle.alert {
-    animation: none;
   }
 }
 

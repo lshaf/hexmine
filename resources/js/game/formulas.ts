@@ -162,9 +162,6 @@ export function processingTime(
 export const apMax = (level: number): number =>
   CHARACTER.baseApMax + (level - 1) * CHARACTER.apPerLevel
 
-export const storageCap = (level: number): number =>
-  CHARACTER.baseStorage + (level - 1) * CHARACTER.storagePerLevel
-
 /**
  * Lazy AP regeneration. Stored as (ap, apUpdatedAt); the value at any moment is
  * derived, never ticked. This is what keeps the client from asserting time.

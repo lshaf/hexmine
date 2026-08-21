@@ -34,6 +34,9 @@ Route::middleware(ResolveCharacter::class)->group(function () {
         ->whereNumber(['col', 'row']);
 
     Route::post('/mining', [MiningController::class, 'store']);
+    // §5.5 -- hunting is its own verb, not a mode of mining: it takes no tile
+    // slot, depletes nothing, and is the only Tier 4 faucet outside a dungeon.
+    Route::post('/hunting', [MiningController::class, 'hunt']);
     Route::post('/jobs/{job}/collect', [MiningController::class, 'collect'])->whereNumber('job');
     Route::delete('/jobs/{job}', [MiningController::class, 'destroy'])->whereNumber('job');
 

@@ -68,8 +68,9 @@ final class GameLoopTest extends TestCase
      * The pace of the journey under way, read back from its own clock.
      *
      * Not Balance::TRAVEL_MS_PER_HEX any more: §8.3 makes travelSpeed divide the
-     * clock, and every character has some of it from the first Explorer node
-     * (§7.5), so there is no single figure a test can assume.
+     * clock, and boots or a tonic move it, so there is no single figure a test
+     * can assume. (The Explorer no longer contributes -- §7.5's ladder pays in
+     * capability and never in a stat.)
      */
     private function perHex(Character $character): int
     {
@@ -348,6 +349,216 @@ final class GameLoopTest extends TestCase
     }
 
     /** Put materials in the bag without mining for them. */
+    /**
+     * Find a hex with a live herd on it and stand the character there.
+     *
+     * Herds are time-bucketed and 6% likely on plains/grassland (§5.5), so this
+     * scans rather than assuming. Returns [col, row].
+     *
+     * @return array{0:int,1:int}
+     */
+    private function standOnAHerd(): array
+    {
+        $now = $this->game->now();
+
+        for ($col = 0; $col < Balance::MAP_COLS; $col++) {
+            for ($row = 0; $row < Balance::MAP_ROWS; $row++) {
+                $tile = $this->game->buildTile($col, $row, $now);
+                if (($tile['herdUntil'] ?? null) !== null && $tile['herdUntil'] > $now) {
+                    $this->character->update(['col' => $col, 'row' => $row]);
+                    $this->character->refresh();
+
+                    return [$col, $row];
+                }
+            }
+        }
+
+        $this->fail('no herd anywhere on the map');
+    }
+
+    /**
+     * A session whose player row has had its session_id cleared comes back to
+     * the same wallet, rather than 500ing on the unique index.
+     *
+     * `game:demo` nulls other rows' session_id when it rebinds, so this is a
+     * state the dev flow produces routinely -- and the wallet is derived from
+     * the session, so creating blind always collides.
+     */
+    public function test_a_cleared_session_rebinds_instead_of_colliding(): void
+    {
+        config(['game.auto_provision' => true]);
+
+        // Laravel's Session\Store replaces an id that is not 40 alphanumerics
+        // with a fresh random one, which would silently defeat this test.
+        $sessionId = str_repeat('a1b2', 10);
+        $wallet = '0x'.substr(hash('sha256', $sessionId), 0, 40);
+
+        // The row exists, orphaned from its session.
+        $player = Player::create(['wallet' => $wallet, 'session_id' => null]);
+
+        $resolve = new \ReflectionMethod(\App\Http\Middleware\ResolveCharacter::class, 'resolvePlayer');
+        $middleware = new \App\Http\Middleware\ResolveCharacter($this->game);
+
+        $request = \Illuminate\Http\Request::create('/api/state');
+        $session = new \Illuminate\Session\Store('test', new \Illuminate\Session\ArraySessionHandler(120), $sessionId);
+        $request->setLaravelSession($session);
+
+        $resolved = $resolve->invoke($middleware, $request);
+
+        $this->assertNotNull($resolved);
+        $this->assertSame($player->id, $resolved->id, 'a new row was created instead of rebinding');
+        $this->assertSame($sessionId, $resolved->session_id);
+        $this->assertSame(1, Player::where('wallet', $wallet)->count());
+    }
+
+    /** Equip a working bow, so the hunting line has its §8.0 tool. */
+    private function equipBow(): void
+    {
+        \App\Models\CharacterItem::create([
+            'character_id' => $this->character->id,
+            'item_key' => 'crude_bow',
+            'durability' => 200,
+            'equipped' => true,
+            'options' => [],
+        ]);
+    }
+
+    /** §5.5 -- a herd pays pelt for a bow, and essence on top often enough to matter. */
+    public function test_a_herd_pays_pelt_and_bridges_to_the_raid_track(): void
+    {
+        [$col, $row] = $this->standOnAHerd();
+        $this->equipBow();
+
+        $preview = $this->game->previewHunt($this->character->fresh(), $col, $row);
+        $this->assertTrue($preview['canHunt'], $preview['reason'] ?? '');
+        $this->assertSame('pelt', $preview['material']);
+        $this->assertFalse($preview['scrap']);
+        $this->assertSame(Balance::HUNT_ESSENCE_CHANCE, $preview['essenceChance']);
+
+        $essence = 0;
+        for ($i = 0; $i < 40; $i++) {
+            $character = $this->character->fresh();
+            $character->update(['ap' => Balance::apMax($character->level)]);
+
+            $job = $this->game->startHunt($character->fresh(), $col, $row);
+            $job->update(['ends_at' => $this->game->now() - 1]);
+
+            $result = $this->game->collectJob($this->character->fresh(), $job->id);
+            $this->assertGreaterThan(0, $result['gained']['pelt']);
+            $essence += $result['gained']['essence'] ?? 0;
+        }
+
+        // At 35% over forty hunts, never seeing one would be a bug, not luck.
+        $this->assertGreaterThan(0, $essence, 'forty hunts produced no essence at all');
+    }
+
+    /** §4.0 / §8.0 -- bare hands take scrap, and never reach a Tier 4 material. */
+    public function test_bare_hands_hunt_scrap_and_never_essence(): void
+    {
+        [$col, $row] = $this->standOnAHerd();
+
+        $preview = $this->game->previewHunt($this->character->fresh(), $col, $row);
+        $this->assertSame('torn_hide', $preview['material']);
+        $this->assertTrue($preview['scrap']);
+        // The sharp end: no bow means the bridge to the raid track is shut.
+        $this->assertSame(0.0, $preview['essenceChance']);
+
+        for ($i = 0; $i < 25; $i++) {
+            $character = $this->character->fresh();
+            $character->update(['ap' => Balance::apMax($character->level)]);
+
+            $job = $this->game->startHunt($character->fresh(), $col, $row);
+            $job->update(['ends_at' => $this->game->now() - 1]);
+
+            $result = $this->game->collectJob($this->character->fresh(), $job->id);
+            $this->assertGreaterThan(0, $result['gained']['torn_hide']);
+            $this->assertArrayNotHasKey('essence', $result['gained']);
+        }
+    }
+
+    /** §5.5 -- a herd is not a seam: no slot taken, nothing depleted. */
+    public function test_hunting_takes_no_slot_and_depletes_nothing(): void
+    {
+        [$col, $row] = $this->standOnAHerd();
+        $this->equipBow();
+
+        $job = $this->game->startHunt($this->character->fresh(), $col, $row);
+
+        $this->assertNull($job->slot);
+        $this->assertSame(0, $this->game->buildTile($col, $row, $this->game->now())['slotsUsed'] ?? 0);
+
+        // Both mining seats are still free to other players while the hunt runs.
+        $others = [];
+        foreach (['0xa', '0xb'] as $wallet) {
+            $other = $this->game->createCharacter(Player::create(['wallet' => $wallet, 'session_id' => $wallet]));
+            $other->update(['col' => $col, 'row' => $row]);
+            $others[] = $this->game->startMining($other->fresh(), $col, $row);
+        }
+        $this->assertCount(2, $others);
+
+        // And collecting the hunt never writes a depletion row.
+        $job->update(['ends_at' => $this->game->now() - 1]);
+        $this->game->collectJob($this->character->fresh(), $job->id);
+        $this->assertSame(0, \App\Models\TileState::where('col', $col)->where('row', $row)->count());
+    }
+
+    /** A person is in one place: a hunt blocks a dig, and a dig blocks a hunt. */
+    public function test_a_hunt_and_a_dig_exclude_each_other(): void
+    {
+        [$col, $row] = $this->standOnAHerd();
+        $this->equipBow();
+
+        $this->game->startHunt($this->character->fresh(), $col, $row);
+        $this->assertFalse($this->game->previewTile($this->character->fresh(), $col, $row)['canMine']);
+
+        try {
+            $this->game->startMining($this->character->fresh(), $col, $row);
+            $this->fail('dug a hex while already hunting it');
+        } catch (\App\Game\GameException $e) {
+            $this->assertSame('blocked', $e->errorCode);
+        }
+    }
+
+    /** §5.5 -- herds wander. A hex without one cannot be hunted. */
+    public function test_a_hex_with_no_herd_cannot_be_hunted(): void
+    {
+        $preview = $this->game->previewHunt(
+            $this->character,
+            (int) $this->character->col,
+            (int) $this->character->row,
+        );
+
+        // Spawn is forest (see the spawn test), so there is never a herd here.
+        $this->assertFalse($preview['canHunt']);
+        $this->assertStringContainsString('No herd', $preview['reason']);
+
+        try {
+            $this->game->startHunt($this->character, (int) $this->character->col, (int) $this->character->row);
+            $this->fail('hunted a hex with no herd on it');
+        } catch (\App\Game\GameException $e) {
+            $this->assertSame('blocked', $e->errorCode);
+        }
+    }
+
+    /** §5.6 -- a herd is live state, so it is bounded by the sight disc. */
+    public function test_a_herd_outside_sight_will_not_be_costed(): void
+    {
+        [$col, $row] = $this->standOnAHerd();
+
+        // Half a map away in both axes, so this is well outside any sight the
+        // Explorer chain can reach -- the scan above starts at 0,0, so simply
+        // standing there could leave the herd inside the disc.
+        $this->character->update([
+            'col' => ($col + intdiv(Balance::MAP_COLS, 2)) % Balance::MAP_COLS,
+            'row' => ($row + intdiv(Balance::MAP_ROWS, 2)) % Balance::MAP_ROWS,
+        ]);
+
+        $preview = $this->game->previewHunt($this->character->fresh(), $col, $row);
+        $this->assertTrue($preview['unseen']);
+        $this->assertNull($preview['herdUntil']);
+        $this->assertFalse($preview['canHunt']);
+    }
+
     private function give(array $materials): void
     {
         $add = new \ReflectionMethod($this->game, 'addMaterial');
@@ -1466,7 +1677,7 @@ final class GameLoopTest extends TestCase
     }
 
     /**
-     * §5.6 -- sight is two hexes, and it is a server rule rather than a
+     * §5.6 -- sight is one hex, and it is a server rule rather than a
      * rendering choice: a client that pans across the map must not be able to
      * learn where everyone else is mining.
      */
@@ -1647,13 +1858,23 @@ final class GameLoopTest extends TestCase
      */
     public function test_explorer_skills_arrive_unbought_and_cost_no_points(): void
     {
-        $this->assertContains('explorer.long_stride', $this->game->ownedNodes($this->character));
-        $this->assertNotContains('explorer.high_ground', $this->game->ownedNodes($this->character));
+        // §7.5 -- a character who has walked nowhere owns nothing. The first
+        // row waits for Explorer 2, not 1: a granted node has no point paying
+        // for it, so the walk is the price.
+        $this->assertNotContains('explorer.deep_pockets', $this->game->ownedNodes($this->character));
+
+        // A row arrives whole, exactly as a bought tree's depth opens whole.
+        $this->explorerAt(2);
+        $owned = $this->game->ownedNodes($this->character->fresh());
+        foreach (['deep_pockets', 'second_strap', 'rolled_blanket'] as $key) {
+            $this->assertContains("explorer.{$key}", $owned);
+        }
+        $this->assertNotContains('explorer.even_load', $owned, 'row two arrived early');
         $this->assertSame(0, $this->game->skillPoints($this->character)['spent']);
 
-        $this->explorerAt(5);
+        $this->explorerAt(9);
 
-        $this->assertContains('explorer.high_ground', $this->game->ownedNodes($this->character));
+        $this->assertContains('explorer.even_load', $this->game->ownedNodes($this->character));
         $this->assertSame(
             0,
             $this->game->skillPoints($this->character)['spent'],
@@ -1671,12 +1892,14 @@ final class GameLoopTest extends TestCase
         $this->game->buyNode($this->character->fresh(), 'explorer.horizon_line');
     }
 
-    /** §7.5 -- two hexes of eye, earned one at a time, and capped. */
+    /** §7.5 -- two hexes of eye on top of the base one, earned one at a time. */
     public function test_the_explorer_chain_widens_sight_and_then_stops(): void
     {
         $this->assertSame(Balance::SIGHT_RADIUS, $this->game->sightRadius($this->character));
 
-        $this->explorerAt(5);
+        // High Ground, row two. The eye is the rarest thing the road pays in,
+        // so it arrives later than a strap does.
+        $this->explorerAt(9);
         $this->assertSame(Balance::SIGHT_RADIUS + 1, $this->game->sightRadius($this->character->fresh()));
 
         $this->explorerAt(Balance::JOB_MAX_LEVEL);
@@ -1688,27 +1911,318 @@ final class GameLoopTest extends TestCase
     }
 
     /**
-     * §8.1 rule 1 -- the ceiling holds even here.
+     * §7.5 + §8.1 rule 1 -- the free tree cannot move a stat at all.
      *
-     * The chain writes 10 + 10 + 5 on its nodes, which is 25 against a 15
-     * ceiling, and that overshoot is deliberate: it is what a free five-node
-     * tree is worth. What it must never do is *pass* the ceiling, because the
-     * ceiling is the one rule every other stat source is balanced against.
+     * The chain used to write travelSpeed and lean on the clamp to stay honest.
+     * It writes nothing now, and that is a stronger rule than a clamp: a tree
+     * that costs no skill points has no business touching the aggregate gear,
+     * options and potions share. What it pays in is capability -- the eye and
+     * the back -- and both of those are counts with their own caps.
      */
-    public function test_a_maxed_explorer_still_stops_at_the_ceiling(): void
+    public function test_a_maxed_explorer_moves_no_stat_whatsoever(): void
     {
         $this->explorerAt(Balance::JOB_MAX_LEVEL);
 
-        $written = array_sum(array_map(
-            fn (array $n) => $n['effect']['kind'] === 'stat' ? $n['effect']['value'] : 0,
+        $written = array_filter(
             \App\Game\Jobs::nodesFor('explorer'),
-        ));
-
-        $this->assertGreaterThan(Balance::STAT_CEILING, $written, 'the chain no longer overshoots');
-        $this->assertSame(
-            Balance::STAT_CEILING,
-            $this->game->bonuses($this->character->fresh())['travelSpeed'],
+            fn (array $n) => $n['effect']['kind'] === 'stat',
         );
+
+        $this->assertSame([], $written, 'a granted node writes a stat again');
+        $this->assertSame(
+            [],
+            $this->game->nodeEffects($this->character->fresh())['stats'],
+            'the chain reached the stat aggregate',
+        );
+
+        // And with nothing worn, every stat is still exactly zero: a full
+        // fifteen rungs of walking buys no power of any kind.
+        foreach ($this->game->bonuses($this->character->fresh()) as $stat => $value) {
+            $this->assertSame(0.0, (float) $value, "{$stat} moved on a maxed explorer");
+        }
+    }
+
+    // ----------------------------------------------------------------- bag §7.6
+
+    /**
+     * Put something on every strap, §7.6.
+     *
+     * The cap is roomier than the material list is long, so this walks the
+     * three things that take a row -- stacks, then the potion shelf, then unworn
+     * gear -- until the bag is full. One unit each, so what it fills is rows and
+     * never weight: a test about straps must not accidentally be a test about
+     * how heavy the bag is.
+     *
+     * Rows are written straight to the tables rather than granted through the
+     * service, because the service is the thing under test here: `addMaterial`
+     * refuses a new kind once the straps are gone, which is exactly the rule
+     * these tests are setting up to exercise.
+     *
+     * @param  array<int,string>  $except  material keys to leave off the straps
+     */
+    private function fillStraps(array $except = [], int $leaveFree = 0): void
+    {
+        $target = Balance::BAG_ROWS - $leaveFree;
+
+        $rows = fn () => $this->game->bag($this->character->fresh())['rows'];
+
+        foreach (array_keys(\App\Game\Catalog::materials()) as $key) {
+            if ($rows() >= $target) {
+                return;
+            }
+            if (in_array($key, $except, true)) {
+                continue;
+            }
+            \App\Models\CharacterMaterial::create([
+                'character_id' => $this->character->id,
+                'material_key' => $key,
+                'quantity' => 1,
+            ]);
+        }
+
+        foreach (\App\Game\Catalog::items() as $key => $def) {
+            if ($rows() >= $target) {
+                return;
+            }
+            if (empty($def['consumable'])) {
+                continue;
+            }
+            $this->character->consumables()->create(['item_key' => $key, 'quantity' => 1]);
+        }
+
+        while ($rows() < $target) {
+            \App\Models\CharacterItem::create([
+                'character_id' => $this->character->id,
+                'item_key' => 'stone_axe',
+                'durability' => 40,
+                'equipped' => false,
+            ]);
+        }
+    }
+
+    /** Somewhere to walk to that is definitely not here. */
+    private function elsewhere(): array
+    {
+        return [(int) $this->character->col + 3, (int) $this->character->row];
+    }
+
+    /**
+     * §7.6 -- the bag holds everything, and counts it two ways.
+     *
+     * Units are the weight, rows are how many separate things it is. A potion
+     * is not a material and a spare axe is neither, but all three are in the
+     * same pack and all three count -- otherwise "what do I carry" would only
+     * ever be a question about ore.
+     */
+    public function test_the_bag_counts_materials_potions_and_unworn_gear(): void
+    {
+        $this->give(['wood' => 10, 'stone' => 5]);
+        $this->character->consumables()->create(['item_key' => 'road_tonic', 'quantity' => 3]);
+        \App\Models\CharacterItem::create([
+            'character_id' => $this->character->id,
+            'item_key' => 'stone_axe',
+            'durability' => 40,
+            'equipped' => false,
+        ]);
+
+        $bag = $this->game->bag($this->character->fresh());
+
+        $this->assertSame(19, $bag['units'], '10 wood + 5 stone + 3 tonics + 1 axe');
+        $this->assertSame(4, $bag['rows'], 'two stacks, one shelf of tonics, one axe');
+        $this->assertSame(Balance::BAG_UNITS, $bag['unitCap']);
+        $this->assertSame(Balance::BAG_ROWS, $bag['rowCap']);
+        $this->assertFalse($bag['over']);
+    }
+
+    /**
+     * §7.6 -- worn is not carried, so equipping is itself a way to make room.
+     *
+     * A prospector who has committed to a line should not be charged a strap for
+     * the tool that commitment is made of.
+     */
+    public function test_equipping_takes_a_tool_out_of_the_bag(): void
+    {
+        $item = \App\Models\CharacterItem::create([
+            'character_id' => $this->character->id,
+            'item_key' => 'stone_axe',
+            'durability' => 40,
+            'equipped' => false,
+        ]);
+
+        $this->assertSame(1, $this->game->bag($this->character->fresh())['rows']);
+
+        $this->game->equipItem($this->character->fresh(), $item->id);
+        $this->assertSame(0, $this->game->bag($this->character->fresh())['rows']);
+
+        $this->game->unequipItem($this->character->fresh(), $item->id);
+        $this->assertSame(1, $this->game->bag($this->character->fresh())['rows']);
+    }
+
+    /**
+     * §7.6 -- and taking something off is the one action that *adds* a row.
+     *
+     * With no strap free it stays on the belt, because the belt is the only
+     * place left for it. Refused rather than silently dropped: an axe that
+     * vanished because the bag was full would be the worst reading of the rule.
+     */
+    public function test_a_full_bag_will_not_let_you_take_your_axe_off(): void
+    {
+        $item = \App\Models\CharacterItem::create([
+            'character_id' => $this->character->id,
+            'item_key' => 'stone_axe',
+            'durability' => 40,
+            'equipped' => true,
+        ]);
+
+        $this->fillStraps();
+
+        try {
+            $this->game->unequipItem($this->character->fresh(), $item->id);
+            $this->fail('unequipped into a bag with no room');
+        } catch (\App\Game\GameException $e) {
+            $this->assertSame('no_room', $e->errorCode);
+        }
+
+        $this->assertTrue((bool) $item->fresh()->equipped, 'the axe came off anyway');
+    }
+
+    /**
+     * §7.6 -- too much to carry means you do not carry it anywhere.
+     *
+     * The refusal is travel and only travel. It is the second one the map has,
+     * after the edge (§5.6), and it is the only one a player can undo.
+     */
+    public function test_too_many_units_pins_you_to_the_hex(): void
+    {
+        $this->give(['wood' => Balance::BAG_UNITS + 1]);
+
+        [$col, $row] = $this->elsewhere();
+
+        try {
+            $this->game->travelTo($this->character->fresh(), $col, $row);
+            $this->fail('walked off with an overloaded bag');
+        } catch (\App\Game\GameException $e) {
+            $this->assertSame('overloaded', $e->errorCode);
+        }
+
+        // The way out is always in reach: drop one and the road opens.
+        $this->game->discardMaterial($this->character->fresh(), 'wood', 1);
+        $travel = $this->game->travelTo($this->character->fresh(), $col, $row);
+
+        $this->assertSame($col, $travel['toCol']);
+    }
+
+    /**
+     * §7.6 -- the second limit refuses instead of pinning.
+     *
+     * A row is a place to put a thing, not weight, and there is nowhere to put a
+     * thing that has no strap. So a full bag turns away a kind it is not already
+     * carrying -- and still takes more of a kind it is.
+     */
+    public function test_a_full_bag_turns_away_a_kind_it_is_not_carrying(): void
+    {
+        $spare = array_key_first(\App\Game\Catalog::materials());
+        $this->fillStraps([$spare]);
+
+        $bag = $this->game->bag($this->character->fresh());
+        $this->assertSame(Balance::BAG_ROWS, $bag['rows']);
+        $this->assertLessThan($bag['unitCap'], $bag['units'], 'this must be about rows, not weight');
+        $this->assertFalse($bag['over'], 'full is not over -- the limit was never passed');
+
+        // A kind it is not holding does not land.
+        $this->give([$spare => 5]);
+        $this->assertSame(0, $this->game->held($this->character->fresh(), $spare));
+        $this->assertSame(Balance::BAG_ROWS, $this->game->bag($this->character->fresh())['rows']);
+
+        // A kind it is holding still does: the limit is on variety, not amount.
+        $carried = (string) $this->character->fresh()->materials()->value('material_key');
+        $before = $this->game->held($this->character->fresh(), $carried);
+        $this->give([$carried => 9]);
+        $this->assertSame($before + 9, $this->game->held($this->character->fresh(), $carried));
+    }
+
+    /**
+     * §7.6 -- and it is said before the hour of work, not after it.
+     *
+     * A dig whose haul has nowhere to land would be an hour spent for nothing,
+     * which is the one way this rule could be worse than no rule.
+     */
+    public function test_a_full_bag_refuses_the_dig_rather_than_the_haul(): void
+    {
+        $col = (int) $this->character->col;
+        $row = (int) $this->character->row;
+        $material = $this->game->previewTile($this->character, $col, $row)['material'];
+
+        // Every strap taken, and none of them by what this hex pays.
+        $this->fillStraps([$material]);
+
+        $ap = (int) $this->character->fresh()->ap;
+
+        try {
+            $this->game->startMining($this->character->fresh(), $col, $row);
+            $this->fail('started a dig with nowhere to put it');
+        } catch (\App\Game\GameException $e) {
+            $this->assertSame('no_room', $e->errorCode);
+        }
+
+        $this->assertSame($ap, (int) $this->character->fresh()->ap, 'a refused dig still charged AP');
+    }
+
+    /**
+     * §7.6 -- an overloaded bag stops the road, and nothing else.
+     *
+     * Working the hex you are standing on, selling, processing and dropping all
+     * have to keep working, because every one of them is a way out. A full bag
+     * that also refused the ways to empty it would be a dead end rather than a
+     * decision.
+     */
+    public function test_an_overloaded_bag_still_lets_you_work_and_sell(): void
+    {
+        $this->give(['wood' => Balance::BAG_UNITS + 20]);
+        $this->assertTrue($this->game->bag($this->character->fresh())['over']);
+
+        $job = $this->game->startMining($this->character->fresh(), (int) $this->character->col, (int) $this->character->row);
+        $this->assertNotNull($job);
+
+        $dropped = $this->game->discardMaterial($this->character->fresh(), 'wood', 20);
+        $this->assertSame(20, $dropped);
+        $this->assertFalse($this->game->bag($this->character->fresh())['over']);
+    }
+
+    /**
+     * §7.5 + §7.6 -- the road is the only thing that widens the bag, and it
+     * stops where the caps do.
+     *
+     * Five rows of three, ten units or four straps a node, at job levels 2, 9,
+     * 16, 23 and 30. The climb is what is being tested here as much as the
+     * ceiling: an early row has to be felt, or a tree nobody spends points on is
+     * a tree nobody notices.
+     */
+    public function test_the_explorer_chain_widens_the_bag_and_then_stops(): void
+    {
+        $bag = $this->game->bag($this->character);
+        $this->assertSame(Balance::BAG_UNITS, $bag['unitCap']);
+        $this->assertSame(Balance::BAG_ROWS, $bag['rowCap']);
+
+        // Row one, at Explorer 2: four hexes of walking, and a whole row of
+        // three arrives at once -- twenty units of room and four straps.
+        $this->explorerAt(2);
+        $bag = $this->game->bag($this->character->fresh());
+        $this->assertSame(Balance::BAG_UNITS + 20, $bag['unitCap']);
+        $this->assertSame(Balance::BAG_ROWS + 4, $bag['rowCap']);
+
+        // Row two is about 290 hexes further on, and pays one of each again.
+        $this->explorerAt(9);
+        $bag = $this->game->bag($this->character->fresh());
+        $this->assertSame(Balance::BAG_UNITS + 30, $bag['unitCap']);
+        $this->assertSame(Balance::BAG_ROWS + 8, $bag['rowCap']);
+
+        $this->explorerAt(Balance::JOB_MAX_LEVEL);
+        $bag = $this->game->bag($this->character->fresh());
+        $this->assertSame(Balance::BAG_UNITS + Balance::SKILL_BAG_UNITS_CAP, $bag['unitCap']);
+        $this->assertSame(Balance::BAG_ROWS + Balance::SKILL_BAG_ROWS_CAP, $bag['rowCap']);
+        $this->assertSame(200, $bag['unitCap'], 'the ceiling moved without the doc moving with it');
+        $this->assertSame(50, $bag['rowCap'], 'the ceiling moved without the doc moving with it');
     }
 
     /** The generation parameters the client needs, and nothing player-specific. */

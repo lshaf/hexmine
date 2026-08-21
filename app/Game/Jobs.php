@@ -16,9 +16,11 @@ namespace App\Game;
  * character level grants. Two numbers and only one of them is power: a job level
  * gates nodes and does nothing else, while a point is the scarce thing you spend.
  *
- * And one job that plays by neither rule. Explorer (§7.5) is five nodes in a
- * line, granted rather than bought, levelling on hexes walked. It is the answer
- * to a map with no reach limit: the only thing a long walk pays out.
+ * And one job that plays by neither rule. Explorer (§7.5) is fifteen nodes in
+ * the same five-row shape as the rest, granted rather than bought, levelling on
+ * hexes walked. It is the answer to a map with no reach limit: the only thing a
+ * long walk pays out, and it pays in capability -- sight and straps -- never in
+ * a stat.
  *
  * This file is the single source of truth and is **served** to the client over
  * GET /api/jobs rather than mirrored into catalog.ts. 180 hand-copied rows would
@@ -33,8 +35,9 @@ namespace App\Game;
  *
  * Generated shape: tiers of 6/8/8/6/2 at job levels 1/5/12/20/28, every node
  * above tier 1 naming a parent, and both capstones naming two. Explorer is the
- * one exception: 1/1/1/1/1 at the same job levels, a single parent all the way
- * down.
+ * one exception: 3/3/3/3/3 at job levels 2/9/16/23/30, wired down its columns
+ * rather than across. Its first row waits for level 2 because a granted node has
+ * no point to pay for it -- the walk is the price (§7.5).
  */
 final class Jobs
 {
@@ -82,7 +85,7 @@ final class Jobs
      * @var array<string,array<string,string>>
      */
     public const JOBS = [
-        'explorer' => ['name' => 'Explorer', 'kind' => self::WAYFARING, 'source' => 'travel', 'palette' => 'fiber', 'description' => 'Levels by walking, and by nothing else. Its five skills are not bought -- they arrive as you go.'],
+        'explorer' => ['name' => 'Explorer', 'kind' => self::WAYFARING, 'source' => 'travel', 'palette' => 'fiber', 'description' => 'Levels by walking, and by nothing else. Its skills are not bought -- they arrive as you go.'],
         'woodcutting' => ['name' => 'Woodcutting', 'kind' => self::GATHERING, 'source' => 'woodcutting', 'palette' => 'wood', 'description' => 'Forest work. Its level is the skill you already carry, and it still takes time off the trip.'],
         'mining' => ['name' => 'Mining', 'kind' => self::GATHERING, 'source' => 'mining', 'palette' => 'iron', 'description' => 'Mountain seams, and the patience a shaft asks for.'],
         'hunting' => ['name' => 'Hunting', 'kind' => self::GATHERING, 'source' => 'hunting', 'palette' => 'pelt', 'description' => 'Plains and tundra. The only line that also brings back essence.'],
@@ -107,10 +110,28 @@ final class Jobs
 
     public const NODES_PER_JOB = 30;
 
-    /** §7.5 -- the wayfaring shape: one node per tier, five in all. */
-    public const CHAIN_TIER_SIZE = [1 => 1, 2 => 1, 3 => 1, 4 => 1, 5 => 1];
+    /** §7.5 -- the wayfaring shape: five rows of three, fifteen in all. */
+    public const CHAIN_TIER_SIZE = [1 => 3, 2 => 3, 3 => 3, 4 => 3, 5 => 3];
 
-    public const NODES_PER_CHAIN = 5;
+    /**
+     * §7.5 -- the wayfaring tree's own depths: 2, 9, 16, 23, 30.
+     *
+     * Five rows, exactly as §7.4.2 shapes every bought tree, but sitting at its
+     * own levels. Those five gates pace a tree bought with skill points, where
+     * the gate only says you may spend one; a granted tree has no price at all,
+     * so its pacing has to come from the walking itself.
+     *
+     * Row one waits for level 2 rather than 1 because a character who has walked
+     * nowhere must not be handed anything. Seventeen XP, four hexes: a short
+     * walk, but a walk, and a walk is the only price this job may charge. Row
+     * five lands exactly on JOB_MAX_LEVEL.
+     *
+     * Even in levels is steep in effort -- the job curve puts row 2 about 290
+     * hexes out and row 5 about 6,400.
+     */
+    public const CHAIN_TIER_JOB_LEVEL = [1 => 2, 2 => 9, 3 => 16, 4 => 23, 5 => 30];
+
+    public const NODES_PER_CHAIN = 15;
 
     /**
      * Every node, keyed by its own key. `requires` names parent nodes in the
@@ -120,11 +141,21 @@ final class Jobs
      */
     public const NODES = [
         // ---- explorer
-        'explorer.long_stride' => ['job' => 'explorer', 'tier' => 1, 'jobLevel' => 1, 'name' => 'Long Stride', 'effect' => ['kind' => 'stat', 'stat' => 'travelSpeed', 'value' => 0.1], 'requires' => [], 'description' => 'Distance is mostly a matter of not stopping.'],
-        'explorer.high_ground' => ['job' => 'explorer', 'tier' => 2, 'jobLevel' => 5, 'name' => 'High Ground', 'effect' => ['kind' => 'sight', 'value' => 1], 'requires' => ['explorer.long_stride'], 'description' => 'Take the ridge and the country opens a hex further out.'],
-        'explorer.road_sense' => ['job' => 'explorer', 'tier' => 3, 'jobLevel' => 12, 'name' => 'Road Sense', 'effect' => ['kind' => 'stat', 'stat' => 'travelSpeed', 'value' => 0.1], 'requires' => ['explorer.high_ground'], 'description' => 'You stop taking the long way round without noticing you stopped.'],
-        'explorer.horizon_line' => ['job' => 'explorer', 'tier' => 4, 'jobLevel' => 20, 'name' => 'Horizon Line', 'effect' => ['kind' => 'sight', 'value' => 1], 'requires' => ['explorer.road_sense'], 'description' => 'You read the far edge of the ground the way others read the near.'],
-        'explorer.second_wind' => ['job' => 'explorer', 'tier' => 5, 'jobLevel' => 28, 'name' => 'Second Wind', 'effect' => ['kind' => 'stat', 'stat' => 'travelSpeed', 'value' => 0.05], 'requires' => ['explorer.horizon_line'], 'description' => 'The last hour of a long day costs what the first one did.'],
+        'explorer.deep_pockets' => ['job' => 'explorer', 'tier' => 1, 'jobLevel' => 2, 'name' => 'Deep Pockets', 'effect' => ['kind' => 'bagUnits', 'value' => 10], 'requires' => [], 'description' => 'You stop leaving things behind because there was nowhere to put them.'],
+        'explorer.second_strap' => ['job' => 'explorer', 'tier' => 1, 'jobLevel' => 2, 'name' => 'Second Strap', 'effect' => ['kind' => 'bagRows', 'value' => 4], 'requires' => [], 'description' => 'A second strap, and four more things you never have to choose between.'],
+        'explorer.rolled_blanket' => ['job' => 'explorer', 'tier' => 1, 'jobLevel' => 2, 'name' => 'Rolled Blanket', 'effect' => ['kind' => 'bagUnits', 'value' => 10], 'requires' => [], 'description' => 'Rolled, not folded. It takes half the room and sheds the rain.'],
+        'explorer.even_load' => ['job' => 'explorer', 'tier' => 2, 'jobLevel' => 9, 'name' => 'Even Load', 'effect' => ['kind' => 'bagUnits', 'value' => 10], 'requires' => ['explorer.deep_pockets'], 'description' => 'Weight over the hips, not the shoulders. The miles get shorter.'],
+        'explorer.side_pouch' => ['job' => 'explorer', 'tier' => 2, 'jobLevel' => 9, 'name' => 'Side Pouch', 'effect' => ['kind' => 'bagRows', 'value' => 4], 'requires' => ['explorer.second_strap'], 'description' => 'Small things stop living at the bottom of the pack.'],
+        'explorer.high_ground' => ['job' => 'explorer', 'tier' => 2, 'jobLevel' => 9, 'name' => 'High Ground', 'effect' => ['kind' => 'sight', 'value' => 1], 'requires' => ['explorer.rolled_blanket'], 'description' => 'Take the ridge and the country opens a hex further out.'],
+        'explorer.bindle' => ['job' => 'explorer', 'tier' => 3, 'jobLevel' => 16, 'name' => 'Bindle', 'effect' => ['kind' => 'bagUnits', 'value' => 10], 'requires' => ['explorer.even_load'], 'description' => 'An old trick: the pack that hangs outside the pack.'],
+        'explorer.sorted_kit' => ['job' => 'explorer', 'tier' => 3, 'jobLevel' => 16, 'name' => 'Sorted Kit', 'effect' => ['kind' => 'bagRows', 'value' => 4], 'requires' => ['explorer.side_pouch'], 'description' => 'Everything has a place, so everything fits in it.'],
+        'explorer.tump_line' => ['job' => 'explorer', 'tier' => 3, 'jobLevel' => 16, 'name' => 'Tump Line', 'effect' => ['kind' => 'bagUnits', 'value' => 10], 'requires' => ['explorer.high_ground'], 'description' => 'A strap across the brow. Your neck argues; the load moves.'],
+        'explorer.packers_knot' => ['job' => 'explorer', 'tier' => 4, 'jobLevel' => 23, 'name' => 'Packer\'s Knot', 'effect' => ['kind' => 'bagUnits', 'value' => 10], 'requires' => ['explorer.bindle'], 'description' => 'Cinch it once and it stays cinched for thirty miles.'],
+        'explorer.outer_pockets' => ['job' => 'explorer', 'tier' => 4, 'jobLevel' => 23, 'name' => 'Outer Pockets', 'effect' => ['kind' => 'bagRows', 'value' => 4], 'requires' => ['explorer.sorted_kit'], 'description' => 'What you need on the road no longer lives under what you do not.'],
+        'explorer.long_haul' => ['job' => 'explorer', 'tier' => 4, 'jobLevel' => 23, 'name' => 'Long Haul', 'effect' => ['kind' => 'bagUnits', 'value' => 10], 'requires' => ['explorer.tump_line'], 'description' => 'The day you stop counting the hours is the day you carry more of them.'],
+        'explorer.drovers_back' => ['job' => 'explorer', 'tier' => 5, 'jobLevel' => 30, 'name' => 'Drover\'s Back', 'effect' => ['kind' => 'bagUnits', 'value' => 10], 'requires' => ['explorer.packers_knot'], 'description' => 'Built by the road, and it shows in what you can pick up.'],
+        'explorer.tinkers_roll' => ['job' => 'explorer', 'tier' => 5, 'jobLevel' => 30, 'name' => 'Tinker\'s Roll', 'effect' => ['kind' => 'bagRows', 'value' => 4], 'requires' => ['explorer.outer_pockets'], 'description' => 'A roll of pockets, and a pocket for everything worth keeping.'],
+        'explorer.horizon_line' => ['job' => 'explorer', 'tier' => 5, 'jobLevel' => 30, 'name' => 'Horizon Line', 'effect' => ['kind' => 'sight', 'value' => 1], 'requires' => ['explorer.long_haul'], 'description' => 'You read the far edge of the ground the way others read the near.'],
         // ---- woodcutting
         'woodcutting.felling_notch' => ['job' => 'woodcutting', 'tier' => 1, 'jobLevel' => 1, 'name' => 'Felling Notch', 'effect' => ['kind' => 'stat', 'stat' => 'yield', 'value' => 0.01], 'requires' => [], 'description' => 'Cut the notch first and the tree goes where you want.'],
         'woodcutting.swing_economy' => ['job' => 'woodcutting', 'tier' => 1, 'jobLevel' => 1, 'name' => 'Swing Economy', 'effect' => ['kind' => 'stat', 'stat' => 'tripReduction', 'value' => 0.01], 'requires' => [], 'description' => 'Fewer swings, each of them meant.'],
@@ -497,6 +528,12 @@ final class Jobs
     public static function tierSizes(string $job): array
     {
         return self::isAutomatic($job) ? self::CHAIN_TIER_SIZE : self::TIER_SIZE;
+    }
+
+    /** @return array<int,int> tier => job level required, for this job's shape. */
+    public static function tierJobLevels(string $job): array
+    {
+        return self::isAutomatic($job) ? self::CHAIN_TIER_JOB_LEVEL : self::TIER_JOB_LEVEL;
     }
 
     /**

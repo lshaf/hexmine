@@ -2,11 +2,12 @@
 /**
  * The trades, §7.4.
  *
- * Eleven trees of thirty nodes, one chain of five, and the panel's one job is
- * to answer "what can I take right now" without the player counting anything.
+ * Eleven trees of thirty nodes, one chain of fifteen rungs, and the panel's one
+ * job is to answer "what can I take right now" without the player counting
+ * anything.
  *
  * The chain is Explorer (§7.5), and it is the one sheet with no price on it:
- * its five skills arrive as the job levels and cost no point. The panel says so
+ * its rungs arrive as the job levels and cost no point. The panel says so
  * rather than drawing a Learn button that would only ever be refused.
  *
  * ── Why strata, and why no wires ─────────────────────────────────────────────
@@ -110,7 +111,30 @@ const accent = computed(() =>
 )
 
 /** Roman numerals, because a stratum is named not counted. */
-const DEPTH = ['', 'I', 'II', 'III', 'IV', 'V']
+/**
+ * Depth in the gutter. A bought tree has five bands; the Explorer's chain has
+ * fifteen rungs (§7.5), so this counts rather than looks up -- a five-entry
+ * table would have quietly rendered the last ten rungs with a blank gutter.
+ */
+const NUMERALS: Array<[number, string]> = [
+  [10, 'X'],
+  [9, 'IX'],
+  [5, 'V'],
+  [4, 'IV'],
+  [1, 'I'],
+]
+
+function roman(n: number): string {
+  let left = n
+  let out = ''
+  for (const [value, glyph] of NUMERALS) {
+    while (left >= value) {
+      out += glyph
+      left -= value
+    }
+  }
+  return out
+}
 
 interface Band {
   tier: number
@@ -127,7 +151,11 @@ const bands = computed<Band[]>(() => {
   const mine = Object.entries(t.nodes).filter(([, n]) => n.job === job.value)
   const out: Band[] = []
 
-  for (const tier of [1, 2, 3, 4, 5]) {
+  // Read the tiers off the nodes rather than assuming five: the chain has
+  // fifteen, and a hardcoded range would silently drop everything past rung 5.
+  const tiers = [...new Set(mine.map(([, n]) => n.tier))].sort((a, b) => a - b)
+
+  for (const tier of tiers) {
     const nodes = mine
       .filter(([, n]) => n.tier === tier)
       .map(([key, def]) => ({ key, def }))
@@ -207,6 +235,8 @@ const EFFECT_ICON: Record<NodeEffect['kind'], string> = {
   craftDurability: 'effectCraftDurability',
   costReduction: 'effectCostReduction',
   batch: 'effectBatch',
+  bagUnits: 'effectBagUnits',
+  bagRows: 'effectBagRows',
 }
 
 /** Plain terms. A node says what it gives you, never what field it writes. */
@@ -226,6 +256,10 @@ function effectText(effect: NodeEffect): string {
       return `+${effect.value} made per craft`
     case 'sight':
       return `+${effect.value} hex of sight`
+    case 'bagUnits':
+      return `+${effect.value} units of bag`
+    case 'bagRows':
+      return `+${effect.value} kinds you can carry`
   }
 }
 
@@ -318,15 +352,16 @@ async function learn(): Promise<void> {
           </p>
           <p v-else-if="automatic" class="tiny granted">
             Levels on hexes walked, and walking earns no character XP — this is
-            the only thing a long road pays out. Its five skills are not bought:
-            each arrives the moment the level does.
+            the only thing a long road pays out. Nothing here is bought, and
+            nothing here is a stat: each rung arrives the moment the level does,
+            and pays in sight or in room to carry things.
           </p>
         </header>
 
         <!-- The strata. Depth in the gutter, the seam beside it. -->
         <div v-for="band in bands" :key="band.tier" class="band" :class="{ sealed: !band.reached }">
           <div class="gutter">
-            <span class="depth">{{ DEPTH[band.tier] }}</span>
+            <span class="depth">{{ roman(band.tier) }}</span>
             <span class="label lv">lv {{ band.jobLevel }}</span>
             <span class="tiny cut">{{ band.owned }}/{{ band.nodes.length }}</span>
           </div>
@@ -362,7 +397,7 @@ async function learn(): Promise<void> {
       <div v-if="chosen" class="inset detail">
         <div class="row-between">
           <strong class="name">{{ chosen.def.name }}</strong>
-          <span class="label tier">Depth {{ DEPTH[chosen.def.tier] }}</span>
+          <span class="label tier">Depth {{ roman(chosen.def.tier) }}</span>
         </div>
         <p class="tiny muted note">{{ chosen.def.description }}</p>
         <p class="tiny gives">{{ effectText(chosen.def.effect) }}</p>
@@ -386,7 +421,14 @@ async function learn(): Promise<void> {
 
       <p v-else class="tiny muted hint">Tap a skill to see what it gives and what it needs.</p>
 
-      <p class="tiny muted footnote">
+      <!-- §7.5 -- the granted tree obeys a stricter rule than the ceiling, so
+           it gets the stricter sentence rather than the general one. -->
+      <p v-if="automatic" class="tiny muted footnote">
+        Nothing on this ladder is a stat. A tree that costs no points may only
+        ever pay in what you can carry and how far you can see — both capped,
+        and neither of them power.
+      </p>
+      <p v-else class="tiny muted footnote">
         A job level opens the depths; points are what you spend in them. Nothing
         here can push a stat past the same ceiling gear stops at — what a tree
         buys is a different road to it.

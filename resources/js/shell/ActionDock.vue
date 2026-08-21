@@ -17,6 +17,7 @@ import { useGame } from '@/stores/game'
 import { RECIPES, RING_LABEL, SKILL_BY_KEY } from '@/game/catalog'
 import { BIOME_LABEL } from '@/theme/palette'
 import { formatDuration } from '@/game/formulas'
+import { worldParams } from '@/game/worldgen'
 import HexAction from './HexAction.vue'
 
 const game = useGame()
@@ -40,6 +41,56 @@ const ready = computed(() => Boolean(trip.value && trip.value.endsAt <= game.now
 const seam = computed(() => Boolean(underfoot.value?.material))
 
 const mineHint = computed(() => underfoot.value?.reason ?? `${underfoot.value?.yield ?? 0} units`)
+
+/**
+ * §5.5 -- a herd standing on this hex right now. Temporary and time-bucketed,
+ * so the cell appears and leaves on its own; there is nothing to un-spawn.
+ */
+const hunt = computed(() => underfoot.value?.hunt)
+const herd = computed(() => Boolean(hunt.value?.herdUntil))
+
+/**
+ * How long the herd stays. The only clock on this dock counting something that
+ * is not yours: a seam waits, a herd leaves (§5.5). That is the whole reason
+ * the cell earns a countdown when Mine never has.
+ *
+ * Hidden while a trip runs -- one trip at a time means the herd is unactionable
+ * then, and a countdown you cannot act on is noise.
+ */
+const herdLeaves = computed(() => {
+  const until = hunt.value?.herdUntil
+  if (!until || trip.value) return null
+
+  return formatDuration(until - game.now)
+})
+
+/**
+ * The last quarter of the herd's stay: the offer is closing.
+ *
+ * A fraction of the lifetime rather than a fixed number of minutes, because
+ * GAME_TIME_SCALE compresses the lifetime and an absolute threshold would read
+ * "closing" for the whole window at a fast clock. worldParams() already carries
+ * the scaled value the server generated the marker from.
+ */
+const herdGoing = computed(() => {
+  const until = hunt.value?.herdUntil
+  if (!until) return false
+
+  return until - game.now < worldParams().herdLifetimeMs * 0.25
+})
+
+const huntHint = computed(() => {
+  const h = hunt.value
+  if (!h) return ''
+  if (h.reason) return h.reason
+  // Both halves of the offer, because the essence is the reason to care and
+  // the pelts are the reason to bother -- §5.5 is the bridge between them.
+  const essence = h.essenceChance > 0
+    ? `, ${Math.round(h.essenceChance * 100)}% essence`
+    : ' — no bow, so no essence'
+
+  return `${h.yield} units${essence}`
+})
 
 const claimHint = computed(() => {
   if (!trip.value) return ''
@@ -67,12 +118,17 @@ const processHint = computed(() => {
  */
 const doing = computed(() => {
   if (!trip.value) return null
-  return ready.value ? 'Haul ready' : `Working · ${formatDuration(trip.value.endsAt - game.now)}`
+  return ready.value ? 'Reward ready' : `Working · ${formatDuration(trip.value.endsAt - game.now)}`
 })
 
 function mine(): void {
   const char = game.character
   if (char) void game.startMining(char.col, char.row)
+}
+
+function hunted(): void {
+  const char = game.character
+  if (char) void game.startHunt(char.col, char.row)
 }
 </script>
 
@@ -86,6 +142,11 @@ function mine(): void {
           {{ here ? here.name : standing ? BIOME_LABEL[standing.biome] : 'Unsurveyed' }}
         </h2>
         <span v-if="doing" class="label doing" :class="{ ready }">{{ doing }}</span>
+        <!-- §5.5 -- perishable, so it says when it goes rather than that it is
+             here. "Herd" alone would read as scenery. -->
+        <span v-else-if="herdLeaves" class="label herd" :class="{ going: herdGoing }">
+          Herd moves on in {{ herdLeaves }}
+        </span>
         <span v-else class="tiny muted meta">
           <template v-if="here">{{ here.tier }} · {{ lineNames || 'no lines' }}</template>
           <template v-else-if="standing">{{ RING_LABEL[standing.ring] }}</template>
@@ -108,25 +169,40 @@ function mine(): void {
             label="Drop"
             danger
             :disabled="game.busy"
-            hint="Forfeits the haul, and frees you to move"
+            hint="Forfeits the reward, and frees you to move"
             @activate="game.abandon(trip.id)"
           />
         </template>
 
-        <HexAction
-          v-else-if="seam"
-          icon="mine"
-          label="Mine"
-          :primary="Boolean(underfoot?.canMine)"
-          :disabled="!underfoot?.canMine"
-          :hint="mineHint"
-          @activate="mine"
-        />
+        <template v-else>
+          <HexAction
+            v-if="seam"
+            icon="mine"
+            label="Mine"
+            :primary="Boolean(underfoot?.canMine) && !herd"
+            :disabled="!underfoot?.canMine"
+            :hint="mineHint"
+            @activate="mine"
+          />
+
+          <!-- §5.5 -- present only while a herd is. Beside Mine rather than
+               instead of it: a hunt takes no tile slot, so both verbs are
+               genuinely available on the same hex at the same time. -->
+          <HexAction
+            v-if="herd"
+            icon="hunt"
+            label="Hunt"
+            :primary="Boolean(hunt?.canHunt)"
+            :disabled="!hunt?.canHunt"
+            :hint="huntHint"
+            @activate="hunted"
+          />
+        </template>
 
         <!-- Settlement-only. Absent in the field rather than greyed: the point
              is that these people are not out here. -->
         <template v-if="here">
-          <span v-if="trip || seam" class="rule" aria-hidden="true" />
+          <span v-if="trip || seam || herd" class="rule" aria-hidden="true" />
           <HexAction icon="trade" label="Trade" @activate="game.openPanel('shop')" />
           <HexAction icon="craft" label="Craft" @activate="game.openPanel('craft')" />
           <HexAction
@@ -183,6 +259,16 @@ function mine(): void {
 
 .doing.ready {
   color: var(--gold);
+}
+
+/* Gold, because a herd is an opportunity rather than work in progress -- the
+   same reading the map already gives gold in §13.1. Ember once it is closing. */
+.herd {
+  color: var(--gold);
+}
+
+.herd.going {
+  color: var(--ember);
 }
 
 .actions {

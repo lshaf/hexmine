@@ -38,7 +38,7 @@ export const MAP = {
    * the Explorer chain and drops to zero on the road; reading these numbers
    * instead of that field is how the fog and the server end up disagreeing.
    */
-  sightRadius: 2,
+  sightRadius: 1,
   sightTravelling: 0,
   /** §5 -- ten minutes of ground per hex, before travelSpeed divides it. */
   travelMsPerHex: 10 * MINUTE,
@@ -91,8 +91,6 @@ export const CHARACTER = {
   apPerLevel: 4,
   baseApMax: 20,
   apRegenMs: 4 * MINUTE,
-  baseStorage: 120,
-  storagePerLevel: 40,
   /**
    * §7.4.4 -- sized against measured income, not picked. ~197,000 XP to level
    * 100 against a career average of ~1,080 char XP a day is roughly 182 days of
@@ -129,10 +127,12 @@ export const JOBS = {
   costReductionCap: 0.15,
   batchCap: 2,
   /**
-   * §7.5 -- extra hexes of sight from the Explorer chain. A query budget rather
-   * than a balance one: cost goes as the square of the radius.
+   * §7.5 -- extra hexes of sight from the Explorer chain, on top of the base
+   * one. A query budget rather than a balance one: cost goes as the square of
+   * the radius -- one hex is seven tiles, three is thirty-seven.
    */
   sightCap: 2,
+  /** §7.6 -- the bag caps are the same kind of thing, and live on BAG below. */
   /** §7.5 -- Explorer XP per hex crossed. Never scaled by the game clock. */
   explorerXpPerHex: 5,
 } as const
@@ -144,11 +144,26 @@ export const SKILLS = {
   xpForLevel: (level: number) => Math.round(45 * Math.pow(level, 1.4)),
 } as const
 
-export const STORAGE = {
-  /** Raw resources decay when over cap, §3.1 / §11.1. */
-  decayIntervalMs: 10 * MINUTE,
-  /** Fraction of the overflow lost per interval. */
-  decayRate: 0.05,
+/**
+ * §7.6 -- the bag, and the two limits on it.
+ *
+ * Documentation only, like `sightRadius` above: what a character may carry is
+ * published per character in the state payload (`character.bag`) because the
+ * Explorer chain widens it. Reading these numbers instead of that field is how
+ * the meters and the server end up disagreeing about whether you may leave.
+ */
+export const BAG = {
+  units: 120,
+  rows: 30,
+  /**
+   * §7.5 -- what the road adds, and the most it can ever add: 120 -> 200 units
+   * and 30 -> 50 rows, ten and four at a time across the Explorer's fifteen
+   * rungs. Counts rather than percentages, so they have nothing to do with the
+   * §8.1 stat ceiling -- which is the whole reason a tree that costs no skill
+   * points is allowed to hand them out.
+   */
+  skillUnitsCap: 80,
+  skillRowsCap: 20,
 } as const
 
 export const EQUIPMENT = {

@@ -88,7 +88,7 @@ const heading = computed(() => {
           class="btn btn-sm btn-danger"
           type="button"
           :disabled="game.busy"
-          title="Abandoning forfeits the partial haul"
+          title="Abandoning forfeits the partial reward"
           @click="game.abandon(job.id)"
         >
           Drop

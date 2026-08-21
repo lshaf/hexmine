@@ -66,7 +66,7 @@ const where = computed(() =>
         class="btn btn-danger btn-sm"
         type="button"
         :disabled="game.busy"
-        title="Abandoning forfeits the partial haul"
+        title="Abandoning forfeits the partial reward"
         @click="game.abandon(job.id)"
       >
         Abandon

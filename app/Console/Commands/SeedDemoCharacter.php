@@ -29,33 +29,29 @@ class SeedDemoCharacter extends Command
 
     protected $description = 'Give a character a mid-game kit so every screen can be exercised';
 
-    /** @var array<string,int> */
+    /**
+     * §7.6 -- a kit that fits in the bag, because everything now has to.
+     *
+     * Five stacks, not twenty. Units are the limit that bites (§7.6), and these
+     * five plus three potions and three unworn items land at 99 of 120 -- a bag
+     * with a haul or two of room in it, which is the state most screens want to
+     * be shown in. A demo character who cannot walk would be a demo of the
+     * wrong thing.
+     *
+     * One stack per tier that has one, so every §4 band still has something to
+     * render on the bag screen.
+     *
+     * @var array<string,int>
+     */
     private const MATERIALS = [
-        'wood' => 60,
-        'iron_ore' => 45,
-        'pelt' => 30,
-        'stone' => 30,
-        'fiber' => 35,
+        'wood' => 44,
+        'iron_ore' => 24,
 
-        'planks' => 24,
-        'ingots' => 18,
-        'leather' => 12,
-        'cut_stone' => 10,
-        'cloth' => 14,
-        'reinforced_frame' => 4,
+        'planks' => 16,
 
-        'ironwood' => 6,
-        'mythril_ore' => 6,
-        'beastfang_hide' => 4,
-        'obsidian_shard' => 3,
-        'silkweave_fiber' => 5,
+        'ironwood' => 5,
 
-        'essence' => 5,
-        'shard_verdant' => 2,
-        'shard_ferrous' => 1,
-        'shard_sanguine' => 1,
-        'relic' => 2,
-        'core' => 1,
+        'essence' => 4,
     ];
 
     /** @var array<string,int> */
@@ -129,17 +125,23 @@ class SeedDemoCharacter extends Command
         $character = $player->character ?? $game->createCharacter($player);
 
         $summary = DB::transaction(fn () => $this->applyKit($game, $character));
+        $bag = $game->bag($character->fresh());
 
         $this->components->info("Kitted out {$character->name} at ({$character->col}, {$character->row}).");
         $this->table(['', ''], [
             ['wallet', $player->wallet],
             ['session', $sessionId ?? 'unbound — rerun without --wallet once the app has opened a session'],
-            ['level', self::LEVEL.'  (storage '.Balance::storageCap(self::LEVEL).', AP '.Balance::apMax(self::LEVEL).')'],
+            ['level', self::LEVEL.'  (AP '.Balance::apMax(self::LEVEL).')'],
             ['gold', (string) self::GOLD],
             ['materials', count(self::MATERIALS).' kinds, '.array_sum(self::MATERIALS).' units'],
             ['equipment', count(self::ITEMS).' items, '
                 .count(array_filter(self::ITEMS, fn (array $i) => $i['equipped'])).' equipped, '
                 .count(array_filter(self::ITEMS, fn (array $i) => $i['durability'] === 0)).' broken'],
+            // §7.6 -- the one number that decides whether this character can
+            // leave the hex it was seeded on. Printed so a kit that outgrows the
+            // bag is caught here rather than in the app.
+            ['bag', "{$bag['units']}/{$bag['unitCap']} units, {$bag['rows']}/{$bag['rowCap']} rows"
+                .($bag['over'] ? '  — OVERLOADED, this character cannot travel' : '')],
             ['jobs', $summary['jobs']],
             ['tutorial', $this->option('tutorial') ? 'running from step 1' : 'finished'],
         ]);
@@ -210,7 +212,6 @@ class SeedDemoCharacter extends Command
         $character->gold = self::GOLD;
         $character->presence_settlement_id = null;
         $character->tutorial_step = $this->option('tutorial') ? 0 : Tutorial::DONE;
-        $character->last_decay_at = $now;
         $character->save();
 
         $character->jobs()->delete();

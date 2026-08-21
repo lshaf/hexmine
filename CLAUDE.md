@@ -28,7 +28,7 @@ structured so botting is *economically pointless* rather than technically preven
 | No P2P resource trade | Direct player-to-player resource transfer does **not exist**. Removes the laundering/arbitrage vector entirely. |
 | Gold has no NFT bridge | Gold buys *common and uncommon* only. Gold can never be converted to NFT value. |
 | Sybil cost | One-time character mint fee per wallet + **wallet must hold a minimum crypto balance for ≥7 continuous days** before it can act. |
-| Soft caps | Storage caps, per-wallet rare-material caps, AP regen limits. A bot with 1000 wallets gets 1000× capped, non-liquid output. |
+| Soft caps | Bag limits (§7.6), per-wallet rare-material caps, AP regen limits. A bot with 1000 wallets gets 1000× capped, non-liquid output, and 1000 bags that have to be emptied by hand. |
 | Server authority | All timers are **server-side**. Client never asserts elapsed time. |
 
 **Rule for any new feature:** if it creates a path from "grind time" to "external value,"
@@ -43,7 +43,7 @@ The three currencies are strictly separated. No backdoor converts one into anoth
 ### 3.1 Resources (raw / refined / rare)
 - Mined from hex tiles, biome-locked
 - **Non-tradeable** between players
-- Decay when over storage cap
+- Carried against the two bag limits (§7.6) — over either one and you cannot travel
 - Consumed by: crafting, repair, building upgrades, raid charges
 
 ### 3.2 Gold
@@ -91,7 +91,7 @@ worth, and no recipe anywhere will take it.
 Scrap sits outside the 20 deliberately: it never enters the economy the §11 sinks
 have to balance.
 
-### Tier 1 — Raw (5, biome-locked, decays over cap)
+### Tier 1 — Raw (5, biome-locked, the bulk of what fills a bag)
 | Material | Biome |
 |---|---|
 | Wood | Forest |
@@ -132,10 +132,18 @@ cross-map travel — same design pressure as biome-locked mining.
 ### 5.1 Structure
 - Hex grid, ~5000×5000 at ship scale
 
-> **Currently set to a 500×500 test map** — `Balance::MAP_COLS/MAP_ROWS` are 500,
+> **Currently set to a 200×200 test map** — `Balance::MAP_COLS/MAP_ROWS` are 200,
 > and that is the only value that differs from ship. Everything else is a
 > fraction of the map radius or an absolute hex count, so it scales on its own.
 > Ship value: 5000 × 5000.
+>
+> The client is handed `cols`/`rows` by `/api/world` at boot rather than
+> compiling them in, so this constant is the single source of truth and the
+> TypeScript generator needs no matching edit. What it *does* need is a
+> regenerated fixture: `php artisan game:worldgen-fixture`, then `npm run
+> parity`. At 200×200 the world keeps its shape — 5 dungeons, and 161 villages
+> to 26 cities to 4 capitals, which holds the §6 ordering with the capital
+> count thin enough to be worth watching.
 
 - **Exactly 2 mining slots per hex.** When both are full, the tile is closed to others.
 - Tiles are **depletable**, then **regrow after ~9h** (tune). Depleted tiles keep their
@@ -180,14 +188,20 @@ map worth walking.
 
 | | Rule |
 |---|---|
-| **Sight** | **2 hexes.** Base `Balance::SIGHT_RADIUS`, up to 4 through the Explorer chain (§7.5). |
+| **Sight** | **1 hex.** Base `Balance::SIGHT_RADIUS`, up to 3 through the Explorer chain (§7.5). |
 | **Sight while travelling** | **0.** You are between hexes, watching your feet. |
 | **Travel range** | **None.** Any hex on the map is walkable from any other. |
 
 **Travel has no reach limit and must not grow one.** Distance already costs the
 one currency an idle game cannot inflate — hours, at ten minutes a hex — so a
 level gate on top of it would be a second answer to a question the clock has
-already answered. The only refusal is the edge of the map.
+already answered.
+
+There are exactly **two refusals**, and neither is a distance. The edge of the
+map, and an **overloaded bag** (§7.6). The second is the only one the player can
+undo, and it can always be undone from the hex they are standing on — sell,
+process, or throw something away. A refusal with no way out from where you are
+standing would be a dead end rather than a decision.
 
 **Outside sight the map is not blank, it is unscouted.** Terrain is a pure
 function of `(col, row, seed)` (§5), so the client draws the land itself for
@@ -198,11 +212,12 @@ whole of the difference between scouted ground and the rest.
 
 Three consequences, all deliberate:
 
-1. **The live-state query is a disc of nineteen tiles**, not the several hundred
-   that reach-as-sight scanned, and it does not grow with level. Sight is the
-   one number in the game no amount of play widens past `SIGHT_RADIUS +
-   SKILL_SIGHT_CAP`, and that ceiling is a query budget rather than a balance
-   one — cost goes as the square of the radius.
+1. **The live-state query is a disc of seven tiles** — the hex underfoot and
+   its six neighbours — rather than the several hundred that reach-as-sight
+   scanned, and thirty-seven at the very most. Sight is the one number in the
+   game no amount of play widens past `SIGHT_RADIUS + SKILL_SIGHT_CAP`, and
+   that ceiling is a query budget rather than a balance one — cost goes as the
+   square of the radius.
 2. **A journey costs no queries at all.** Sight closes to zero when the road
    starts and opens when it ends, so a walk of two hundred hexes and a walk of
    one both cost exactly two requests.
@@ -288,12 +303,15 @@ accelerates an already-capped queue.
 things, not the character — this prevents power-account selling.
 
 ### 7.1 Level
-Level unlocks **capacity, not power**: AP pool, storage cap, access to higher-tier hexes
-and dungeon floors. A whale can out-scale logistics but never out-damage a grinder.
+Level unlocks **capacity, not power**: AP pool, access to higher-tier hexes and
+dungeon floors. A whale can out-scale logistics but never out-damage a grinder.
 
-Travel range is deliberately *not* on that list — there is no reach to unlock
-(§5.6). Nor is sight: the only thing that widens the eye is having walked
-(§7.5), which is the one reward in the game that cannot be bought.
+Three things are deliberately *not* on that list. Travel range, because there is
+no reach to unlock (§5.6). Sight, because the only thing that widens the eye is
+having walked (§7.5). And the **bag** (§7.6), for the same reason as sight:
+carrying capacity used to be a level reward, which made it a problem that solved
+itself — by the time it mattered you had outgrown it. It is the Explorer's now,
+and walking is the one reward in the game that cannot be bought.
 
 ### 7.2 Gathering lines (5, one per material line)
 Woodcutting · Mining · Hunting · Quarrying · Harvesting
@@ -411,7 +429,9 @@ a matter of judgement. A node's effect must be one of these, and nothing else:
 | `craftDurability` | Higher starting max durability on what you make | `SKILL_DURABILITY_CAP` |
 | `costReduction` | Fewer inputs per craft | `SKILL_COST_REDUCTION_CAP` |
 | `batch` | More output per craft or processing run | `SKILL_BATCH_CAP` |
-| `sight` | Whole hexes of sight (§5.6), on top of the base two | `SKILL_SIGHT_CAP` |
+| `sight` | Whole hexes of sight (§5.6), on top of the base one | `SKILL_SIGHT_CAP` |
+| `bagUnits` | Units the bag holds (§7.6), on top of the flat base | `SKILL_BAG_UNITS_CAP` (+80) |
+| `bagRows` | Distinct things the bag holds, on top of the flat base | `SKILL_BAG_ROWS_CAP` (+20) |
 
 **A skill point can never take a stat past +15%.** `stat` nodes feed the very same
 sum and clamp as equipment, rolled options and potions (§8.1 rule 1). What they
@@ -419,18 +439,24 @@ buy is a *different road to the ceiling*, not a higher one — which is the poin
 a player deep in a tree reaches the same cap as one in full epic gear, and §8.1
 rule 4 stays true.
 
-The four caps that are not the stat ceiling exist to protect §11 and §5.6, not
-§8. `costReduction` and `batch` both thin a materials sink, and
-`craftDurability` thins the repair sink. Left uncapped, a maxed crafter would
-quietly switch off the loss the whole economy is balanced around.
+The caps that are not the stat ceiling exist to protect §11 and §5.6, not §8.
+`costReduction` and `batch` both thin a materials sink, and `craftDurability`
+thins the repair sink. Left uncapped, a maxed crafter would quietly switch off
+the loss the whole economy is balanced around.
 
-`sight` is the odd one, and its cap is the sharpest because sight is the radius
-of the map query — cost grows as the *square* of it. Two hexes is nineteen
-tiles, four is thirty-seven, ten would be two hundred and change.
-`SKILL_SIGHT_CAP` is a query budget rather than a balance one, and it is what
-lets sight be a reward at all instead of a scanner handed to anyone patient
-enough to walk. It is also a **count, not a percentage**, so like `unlock` it
-has nothing to do with the stat ceiling. It is capability.
+`bagUnits` and `bagRows` are the same argument in counts rather than
+percentages. The bag is the pressure that turns a haul into a decision (§7.6),
+and an uncapped tree could carry enough that the decision never arrives — which
+would switch off the selling, processing and dumping §11.1 runs on.
+
+`sight` is the odd one, and its cap is the sharpest because sight is the
+radius of the map query — cost grows as the *square* of it. One hex is seven
+tiles, two is nineteen, three is thirty-seven, and ten would be three hundred
+and thirty-one. `SKILL_SIGHT_CAP` is a query budget rather than a balance one,
+and it is what lets sight be a reward at all instead of a scanner handed to
+anyone patient enough to walk. It is also a **count, not a
+percentage**, so like `unlock` it has nothing to do with the stat ceiling. It
+is capability.
 
 **`unlock` is the one with no cap, and that is deliberate** — it is where the
 trees grow. New materials, new biome variants and new equipment tiers arrive as
@@ -459,27 +485,67 @@ test for this.
 
 ### 7.5 Explorer — the road job
 
-**A twelfth job, of a fourth kind (`wayfaring`), and it breaks four of §7.4's
+**A twelfth job, of a fourth kind (`wayfaring`), and it breaks five of §7.4's
 rules on purpose.** It exists because §5.6 took the reach limit off the map: if
 any hex is walkable, a long walk has to pay out *something*, or the map is just
 a waiting room.
 
 | | Explorer | Every other job |
 |---|---|---|
-| Tree | **5 nodes, one per tier, a single chain** | 30 nodes, 6/8/8/6/2, branching |
+| Tree | **15 rungs, one per tier, a single chain** | 30 nodes, 6/8/8/6/2, branching |
 | Cost | **Nothing — granted at its job level** | 1 skill point each |
 | Levels from | **Hexes crossed** | Bench work, or raiding |
 | Capstone | **one parent** (a chain has no fork) | two parents |
+| Gates | **every second job level, 2 → 30** | 1 / 5 / 12 / 20 / 28 |
 
-The chain, in order — the tier gates are §7.4.2's, unchanged:
+The ladder, in order. Nothing on it is a stat:
 
-| Tier | Job level | Node | Effect |
+| Rung | Job level | Node | Effect |
 |---|---|---|---|
-| 1 | 1 | Long Stride | +10% travel speed |
-| 2 | 5 | High Ground | **+1 sight** |
-| 3 | 12 | Road Sense | +10% travel speed |
-| 4 | 20 | Horizon Line | **+1 sight** |
-| 5 | 28 | Second Wind | +5% travel speed |
+| 1 | **2** | Deep Pockets | +10 bag units |
+| 2 | 4 | Second Strap | **+4 bag rows** |
+| 3 | 6 | Rolled Blanket | +10 bag units |
+| 4 | 8 | High Ground | **+1 sight** |
+| 5 | 10 | Side Pouch | **+4 bag rows** |
+| 6 | 12 | Even Load | +10 bag units |
+| 7 | 14 | Sorted Kit | **+4 bag rows** |
+| 8 | 16 | Bindle | +10 bag units |
+| 9 | 18 | Outer Pockets | **+4 bag rows** |
+| 10 | 20 | Tump Line | +10 bag units |
+| 11 | 22 | Packer's Knot | +10 bag units |
+| 12 | 24 | Tinker's Roll | **+4 bag rows** |
+| 13 | 26 | Long Haul | +10 bag units |
+| 14 | 28 | Drover's Back | +10 bag units |
+| 15 | **30** | Horizon Line | **+1 sight** |
+
+Totals: **120 → 200 units, 30 → 50 rows, 1 → 3 hexes of sight.** Eight rungs of
+ten, five of four, two of one.
+
+**Every rung is the eye or the back, and not one of them is a stat.** This is
+the rule that makes a granted tree safe to exist, and it is stricter than the
+§8.1 clamp it replaced. Every other tree is paid for with a skill point, and the
+point is what keeps the hundred-point cap (§7.4.1) meaningful; this one is free,
+so the only currency left to it is **capability** — counts, each with its own
+cap, none of them touching the stat ceiling. A percentage here would be a power
+ladder you climb by leaving the app open on a long walk. There is a test
+asserting a maxed Explorer moves no stat whatsoever.
+
+*(The chain used to end on +25% travelSpeed against a +15% ceiling and lean on
+the clamp to stay honest. Writing nothing is the better version of that
+argument.)*
+
+**Rung 1 waits for level 2, where every bought tree opens at 1.** A bought tree
+can open immediately because the skill point is the price — the job level only
+says you may spend it. A granted tree has no price at all, so opening at 1 would
+hand a character who has walked nowhere something for existing. Two Explorer
+levels is seventeen XP, four hexes: a short walk, but a walk, and a walk is the
+only thing this job is ever allowed to charge.
+
+**One rung every second level, not every level, and the last lands exactly on
+`JOB_MAX_LEVEL`.** Every level would make a rung ordinary; the gap is what makes
+one an event. `Jobs::CHAIN_TIER_JOB_LEVEL` holds the ladder, and it borrows
+nothing from §7.4.2's five tiers — those pace a tree bought with points, and
+this one is paced by walking.
 
 **Walking earns Explorer XP and no character XP.** Both halves are load-bearing.
 Without the first, a map with no reach limit is a long wait; without the second,
@@ -488,22 +554,97 @@ whole argument is that idle time must not be a faucet.
 
 **Its nodes are granted, never bought, and that is only safe because there is
 exactly one such tree.** A second free tree would not be a new job, it would be
-a hole in the 100-point cap (§7.4.1). Five nodes is likewise the ceiling on what
-a free tree may be worth. Granted nodes are **derived from the job level and
-never stored** — a row would be a second place for "do you have this yet" to be
-answered, and the two would eventually disagree.
+a hole in the 100-point cap (§7.4.1). Granted nodes are **derived from the job
+level and never stored** — a row would be a second place for "do you have this
+yet" to be answered, and the two would eventually disagree.
 
-**The travel bonus totals +25% against a +15% ceiling, and it is still clamped
-at +15%.** This is the one place a tree deliberately spends a whole stat by
-itself, so say it plainly: a maxed Explorer has `travelSpeed` spent for them and
-boots stop adding to it. That is the trade for a five-node tree that costs no
-points. What it does **not** do is pass the ceiling — those 25 points go into
-the same sum and the same clamp as gear, options and potions (§8.1 rule 1), and
-there is a test pinning it.
+**Sight is the rarest thing the road pays in**, and it is capped for the reason
+in §7.4.3: it is a query radius, and cost goes as the square of it. It goes
+1 → 3 and no further, ever, and both rungs sit late — one at level 8 and the
+other at 30, the last thing the ladder gives. Starting at one hex is what makes
+the first of them felt: the chain trebles what a prospector can see rather than
+adding a fringe to a view that was already wide.
 
-**Sight is the reward that matters**, and it is capped at `SKILL_SIGHT_CAP` for
-the reason in §7.4.3: sight is a query radius, not a stat. Base 2 → 4 at the end
-of the chain, and no further, ever.
+**The back grows the whole way up**, because that is what a long career of
+walking should feel like. Ten units is most of a haul; four straps is four more
+kinds you never have to choose between. A maxed Explorer carries two hundred
+units across fifty straps — which is a different *game* from 120 across 30, and
+the only way to get there is to have walked several thousand hexes.
+
+### 7.6 The bag — two limits, and they refuse in two different ways
+
+Everything a character owns and is not wearing is in one bag, and the bag has
+**two limits that are counted separately**:
+
+| | Limit | Constant |
+|---|---|---|
+| **Units** | **120.** Every unit of every material, every potion, and every unworn item. | `Balance::BAG_UNITS` |
+| **Rows** | **30.** How many *distinct* things that is: a stack is one row whether it holds 1 or 100, and two axes are two rows because gear does not stack. Roomy against a catalogue of 29 materials and 5 draughts, on purpose — see below. | `Balance::BAG_ROWS` |
+
+Both are **flat, and level does not move them** (§7.1). The only thing that
+widens either is the Explorer chain (§7.5), to **200 and 50** — fifteen rungs of
+ten units or four rows, earned by walking and by nothing else.
+
+**Units are the limit that bites; rows are the ceiling on carrying one of
+everything.** A prospector who commits to a line or two will meet 120 units
+several times a day and the straps almost never. That is the intended shape: the
+daily decision is *what is this haul worth carrying home*, and the straps are
+there so that "a little of everything, forever" is not an answer to it.
+
+The two are enforced in two different places, and the difference is the design:
+
+| | What happens at the limit | Where it is checked |
+|---|---|---|
+| **Units** | You **cannot travel.** Nothing is refused on the way in: a haul lands whole, and being too heavy stops the road rather than the work. | At the gate — `travelTo` |
+| **Rows** | A kind you are **not already carrying is turned away.** Rows can therefore never go over; there is nowhere to put a thing that has no strap. | At the door — mining, processing, crafting, buying, unequipping |
+
+**A row is a place, not a weight,** which is why it refuses rather than pins.
+Units can be dealt with after the fact — sell, process, drop — but "put it
+somewhere" has no after-the-fact answer, so the refusal has to come first.
+
+Three rules follow from that, and all three are mandatory:
+
+- **The refusal is said before the work, never after it.** A dig whose haul has
+  nowhere to land is refused at the hex, with AP untouched; a craft is refused
+  before its inputs are spent. An hour of mining that ends in a lost haul would
+  be a worse rule than no rule.
+- **More of what you already carry always fits.** Topping up a stack needs no
+  new row, and that asymmetry is the whole point: the limit is on *variety*,
+  which is what keeps §4's five lines a choice rather than a checklist.
+- **Worn gear is not carried.** An equipped axe is on your belt, not in your
+  pack — so equipping is itself a way to free a row, and a prospector who has
+  committed to their five lines is not charged for the commitment. Taking
+  something off is the one action that *adds* a row, so a full bag leaves it on
+  the belt.
+
+**Everything else keeps working while you are over on units.** Mining the hex
+you are standing on, selling, processing, drinking, dropping. Every one of those
+is a way out, and every one of them works from where you already are.
+
+**Two numbers rather than one, because one is a bucket.** Units alone would let
+a prospector carry a little of everything for nothing, and the whole of §4 is
+built on not being able to work every line at once. Rows are the tighter limit
+in practice, and they are the one that makes a second material line a decision
+rather than an accumulation.
+
+**It replaced storage-overflow decay** (old §11.1). Decay punished the same
+state twice — you lost the surplus *and* it happened while you were not looking,
+which is the worst way for an idle game to take something away. A bag that stops
+the road takes nothing at all; it makes you choose what to do with the surplus,
+and every one of those choices is a §11 sink.
+
+**On screen** (§13.2's rules, off the map): rows are **drawn as a comb of
+hexagons**, never measured on a bar — an empty strap is the same shape as a full
+one, so free space is something you see rather than subtract. Units are a
+**bar**, because a quantity is not a set of places. Tapping a strap opens what
+is on it in a popup, with the one or two things that can be done with it, rather
+than growing a detail panel that would push the comb off its own screen.
+
+The bag cell in the top-right turns ember when either limit is reached, and that
+is the only place the state is reported outside the bag itself. It is
+deliberately **not** in the instrument cluster: those needles measure what you
+can *do* next — action points, and the level that gates where you may go — and
+the bag is about what you are *holding*.
 
 ---
 
@@ -754,7 +895,10 @@ This is likely the single largest gold sink in the game.
 ## 11. Sinks (the stability engine)
 
 ### 11.1 Continuous / passive (unavoidable, happens during normal play)
-- Storage overflow decay on raw resources
+- **Bag pressure** (§7.6) — the bag does not destroy anything itself; it forces
+  the choice between the NPC's deliberately poor rate, a processing queue, and
+  throwing the surplus away. It replaced storage-overflow decay, which punished
+  the same state twice and did it while the player was not looking.
 - Building/feature degradation requiring refined-material repair
 - Equipment durability drain from mining and raiding
 - Tile abandonment penalty (leaving a hex mid-progress forfeits partial yield)

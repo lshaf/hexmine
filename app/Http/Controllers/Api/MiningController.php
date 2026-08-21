@@ -29,6 +29,25 @@ class MiningController extends GameController
         );
     }
 
+    /** §5.5 -- work a herd marker. AP and time, no raid charge. */
+    public function hunt(Request $request): JsonResponse
+    {
+        $character = $this->character($request);
+
+        $validated = $request->validate([
+            'col' => ['required', 'integer', 'min:0', 'max:'.(Balance::MAP_COLS - 1)],
+            'row' => ['required', 'integer', 'min:0', 'max:'.(Balance::MAP_ROWS - 1)],
+        ]);
+
+        $job = $this->game->startHunt($character, (int) $validated['col'], (int) $validated['row']);
+
+        return $this->respond(
+            $character,
+            $this->game->jobPayload($job),
+            "Hunting the herd at {$validated['col']},{$validated['row']}.",
+        );
+    }
+
     public function collect(Request $request, int $job): JsonResponse
     {
         $character = $this->character($request);
@@ -50,6 +69,6 @@ class MiningController extends GameController
         $character = $this->character($request);
         $this->game->abandonJob($character, $job);
 
-        return $this->respond($character, null, 'Trip abandoned. The partial haul is lost.');
+        return $this->respond($character, null, 'Trip abandoned. The partial reward is lost.');
     }
 }

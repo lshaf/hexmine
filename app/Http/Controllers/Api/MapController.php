@@ -39,6 +39,11 @@ class MapController extends GameController
     {
         $character = $this->character($request);
 
-        return response()->json($this->game->previewTile($character, $col, $row));
+        // §5.5 -- both verbs on one hex, so the client costs them in one call
+        // rather than spending a second request inside the same sight disc.
+        return response()->json([
+            ...$this->game->previewTile($character, $col, $row),
+            'hunt' => $this->game->previewHunt($character, $col, $row),
+        ]);
     }
 }

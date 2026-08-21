@@ -47,7 +47,7 @@ const TIER_LABEL: Record<string, string> = {
 const depleted = computed(() => Boolean(tile.value && tile.value.regrowsAt > game.now))
 
 /**
- * §5.6 -- outside two hexes there is no scouting report, because there is no
+ * §5.6 -- outside sight there is no scouting report, because there is no
  * scouting. The card falls back to what the seed already told this device: the
  * lie of the land, whether anybody lives there, and how long the walk is.
  *
@@ -91,13 +91,23 @@ const onSelected = computed(() => {
 /** A trip pins you to the hex you are working until you claim or drop it. */
 const working = computed(() => game.miningJob)
 
+/** §7.6 -- too much in the bag and the road is shut until it is not. */
+const overloaded = computed(() => Boolean(game.character?.bag.over))
+
 /**
  * §5.6 -- distance is not a gate any more. Every hex on the map can be walked
- * to, scouted or not; the only things that stop you are already being there and
- * being busy with something else.
+ * to, scouted or not. What stops you is being there already, being busy with
+ * something else, or carrying more than you can carry (§7.6) -- and that last
+ * one is the only refusal on this card the player can undo from where they are
+ * standing.
  */
 const canTravel = computed(
-  () => Boolean(tile.value) && !onSelected.value && !working.value && !game.travel,
+  () =>
+    Boolean(tile.value) &&
+    !onSelected.value &&
+    !working.value &&
+    !game.travel &&
+    !overloaded.value,
 )
 
 /** What the walk actually costs, which is the decision now that reach is not. */
@@ -110,8 +120,16 @@ const travelHint = computed(() => {
   if (game.travel) return 'You are on the road — stop before setting a new course'
   if (working.value) {
     return working.value.endsAt <= game.now
-      ? 'Claim your haul before you move on'
+      ? 'Claim your reward before you move on'
       : 'You are working this hex — claim or drop it first'
+  }
+  // Named against the limit that is actually broken, because "bag full" in
+  // front of a map that will not move reads as a bug rather than a decision.
+  if (overloaded.value) {
+    const bag = game.character!.bag
+    return bag.units > bag.unitCap
+      ? `Too much to carry — ${bag.units}/${bag.unitCap} units`
+      : `Too many kinds — ${bag.rows}/${bag.rowCap} straps`
   }
   return `${distance.value} hexes · ${formatSpan(eta.value)}`
 })
@@ -161,7 +179,7 @@ watch(tile, () => {
 
           <span v-if="trip" class="stats">
             <span class="stat">
-              <span class="label">Haul</span>
+              <span class="label">Reward</span>
               <span class="readout">{{ trip.yield }}</span>
             </span>
             <span class="stat">
@@ -214,6 +232,13 @@ watch(tile, () => {
           {{ game.sight === 1 ? 'hex' : 'hexes' }}<template v-if="game.travel">
             — and nothing at all while you are on the road</template>. Walk there
           to see the seam, who is on it, and what it pays.
+        </p>
+
+        <!-- §7.6 -- the way out, not just the refusal. Every one of these can
+             be done from the hex you are standing on. -->
+        <p v-else-if="overloaded" class="tiny blocked">
+          Your bag is over its limit, so you cannot set off. Sell, process or
+          throw something away first.
         </p>
 
         <!-- Workable hex, wrong place to be standing. Says the next move

@@ -47,7 +47,7 @@ class GameService
      * drops you: a forest tile in the outer ring, with a village running the
      * woodcutting line a short walk away. Villages run only 1 of 5 lines (§6),
      * so unconstrained spawns leave most players with no nearby way to turn
-     * wood into planks -- and with sight down to two hexes (§5.6) they would
+     * wood into planks -- and with sight down to one hex (§5.6) they would
      * not even be able to see that there is one.
      *
      * @return array{col:int,row:int}
@@ -129,7 +129,6 @@ class GameService
                 'col' => $spawn['col'],
                 'row' => $spawn['row'],
                 'tutorial_step' => 0,
-                'last_decay_at' => $now,
             ]);
 
             foreach (Catalog::SKILLS as $skill) {
@@ -171,8 +170,9 @@ class GameService
     /**
      * Lazy settlement of everything time-based. Runs before every read and write.
      *
-     * Nothing in this game ticks: AP regen and storage decay are derived from
-     * timestamps, so an hour offline and an hour idle produce the same result.
+     * Nothing in this game ticks: AP regen, arrival and buff expiry are derived
+     * from timestamps, so an hour offline and an hour idle produce the same
+     * result.
      */
     public function settle(Character $character): void
     {
@@ -195,64 +195,8 @@ class GameService
             $dirty = true;
         }
 
-        // §11.1 -- storage overflow decay.
-        $interval = Balance::scaled(Balance::DECAY_INTERVAL_MS);
-        $elapsed = $now - $character->last_decay_at;
-        if ($elapsed >= $interval) {
-            $intervals = intdiv($elapsed, $interval);
-            $this->applyDecay($character, $intervals);
-            $character->last_decay_at += $intervals * $interval;
-            $dirty = true;
-        }
-
         if ($dirty) {
             $character->save();
-        }
-    }
-
-    /**
-     * §11.1 -- only tier 1 raw materials rot. Refined and rare goods represent
-     * invested work; punishing those twice reads as a bug, not a sink.
-     */
-    private function applyDecay(Character $character, int $intervals): void
-    {
-        $cap = Balance::storageCap($character->level);
-        $rows = $character->materials()->get();
-        $total = $rows->sum('quantity');
-
-        if ($total <= $cap) {
-            return;
-        }
-
-        $raw = $rows->filter(fn ($r) => Catalog::materialTier($r->material_key) === 1 && $r->quantity > 0)
-            ->sortByDesc('quantity')
-            ->values();
-
-        if ($raw->isEmpty()) {
-            return;
-        }
-
-        for ($i = 0; $i < $intervals && $total > $cap; $i++) {
-            $overflow = $total - $cap;
-            $loss = max(1, (int) ceil($overflow * Balance::DECAY_RATE));
-            $remaining = $loss;
-
-            foreach ($raw as $row) {
-                if ($remaining <= 0) {
-                    break;
-                }
-                if ($row->quantity <= 0) {
-                    continue;
-                }
-                $take = min($row->quantity, max(1, (int) ceil($remaining / max(1, $raw->count()))));
-                $row->quantity -= $take;
-                $remaining -= $take;
-                $total -= $take;
-            }
-        }
-
-        foreach ($raw as $row) {
-            $row->quantity > 0 ? $row->save() : $row->delete();
         }
     }
 
@@ -281,6 +225,14 @@ class GameService
             'material_key' => $key,
         ]);
         $current = (int) ($row->quantity ?? 0);
+
+        // §7.6 -- a kind the bag is not already holding needs a free row, and
+        // when there is none the haul does not land. Silent rather than thrown,
+        // because the callers that grant are collections: they report what was
+        // lost through `lostToOverflow` and carry on.
+        if ($current <= 0 && ! $this->hasFreeRow($character)) {
+            return 0;
+        }
 
         $granted = $quantity;
         $cap = Catalog::walletCap($key);
@@ -311,9 +263,127 @@ class GameService
         $row->quantity > 0 ? $row->save() : $row->delete();
     }
 
-    public function storageUsed(Character $character): int
+    // -------------------------------------------------------------------- bag
+
+    /**
+     * §7.6 -- what is in the bag, against the two limits on it.
+     *
+     * Two numbers, because one is not enough. `units` is the weight of the thing
+     * -- every material, every potion, every unworn tool -- and `rows` is how
+     * many separate things they are. A bucket has only the first, and a bucket
+     * lets a prospector carry one of everything for free, which is exactly the
+     * pressure §4's biome-locked ladder is built on.
+     *
+     * **Worn gear is not carried.** An equipped axe is on your belt, not in your
+     * pack, so equipping is itself a way to free a row -- and a prospector who
+     * has committed to their five lines is not punished for it. Spares and
+     * anything waiting to be equipped cost a row each, because two axes do not
+     * stack.
+     *
+     * Derived on every read and never stored. A counter would be a second
+     * opinion about what you are carrying, and the two would eventually
+     * disagree the first time a row was deleted somewhere that forgot about it.
+     *
+     * @return array{units:int,unitCap:int,rows:int,rowCap:int,over:bool}
+     */
+    public function bag(Character $character): array
     {
-        return (int) $character->materials()->sum('quantity');
+        $materials = $character->materials()->where('quantity', '>', 0)->pluck('quantity');
+        $potions = $character->consumables()->where('quantity', '>', 0)->pluck('quantity');
+        // Queried rather than read off the loaded relation: the bag is checked
+        // right after equipping and dropping, and a cached collection would be
+        // one action out of date exactly when it matters.
+        $loose = $character->items()->where('equipped', false)->count();
+
+        $units = (int) $materials->sum() + (int) $potions->sum() + $loose;
+        $rows = $materials->count() + $potions->count() + $loose;
+
+        $effects = $this->nodeEffects($character);
+        $unitCap = Balance::BAG_UNITS + $effects['bagUnits'];
+        $rowCap = Balance::BAG_ROWS + $effects['bagRows'];
+
+        return [
+            'units' => $units,
+            'unitCap' => $unitCap,
+            'rows' => $rows,
+            'rowCap' => $rowCap,
+            'over' => $units > $unitCap || $rows > $rowCap,
+        ];
+    }
+
+    /**
+     * §7.6 -- is there a strap free for something the bag is not already holding?
+     *
+     * The two limits refuse in two different ways, on purpose. **Units** may go
+     * over: a haul lands whole, and being too heavy stops the road rather than
+     * the work, which is a decision the player can undo from where they stand.
+     * **Rows** may not, because a row is not weight -- it is a place to put a
+     * thing, and there is nowhere to put a thing that has no strap. So the row
+     * limit is checked at the door and the unit limit at the gate.
+     *
+     * More of what you already carry never needs a new row, and that asymmetry
+     * is the whole point: the limit is on *variety*, which is what keeps §4's
+     * five lines a choice instead of a checklist.
+     */
+    public function hasFreeRow(Character $character): bool
+    {
+        $bag = $this->bag($character);
+
+        return $bag['rows'] < $bag['rowCap'];
+    }
+
+    /** True when this material can land: an open strap, or a stack to join. */
+    public function canTakeMaterial(Character $character, string $key): bool
+    {
+        return $this->held($character, $key) > 0 || $this->hasFreeRow($character);
+    }
+
+    /**
+     * §7.6 -- refuse a new row, in the words the player needs.
+     *
+     * Called before anything is spent, never after: a craft that takes the
+     * planks and then finds nowhere to put the axe would be the worst version
+     * of this rule.
+     */
+    private function requireFreeRow(Character $character, string $what): void
+    {
+        if ($this->hasFreeRow($character)) {
+            return;
+        }
+
+        $bag = $this->bag($character);
+
+        throw new GameException(
+            "No room for {$what} — your bag is full at {$bag['rowCap']} kinds. Clear one out first.",
+            'no_room',
+        );
+    }
+
+    /**
+     * §7.6 -- why you cannot leave, in the words the player needs.
+     *
+     * Null when the bag is fine. The message names the limit that is broken and
+     * by how much, because "your bag is full" in front of a map that will not
+     * move is the kind of refusal that reads as a bug.
+     */
+    public function overloaded(Character $character): ?string
+    {
+        $bag = $this->bag($character);
+
+        if ($bag['units'] > $bag['unitCap']) {
+            $over = $bag['units'] - $bag['unitCap'];
+
+            return "Too much to carry — {$bag['units']} of {$bag['unitCap']}. Sell, process or drop {$over} before you set off.";
+        }
+
+        if ($bag['rows'] > $bag['rowCap']) {
+            $over = $bag['rows'] - $bag['rowCap'];
+            $things = $over === 1 ? 'one kind of thing' : "{$over} kinds of thing";
+
+            return "Your pack will not close — {$bag['rows']} kinds against {$bag['rowCap']} straps. Clear {$things} before you set off.";
+        }
+
+        return null;
     }
 
     /**
@@ -699,8 +769,12 @@ class GameService
      */
     private function occupiedSlots(int $col, int $row): int
     {
+        // Mining only. §5.5 hunts sit on a hex without taking one of its two
+        // seats -- the pelts come off the herd, not out of the ground -- so
+        // counting them here would let a wandering herd close a seam.
         return GameJob::where('col', $col)
             ->where('row', $row)
+            ->where('kind', 'mining')
             ->where('status', 'active')
             ->count();
     }
@@ -718,7 +792,10 @@ class GameService
      */
     public function miningTrip(Character $character): ?GameJob
     {
-        return $character->jobs()->where('kind', 'mining')->first();
+        // Hunting counts, §5.5. A herd is not a seam, but it is still a person
+        // out in the field, and a person is only in one place at a time -- so a
+        // hunt blocks a dig and a dig blocks a hunt.
+        return $character->jobs()->whereIn('kind', ['mining', 'hunting'])->first();
     }
 
     /**
@@ -806,15 +883,16 @@ class GameService
      * seed already gives them: which tiles are worked out, and who is standing
      * on them.
      *
-     * Scoped to sight (§5.6), which is two hexes and takes no arguments. The
+     * Scoped to sight (§5.6), which is one hex at the start and three at the
+     * end of the Explorer chain, and takes no arguments. The
      * camera can be dragged anywhere and costs nothing, because terrain is
      * derived (§5); but live state follows the character, not the camera, so a
      * client cannot walk a viewport parameter across the map to harvest where
      * everyone is mining. Nothing outside sight is knowable, not merely undrawn.
      *
-     * Two hexes is nineteen tiles rather than the several hundred that reach-
-     * as-sight scanned, and a character on the road sees zero -- so the walk
-     * itself costs no queries at all, however long it is.
+     * One hex is seven tiles and three is thirty-seven, rather than the several
+     * hundred that reach-as-sight scanned, and a character on the road sees zero
+     * -- so the walk itself costs no queries at all, however long it is.
      *
      * @return array{depleted:array<int,array{0:int,1:int,2:int}>,occupied:array<int,array{0:int,1:int,2:int}>}
      */
@@ -974,7 +1052,7 @@ class GameService
             $reason = 'You are on the road. Stop the journey, or wait until you arrive.';
         } elseif ($working !== null) {
             $reason = $working->isReady($now)
-                ? 'Your haul is waiting. Claim it before working anything else.'
+                ? 'Your reward is waiting. Claim it before working anything else.'
                 : 'You are already working a hex. Finish that one first.';
         } elseif ($distance !== 0) {
             $reason = 'You are standing elsewhere. Travel to this hex to work it.';
@@ -1007,6 +1085,145 @@ class GameService
         ];
     }
 
+    // ----------------------------------------------------------- hunting §5.5
+
+    /**
+     * What working a herd on this hex would cost and give.
+     *
+     * Shaped like previewTile() and bounded by the same sight rule, because a
+     * herd is live state: whether one is standing here is exactly the kind of
+     * fact §5.6 keeps outside the disc.
+     *
+     * @return array<string,mixed>
+     */
+    public function previewHunt(Character $character, int $col, int $row): array
+    {
+        $now = $this->now();
+        $distance = HexGeometry::distance((int) $character->col, (int) $character->row, $col, $row);
+
+        $base = [
+            'canHunt' => false,
+            'reason' => null,
+            'seconds' => Balance::scaled(Balance::HUNT_BASE_SECONDS * 1000) / 1000,
+            'herdUntil' => null,
+            'yield' => 0,
+            'material' => null,
+            'scrap' => false,
+            'essenceChance' => 0.0,
+            'note' => null,
+            'apCost' => Balance::HUNT_AP_COST,
+            'unseen' => false,
+        ];
+
+        if ($distance > $this->sightRadius($character)) {
+            $base['reason'] = $this->isTravelling($character)
+                ? 'You are watching your feet. Nothing is scouted until you stop.'
+                : 'Too far to make out. Walk there and see for yourself.';
+            $base['unseen'] = true;
+
+            return $base;
+        }
+
+        $tile = $this->buildTile($col, $row, $now);
+        $herdUntil = $tile['herdUntil'] ?? null;
+
+        if ($herdUntil === null || $herdUntil <= $now) {
+            $base['reason'] = 'No herd here. They wander, and they do not stay long.';
+
+            return $base;
+        }
+
+        $base['herdUntil'] = $herdUntil;
+
+        // §8.0 rule 1 -- the bow is the hunting line's tool and nothing else
+        // stands in for it. Bare hands still get something, per §4.0.
+        $bare = ! $this->hasLineTool($character, 'hunting');
+        $material = $bare ? Catalog::BIOME_SCRAP['plains'] : 'pelt';
+        $bonuses = $this->bonuses($character, 'hunting');
+        $skillLevel = (int) ($character->skills()->where('skill_key', 'hunting')->value('level') ?? 1);
+
+        $rolled = Hash::randInt(
+            Hash::hash2($col, $row + $herdUntil, Balance::MAP_SEED ^ 0x8eed),
+            Balance::HUNT_PELT_MIN,
+            Balance::HUNT_PELT_MAX,
+        );
+
+        $base['material'] = $material;
+        $base['scrap'] = $bare;
+        $base['yield'] = Formulas::tripYield(
+            $rolled,
+            $skillLevel,
+            $bonuses['yield'],
+            WorldGen::ringYield($tile['ring']),
+        );
+
+        // §4.0 again, and this is the sharp end of it. Essence is the most
+        // valuable thing a non-raider can hold, so a bare-handed haul must not
+        // reach it -- otherwise the bow is optional on the one line where it
+        // pays for a Tier 4 material, and the §8.0 ladder inverts.
+        $base['essenceChance'] = $bare ? 0.0 : Balance::HUNT_ESSENCE_CHANCE;
+
+        if ($bare) {
+            $base['note'] = 'No bow — bare hands take Torn Hide here, not Pelt, and the herd leaves you nothing else.';
+        }
+
+        $working = $this->miningTrip($character);
+
+        $base['reason'] = match (true) {
+            $this->isTravelling($character) => 'You are on the road. Stop the journey, or wait until you arrive.',
+            $working !== null => $working->isReady($now)
+                ? 'Your reward is waiting. Claim it before working anything else.'
+                : 'You are already working a hex. Finish that one first.',
+            $distance !== 0 => 'You are standing elsewhere. Travel to this hex to hunt it.',
+            $character->ap < Balance::HUNT_AP_COST => 'Not enough action points.',
+            default => null,
+        };
+
+        $base['canHunt'] = $base['reason'] === null;
+
+        return $base;
+    }
+
+    /**
+     * §5.5 -- AP and time, no party and no raid charge.
+     *
+     * A hunt takes no tile slot and never depletes the tile: the pelts come off
+     * the herd, not out of the ground, so two miners can be working the same hex
+     * while everyone else hunts across it.
+     */
+    public function startHunt(Character $character, int $col, int $row): GameJob
+    {
+        return DB::transaction(function () use ($character, $col, $row) {
+            $preview = $this->previewHunt($character, $col, $row);
+
+            if (! $preview['canHunt']) {
+                throw new GameException($preview['reason'] ?? 'Cannot hunt here.', 'blocked');
+            }
+
+            $now = $this->now();
+            $character->ap -= Balance::HUNT_AP_COST;
+
+            $job = GameJob::create([
+                'character_id' => $character->id,
+                'kind' => 'hunting',
+                'status' => 'active',
+                'col' => $col,
+                'row' => $row,
+                // No slot: a herd is not one of the hex's two seats, §5.5.
+                'slot' => null,
+                'material_key' => $preview['material'],
+                'quantity' => max(1, (int) $preview['yield']),
+                'skill_key' => 'hunting',
+                'started_at' => $now,
+                'ends_at' => $now + Balance::scaled(Balance::HUNT_BASE_SECONDS * 1000),
+            ]);
+
+            $character->save();
+
+            return $job;
+        });
+    }
+
     // ------------------------------------------------------------------ mining
 
     public function startMining(Character $character, int $col, int $row): GameJob
@@ -1015,6 +1232,13 @@ class GameService
             $preview = $this->previewTile($character, $col, $row);
             if (! $preview['canMine']) {
                 throw new GameException($preview['reason'] ?? 'Cannot mine here.', 'blocked');
+            }
+
+            // §7.6 -- a full bag refuses a kind it is not already carrying, so
+            // the refusal belongs here rather than an hour later at the haul.
+            if (! $this->canTakeMaterial($character, $preview['material'])) {
+                $name = Catalog::material($preview['material'])['name'] ?? $preview['material'];
+                $this->requireFreeRow($character, $name);
             }
 
             if ($character->ap < $preview['apCost']) {
@@ -1101,6 +1325,43 @@ class GameService
                     );
                 }
 
+                $this->fireTutorial($character, 'collect');
+            } elseif ($job->kind === 'hunting') {
+                $granted = $this->addMaterial($character, $job->material_key, $job->quantity);
+                $lostToOverflow = $job->quantity - $granted;
+                $gained[$job->material_key] = $granted;
+
+                $bare = Catalog::isScrap($job->material_key);
+
+                $xpAmount = $bare
+                    ? max(1, (int) round($job->quantity * 4 * Balance::SCRAP_XP_RATE))
+                    : $job->quantity * 4;
+
+                // §5.5 -- the bridge to the raid track, and the only Tier 4
+                // faucet outside a dungeon. Rolled server-side from a seed like
+                // every other outcome, and closed to bare hands: see
+                // previewHunt() for why that is not a tuning value.
+                if (! $bare) {
+                    $roll = Hash::rand01(
+                        Hash::hash2($job->col + $job->id, $job->row + $now, Balance::MAP_SEED ^ 0x3550)
+                    );
+
+                    if ($roll < Balance::HUNT_ESSENCE_CHANCE) {
+                        $essence = $this->addMaterial($character, 'essence', 1);
+                        $lostToOverflow += 1 - $essence;
+
+                        if ($essence > 0) {
+                            $gained['essence'] = $essence;
+                        }
+                    }
+                }
+
+                // A bow is drawn, so a bow wears. The other four slots idle,
+                // §8.0 rule 2 -- drainDurability already scopes to the line.
+                $durabilityLost = $this->drainDurability($character, Balance::DRAIN_PER_MINE, 'hunting');
+
+                // No depletion and no TileState row: the herd was the resource,
+                // and it leaves on its own clock whatever anybody does here.
                 $this->fireTutorial($character, 'collect');
             } else {
                 $granted = $this->addMaterial($character, $job->output_key, $job->quantity);
@@ -1214,6 +1475,13 @@ class GameService
                 throw new GameException('Every slot here is busy. Wait, or try another settlement.', 'queue_full');
             }
 
+            // §7.6 -- same rule as a dig: the output needs a strap before the
+            // inputs are spent, not after the run finishes.
+            if (! $this->canTakeMaterial($character, $recipe['output'])) {
+                $name = Catalog::material($recipe['output'])['name'] ?? $recipe['output'];
+                $this->requireFreeRow($character, $name);
+            }
+
             $count = max(1, $batches);
             $this->takeMaterial($character, $recipe['input'], $recipe['inputQty'] * $count);
             if (isset($recipe['secondInput'])) {
@@ -1312,7 +1580,7 @@ class GameService
         if ($trip !== null) {
             throw new GameException(
                 $trip->isReady($this->now())
-                    ? 'Claim your haul before you move on.'
+                    ? 'Claim your reward before you move on.'
                     : 'You are working this hex. Claim it when it finishes, or drop it.',
                 'working',
             );
@@ -1335,6 +1603,16 @@ class GameService
         $distance = HexGeometry::distance($character->col, $character->row, $col, $row);
         if ($distance === 0) {
             throw new GameException('You are already standing here.', 'blocked');
+        }
+
+        // §7.6 -- the second refusal, and the only one that is not the edge of
+        // the map. An overloaded bag does not stop you working the hex you are
+        // standing on, selling, processing or dropping what is in it; it stops
+        // you carrying it somewhere else. The way out is always in reach, which
+        // is what keeps this a decision rather than a dead end.
+        $overloaded = $this->overloaded($character);
+        if ($overloaded !== null) {
+            throw new GameException($overloaded, 'overloaded');
         }
 
         // Whatever you were helping with, you are not helping with it any more.
@@ -1570,6 +1848,9 @@ class GameService
 
             $this->requireSettlement($character, 'trade', $def['station'] ?? 'village');
 
+            // §7.6 -- gear does not stack, so a purchase is always a new row.
+            $this->requireFreeRow($character, $def['name']);
+
             if ($character->gold < $def['goldPrice']) {
                 throw new GameException('Not enough gold.', 'no_gold');
             }
@@ -1652,6 +1933,12 @@ class GameService
             // cheaper, so the discount is read from the job whose bench this is.
             // Never below one of anything: a free craft is not a discount, it is
             // a hole in the §11 materials sink.
+            // §7.6 -- a potion joins a shelf it may already have; anything with
+            // a slot is a new row every time, because gear does not stack.
+            if (empty($def['consumable']) || $this->heldConsumable($character, $itemKey) <= 0) {
+                $this->requireFreeRow($character, $def['name']);
+            }
+
             $effects = $this->craftEffects($character, $this->jobForItem($def));
             $inputs = [];
             foreach ($def['inputs'] as $key => $qty) {
@@ -1872,7 +2159,7 @@ class GameService
      * rest apply at the craft site. Each non-stat total is clamped to its own
      * cap, which is what keeps a maxed tree from switching off a §11 sink.
      *
-     * @return array{stats:array<string,float>,unlocks:array<int,string>,byJob:array<string,array<string,float>>}
+     * @return array{stats:array<string,float>,unlocks:array<int,string>,byJob:array<string,array<string,float>>,sight:int,bagUnits:int,bagRows:int}
      */
     public function nodeEffects(Character $character): array
     {
@@ -1881,6 +2168,8 @@ class GameService
         $unlocks = [];
         $byJob = [];
         $sight = 0;
+        $bagUnits = 0;
+        $bagRows = 0;
 
         foreach ($this->ownedNodes($character) as $key) {
             $node = Jobs::node($key);
@@ -1914,6 +2203,15 @@ class GameService
                     // cap it is bounded by.
                     $sight += (int) $effect['value'];
                     break;
+                case 'bagUnits':
+                    // §7.6 -- counts, like sight, and bounded by their own caps
+                    // rather than the stat ceiling. What they thin is the §11
+                    // pressure to sell, process and dump, not a power curve.
+                    $bagUnits += (int) $effect['value'];
+                    break;
+                case 'bagRows':
+                    $bagRows += (int) $effect['value'];
+                    break;
                 default:
                     $byJob[$job][$effect['kind']] = ($byJob[$job][$effect['kind']] ?? 0) + $effect['value'];
             }
@@ -1940,6 +2238,8 @@ class GameService
             'unlocks' => $unlocks,
             'byJob' => $byJob,
             'sight' => min($sight, Balance::SKILL_SIGHT_CAP),
+            'bagUnits' => min($bagUnits, Balance::SKILL_BAG_UNITS_CAP),
+            'bagRows' => min($bagRows, Balance::SKILL_BAG_ROWS_CAP),
         ];
     }
 
@@ -2071,6 +2371,12 @@ class GameService
     public function unequipItem(Character $character, int $itemId): void
     {
         $item = $this->ownedItem($character, $itemId);
+
+        // §7.6 -- worn is not carried, so taking something off is the one action
+        // that *adds* a row. With no strap free it stays on the belt, which is
+        // the only place left for it.
+        $this->requireFreeRow($character, Catalog::item($item->item_key)['name'] ?? 'it');
+
         $item->equipped = false;
         $item->save();
     }
@@ -2206,8 +2512,11 @@ class GameService
                 'gold' => $character->gold,
                 'col' => $character->col,
                 'row' => $character->row,
-                'storageUsed' => (int) $character->materials->sum('quantity'),
-                'storageCap' => Balance::storageCap($character->level),
+                // §7.6 -- the bag, both limits, and whether it is over one of
+                // them. Published rather than derived client-side because it is
+                // what the travel refusal is decided on, and the map must never
+                // offer a walk the server will refuse.
+                'bag' => $this->bag($character),
                 // §5.6 -- how far the character can see. There is no reach to
                 // publish any more: every hex is walkable. Sight is published
                 // rather than mirrored client-side so the fog on the map and
@@ -2246,7 +2555,10 @@ class GameService
             // The hex under the character's feet, costed. The dock acts on this
             // rather than on whatever is selected, because selecting is aiming
             // and the dock is only ever about here.
-            'underfoot' => $this->previewTile($character, $character->col, $character->row),
+            'underfoot' => [
+                ...$this->previewTile($character, $character->col, $character->row),
+                'hunt' => $this->previewHunt($character, $character->col, $character->row),
+            ],
             'shopStock' => $this->shopStock($character),
             // §7.4 -- what the tree panel needs about *this* character. The tree
             // itself is static and comes from GET /api/jobs instead, so it is

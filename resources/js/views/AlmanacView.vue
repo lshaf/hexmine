@@ -42,7 +42,7 @@ import {
 } from '@/game/sources'
 import type { SourceLine } from '@/game/sources'
 import { formatPercent } from '@/game/formulas'
-import { EQUIPMENT, ECONOMY, PROCESSING, STORAGE } from '@/game/balance'
+import { EQUIPMENT, ECONOMY, PROCESSING, BAG } from '@/game/balance'
 import { ACTION_PATHS } from '@/icons/actions'
 import { BIOME_LABEL } from '@/theme/palette'
 import { itemIcon, materialIcon } from '@/icons/procedural'
@@ -80,9 +80,7 @@ const TIER_NAME: Record<MaterialTier, string> = {
 /** One structural fact per tier -- the thing that is true of all five of them. */
 const TIER_NOTE: Record<MaterialTier, string> = {
   0: 'What a hex gives up to bare hands, on any ring: the same haul as the real thing, a fraction of the worth. Outside the twenty on purpose — it feeds no recipe and reaches no other tier, so it never enters the economy the sinks have to balance.',
-  1: `Biome-locked, on the outer and middle rings. The only tier that decays: anything over your storage cap sheds ${Math.round(
-    STORAGE.decayRate * 100,
-  )}% of the overflow every ${Math.round(STORAGE.decayIntervalMs / 60000)} minutes.`,
+  1: `Biome-locked, on the outer and middle rings, and the bulk of what fills a bag: ${BAG.units} units and ${BAG.rows} kinds is all a prospector carries, and a haul that puts you over either one keeps you on the hex until you sell, process or drop it.`,
   2: `Made at settlements, never mined. A village runs one line of five, a city two, a capital all of them — which is most of what makes a capital worth the walk. Every station has ${PROCESSING.publicSlots} public slots, first come first served, so a busy capital queues.`,
   3: `Contested ring only, and capped at ${ECONOMY.rareWalletCap} per wallet. A thousand bot wallets get a thousand capped hauls, which is the point.`,
   4: 'Dungeon-sourced and not biome-locked. Shards are typed to their dungeon, so a top-tier tool always means crossing the map.',

@@ -57,7 +57,8 @@ const emit = defineEmits<{
  * the network.
  *
  * What the camera does not move is SIGHT. Live state -- worked-out tiles, who
- * is mining where -- is scoped server-side to two hexes around the character
+ * is mining where -- is scoped server-side to the hexes in sight around the
+ * character
  * (§5.6), so outside that small disc there is genuinely nothing to draw but the
  * land itself and whether anybody lives on it. The dashed ring is that
  * boundary, and it is a fog line, not a fence: every hex on the map is walkable

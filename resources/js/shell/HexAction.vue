@@ -18,8 +18,14 @@ withDefaults(
     danger?: boolean
     /** A secondary cell, for actions that are not the dock's main business. */
     small?: boolean
+    /**
+     * §7.6 -- the cell is reporting a state that needs dealing with, not an
+     * action that is unavailable. Ember, and still perfectly clickable: a full
+     * bag is exactly the thing you want to open.
+     */
+    alert?: boolean
   }>(),
-  { disabled: false, primary: false, hint: '', danger: false, small: false },
+  { disabled: false, primary: false, hint: '', danger: false, small: false, alert: false },
 )
 
 defineEmits<{ (e: 'activate'): void }>()
@@ -29,7 +35,7 @@ defineEmits<{ (e: 'activate'): void }>()
   <button
     type="button"
     class="cell"
-    :class="{ primary, danger, small, off: disabled }"
+    :class="{ primary, danger, small, alert, off: disabled }"
     :disabled="disabled"
     :title="hint || label"
     :aria-label="hint ? `${label} — ${hint}` : label"
@@ -117,6 +123,26 @@ defineEmits<{ (e: 'activate'): void }>()
 .name {
   font-size: 8.5px;
   letter-spacing: 0.14em;
+}
+
+/* §7.6 -- a state, not a mode. The cell keeps working; it is just the colour of
+   something you have to deal with. The rim is the hairline the shape already
+   has (see .hex in app.css), so this is a colour swap rather than a second
+   border that a clip-path would eat. */
+.alert .hex {
+  background: var(--ember);
+}
+
+.alert .face {
+  color: var(--ember);
+}
+
+.alert:hover:not(:disabled) .face {
+  background: #3a2422;
+}
+
+.alert .name {
+  color: var(--ember);
 }
 
 /* Secondary cells: same shape, less weight. Used by the tile card, where

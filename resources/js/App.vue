@@ -5,8 +5,9 @@
  * The screen is the map. Everything else floats over it as cut plates, anchored
  * to corners, so nothing steals area from the thing the game is actually about.
  *
- *   top-left      instrument cluster (AP / storage / level) + village work
- *   top-right     the location-independent screens, and the tutorial
+ *   top-left      instrument cluster (AP / level) + village work
+ *   top-right     the location-independent screens, nested into a
+ *                 honeycomb strip, and the tutorial
  *   bottom-centre what you are pointing at, and what you can do here
  *   bottom-right  recentre
  *
@@ -108,7 +109,15 @@ onMounted(() => {
         <div class="screens">
           <HexAction icon="atlas" label="Atlas" @activate="game.openPanel('atlas')" />
           <HexAction icon="skills" label="Jobs" @activate="game.openPanel('skills')" />
-          <HexAction icon="bag" label="Bag" @activate="game.openPanel('bag')" />
+          <!-- §7.6 -- the bag says when it is full, because nothing else does
+               any more: no strap free means the next new kind is turned away. -->
+          <HexAction
+            icon="bag"
+            label="Bag"
+            :alert="game.bagFull"
+            :hint="game.bagFull ? 'Full — no strap free for a new kind' : ''"
+            @activate="game.openPanel('bag')"
+          />
           <HexAction icon="hero" label="Hero" @activate="game.openPanel('hero')" />
         </div>
         <TutorialCard v-if="isWide" />
@@ -229,8 +238,48 @@ onMounted(() => {
 }
 
 .screens {
+  /*
+   * A honeycomb strip, not a row.
+   *
+   * Four cells side by side ate 250px of the top edge and left the map with a
+   * band it could not use. Stacked and nested the way the map's own hexes nest
+   * -- three quarters of a width across, half a height down -- the same four
+   * cells occupy one and three quarter widths and give the horizon back.
+   *
+   * The captions go with the row. They were never the thing being read at a
+   * glance, and there is nowhere to put them between two nested cells; every
+   * button keeps its title and aria-label, so nothing is lost but the ink.
+   */
+  --cell-w: 58px;
+  --cell-h: 50px;
   display: flex;
-  gap: 6px;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+/* Nested cells overlap at the tips, so hit-testing has to follow the hexagon
+   rather than the box, or the pointed corner of one cell would swallow clicks
+   meant for its neighbour. */
+.screens :deep(.cell) {
+  clip-path: var(--hex-clip);
+}
+
+.screens :deep(.cell + .cell) {
+  margin-top: calc(var(--cell-h) / -2);
+}
+
+.screens :deep(.cell:nth-child(even)) {
+  transform: translateX(calc(var(--cell-w) * -0.75));
+}
+
+.screens :deep(.cell .name) {
+  display: none;
+}
+
+/* The lift would be clipped by the shape above, and a cell that rises out of a
+   honeycomb reads as a mistake anyway. The face still lights on hover. */
+.screens :deep(.cell:hover:not(:disabled) .hex) {
+  transform: none;
 }
 
 .bottom-centre {
@@ -325,19 +374,18 @@ onMounted(() => {
   }
 
   /*
-   * The screens do not fit beside the instrument cluster on a phone, and the
-   * captions were already wider than their own cells. Drop to icons and tighten
-   * the cells -- every button keeps its aria-label and title, so nothing is lost
-   * but the ink. Selectors outrank HexAction's own so this does not depend on
-   * which stylesheet the bundler happens to emit first.
+   * Tighter cells on a phone, where the strip shares the top edge with the
+   * instrument cluster. The nesting maths reads these two, so the honeycomb
+   * closes up with them rather than coming apart.
    */
-  .screens :deep(.cell .hex) {
-    width: 40px;
-    height: 35px;
+  .screens {
+    --cell-w: 40px;
+    --cell-h: 35px;
   }
 
-  .screens :deep(.cell .name) {
-    display: none;
+  .screens :deep(.cell .hex) {
+    width: var(--cell-w);
+    height: var(--cell-h);
   }
 }
 </style>

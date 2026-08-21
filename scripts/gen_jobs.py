@@ -14,6 +14,8 @@ def opt(v): return ('craftOption', None, v)
 def batch(n): return ('batch', None, n)
 def unlock(k): return ('unlock', k, 0)
 def sight(n): return ('sight', None, n)
+def bag_units(n): return ('bagUnits', None, n)
+def bag_rows(n): return ('bagRows', None, n)
 
 # ---------------------------------------------------------------- craft trees
 SMITH = [
@@ -459,13 +461,51 @@ HARVESTING_NAMES = [
 # point of it is the opposite.
 #
 # It levels by hexes crossed, and travelling grants no character XP at all -- so
-# this is the only thing a long walk pays out, and it pays in reach of the eye.
+# this is the only thing a long walk pays out. What it pays in is the two things
+# a walker owns: how far the eye reaches (§5.6) and how much the back carries
+# (§7.6).
+#
+# **It writes no stat, and it must never write one.** Every other tree is paid
+# for with a skill point, and a point is the scarce thing that keeps §7.4.1's
+# hundred-point cap meaningful. This one is free, so the only safe currency for
+# it is capability: counts, each with its own cap, none of them touching the
+# §8.1 ceiling. A free tree that could move a percentage would be a power ladder
+# you climb by leaving the app open on a long walk.
+#
+# It is also the only tree that touches the bag at all. Carrying capacity used
+# to come from levelling, which made it a problem that solved itself; putting it
+# on the road makes it a problem you solve by walking.
+#
+# Fifteen skills in five rows of three: eight of ten units (120 -> 200), five of
+# four rows (30 -> 50), and two hexes of sight (1 -> 3). The eye comes late both
+# times -- it is the rarest thing here and the one with a query budget behind it
+# -- while the back grows the whole way up, because that is what a long career of
+# walking should feel like.
+#
+# Read it in columns, which is how the parent wiring runs: the left is room in
+# the pack, the middle is straps all the way down, and the right is the mixed
+# one that carries both hexes of sight.
 EXPLORER = [
- ('long_stride','Long Stride',stat('travelSpeed',.10),'Distance is mostly a matter of not stopping.'),
+ # row 1 -- lv 2. What a walker learns in the first fortnight.
+ ('deep_pockets','Deep Pockets',bag_units(10),'You stop leaving things behind because there was nowhere to put them.'),
+ ('second_strap','Second Strap',bag_rows(4),'A second strap, and four more things you never have to choose between.'),
+ ('rolled_blanket','Rolled Blanket',bag_units(10),'Rolled, not folded. It takes half the room and sheds the rain.'),
+ # row 2 -- lv 9. The load starts sitting right, and the country opens up.
+ ('even_load','Even Load',bag_units(10),'Weight over the hips, not the shoulders. The miles get shorter.'),
+ ('side_pouch','Side Pouch',bag_rows(4),'Small things stop living at the bottom of the pack.'),
  ('high_ground','High Ground',sight(1),'Take the ridge and the country opens a hex further out.'),
- ('road_sense','Road Sense',stat('travelSpeed',.10),'You stop taking the long way round without noticing you stopped.'),
+ # row 3 -- lv 16.
+ ('bindle','Bindle',bag_units(10),'An old trick: the pack that hangs outside the pack.'),
+ ('sorted_kit','Sorted Kit',bag_rows(4),'Everything has a place, so everything fits in it.'),
+ ('tump_line','Tump Line',bag_units(10),'A strap across the brow. Your neck argues; the load moves.'),
+ # row 4 -- lv 23.
+ ('packers_knot','Packer\'s Knot',bag_units(10),'Cinch it once and it stays cinched for thirty miles.'),
+ ('outer_pockets','Outer Pockets',bag_rows(4),'What you need on the road no longer lives under what you do not.'),
+ ('long_haul','Long Haul',bag_units(10),'The day you stop counting the hours is the day you carry more of them.'),
+ # row 5 -- lv 30. Six thousand hexes in.
+ ('drovers_back','Drover\'s Back',bag_units(10),'Built by the road, and it shows in what you can pick up.'),
+ ('tinkers_roll','Tinker\'s Roll',bag_rows(4),'A roll of pockets, and a pocket for everything worth keeping.'),
  ('horizon_line','Horizon Line',sight(1),'You read the far edge of the ground the way others read the near.'),
- ('second_wind','Second Wind',stat('travelSpeed',.05),'The last hour of a long day costs what the first one did.'),
 ]
 
 # Order matters: this is the order the panel lists them in, and it follows the
@@ -491,7 +531,7 @@ TREES = {
 }
 
 JOBS = [
-    ('explorer', 'Explorer', 'wayfaring', 'travel', 'fiber', 'Levels by walking, and by nothing else. Its five skills are not bought -- they arrive as you go.'),
+    ('explorer', 'Explorer', 'wayfaring', 'travel', 'fiber', 'Levels by walking, and by nothing else. Its skills are not bought -- they arrive as you go.'),
 
     ('woodcutting', 'Woodcutting', 'gathering', 'woodcutting', 'wood', 'Forest work. Its level is the skill you already carry, and it still takes time off the trip.'),
     ('mining', 'Mining', 'gathering', 'mining', 'iron', 'Mountain seams, and the patience a shaft asks for.'),
@@ -515,21 +555,45 @@ TIERS = [(1, 6, 1), (2, 8, 5), (3, 8, 12), (4, 6, 20), (5, 2, 28)]
 # as a full tree and "level 12" means one thing across the whole panel.
 JOB_LEVELS = {tier: job_level for tier, _, job_level in TIERS}
 
+# ...and the wayfaring tree keeps their *shape* while setting its own depths.
+#
+# Five rows of three, exactly like every bought tree, because a twelfth job that
+# is also a twelfth layout is one thing too many to learn. What differs is where
+# the rows sit: 2, 9, 16, 23, 30, evenly spaced from the first walk to
+# JOB_MAX_LEVEL.
+#
+# Row one waits for level 2 rather than 1 because a granted node has no skill
+# point paying for it -- seventeen XP, four hexes. Short, but a walk, and a walk
+# is the only thing this job is ever allowed to charge. Even spacing in *levels*
+# is steep spacing in effort: the job XP curve means row 2 is about 290 hexes
+# and row 5 about 6,400.
+CHAIN_JOB_LEVELS = {1: 2, 2: 9, 3: 16, 4: 23, 5: 30}
+CHAIN_TIER_WIDTH = 3
+
 
 def chain(nodes):
-    """Five nodes, one per tier, each hanging off the one above it.
+    """Five rows of three, wired down the columns.
 
-    The wayfaring shape. A full tree branches so that thirty points have to be
-    spent through choices; a chain has nothing to choose, which is right for a
-    tree nobody spends anything on.
+    The wayfaring shape, §7.5. It borrows the *layout* of a bought tree -- five
+    depths, gated one after another -- because a twelfth job that is also a
+    twelfth kind of diagram is one thing too many to learn. What it does not
+    borrow is the branching: a bought tree forks so that thirty points have to be
+    spent through choices, and there is nothing to choose here, because nothing
+    is bought.
+
+    So each node hangs off the one directly above it in its own column. That
+    makes the columns readable as three strands -- room, straps, and the mixed
+    one -- rather than a lattice nobody has to navigate.
     """
-    assert len(nodes) == 5, len(nodes)
+    assert len(nodes) == 15, len(nodes)
+    width = CHAIN_TIER_WIDTH
 
     out = []
     for idx, (key, name, effect, desc) in enumerate(nodes):
-        tier = idx + 1
-        req = [] if tier == 1 else [nodes[idx - 1][0]]
-        out.append((key, name, tier, JOB_LEVELS[tier], effect, req, desc))
+        tier, column = divmod(idx, width)
+        tier += 1
+        req = [] if tier == 1 else [nodes[idx - width][0]]
+        out.append((key, name, tier, CHAIN_JOB_LEVELS[tier], effect, req, desc))
     return out
 
 
@@ -569,7 +633,7 @@ def effect_php(e):
         return "['kind' => 'unlock', 'target' => %s]" % php_str(target)
     if kind == 'stat':
         return "['kind' => 'stat', 'stat' => %s, 'value' => %s]" % (php_str(target), value)
-    if kind in ('batch', 'sight'):
+    if kind in ('batch', 'sight', 'bagUnits', 'bagRows'):
         return "['kind' => %s, 'value' => %d]" % (php_str(kind), value)
     return "['kind' => %s, 'value' => %s]" % (php_str(kind), value)
 
@@ -593,9 +657,11 @@ namespace App\\Game;
  * character level grants. Two numbers and only one of them is power: a job level
  * gates nodes and does nothing else, while a point is the scarce thing you spend.
  *
- * And one job that plays by neither rule. Explorer (§7.5) is five nodes in a
- * line, granted rather than bought, levelling on hexes walked. It is the answer
- * to a map with no reach limit: the only thing a long walk pays out.
+ * And one job that plays by neither rule. Explorer (§7.5) is fifteen nodes in
+ * the same five-row shape as the rest, granted rather than bought, levelling on
+ * hexes walked. It is the answer to a map with no reach limit: the only thing a
+ * long walk pays out, and it pays in capability -- sight and straps -- never in
+ * a stat.
  *
  * This file is the single source of truth and is **served** to the client over
  * GET /api/jobs rather than mirrored into catalog.ts. 180 hand-copied rows would
@@ -610,8 +676,9 @@ namespace App\\Game;
  *
  * Generated shape: tiers of 6/8/8/6/2 at job levels 1/5/12/20/28, every node
  * above tier 1 naming a parent, and both capstones naming two. Explorer is the
- * one exception: 1/1/1/1/1 at the same job levels, a single parent all the way
- * down.
+ * one exception: 3/3/3/3/3 at job levels 2/9/16/23/30, wired down its columns
+ * rather than across. Its first row waits for level 2 because a granted node has
+ * no point to pay for it -- the walk is the price (§7.5).
  */
 final class Jobs
 {
@@ -677,10 +744,28 @@ lines.append('''    ];
 
     public const NODES_PER_JOB = 30;
 
-    /** §7.5 -- the wayfaring shape: one node per tier, five in all. */
-    public const CHAIN_TIER_SIZE = [1 => 1, 2 => 1, 3 => 1, 4 => 1, 5 => 1];
+    /** §7.5 -- the wayfaring shape: five rows of three, fifteen in all. */
+    public const CHAIN_TIER_SIZE = [1 => 3, 2 => 3, 3 => 3, 4 => 3, 5 => 3];
 
-    public const NODES_PER_CHAIN = 5;
+    /**
+     * §7.5 -- the wayfaring tree's own depths: 2, 9, 16, 23, 30.
+     *
+     * Five rows, exactly as §7.4.2 shapes every bought tree, but sitting at its
+     * own levels. Those five gates pace a tree bought with skill points, where
+     * the gate only says you may spend one; a granted tree has no price at all,
+     * so its pacing has to come from the walking itself.
+     *
+     * Row one waits for level 2 rather than 1 because a character who has walked
+     * nowhere must not be handed anything. Seventeen XP, four hexes: a short
+     * walk, but a walk, and a walk is the only price this job may charge. Row
+     * five lands exactly on JOB_MAX_LEVEL.
+     *
+     * Even in levels is steep in effort -- the job curve puts row 2 about 290
+     * hexes out and row 5 about 6,400.
+     */
+    public const CHAIN_TIER_JOB_LEVEL = [1 => 2, 2 => 9, 3 => 16, 4 => 23, 5 => 30];
+
+    public const NODES_PER_CHAIN = 15;
 
     /**
      * Every node, keyed by its own key. `requires` names parent nodes in the
@@ -692,9 +777,9 @@ lines.append('''    ];
 
 total = 0
 for job, nodes in TREES.items():
-    assert len(nodes) in (5, 30), (job, len(nodes))
+    assert len(nodes) in (15, 30), (job, len(nodes))
     lines.append('        // ---- %s' % job)
-    for key, name, tier, job_level, effect, req, desc in (chain if len(nodes) == 5 else wire)(nodes):
+    for key, name, tier, job_level, effect, req, desc in (chain if len(nodes) == 15 else wire)(nodes):
         total += 1
         # Parents are namespaced here, where the job is known. Doing it after
         # the fact by string replacement used to reach across trees: two jobs
@@ -738,6 +823,12 @@ lines.append('''    ];
     public static function tierSizes(string $job): array
     {
         return self::isAutomatic($job) ? self::CHAIN_TIER_SIZE : self::TIER_SIZE;
+    }
+
+    /** @return array<int,int> tier => job level required, for this job's shape. */
+    public static function tierJobLevels(string $job): array
+    {
+        return self::isAutomatic($job) ? self::CHAIN_TIER_JOB_LEVEL : self::TIER_JOB_LEVEL;
     }
 
     /**

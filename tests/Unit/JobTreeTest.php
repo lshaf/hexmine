@@ -52,8 +52,10 @@ final class JobTreeTest extends TestCase
      *
      * This is the load-bearing one for the point economy. Skill points are the
      * scarce thing (§7.4.1) and a granted tree costs none, so a second one would
-     * not be a new job -- it would be a hole in the hundred-point cap. Five
-     * nodes is also the ceiling on how much a free tree may be worth.
+     * not be a new job -- it would be a hole in the hundred-point cap.
+     *
+     * What bounds the free tree is not its length but its currency: capability
+     * only, every kind of it capped, and never a stat. See the next test.
      */
     public function test_only_one_tree_is_granted_rather_than_bought(): void
     {
@@ -61,32 +63,27 @@ final class JobTreeTest extends TestCase
 
         $this->assertSame(['explorer'], array_values($automatic));
         $this->assertCount(Jobs::NODES_PER_CHAIN, Jobs::nodesFor('explorer'));
-        $this->assertSame(5, Jobs::NODES_PER_CHAIN);
+        $this->assertSame(15, Jobs::NODES_PER_CHAIN);
     }
 
     /**
-     * §7.5 -- Explorer levels on hexes crossed, so its reward has to be about
-     * being out on the map. A node that made crafting cheaper or a haul bigger
-     * would turn walking into a way of farming something else.
+     * §7.5 -- the free tree deals in capability and never in a stat.
+     *
+     * This is the rule that makes a granted tree safe to exist at all. Every
+     * other tree is paid for with a skill point, and the point is what keeps
+     * §7.4.1's hundred-point cap meaningful; this one is free, so the only
+     * currency left to it is the eye and the back -- counts, each with its own
+     * cap, none of them touching the §8.1 ceiling. A percentage here would be a
+     * power ladder climbed by leaving the app open on a long walk.
      */
-    public function test_the_granted_tree_only_pays_out_in_road_and_eye(): void
+    public function test_the_granted_tree_pays_only_in_eye_and_back(): void
     {
         foreach (Jobs::nodesFor('explorer') as $key => $node) {
-            $effect = $node['effect'];
-
             $this->assertContains(
-                $effect['kind'],
-                ['stat', 'sight'],
-                "{$key} pays out in something walking should not buy",
+                $node['effect']['kind'],
+                ['sight', 'bagUnits', 'bagRows'],
+                "{$key} pays out in something a free tree must never buy",
             );
-
-            if ($effect['kind'] === 'stat') {
-                $this->assertSame(
-                    'travelSpeed',
-                    $effect['stat'],
-                    "{$key} moves a stat that has nothing to do with the road",
-                );
-            }
         }
 
         $sight = array_sum(array_map(
@@ -98,6 +95,18 @@ final class JobTreeTest extends TestCase
         // square of it. The cap is not a balance nicety, it is the reason sight
         // can be a reward at all.
         $this->assertSame(Balance::SKILL_SIGHT_CAP, $sight);
+
+        // §7.6 -- the same argument for the bag. Both limits are counts rather
+        // than percentages, and both are capped because the bag is the pressure
+        // the §11 sinks run on: a chain that could switch it off would switch
+        // off the selling, processing and dumping it drives.
+        $summed = fn (string $kind) => array_sum(array_map(
+            fn (array $n) => $n['effect']['kind'] === $kind ? $n['effect']['value'] : 0,
+            Jobs::nodesFor('explorer'),
+        ));
+
+        $this->assertSame(Balance::SKILL_BAG_UNITS_CAP, $summed('bagUnits'));
+        $this->assertSame(Balance::SKILL_BAG_ROWS_CAP, $summed('bagRows'));
     }
 
     public function test_prerequisites_point_backwards_at_real_nodes(): void
@@ -141,8 +150,12 @@ final class JobTreeTest extends TestCase
             };
 
             $this->assertCount($expected, $node['requires'], "{$key} has the wrong number of parents");
+
+            // §7.5 -- the chain gates one tier differently (its tier 1 waits for
+            // level 3, because no point is paid for a granted node), so the
+            // table is asked for per shape rather than assumed.
             $this->assertSame(
-                Jobs::TIER_JOB_LEVEL[$node['tier']],
+                Jobs::tierJobLevels($node['job'])[$node['tier']],
                 $node['jobLevel'],
                 "{$key} gates on a job level that does not match its tier",
             );
@@ -183,7 +196,10 @@ final class JobTreeTest extends TestCase
 
     public function test_every_effect_is_a_kind_the_game_knows(): void
     {
-        $known = ['stat', 'unlock', 'craftOption', 'craftDurability', 'costReduction', 'batch', 'sight'];
+        $known = [
+            'stat', 'unlock', 'craftOption', 'craftDurability', 'costReduction',
+            'batch', 'sight', 'bagUnits', 'bagRows',
+        ];
 
         foreach (Jobs::NODES as $key => $node) {
             $this->assertContains($node['effect']['kind'], $known, "{$key} has an unknown effect kind");

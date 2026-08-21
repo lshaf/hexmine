@@ -5,6 +5,10 @@
  */
 export const ACTION_PATHS: Record<string, string> = {
   mine: 'M4 20 15 9 M6 6q6-3 12 0-6-1.6-12 0Z M12 8l4 4',
+  /* §5.5 -- the bow, because §8.0 makes it the hunting line's tool and the
+     herd is the one thing on the map you bring it for. Stave, string, nocked
+     arrow: drawn from the subject's own tool like every other glyph here. */
+  hunt: 'M7 3.5a13 13 0 0 1 0 17 M7 3.5 18.5 12 7 20.5 M10.5 12h8.5 M16.5 9.6 19 12l-2.5 2.4',
   travel: 'M8 3v10l-3 8h11l-1-5 5-2-4-4V3Z M8 8h5',
   trade: 'M12 4v16 M5 8l7-2 7 2 M3 15a3 3 0 0 0 6 0L6 8Z M15 15a3 3 0 0 0 6 0l-3-7Z',
   craft: 'M3 21 12 12 M9 6l5-3 7 7-3 5-4-4 2-2-3-3Z',
@@ -33,6 +37,11 @@ export const ACTION_PATHS: Record<string, string> = {
   effectBatch: 'M4 9h9v9H4Z M8 9V5h9v9h-4',
   // §7.5 -- sight: a horizon with the eye above it. Distance, not vision.
   effectSight: 'M3 17h18 M12 5.5c3.6 0 6 3.2 6 3.2s-2.4 3.2-6 3.2-6-3.2-6-3.2 2.4-3.2 6-3.2Z M12 7.6v2.2',
+  /* §7.6 -- the two bag limits, told apart the way the game tells them apart:
+     one pack filled to a line, and a stack of separate pockets. Same object,
+     two different questions about it. */
+  effectBagUnits: 'M6 9h12l1 11H5Z M9 9V6.5a3 3 0 0 1 6 0V9 M6.4 15h11.2',
+  effectBagRows: 'M4 5.5h16v4H4Z M4 11h16v4H4Z M4 16.5h16v4H4Z',
   /* An arch with a doorway in it. Dungeons are the one place tier 4 comes
      from, so the almanac needs a glyph for them even though raiding is not
      built yet. */

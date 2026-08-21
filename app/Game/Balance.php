@@ -23,8 +23,8 @@ final class Balance
 
     // ---------------------------------------------------------------- map §5
 
-    public const MAP_COLS = 500;
-    public const MAP_ROWS = 500;
+    public const MAP_COLS = 200;
+    public const MAP_ROWS = 200;
     public const MAP_SEED = 0x5eed1a3f;
 
     /** Biome lattice, §5.3. Cell size in tiles, and cells per coherent region. */
@@ -67,6 +67,30 @@ final class Balance
     public const HERD_LIFETIME_MS = 4 * self::HOUR;
     public const HERD_CHANCE = 0.06;
 
+    /**
+     * Mirrors HUNTING in resources/js/game/balance.ts.
+     *
+     * Flat, and deliberately outside Formulas::tripTime(): §7.3's clamp floors a
+     * trip at 30 minutes, so routing a 25-minute hunt through it would round the
+     * hunt UP and quietly delete the difference. §7.3 is a rule about working a
+     * hex for its seam; a herd is not a seam.
+     */
+    public const HUNT_BASE_SECONDS = 25 * 60;
+
+    public const HUNT_AP_COST = 1;
+
+    /** Pelt haul before skill, gear and ring are applied. */
+    public const HUNT_PELT_MIN = 2;
+
+    public const HUNT_PELT_MAX = 5;
+
+    /**
+     * §5.5 -- the only bridge between the mining and raid tracks, and the only
+     * faucet for a Tier 4 material outside a dungeon. Bow required: see
+     * GameService::collectJob().
+     */
+    public const HUNT_ESSENCE_CHANCE = 0.35;
+
     // ---------------------------------------------------------- processing §6
 
     /** Five open slots per feature, first-come-first-served, §6.1. */
@@ -87,8 +111,6 @@ final class Balance
     public const BASE_AP_MAX = 20;
     public const AP_PER_LEVEL = 4;
     public const AP_REGEN_MS = 4 * self::MINUTE;
-    public const BASE_STORAGE = 120;
-    public const STORAGE_PER_LEVEL = 40;
     /**
      * §7.4.1 -- 100 levels, and one skill point each. The cap is the point: 100
      * points buys three complete 30-node trees with 10 spare, deliberately just
@@ -97,6 +119,37 @@ final class Balance
     public const MAX_LEVEL = 100;
 
     public const SKILL_POINTS_PER_LEVEL = 1;
+
+    // ------------------------------------------------------------------ bag §7.6
+
+    /**
+     * §7.6 -- what a prospector can carry, in units. Everything in the bag
+     * counts: materials, potions, and every piece of gear not being worn.
+     *
+     * Flat, and level does not move it. Carrying capacity used to be one of the
+     * things a level bought, which made the bag a number that solved itself --
+     * by the time it mattered you had outgrown it. A fixed floor makes "what do
+     * I take" a decision that lasts the whole game, and the only thing that
+     * widens it is the road (§7.5), which is the one reward that cannot be
+     * bought.
+     */
+    public const BAG_UNITS = 120;
+
+    /**
+     * §7.6 -- how many distinct things, regardless of how many of each.
+     *
+     * The second limit is what makes a bag a bag rather than a bucket. A stack
+     * is a row whether it holds one or a hundred; an unworn tool is a row of
+     * its own, because two axes do not stack.
+     *
+     * Thirty is deliberately roomy against a catalogue of twenty-nine materials
+     * and five draughts: the straps are not meant to be the thing that bites on
+     * an ordinary trip. They are the ceiling on carrying *one of everything* --
+     * a prospector who never chooses a line still runs out of places to put
+     * things -- while `BAG_UNITS` is what actually decides when a haul has to be
+     * dealt with. Two limits, and only one of them is felt every day.
+     */
+    public const BAG_ROWS = 30;
 
     // -------------------------------------------------------------- skills §7.2
 
@@ -127,7 +180,9 @@ final class Balance
      * These four can, though, and each one thins a §11 sink rather than a power
      * curve -- cheaper crafts and bigger batches drain the materials sink, and
      * tougher gear drains the repair sink. Uncapped, a maxed crafter would
-     * quietly switch off the loss the whole economy is balanced around.
+     * quietly switch off the loss the whole economy is balanced around. The bag
+     * and sight caps below are the same argument in counts rather than
+     * percentages.
      */
     public const SKILL_OPTION_CHANCE_CAP = 0.35;
 
@@ -138,15 +193,32 @@ final class Balance
     public const SKILL_BATCH_CAP = 2;
 
     /**
-     * §7.5 -- how many hexes of sight the Explorer chain can add, on top of the
-     * base two.
+     * §7.6 -- what the Explorer chain (§7.5) may add to each limit: 120 -> 200
+     * units and 30 -> 50 rows, arrived at ten and four at a time across a
+     * fifteen-rung climb from job level 2 to 30.
      *
-     * A fifth cap, and it guards the same kind of thing the four above do: not a
+     * Bounded for the same reason every other skill cap is: the bag is the
+     * pressure that turns hauls into decisions, and a tree that could switch it
+     * off would switch off the selling, processing and dumping it drives (§11.1).
+     * These are counts rather than percentages, so like `sight` they have
+     * nothing to do with the stat ceiling -- which matters more here than
+     * anywhere, because the Explorer's rungs are granted rather than bought
+     * (§7.5) and capability is the only thing a free tree may ever hand out.
+     */
+    public const SKILL_BAG_UNITS_CAP = 80;
+
+    public const SKILL_BAG_ROWS_CAP = 20;
+
+    /**
+     * §7.5 -- how many hexes of sight the Explorer chain can add, on top of the
+     * base one.
+     *
+     * The last of them, and it guards the same kind of thing the rest do: not a
      * power curve but a cost. Sight is the radius of the one query the map makes
-     * (§5.6), and its cost is the square of that radius -- two hexes is nineteen
-     * tiles, four is thirty-seven, ten would be two hundred. The cap is what
-     * lets sight be a reward at all without handing a scanner to anyone patient
-     * enough to walk.
+     * (§5.6), and its cost is the square of that radius -- one hex is seven
+     * tiles, two is nineteen, three is thirty-seven, ten would be three hundred
+     * and thirty-one. The cap is what lets sight be a reward at all without
+     * handing a scanner to anyone patient enough to walk.
      */
     public const SKILL_SIGHT_CAP = 2;
 
@@ -160,11 +232,6 @@ final class Balance
      * journeys, not a number of days.
      */
     public const EXPLORER_XP_PER_HEX = 5;
-
-    // ------------------------------------------------------------- storage §11.1
-
-    public const DECAY_INTERVAL_MS = 10 * self::MINUTE;
-    public const DECAY_RATE = 0.05;
 
     // ----------------------------------------------------------- equipment §8.1
 
@@ -318,17 +385,19 @@ final class Balance
     // ------------------------------------------------------------------- sight
 
     /**
-     * §5.6 -- how far a prospector can actually see. Two hexes, and that is the
+     * §5.6 -- how far a prospector can actually see. One hex, and that is the
      * whole of it.
      *
      * Sight used to be reach, which made it wide enough that the live-state
      * query behind it was a scan of a couple of hundred hexes on every move.
-     * Two is a disc of nineteen. The map beyond it is not blank -- terrain is
-     * derived from the seed and settlement glyphs are drawn everywhere (§13.2)
-     * -- it is merely *unscouted*: no depletion, no miners, no haul figures.
-     * That is what makes walking somewhere worth doing.
+     * One is a disc of seven -- the hex underfoot and its six neighbours. The
+     * map beyond it is not blank -- terrain is derived from the seed and
+     * settlement glyphs are drawn everywhere (§13.2) -- it is merely
+     * *unscouted*: no depletion, no miners, no haul figures. That is what makes
+     * walking somewhere worth doing, and starting at one is what leaves the
+     * Explorer chain (§7.5) something to actually give.
      */
-    public const SIGHT_RADIUS = 2;
+    public const SIGHT_RADIUS = 1;
 
     /**
      * §5.6 -- sight on the road. You are between hexes, watching your feet.
@@ -387,11 +456,6 @@ final class Balance
     public static function apMax(int $level): int
     {
         return self::BASE_AP_MAX + ($level - 1) * self::AP_PER_LEVEL;
-    }
-
-    public static function storageCap(int $level): int
-    {
-        return self::BASE_STORAGE + ($level - 1) * self::STORAGE_PER_LEVEL;
     }
 
     /**

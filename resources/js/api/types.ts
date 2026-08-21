@@ -39,10 +39,10 @@ export interface CharacterDto {
   gold: number
   col: number
   row: number
-  storageUsed: number
-  storageCap: number
+  /** §7.6 -- what is in the pack, against the two limits on it. */
+  bag: BagDto
   /**
-   * §5.6 -- how far the character can see, in hexes. Two standing still, zero
+   * §5.6 -- how far the character can see, in hexes. One standing still, zero
    * on the road. Not a reach: every hex on the map is walkable.
    */
   sight: number
@@ -50,6 +50,24 @@ export interface CharacterDto {
   travelPerHexMs: number
   /** §12 -- index into the tutorial script; -1 once finished. */
   tutorialStep: number
+}
+
+/**
+ * §7.6 -- the bag.
+ *
+ * Two limits, not one. `units` is the weight of everything carried -- materials,
+ * potions, and every piece of gear not being worn -- and `rows` is how many
+ * separate things that is. Over either one and the character cannot travel,
+ * which is what `over` is for: the map reads it rather than comparing the pairs
+ * itself, so the client and the server never disagree about whether a walk is
+ * allowed.
+ */
+export interface BagDto {
+  units: number
+  unitCap: number
+  rows: number
+  rowCap: number
+  over: boolean
 }
 
 export interface SkillDto {
@@ -133,7 +151,7 @@ export interface JobLevel {
   xpToNext: number
 }
 
-/** §7.4.3 -- what a node does. One of six kinds, and nothing else. */
+/** §7.4.3 -- what a node does. One of these kinds, and nothing else. */
 export type NodeEffect =
   | { kind: 'stat'; stat: StatKey; value: number }
   | { kind: 'unlock'; target: string }
@@ -141,8 +159,11 @@ export type NodeEffect =
   | { kind: 'craftDurability'; value: number }
   | { kind: 'costReduction'; value: number }
   | { kind: 'batch'; value: number }
-  /** §7.5 -- whole hexes of sight, on top of the base two. Not a percentage. */
+  /** §7.5 -- whole hexes of sight, on top of the base one. Not a percentage. */
   | { kind: 'sight'; value: number }
+  /** §7.6 -- units and rows of bag, on top of the flat base. Counts, not stats. */
+  | { kind: 'bagUnits'; value: number }
+  | { kind: 'bagRows'; value: number }
 
 export interface JobDef {
   name: string
@@ -201,6 +222,35 @@ export interface TilePreview {
    * hex, so the card reports the walk instead of the seam.
    */
   unseen: boolean
+  /** §5.5 -- the other verb on this hex, costed in the same request. */
+  hunt: HuntPreview
+}
+
+/**
+ * §5.5 -- what working a herd here would cost and give.
+ *
+ * Separate from TilePreview rather than folded into it, because a hunt is a
+ * different verb and not a mode of mining: it takes no tile slot, depletes
+ * nothing, and pays a Tier 4 material the seam never does.
+ */
+export interface HuntPreview {
+  canHunt: boolean
+  reason?: string | null
+  seconds: number
+  /** Server-clock deadline the herd wanders off at, or null if there is none. */
+  herdUntil: number | null
+  yield: number
+  material: MaterialKey | null
+  /** §4.0 -- true when there is no bow and the haul comes back as Torn Hide. */
+  scrap: boolean
+  /**
+   * §5.5 -- odds of essence on top. Zero without a bow, and that is a rule
+   * rather than a tuning value: bare hands must not reach a Tier 4 material.
+   */
+  essenceChance: number
+  note: string | null
+  apCost: number
+  unseen: boolean
 }
 
 /**
@@ -226,7 +276,7 @@ export interface ActionResult<T = unknown> {
 
 export interface CollectResult {
   gained: Partial<Record<MaterialKey, number>>
-  /** Units lost because storage was over cap, §11.1. */
+  /** Units that did not fit: the §2 per-wallet cap, or a full bag (§7.6). */
   lostToOverflow: number
   xp: { skill: SkillKey; amount: number }
   characterXp: number
@@ -258,6 +308,8 @@ export interface GameApi {
   previewTile(col: number, row: number): Promise<TilePreview>
 
   startMining(col: number, row: number): Promise<ActionResult<Job>>
+  /** §5.5 -- work a herd marker. Its own verb, not a mode of mining. */
+  startHunt(col: number, row: number): Promise<ActionResult<Job>>
   collectJob(jobId: string): Promise<ActionResult<CollectResult>>
   abandonJob(jobId: string): Promise<ActionResult<null>>
 
