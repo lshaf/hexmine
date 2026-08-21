@@ -301,18 +301,63 @@ class GameService
         ])->all();
     }
 
-    /** @return array<string,float> */
-    public function bonuses(Character $character): array
+    /**
+     * Aggregated equipment bonuses. `$line` is the skill line being worked --
+     * §8 gathering tools only count for their own line, so a trip must say which
+     * line it is, and a read with no line in mind (the hero sheet, travel range)
+     * gets only the gear that works everywhere.
+     *
+     * @return array<string,float>
+     */
+    public function bonuses(Character $character, ?string $line = null): array
     {
         $items = $this->itemRows($character);
 
         return [
-            'yield' => Formulas::aggregateStat($items, 'yield'),
-            'tripReduction' => Formulas::aggregateStat($items, 'tripReduction'),
-            'travelSpeed' => Formulas::aggregateStat($items, 'travelSpeed'),
-            'processingSpeed' => Formulas::aggregateStat($items, 'processingSpeed'),
-            'power' => Formulas::aggregateStat($items, 'power'),
+            'yield' => Formulas::aggregateStat($items, 'yield', $line),
+            'tripReduction' => Formulas::aggregateStat($items, 'tripReduction', $line),
+            'travelSpeed' => Formulas::aggregateStat($items, 'travelSpeed', $line),
+            'processingSpeed' => Formulas::aggregateStat($items, 'processingSpeed', $line),
+            'power' => Formulas::aggregateStat($items, 'power', $line),
         ];
+    }
+
+    /**
+     * Whether the character is carrying a working tool for this line, §8.0.
+     * Broken counts as absent: §8.2 makes a 0-durability item inactive, and it
+     * would be a strange rule that let a snapped axe still fell trees.
+     */
+    public function hasLineTool(Character $character, string $line): bool
+    {
+        $slot = Catalog::slotForSkill($line);
+
+        foreach ($character->items as $item) {
+            if (! $item->equipped || $item->durability <= 0) {
+                continue;
+            }
+            if ((Catalog::item($item->item_key)['slot'] ?? null) === $slot) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * What each line's equipped tool is worth on its own trips, §8. The hero
+     * sheet needs all five at once; there is no single "yield bonus" any more.
+     *
+     * @return array<string,float>
+     */
+    public function toolYieldByLine(Character $character): array
+    {
+        $items = $this->itemRows($character);
+        $out = [];
+        foreach (Catalog::SKILLS as $line) {
+            $out[$line] = Formulas::aggregateStat($items, 'yield', $line);
+        }
+
+        return $out;
     }
 
     public function travelRange(Character $character): int
@@ -320,11 +365,25 @@ class GameService
         return Balance::travelRange($character->level, $this->bonuses($character)['travelSpeed']);
     }
 
-    private function drainDurability(Character $character, int $amount): int
+    /**
+     * Wear on the gear that did the work. §8 gathering tools are line-locked, so
+     * only the tool for `$line` wears -- the axe on your back does not blunt
+     * itself while you are down a mine. Everything worn on the body wears every
+     * trip regardless.
+     */
+    private function drainDurability(Character $character, int $amount, ?string $line = null): int
     {
         $drained = 0;
         foreach ($character->items as $item) {
             if (! $item->equipped || $item->durability <= 0) {
+                continue;
+            }
+            $def = Catalog::item($item->item_key);
+            if ($def === null) {
+                continue;
+            }
+            $toolLine = Catalog::skillForSlot($def['slot']);
+            if ($toolLine !== null && $toolLine !== $line) {
                 continue;
             }
             // §8.2 -- at 0 an item is broken and inactive, never destroyed.
@@ -577,6 +636,9 @@ class GameService
             'clamped' => false,
             'yield' => 0,
             'material' => $tile['material'],
+            'skill' => null,
+            'scrap' => false,
+            'note' => null,
             'apCost' => Balance::MINING_AP_COST,
         ];
 
@@ -604,7 +666,24 @@ class GameService
 
         $skillKey = Catalog::skillForMaterial($tile['material']);
         $skillLevel = (int) ($character->skills()->where('skill_key', $skillKey)->value('level') ?? 1);
-        $bonuses = $this->bonuses($character);
+        // §8 -- the only tool that counts here is the one for this tile's line.
+        $bonuses = $this->bonuses($character, $skillKey);
+
+        // §4.0 -- no tool for this line means bare hands, and bare hands bring
+        // back scrap. The hex is not blocked: you may always work it, you just
+        // will not get the material out of it. This is the whole reason the
+        // first tool is worth buying, so it must never read as a refusal.
+        $bare = ! $this->hasLineTool($character, $skillKey);
+        $material = $bare ? Catalog::BIOME_SCRAP[$tile['biome']] : $tile['material'];
+        $note = null;
+
+        if ($bare) {
+            // The slot keys are the nouns -- axe, pickaxe, bow, hammer, sickle.
+            $tool = Catalog::slotForSkill($skillKey);
+            $scrap = Catalog::material($material)['name'];
+            $real = Catalog::material($tile['material'])['name'];
+            $note = "No {$tool} — bare hands take {$scrap} here, not {$real}.";
+        }
 
         $trip = Formulas::tripTime($tile['baseSeconds'], $skillLevel, $bonuses['tripReduction']);
 
@@ -620,7 +699,7 @@ class GameService
         } elseif ($working !== null) {
             $reason = $working->isReady($now)
                 ? 'Your haul is waiting. Claim it before working anything else.'
-                : 'You are already working a hex. One trip at a time.';
+                : 'You are already working a hex. Finish that one first.';
         } elseif ((int) $character->col !== $col || (int) $character->row !== $row) {
             $distance = HexGeometry::distance($character->col, $character->row, $col, $row);
             $reason = $distance > $this->travelRange($character)
@@ -644,7 +723,12 @@ class GameService
                 $bonuses['yield'],
                 WorldGen::ringYield($tile['ring']),
             ),
-            'material' => $tile['material'],
+            'material' => $material,
+            // The line stays the tile's own even on a scrap haul: swinging at a
+            // tree by hand is still woodcutting practice, §4.0, just poor.
+            'skill' => $skillKey,
+            'scrap' => $bare,
+            'note' => $note,
             'apCost' => Balance::MINING_AP_COST,
         ];
     }
@@ -682,7 +766,9 @@ class GameService
                 'slot' => $slot % Balance::SLOTS_PER_TILE,
                 'material_key' => $preview['material'],
                 'quantity' => $preview['yield'],
-                'skill_key' => Catalog::skillForMaterial($preview['material']),
+                // From the preview, not from the material: a scrap haul still
+                // belongs to the hex's own line, §4.0.
+                'skill_key' => $preview['skill'],
                 'started_at' => $now,
                 // The duration is decided here. The client is told endsAt, nothing more.
                 'ends_at' => $now + Balance::scaled($preview['seconds'] * 1000),
@@ -719,8 +805,15 @@ class GameService
                 $granted = $this->addMaterial($character, $job->material_key, $job->quantity);
                 $lostToOverflow = $job->quantity - $granted;
                 $gained[$job->material_key] = $granted;
-                $xpAmount = $job->quantity * 4;
-                $durabilityLost = $this->drainDurability($character, Balance::DRAIN_PER_MINE);
+
+                // §4.0 -- bare-handed work still teaches the line, badly. Full
+                // rate here would make the §8.0 tool ladder optional.
+                $xpAmount = Catalog::isScrap($job->material_key)
+                    ? max(1, (int) round($job->quantity * 4 * Balance::SCRAP_XP_RATE))
+                    : $job->quantity * 4;
+
+                // Nothing was in your hands, so nothing wore out.
+                $durabilityLost = $this->drainDurability($character, Balance::DRAIN_PER_MINE, $job->skill_key);
 
                 // §5.1 -- worked-out tiles regrow rather than dying.
                 $exhausted = Hash::rand01(
@@ -946,7 +1039,7 @@ class GameService
             throw new GameException(
                 $trip->isReady($this->now())
                     ? 'Claim your haul before you move on.'
-                    : 'You are working this hex. Claim the trip when it finishes, or drop it.',
+                    : 'You are working this hex. Claim it when it finishes, or drop it.',
                 'working',
             );
         }
@@ -1473,6 +1566,7 @@ class GameService
             'underfoot' => $this->previewTile($character, $character->col, $character->row),
             'shopStock' => $this->shopStock($character),
             'bonuses' => $this->bonuses($character),
+            'toolYield' => $this->toolYieldByLine($character),
         ];
     }
 }

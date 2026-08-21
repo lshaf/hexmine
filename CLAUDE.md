@@ -60,7 +60,36 @@ The three currencies are strictly separated. No backdoor converts one into anoth
 
 ---
 
-## 4. Materials (20 total)
+## 4. Materials (20 total, plus 5 scrap)
+
+### Tier 0 — Scrap (5, biome-locked, **not part of the 20**)
+
+What a hex gives up to **bare hands**. Work a hex with no tool for its line (§8.0)
+and you get this instead of the real material: same haul size, a fraction of the
+worth, and no recipe anywhere will take it.
+
+| Scrap | Biome | Instead of |
+|---|---|---|
+| Branch | Forest | Wood |
+| Ore Chips | Mountain | Iron ore |
+| Torn Hide | Plains/Tundra | Pelt |
+| Gravel | Badlands | Stone |
+| Chaff | Grassland | Fiber |
+
+- Sells to the NPC for **1 gold**, and **every raw material must sell for more** —
+  that gap is the entire argument for buying a first tool, so it is a rule, not a
+  tuning value.
+- Reaches no other tier: not a processing input, not a crafting input, never an
+  NFT ingredient. It is a gold faucet of last resort and nothing else.
+- Grants the line **reduced XP** (25%). Bare-handed work still teaches, badly. At
+  full rate a player could max a skill without ever buying a tool, which would
+  make the §8.0 ladder optional.
+- A hex is **never blocked** for want of a tool. You may always work it; you just
+  will not get its material out. The UI must say this as a warning, never as a
+  refusal.
+
+Scrap sits outside the 20 deliberately: it never enters the economy the §11 sinks
+have to balance.
 
 ### Tier 1 — Raw (5, biome-locked, decays over cap)
 | Material | Biome |
@@ -185,6 +214,10 @@ tree alone.
 
 Cap total points so characters are meaningfully specialized, not universally strong.
 
+Each line also has its **own tool slot** (§8.0) — axe, pickaxe, bow, hammer, sickle.
+Tools are not the specialisation lever: all five can be equipped at once and every line
+offers the same ladder. The skill point cap is the lever, and it is the only one.
+
 ### 7.3 Mining time formula
 ```
 trip_time = clamp(base_tile_time - skill_reduction - equipment_reduction, 30min, 60min)
@@ -204,9 +237,41 @@ future buff/equipment tier creates a sub-30 or zero-time exploit.
 
 | Tier | Source | Materials | Stat ceiling |
 |---|---|---|---|
-| Basic | Gold (NPC shop) | none | +3–5%, universal |
-| Crafted | Player crafting | Tier 1–2 | +6–8%, universal |
+| Basic | Gold (NPC shop) | none | +3–5% |
+| Crafted | Player crafting | Tier 1–2 | +6–8% |
 | NFT | Marketplace / rare crafting | Tier 3 + Tier 4 | +12–15% (hard cap) |
+
+### 8.0 Slots — a gathering tool per line, and combat kept separate
+
+Nine slots. Five are **gathering tools, one per skill line**; the rest are worn.
+
+| Slot | Line | Biome | Worked material |
+|---|---|---|---|
+| Axe | Woodcutting | Forest | Wood / Ironwood |
+| Pickaxe | Mining | Mountain | Iron ore / Mythril |
+| Bow | Hunting | Plains, Tundra | Pelt / Beastfang Hide |
+| Hammer | Quarrying | Badlands | Stone / Obsidian |
+| Sickle | Harvesting | Grassland | Fiber / Silkweave |
+
+Worn: **Armor · Boots · Gloves · Weapon.**
+
+Rules, all mandatory:
+
+1. **A tool pays out on its own line and on no other.** An axe does nothing to a seam;
+   a bow is for animals, not trees. Working a line you own no tool for is allowed — it
+   simply pays the un-geared rate.
+2. **Only the tool that did the work loses durability.** The others idle. Each line's
+   sink therefore scales with how much that line is actually played, not with how many
+   tools are equipped.
+3. **All five slots may be equipped at once.** This is an idle game; forcing a swap
+   before every trip is friction, not a decision. The interesting decision is which
+   lines you *invest* in — that is already capped by §7.2 skill points.
+4. **Every line gets the same ladder** — village basic, city basic, crafted starter,
+   crafted, NFT — and the same ceiling. Specialisation must come from the skill point
+   cap, never from one line having better tools on offer than another.
+5. **`Weapon` is raid combat only and never gathers.** Combat gear must not be able to
+   stand in for a gathering tool, or raiding becomes a shortcut around the mining ladder.
+   *(Raid combat is not yet designed — see §14.2. The slot exists and stays empty.)*
 
 ### 8.1 Anti-imbalance rules (all mandatory)
 1. **Hard % cap per slot** regardless of rarity. Rarity changes *durability and reliability*,
@@ -227,15 +292,41 @@ future buff/equipment tier creates a sub-30 or zero-time exploit.
   dramatically so, or the crafting-materials sink stalls at endgame.
 
 ### 8.3 Example recipes (starting values)
+
+Worn gear:
 ```
-Iron Pickaxe      = 5 Ingots + 3 Planks                        → +6% yield
 Leather Armor     = 6 Leather + 2 Cloth                        → +6% trip reduction
 Reinforced Boots  = 4 Cut Stone + 3 Leather                    → +8% travel speed
 Work Gloves       = 3 Cloth + 2 Planks                         → +4% processing speed
-Mythril Pickaxe   = 3 Mythril + 2 Reinforced Frame + 1 Essence → +12% yield   [NFT]
 Ironwood Armor    = 3 Ironwood + 2 Silkweave + 1 Shard         → +12% trip    [NFT]
 Beastfang Boots   = 2 Beastfang + 1 Obsidian + 1 Relic         → +15% travel  [NFT]
 ```
+
+Gathering tools, §8.0 — one ladder, repeated per line. Yield only, and only on
+that line. The crafted starter is single-line on purpose: it is what a player can
+build straight off the tutorial's first processing run (§12 step 7).
+
+| Line | Village +3% | City +5% | Starter +4% | Crafted +6% | NFT +12% |
+|---|---|---|---|---|---|
+| Woodcutting | Stone Axe | Iron Hatchet | Hewn Axe | Ironbound Axe | Ironwood Axe |
+| Mining | Chipped Pick | Miner's Pick | Wood Pickaxe | Iron Pickaxe | Mythril Pickaxe |
+| Hunting | Crude Bow | Recurve Bow | Shortbow | Sinew Longbow | Beastfang Bow |
+| Quarrying | Stone Mallet | Iron Sledge | Stone Maul | Banded Sledge | Obsidian Sledge |
+| Harvesting | Bent Sickle | Steel Sickle | Reed Sickle | Toothed Sickle | Silkweave Sickle |
+
+```
+Hewn Axe          = 4 Planks
+Iron Pickaxe      = 5 Ingots + 3 Planks
+Sinew Longbow     = 4 Leather + 3 Cloth
+Banded Sledge     = 4 Ingots + 4 Cut Stone
+Toothed Sickle    = 4 Ingots + 3 Cloth
+Mythril Pickaxe   = 3 Mythril + 2 Reinforced Frame + 1 Essence            [NFT]
+Beastfang Bow     = 3 Beastfang + 2 Silkweave + 1 Sanguine Shard          [NFT]
+```
+
+Every NFT tool wants its line's rare material **and** its line's dungeon shard, so
+kitting out a second line is a cross-map project, not a shopping trip — the same
+pressure §4 puts on Shards.
 
 ---
 
@@ -342,14 +433,14 @@ not on a calendar. Fixed schedules let players time their entry and defeat the p
 
 The tutorial is the **actual game loop**, not scripted fake mechanics — nothing to unlearn.
 
-1. Collect branch in a Forest hex → teaches hex mining, biome locking
-2. Sell branch for gold → teaches NPC shop, gold faucet (deliberately poor rate)
-3. Buy basic axe → teaches gold-tier equipment, instant visible payoff
-4. Mine wood with axe → equipment value demonstrated immediately
+1. Collect branches in a Forest hex → teaches hex mining, biome locking, and §4.0: bare hands get scrap
+2. Sell branches for gold → teaches NPC shop, gold faucet (1g a branch, deliberately poor)
+3. Buy a Stone Axe → teaches gold-tier equipment, and that the axe is the *forest* tool (§8.0)
+4. Mine wood with axe → the same hex now gives wood, not branches. This is the payoff
 5. Sell more wood → reinforces gold loop
 6. Process wood → planks → teaches processing + presence bonus
-7. Craft wood pickaxe → teaches material crafting, gold→crafted tier ladder
-8. Mine with new pickaxe → loop closes with visible improvement
+7. Craft a Hewn Axe → teaches material crafting, gold→crafted tier ladder
+8. Mine with the new axe → loop closes with visible improvement
 9. Sell some, process some → teaches the **sell-vs-process decision** players make forever
 
 End on a soft hook toward the contested ring ("the forest edge holds rarer wood, but it's
@@ -360,12 +451,14 @@ contested") so depth is signposted without overwhelming onboarding.
 ## 13. Art direction — no artist required
 
 All visuals are **procedural SVG**. The full equipment icon set is generated from
-`5 base shapes × 3 tier treatments × 5 material palettes` via fill/stroke swaps.
+`9 base shapes (one per slot) × 3 tier treatments × 5 material palettes` via
+fill/stroke swaps. The 25 gathering tools of §8.0 cost five new silhouettes and
+nothing else.
 
 ### 13.1 Icon system
 | Axis | Encoding |
 |---|---|
-| Equipment slot | One base silhouette (pickaxe, armor, boots, gloves, weapon) |
+| Equipment slot | One base silhouette (axe, pickaxe, bow, hammer, sickle, armor, boots, gloves, weapon) |
 | Tier | Fill treatment: flat grey (basic) → solid color (crafted) → gradient + border glow (NFT) |
 | Material | Accent color: wood=brown, iron=steel, pelt=tan, stone=slate, fiber=cream |
 | Rarity | Hex-shaped border frame, ornamentation increases per tier |

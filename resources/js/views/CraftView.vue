@@ -28,7 +28,7 @@ const TIER_LABEL: Record<EquipTier, string> = {
 
 const TIER_NOTE: Record<EquipTier, string> = {
   basic: 'Bought with gold.',
-  crafted: 'Tier 1–2 materials. Beats anything gold can buy.',
+  crafted: 'Tier 1–2 materials, no gold. Starts below the city shop and climbs well past it.',
   nft: 'Tier 3 + tier 4 only. Tradeable, and hard-capped at the same ceiling as everything else.',
 }
 

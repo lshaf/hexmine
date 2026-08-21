@@ -14,6 +14,7 @@ import type { Material, MaterialKey, MaterialTier } from '@/game/types'
 const game = useGame()
 
 const TIER_NAME: Record<MaterialTier, string> = {
+  0: 'Scrap',
   1: 'Raw',
   2: 'Refined',
   3: 'Rare',
@@ -21,6 +22,7 @@ const TIER_NAME: Record<MaterialTier, string> = {
 }
 
 const TIER_NOTE: Record<MaterialTier, string> = {
+  0: 'What bare hands bring back. Sells for a copper, and feeds nothing.',
   1: 'Biome-locked. Decays while you are over your storage cap.',
   2: 'Processed at settlements. The backbone of crafting.',
   3: 'Contested ring only, and capped per wallet.',
@@ -33,13 +35,13 @@ interface Held {
 }
 
 const byTier = computed(() => {
-  const groups: Record<MaterialTier, Held[]> = { 1: [], 2: [], 3: [], 4: [] }
+  const groups: Record<MaterialTier, Held[]> = { 0: [], 1: [], 2: [], 3: [], 4: [] }
   for (const [key, qty] of Object.entries(game.inventory)) {
     if (!qty) continue
     const mat = MATERIALS[key as MaterialKey] as Material
     groups[mat.tier].push({ mat, qty })
   }
-  for (const tier of [1, 2, 3, 4] as MaterialTier[]) {
+  for (const tier of [0, 1, 2, 3, 4] as MaterialTier[]) {
     groups[tier].sort((a, b) => b.qty - a.qty)
   }
   return groups
@@ -47,7 +49,7 @@ const byTier = computed(() => {
 
 const empty = computed(() => Object.values(game.inventory).every((n) => !n))
 
-const tiers: MaterialTier[] = [1, 2, 3, 4]
+const tiers: MaterialTier[] = [0, 1, 2, 3, 4]
 </script>
 
 <template>

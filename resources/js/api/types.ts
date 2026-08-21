@@ -94,8 +94,14 @@ export interface PlayerState {
   underfoot: TilePreview
   /** Item keys this settlement stocks. Bigger settlements carry more, §3.2. */
   shopStock: string[]
-  /** Aggregated equipment bonuses, already capped and diminished server-side. */
+  /**
+   * Aggregated equipment bonuses, already capped and diminished server-side.
+   * Gear that works everywhere only -- §8 gathering tools are line-locked and
+   * are reported per line in `toolYield`.
+   */
   bonuses: Record<StatKey, number>
+  /** What each line's equipped tool is worth on its own trips, §8. */
+  toolYield: Record<SkillKey, number>
 }
 
 /** Server-computed preview of what a trip on this tile would cost and give. */
@@ -108,6 +114,12 @@ export interface TilePreview {
   equipReduction: number
   clamped: boolean
   yield: number
+  /** The line this hex belongs to, even when the haul comes back as scrap. */
+  skill: SkillKey | null
+  /** §4.0 -- true when there is no tool for the line and `material` is scrap. */
+  scrap: boolean
+  /** Why the haul is scrap, naming the tool that would fix it. */
+  note: string | null
   material: MaterialKey | null
   apCost: number
 }

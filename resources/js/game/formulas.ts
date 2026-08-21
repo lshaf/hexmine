@@ -7,8 +7,15 @@
  * can *predict* and display them; it must never be the authority.
  */
 import { CHARACTER, EQUIPMENT, MINING, PROCESSING, SKILLS } from './balance'
-import { ITEM_BY_KEY } from './catalog'
-import type { EquipTier, ItemDef, OwnedItem, SettlementTier, StatKey } from './types'
+import { ITEM_BY_KEY, skillForSlot } from './catalog'
+import type {
+  EquipTier,
+  ItemDef,
+  OwnedItem,
+  SettlementTier,
+  SkillKey,
+  StatKey,
+} from './types'
 
 // ------------------------------------------------------------------ equipment
 
@@ -21,12 +28,25 @@ import type { EquipTier, ItemDef, OwnedItem, SettlementTier, StatKey } from './t
  *
  * §8.1 rule 1 -- the total is then clamped to the hard per-stat ceiling of the
  * best tier present, so rarity buys durability and reliability, not power.
+ *
+ * §8 gathering tools are line-locked: a bow does nothing to a tree. A tool
+ * counts only when `line` is the skill line it serves, so passing nothing --
+ * "no line is being worked" -- leaves every tool out and returns what the player
+ * gets from gear that works anywhere.
  */
-export function aggregateStat(items: OwnedItem[], stat: StatKey): number {
+export function aggregateStat(
+  items: OwnedItem[],
+  stat: StatKey,
+  line: SkillKey | null = null,
+): number {
   const contributions = items
     .filter((it) => it.equipped && it.durability > 0)
     .map((it) => ITEM_BY_KEY[it.key])
     .filter((def): def is ItemDef => Boolean(def) && def.stat === stat)
+    .filter((def) => {
+      const toolLine = skillForSlot(def.slot)
+      return toolLine === null || toolLine === line
+    })
 
   if (contributions.length === 0) return 0
 

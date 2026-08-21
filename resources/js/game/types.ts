@@ -20,7 +20,13 @@ export type SettlementTier = 'village' | 'city' | 'capital'
 
 // ---------------------------------------------------------------- materials
 
-export type MaterialTier = 1 | 2 | 3 | 4
+export type MaterialTier = 0 | 1 | 2 | 3 | 4
+
+/**
+ * §4.0 -- scrap. What bare hands bring back from a hex when you have no tool
+ * for its line: sells for a copper, feeds no recipe, reaches no other tier.
+ */
+export type ScrapKey = 'branch' | 'ore_chips' | 'torn_hide' | 'gravel' | 'chaff'
 
 export type RawKey = 'wood' | 'iron_ore' | 'pelt' | 'stone' | 'fiber'
 
@@ -49,7 +55,7 @@ export type RaidKey =
   | 'relic'
   | 'core'
 
-export type MaterialKey = RawKey | RefinedKey | RareKey | RaidKey
+export type MaterialKey = ScrapKey | RawKey | RefinedKey | RareKey | RaidKey
 
 export interface Material {
   key: MaterialKey
@@ -80,12 +86,20 @@ export interface Skill {
   name: string
   material: RawKey
   rareMaterial: RareKey
+  /** §4.0 -- what this line yields to bare hands. */
+  scrapMaterial: ScrapKey
   description: string
 }
 
 // ---------------------------------------------------------------- equipment
 
-export type EquipSlot = 'tool' | 'armor' | 'boots' | 'gloves' | 'weapon'
+/**
+ * Slots, §8. The five gathering slots are one implement per skill line -- an axe
+ * is no use on a seam and a bow is no use on a tree -- so a line-locked tool
+ * only counts on its own trips. `weapon` is raid combat and never gathers.
+ */
+export type GatherSlot = 'axe' | 'pickaxe' | 'bow' | 'hammer' | 'sickle'
+export type EquipSlot = GatherSlot | 'armor' | 'boots' | 'gloves' | 'weapon'
 export type EquipTier = 'basic' | 'crafted' | 'nft'
 
 /** What an item modifies. All are capped per slot, §8.1. */

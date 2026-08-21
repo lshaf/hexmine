@@ -187,9 +187,91 @@ final class GameLoopTest extends TestCase
         // Wind the clock back rather than sleeping.
         $job->update(['ends_at' => $this->game->now() - 1]);
 
+        // §4.0 -- nothing equipped, so this is bare hands and brings back scrap.
         $result = $this->game->collectJob($this->character->fresh(), $job->id);
-        $this->assertGreaterThan(0, $result['gained']['wood']);
+        $this->assertGreaterThan(0, $result['gained']['branch']);
+        $this->assertArrayNotHasKey('wood', $result['gained']);
         $this->assertSame(0, GameJob::count());
+    }
+
+    /**
+     * §4.0 -- the tool is the difference between a haul and a pile of junk.
+     * This is what the tutorial's first three steps exist to teach, and what
+     * makes the first 12 gold worth spending.
+     */
+    public function test_bare_hands_bring_back_scrap_and_the_tool_brings_back_the_material(): void
+    {
+        $col = $this->character->col;
+        $row = $this->character->row;
+
+        $bare = $this->game->previewTile($this->character, $col, $row);
+        $this->assertTrue($bare['scrap']);
+        $this->assertSame('branch', $bare['material']);
+        $this->assertSame('woodcutting', $bare['skill'], 'a scrap haul left its own line');
+        $this->assertStringContainsString('No axe', $bare['note']);
+        $this->assertTrue($bare['canMine'], 'bare hands were refused the hex outright');
+
+        // Scrap is worth strictly less than what the hex really holds.
+        $this->assertLessThan(
+            \App\Game\Catalog::material('wood')['npcPrice'],
+            \App\Game\Catalog::material('branch')['npcPrice'],
+        );
+
+        \App\Models\CharacterItem::create([
+            'character_id' => $this->character->id,
+            'item_key' => 'stone_axe',
+            'durability' => \App\Game\Catalog::item('stone_axe')['maxDurability'],
+            'equipped' => true,
+        ]);
+
+        $armed = $this->game->previewTile($this->character->fresh(), $col, $row);
+        $this->assertFalse($armed['scrap']);
+        $this->assertSame('wood', $armed['material']);
+        $this->assertNull($armed['note']);
+    }
+
+    /** §8.2 -- a snapped axe is not an axe, so it does not stop the scrap. */
+    public function test_a_broken_tool_counts_as_no_tool(): void
+    {
+        \App\Models\CharacterItem::create([
+            'character_id' => $this->character->id,
+            'item_key' => 'stone_axe',
+            'durability' => 0,
+            'equipped' => true,
+        ]);
+
+        $preview = $this->game->previewTile(
+            $this->character->fresh(),
+            $this->character->col,
+            $this->character->row,
+        );
+
+        $this->assertTrue($preview['scrap']);
+        $this->assertSame('branch', $preview['material']);
+    }
+
+    /** §4.0 -- scrap reaches nothing. It is not an input to any recipe. */
+    public function test_scrap_feeds_no_recipe_and_undercuts_every_raw_material(): void
+    {
+        $rawPrices = [];
+        foreach (\App\Game\Catalog::BIOME_MATERIAL as $key) {
+            $rawPrices[] = \App\Game\Catalog::material($key)['npcPrice'];
+        }
+
+        foreach (\App\Game\Catalog::BIOME_SCRAP as $biome => $key) {
+            $def = \App\Game\Catalog::material($key);
+            $this->assertNotNull($def, "{$biome} has no scrap");
+            $this->assertSame(0, $def['tier']);
+            $this->assertGreaterThan(0, $def['npcPrice'], 'the trader refuses scrap');
+            $this->assertLessThan(min($rawPrices), $def['npcPrice'], "{$key} is worth as much as a raw material");
+
+            foreach (\App\Game\Catalog::recipes() as $recipe) {
+                $this->assertNotContains($key, [$recipe['input'], $recipe['secondInput'] ?? null]);
+            }
+            foreach (\App\Game\Catalog::items() as $item) {
+                $this->assertArrayNotHasKey($key, $item['inputs'] ?? []);
+            }
+        }
     }
 
     /** You work the hex under your feet, never one across the valley. */
@@ -270,14 +352,125 @@ final class GameLoopTest extends TestCase
         $one = \App\Game\Formulas::aggregateStat(
             [['key' => 'iron_pickaxe', 'durability' => 10, 'equipped' => true]],
             'yield',
+            'mining',
         );
         $three = \App\Game\Formulas::aggregateStat(
             array_fill(0, 3, ['key' => 'iron_pickaxe', 'durability' => 10, 'equipped' => true]),
             'yield',
+            'mining',
         );
 
         $this->assertLessThan($one * 3, $three, 'three identical items scaled linearly');
         $this->assertLessThanOrEqual(Balance::STAT_CAP['crafted'], $three);
+    }
+
+    /** §8 -- a tool pays out on its own line and on no other. */
+    public function test_a_gathering_tool_only_counts_on_its_own_line(): void
+    {
+        $kit = [['key' => 'iron_pickaxe', 'durability' => 10, 'equipped' => true]];
+
+        $this->assertGreaterThan(
+            0,
+            \App\Game\Formulas::aggregateStat($kit, 'yield', 'mining'),
+            'a pickaxe did nothing on a seam',
+        );
+        $this->assertSame(
+            0.0,
+            \App\Game\Formulas::aggregateStat($kit, 'yield', 'woodcutting'),
+            'a pickaxe felled a tree',
+        );
+        $this->assertSame(
+            0.0,
+            \App\Game\Formulas::aggregateStat($kit, 'yield'),
+            'a tool counted with no line being worked',
+        );
+
+        // Gear worn on the body is not line-locked and counts everywhere.
+        $worn = [['key' => 'leather_armor', 'durability' => 10, 'equipped' => true]];
+        $this->assertGreaterThan(
+            0,
+            \App\Game\Formulas::aggregateStat($worn, 'tripReduction', 'harvesting'),
+            'armor stopped working outside a line',
+        );
+        $this->assertGreaterThan(
+            0,
+            \App\Game\Formulas::aggregateStat($worn, 'tripReduction'),
+            'armor stopped working with no line in mind',
+        );
+    }
+
+    /**
+     * §8 -- every gathering line gets the same ladder. Specialisation is meant
+     * to come from the §7.2 skill point cap, never from one line having better
+     * tools on offer than another.
+     */
+    public function test_every_gathering_line_has_the_same_tool_ladder(): void
+    {
+        $ceilings = [];
+
+        foreach (\App\Game\Catalog::TOOL_SLOT_SKILL as $slot => $line) {
+            $tools = array_filter(
+                \App\Game\Catalog::items(),
+                fn (array $def) => $def['slot'] === $slot,
+            );
+
+            $tiers = array_count_values(array_column($tools, 'tier'));
+            $this->assertSame(2, $tiers['basic'] ?? 0, "{$line} is missing a shop tool");
+            $this->assertSame(2, $tiers['crafted'] ?? 0, "{$line} is missing a crafted tool");
+            $this->assertSame(1, $tiers['nft'] ?? 0, "{$line} is missing its NFT tool");
+
+            $ceilings[$line] = max(array_column($tools, 'value'));
+            $this->assertLessThanOrEqual(
+                Balance::STAT_CAP['nft'],
+                $ceilings[$line],
+                "{$line} tops out above the hard cap",
+            );
+        }
+
+        $this->assertCount(1, array_unique($ceilings), 'one line reaches higher than the rest');
+    }
+
+    /** §8 -- only the tool that did the work wears out. */
+    public function test_a_trip_wears_the_line_tool_and_leaves_the_others_alone(): void
+    {
+        // Kit out two lines at once, which is the whole point of separate slots.
+        foreach (['stone_axe', 'chipped_pick'] as $key) {
+            \App\Models\CharacterItem::create([
+                'character_id' => $this->character->id,
+                'item_key' => $key,
+                'durability' => \App\Game\Catalog::item($key)['maxDurability'],
+                'equipped' => true,
+            ]);
+        }
+
+        // Spawn is forest (§12 step 1), so this trip is the axe's line.
+        $col = $this->character->col;
+        $row = $this->character->row;
+        $tile = $this->game->buildTile($col, $row, $this->game->now());
+        $worn = \App\Game\Catalog::slotForSkill(\App\Game\Catalog::skillForMaterial($tile['material']));
+        $this->assertSame('axe', $worn, 'spawn is no longer a forest hex');
+
+        $job = $this->game->startMining($this->character->fresh(), $col, $row);
+        $job->update(['ends_at' => $this->game->now() - 1]);
+        $this->game->collectJob($this->character->fresh(), $job->id);
+
+        foreach ($this->character->fresh()->items as $item) {
+            $def = \App\Game\Catalog::item($item->item_key);
+
+            if ($def['slot'] === $worn) {
+                $this->assertLessThan(
+                    $def['maxDurability'],
+                    $item->durability,
+                    "the {$def['slot']} did the work and took no wear",
+                );
+            } else {
+                $this->assertSame(
+                    $def['maxDurability'],
+                    $item->durability,
+                    "the {$def['slot']} blunted itself doing nothing",
+                );
+            }
+        }
     }
 
     /** You cannot trade in the middle of a forest. §6 puts the trader at a settlement. */
@@ -448,8 +641,8 @@ final class GameLoopTest extends TestCase
         $this->fail('spawn guarantee broken: no woodcutting village in level-1 range');
     }
 
-    /** One trip at a time: mine, wait, claim. No queue of hexes. */
-    public function test_only_one_trip_at_a_time(): void
+    /** One hex at a time: mine, wait, claim. No queue of hexes. */
+    public function test_only_one_mine_at_a_time(): void
     {
         $col = $this->character->col;
         $row = $this->character->row;
@@ -459,7 +652,7 @@ final class GameLoopTest extends TestCase
         // The tile still has a free slot, but the character does not.
         $preview = $this->game->previewTile($this->character->fresh(), $col, $row);
         $this->assertFalse($preview['canMine']);
-        $this->assertStringContainsString('One trip at a time', $preview['reason']);
+        $this->assertStringContainsString('Finish that one first', $preview['reason']);
 
         // Finishing is not claiming: the trip still occupies you until collected.
         $job->update(['ends_at' => $this->game->now() - 1]);

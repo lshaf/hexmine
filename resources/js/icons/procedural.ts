@@ -1,9 +1,11 @@
 /**
  * Procedural icon system, §13.1. No artist required.
  *
- * The whole equipment set is 5 base silhouettes x 3 tier treatments x 5 material
- * palettes, produced by fill/stroke swaps. Adding an item never means drawing
- * anything -- it means picking a slot, a tier and a palette.
+ * The whole equipment set is one base silhouette per slot x 3 tier treatments x
+ * 5 material palettes, produced by fill/stroke swaps. Adding an item never means
+ * drawing anything -- it means picking a slot, a tier and a palette. That is why
+ * §8 giving every gathering line its own tool cost five silhouettes and nothing
+ * else: 25 tools came out of it.
  *
  *   slot     -> base silhouette
  *   tier     -> fill treatment (flat grey / solid / gradient + glow)
@@ -21,11 +23,56 @@ const nextId = () => `g${++gradientSeq}`
 
 // --------------------------------------------------------- base silhouettes
 
+/*
+ * The five gathering tools have to be told apart at 26px in a shop list, so each
+ * one owns a different read: crescent off a centre line (axe), wide symmetric
+ * points (pickaxe), open arc (bow), solid block (hammer), diagonal hook
+ * (sickle). Within that, one convention holds the family together -- the haft is
+ * always drawn in `edge`, the working head in `fill`, so the material accent
+ * always lands on the part that meets the ground.
+ */
 const SILHOUETTE: Record<EquipSlot, (fill: string, edge: string) => string> = {
-  tool: (fill, edge) => `
-    <rect x="18.4" y="12" width="3.2" height="20" rx="1.2" fill="${edge}"/>
-    <path d="M8 15 Q20 6 32 15 Q20 12.5 8 15 Z" fill="${fill}" stroke="${edge}" stroke-width="1.1"/>
-    <path d="M18.4 12 h3.2 v4 h-3.2 Z" fill="${edge}"/>`,
+  // Woodcutting. A bearded bit hung off one side of the haft: the beard hooking
+  // low is what stops it reading as a symmetrical lens.
+  axe: (fill, edge) => `
+    <rect x="16.4" y="7" width="3.2" height="27" rx="1.4" fill="${edge}"/>
+    <path d="M19.4 11 L28 9 Q31.5 16 26 23.5 Q22.8 26.5 19.4 19.5 Z"
+          fill="${fill}" stroke="${edge}" stroke-width="1.1" stroke-linejoin="round"/>
+    <path d="M21.4 12.8 Q27.2 16.4 25.4 21.4" fill="none" stroke="${edge}" stroke-width="0.8"/>`,
+
+  // Mining. Wide and thin, sharp at both tips -- read against the hammer, which
+  // is narrow and thick. Width plus taper is the only thing telling them apart
+  // at 26px, so do not soften either.
+  pickaxe: (fill, edge) => `
+    <rect x="18.4" y="13" width="3.2" height="21" rx="1.4" fill="${edge}"/>
+    <path d="M6.5 17.5 Q20 3.5 33.5 17.5 Q20 11.5 6.5 17.5 Z"
+          fill="${fill}" stroke="${edge}" stroke-width="1.1" stroke-linejoin="round"/>
+    <path d="M18.4 12.6 h3.2 v4.6 h-3.2 Z" fill="${edge}"/>`,
+
+  // Hunting. Mostly negative space -- nothing else in the set is an open curve.
+  bow: (fill, edge) => `
+    <path d="M16.5 6 Q30.4 20 16.5 34" fill="none" stroke="${edge}" stroke-width="4.6" stroke-linecap="round"/>
+    <path d="M16.5 6 Q30.4 20 16.5 34" fill="none" stroke="${fill}" stroke-width="2.6" stroke-linecap="round"/>
+    <path d="M16.5 6 L16.5 34" stroke="${edge}" stroke-width="1"/>
+    <path d="M13.6 20 H28.6" stroke="${edge}" stroke-width="1.3"/>
+    <path d="M32.4 20 L27.6 17.4 L27.6 22.6 Z" fill="${edge}"/>
+    <path d="M13.4 20 L16.4 17.8 L16.4 22.2 Z" fill="${edge}"/>`,
+
+  // Quarrying. Narrow and thick where the pickaxe is wide and thin, with a peen
+  // wedge on one side so it never resolves into the same symmetrical T.
+  hammer: (fill, edge) => `
+    <path d="M11.5 7.6 L25.5 7.6 L29 13.05 L25.5 18.5 L11.5 18.5 Z"
+          fill="${fill}" stroke="${edge}" stroke-width="1.2" stroke-linejoin="round"/>
+    <path d="M14.8 7.6 V18.5" stroke="${edge}" stroke-width="0.9"/>
+    <rect x="16.9" y="7" width="3.2" height="27" rx="1.4" fill="${edge}"/>`,
+
+  // Harvesting. The only tool with no vertical axis at all. The handle gets the
+  // bow's two-tone treatment or it disappears under the blade.
+  sickle: (fill, edge) => `
+    <path d="M23.5 23.5 L30.5 30.5" stroke="${edge}" stroke-width="4.4" stroke-linecap="round"/>
+    <path d="M23.5 23.5 L30.5 30.5" stroke="${fill}" stroke-width="2.2" stroke-linecap="round"/>
+    <path d="M25.5 26.5 C14.5 26.5 8 19.5 10.5 10 C15 16.5 19 20.5 25.5 22.5 Z"
+          fill="${fill}" stroke="${edge}" stroke-width="1.1" stroke-linejoin="round"/>`,
 
   armor: (fill, edge) => `
     <path d="M13 10 L20 13 L27 10 L30 15 L28.5 30 Q20 34 11.5 30 L10 15 Z"
@@ -144,6 +191,11 @@ export function materialIcon(mat: Material, size = 32): string {
   const id = nextId()
 
   const shapes: Record<MaterialTier, string> = {
+    // Scrap: broken offcuts, scattered. Nothing about it reads as a resource,
+    // which is the point -- §4.0 wants it to look like what it is worth.
+    0: `<path d="M8 27 L13 18 L17 21 L14 30 Z" fill="${accent}" stroke="${dark}" stroke-width="1.1" stroke-linejoin="round"/>
+        <path d="M17 9 L24 12 L21 20 L15 17 Z" fill="${light}" stroke="${dark}" stroke-width="1.1" stroke-linejoin="round"/>
+        <path d="M24 22 L31 24 L29 31 L23 29 Z" fill="${accent}" stroke="${dark}" stroke-width="1.1" stroke-linejoin="round"/>`,
     // Raw: a rough, irregular lump.
     1: `<path d="M9 26 L7 15 L15 8 L27 10 L32 20 L26 30 L14 31 Z" fill="${accent}" stroke="${dark}" stroke-width="1.2" stroke-linejoin="round"/>
         <path d="M15 8 L18 19 L9 26" fill="none" stroke="${light}" stroke-width="1.1"/>`,

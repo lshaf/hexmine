@@ -66,13 +66,22 @@ class SeedDemoCharacter extends Command
         'harvesting' => 5,
     ];
 
-    /** @var array<int,array{key:string,durability:int,equipped:bool}> */
+    /**
+     * §8 -- one tool per gathering line, so the kit fills three of the five and
+     * deliberately leaves the sickle line bare. An empty line is a state the
+     * hero sheet has to render, and it is the one the old single-tool kit could
+     * never produce.
+     *
+     * @var array<int,array{key:string,durability:int,equipped:bool}>
+     */
     private const ITEMS = [
+        ['key' => 'ironbound_axe', 'durability' => 88, 'equipped' => true],
         ['key' => 'iron_pickaxe', 'durability' => 74, 'equipped' => true],
+        ['key' => 'crude_bow', 'durability' => 31, 'equipped' => true],
         ['key' => 'leather_armor', 'durability' => 108, 'equipped' => true],
         ['key' => 'work_gloves', 'durability' => 61, 'equipped' => true],
         ['key' => 'reinforced_boots', 'durability' => 140, 'equipped' => false],
-        ['key' => 'iron_hatchet', 'durability' => 22, 'equipped' => false],
+        ['key' => 'stone_maul', 'durability' => 44, 'equipped' => false],
         ['key' => 'stone_axe', 'durability' => 0, 'equipped' => false],
     ];
 
@@ -115,7 +124,9 @@ class SeedDemoCharacter extends Command
             ['level', self::LEVEL.'  (storage '.Balance::storageCap(self::LEVEL).', AP '.Balance::apMax(self::LEVEL).')'],
             ['gold', (string) self::GOLD],
             ['materials', count(self::MATERIALS).' kinds, '.array_sum(self::MATERIALS).' units'],
-            ['equipment', count(self::ITEMS).' items, 3 equipped, 1 broken'],
+            ['equipment', count(self::ITEMS).' items, '
+                .count(array_filter(self::ITEMS, fn (array $i) => $i['equipped'])).' equipped, '
+                .count(array_filter(self::ITEMS, fn (array $i) => $i['durability'] === 0)).' broken'],
             ['jobs', $summary['jobs']],
             ['tutorial', $this->option('tutorial') ? 'running from step 1' : 'finished'],
         ]);
@@ -258,7 +269,7 @@ class SeedDemoCharacter extends Command
             'ends_at' => $now - 1_000,
         ]);
 
-        return 'a finished '.$preview['material'].' trip, ready to collect';
+        return 'a finished '.$preview['material'].' dig, ready to collect';
     }
 
     /** @param  array<string,int>  $materials */

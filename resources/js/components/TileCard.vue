@@ -74,7 +74,7 @@ const travelHint = computed(() => {
   if (working.value) {
     return working.value.endsAt <= game.now
       ? 'Claim your haul before you move on'
-      : 'You are working this hex — claim or drop the trip first'
+      : 'You are working this hex — claim or drop it first'
   }
   if (distance.value > game.travelRange) return 'Out of range — move in shorter hops'
   return `${distance.value} hexes`
@@ -114,7 +114,7 @@ watch(tile, () => {
               <span class="readout">{{ trip.yield }}</span>
             </span>
             <span class="stat">
-              <span class="label">Trip</span>
+              <span class="label">Mine</span>
               <span class="readout">{{ formatSpan(wallTime(trip.seconds)) }}</span>
             </span>
             <span class="stat">
@@ -151,9 +151,18 @@ watch(tile, () => {
           {{ trip.reason }}
         </p>
 
+        <!-- §4.0 -- not a refusal: the hex is workable, it just will not give up
+             its material to bare hands. Sits apart from `blocked` for that
+             reason, and names the tool that would fix it. -->
+        <p v-if="trip && trip.scrap" class="tiny bare">
+          {{ trip.note }}
+        </p>
+
         <div v-if="open && trip && mat" class="detail">
+          <!-- The line comes from the server, not from the material: a scrap
+               haul still belongs to the hex's own line, §4.0. -->
           <p class="tiny muted lede">
-            {{ mat.name }} · trains {{ SKILL_BY_KEY[skillForMaterial(mat.key)].name }}
+            {{ mat.name }} · trains {{ SKILL_BY_KEY[trip.skill ?? skillForMaterial(mat.key)].name }}
           </p>
 
           <div class="inset breakdown tiny">
@@ -171,7 +180,7 @@ watch(tile, () => {
             </div>
             <hr class="divider" />
             <div class="row-between">
-              <span>Trip time</span>
+              <span>Mine time</span>
               <span class="readout">{{ formatSpan(gameTime(trip.seconds)) }}</span>
             </div>
             <p v-if="trip.clamped" class="note clamp">
@@ -284,6 +293,16 @@ watch(tile, () => {
   padding: 8px 14px 10px;
   border-top: 1px solid var(--hud-line-soft);
   color: var(--copper);
+  line-height: 1.35;
+}
+
+/* A warning, not a refusal -- muted rather than copper, so it never reads as
+   the hex saying no. */
+.bare {
+  margin: 0;
+  padding: 8px 14px 10px;
+  border-top: 1px solid var(--hud-line-soft);
+  color: var(--vellum-dim);
   line-height: 1.35;
 }
 

@@ -111,6 +111,14 @@ final class Balance
     /** Diminishing returns on stacking, §8.1 rule 2. */
     public const STACK_FALLOFF = 0.5;
 
+    /**
+     * §4.0 -- what a scrap haul is worth as XP, against the same haul of the
+     * real material. Bare-handed work still teaches the line, just badly: at 1.0
+     * a player could max a skill without ever buying a tool, which would make
+     * the whole §8.0 ladder optional.
+     */
+    public const SCRAP_XP_RATE = 0.25;
+
     public const DRAIN_PER_MINE = 1;
     public const DRAIN_PER_RAID = 4;
     public const SALVAGE_RATE = 0.25;

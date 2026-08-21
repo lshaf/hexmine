@@ -25,7 +25,7 @@ final class Tutorial
         'collect',         //  6  cut wood with the axe
         'process_start',   //  7  process wood into planks
         'process_collect', //  8  collect your planks
-        'craft',           //  9  craft a Wood Pickaxe
+        'craft',           //  9  craft a Hewn Axe
         'collect',         // 10  put the pickaxe to work
     ];
 

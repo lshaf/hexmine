@@ -8,21 +8,55 @@
  */
 import { computed } from 'vue'
 import { useGame } from '@/stores/game'
-import { ITEM_BY_KEY, SKILL_LIST, STAT_LABEL } from '@/game/catalog'
+import {
+  ITEM_BY_KEY,
+  SKILL_BY_KEY,
+  SKILL_LIST,
+  SLOT_LABEL,
+  STAT_LABEL,
+  slotForSkill,
+} from '@/game/catalog'
 import { formatPercent } from '@/game/formulas'
 import { EQUIPMENT, SKILLS } from '@/game/balance'
 import { itemIcon, skillIcon } from '@/icons/procedural'
 import SvgIcon from '@/components/SvgIcon.vue'
-import type { EquipSlot, OwnedItem, StatKey } from '@/game/types'
+import type { EquipSlot, OwnedItem, SkillKey, StatKey } from '@/game/types'
 
 const game = useGame()
 
-const SLOTS: Array<{ key: EquipSlot; label: string }> = [
-  { key: 'tool', label: 'Tool' },
-  { key: 'armor', label: 'Armor' },
-  { key: 'boots', label: 'Boots' },
-  { key: 'gloves', label: 'Gloves' },
-  { key: 'weapon', label: 'Weapon' },
+/**
+ * §8 -- one tool slot per gathering line. They are listed apart from worn gear
+ * because they behave differently: a tool only pays out on its own line, and
+ * only the tool that did the work loses durability.
+ */
+interface SlotRow {
+  key: EquipSlot
+  label: string
+  /** Shown on an empty slot, where the label alone does not say what goes here. */
+  hint?: string
+}
+
+interface ToolRow extends SlotRow {
+  line: SkillKey
+}
+
+const TOOL_SLOTS: ToolRow[] = SKILL_LIST.map((skill) => ({
+  key: slotForSkill(skill.key),
+  label: SLOT_LABEL[slotForSkill(skill.key)],
+  line: skill.key,
+  hint: skill.name,
+}))
+
+const WORN_SLOTS: SlotRow[] = [
+  { key: 'armor', label: SLOT_LABEL.armor },
+  { key: 'boots', label: SLOT_LABEL.boots },
+  { key: 'gloves', label: SLOT_LABEL.gloves },
+  { key: 'weapon', label: SLOT_LABEL.weapon, hint: 'Raids — nothing to equip yet' },
+]
+
+const GROUPS: Array<{ title: string; note: string; slots: SlotRow[] }> = [
+  { title: 'Gathering tools', note: 'one line each', slots: TOOL_SLOTS },
+  { title: 'Worn', note: 'works everywhere', slots: WORN_SLOTS },
 ]
 
 const equipped = computed(() => {
@@ -46,7 +80,8 @@ const def = (item: OwnedItem) => ITEM_BY_KEY[item.key]!
 const durabilityPercent = (item: OwnedItem) =>
   (item.durability / def(item).maxDurability) * 100
 
-const statKeys: StatKey[] = ['yield', 'tripReduction', 'travelSpeed', 'processingSpeed']
+/** Yield is missing on purpose: §8 makes it a number per line, not one number. */
+const statKeys: StatKey[] = ['tripReduction', 'travelSpeed', 'processingSpeed']
 </script>
 
 <template>
@@ -69,10 +104,36 @@ const statKeys: StatKey[] = ['yield', 'tripReduction', 'travelSpeed', 'processin
       </p>
     </section>
 
+    <!-- ------------------------------------------------- yield by line -->
+    <!-- §8: a tool pays out on its own line and nowhere else, so there is no
+         single yield figure any more. The zeroes are the useful part — they are
+         the lines you own no tool for. -->
+    <section class="inset">
+      <div class="row-between" style="margin-bottom: 9px">
+        <h3 class="head">Yield by line</h3>
+        <span class="tiny muted">tools work one line each</span>
+      </div>
+      <div class="lines">
+        <div
+          v-for="tool in TOOL_SLOTS"
+          :key="tool.line"
+          class="line-cell"
+          :class="{ bare: (game.toolYield?.[tool.line] ?? 0) === 0 }"
+        >
+          <SvgIcon :svg="skillIcon(tool.line, 20)" :size="20" />
+          <span class="tiny">{{ SKILL_BY_KEY[tool.line].name }}</span>
+          <strong class="tiny mono">{{ formatPercent(game.toolYield?.[tool.line] ?? 0) }}</strong>
+        </div>
+      </div>
+    </section>
+
     <!-- ------------------------------------------------------ equipment -->
-    <section class="section">
-      <h3 class="head" style="margin-bottom: 8px">Equipment</h3>
-      <div v-for="slot in SLOTS" :key="slot.key" class="slot-row">
+    <section v-for="group in GROUPS" :key="group.title" class="section">
+      <div class="row-between" style="margin-bottom: 8px">
+        <h3 class="head">{{ group.title }}</h3>
+        <span class="tiny muted">{{ group.note }}</span>
+      </div>
+      <div v-for="slot in group.slots" :key="slot.key" class="slot-row">
         <template v-if="equipped[slot.key]">
           <SvgIcon
             :svg="itemIcon({
@@ -129,7 +190,7 @@ const statKeys: StatKey[] = ['yield', 'tripReduction', 'travelSpeed', 'processin
           </span>
           <div class="grow">
             <strong class="tiny muted">{{ slot.label }}</strong>
-            <div class="tiny muted">Empty</div>
+            <div class="tiny muted">{{ slot.hint ?? 'Empty' }}</div>
           </div>
           <div class="row-actions"></div>
         </template>
@@ -268,6 +329,32 @@ const statKeys: StatKey[] = ['yield', 'tripReduction', 'travelSpeed', 'processin
 
 .stat strong {
   font-size: 15px;
+}
+
+/* One row per gathering line. A bare line is dimmed rather than hidden -- the
+   gap is the thing worth seeing. */
+.lines {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.line-cell {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--ink);
+  border: 1px solid var(--line);
+}
+
+.line-cell span {
+  flex: 1 1 auto;
+}
+
+.line-cell.bare {
+  opacity: 0.5;
 }
 
 .slot-row {

@@ -1,11 +1,13 @@
 /**
- * Static game data: the 20 materials (§4), 5 skill lines (§7.2), the processing
- * recipes (§6) and the item catalog (§8.3). This is the data a Laravel seeder
- * will eventually own -- keeping it in one file makes that port mechanical.
+ * Static game data: the 20 materials (§4) plus the 5 scrap (§4.0), 5 skill lines
+ * (§7.2), the processing recipes (§6) and the item catalog (§8.3). This is the
+ * data a Laravel seeder will eventually own -- one file makes the port mechanical.
  */
 import { ECONOMY } from './balance'
 import type {
   Biome,
+  EquipSlot,
+  GatherSlot,
   ItemDef,
   Material,
   MaterialKey,
@@ -13,6 +15,7 @@ import type {
   RawKey,
   Recipe,
   Ring,
+  ScrapKey,
   SettlementTier,
   Skill,
   SkillKey,
@@ -22,6 +25,30 @@ import type {
 // ------------------------------------------------------------- materials §4
 
 export const MATERIALS: Record<MaterialKey, Material> = {
+  // Tier 0 -- Scrap, §4.0. What bare hands bring back when you have no tool for
+  // the line. Sells for a copper, feeds no recipe, and exists only to make the
+  // first tool obviously worth buying.
+  branch: {
+    key: 'branch', name: 'Branch', tier: 0, biome: 'forest', palette: 'wood',
+    npcPrice: 1, description: 'Snapped off by hand. The trader gives you a copper and looks away.',
+  },
+  ore_chips: {
+    key: 'ore_chips', name: 'Ore Chips', tier: 0, biome: 'mountain', palette: 'iron',
+    npcPrice: 1, description: 'Loose flakes off the seam face. Barely worth carrying down.',
+  },
+  torn_hide: {
+    key: 'torn_hide', name: 'Torn Hide', tier: 0, biome: 'plains', palette: 'pelt',
+    npcPrice: 1, description: 'Scavenged, not hunted. Half of it is unusable.',
+  },
+  gravel: {
+    key: 'gravel', name: 'Gravel', tier: 0, biome: 'badlands', palette: 'stone',
+    npcPrice: 1, description: 'Kicked loose from the scree. Nobody dresses this into anything.',
+  },
+  chaff: {
+    key: 'chaff', name: 'Chaff', tier: 0, biome: 'grassland', palette: 'fiber',
+    npcPrice: 1, description: 'Pulled up by the root and mostly broken. The trader takes it by the sack.',
+  },
+
   // Tier 1 -- Raw, biome-locked, decays over cap
   wood: {
     key: 'wood', name: 'Wood', tier: 1, biome: 'forest', palette: 'wood',
@@ -145,23 +172,28 @@ export const RING_LABEL: Record<Ring, string> = {
 export const SKILL_LIST: Skill[] = [
   {
     key: 'woodcutting', name: 'Woodcutting', material: 'wood', rareMaterial: 'ironwood',
-    description: 'Faster trips and better yield in forest hexes.',
+    scrapMaterial: 'branch',
+    description: 'Faster mining and better yield in forest hexes.',
   },
   {
     key: 'mining', name: 'Mining', material: 'iron_ore', rareMaterial: 'mythril_ore',
-    description: 'Faster trips and better yield in mountain hexes.',
+    scrapMaterial: 'ore_chips',
+    description: 'Faster mining and better yield in mountain hexes.',
   },
   {
     key: 'hunting', name: 'Hunting', material: 'pelt', rareMaterial: 'beastfang_hide',
-    description: 'Faster trips and better yield on plains and tundra.',
+    scrapMaterial: 'torn_hide',
+    description: 'Faster mining and better yield on plains and tundra.',
   },
   {
     key: 'quarrying', name: 'Quarrying', material: 'stone', rareMaterial: 'obsidian_shard',
-    description: 'Faster trips and better yield in the badlands.',
+    scrapMaterial: 'gravel',
+    description: 'Faster mining and better yield in the badlands.',
   },
   {
     key: 'harvesting', name: 'Harvesting', material: 'fiber', rareMaterial: 'silkweave_fiber',
-    description: 'Faster trips and better yield in grassland hexes.',
+    scrapMaterial: 'chaff',
+    description: 'Faster mining and better yield in grassland hexes.',
   },
 ]
 
@@ -178,6 +210,22 @@ export const BIOME_MATERIAL: Record<Biome, RawKey> = {
   grassland: 'fiber',
 }
 
+/**
+ * Biome -> scrap, §4.0. What the hex gives up to bare hands: worked without the
+ * line's tool, a hex yields this instead of its real material. Same haul size, a
+ * fraction of the worth, and no recipe will take it.
+ */
+export const BIOME_SCRAP: Record<Biome, ScrapKey> = {
+  forest: 'branch',
+  mountain: 'ore_chips',
+  plains: 'torn_hide',
+  badlands: 'gravel',
+  grassland: 'chaff',
+}
+
+export const isScrap = (key: MaterialKey): boolean =>
+  (Object.values(BIOME_SCRAP) as MaterialKey[]).includes(key)
+
 /** Biome -> its rare variant, spawned in the contested inner ring, §5.3. */
 export const BIOME_RARE: Record<Biome, RareKey> = {
   forest: 'ironwood',
@@ -188,7 +236,9 @@ export const BIOME_RARE: Record<Biome, RareKey> = {
 }
 
 export const skillForMaterial = (key: MaterialKey): SkillKey => {
-  const found = SKILL_LIST.find((s) => s.material === key || s.rareMaterial === key)
+  const found = SKILL_LIST.find(
+    (s) => s.material === key || s.rareMaterial === key || s.scrapMaterial === key,
+  )
   return found?.key ?? 'woodcutting'
 }
 
@@ -234,28 +284,119 @@ export const recipesForLines = (lines: SkillKey[]): Recipe[] =>
  *  and must never reach the screen. */
 export const STAT_LABEL: Record<StatKey, string> = {
   yield: 'yield',
-  tripReduction: 'trip time',
+  tripReduction: 'mine time',
   travelSpeed: 'travel',
   processingSpeed: 'processing',
   power: 'power',
 }
 
+/**
+ * Gathering tool slots, §8. One implement per skill line -- an axe is no use on
+ * a seam and a bow is no use on a tree, so each line has its own slot and its
+ * own ladder. A tool contributes its stat *only* on trips for its own line, and
+ * only that tool takes durability for the trip.
+ *
+ * `weapon` is deliberately absent: that slot is raid combat, and combat gear
+ * must never be able to stand in for a gathering tool.
+ */
+export const TOOL_SLOT_SKILL: Record<GatherSlot, SkillKey> = {
+  axe: 'woodcutting',
+  pickaxe: 'mining',
+  bow: 'hunting',
+  hammer: 'quarrying',
+  sickle: 'harvesting',
+}
+
+/** The skill a gathering slot serves, or null for gear that works anywhere. */
+export const skillForSlot = (slot: EquipSlot): SkillKey | null =>
+  (TOOL_SLOT_SKILL as Partial<Record<EquipSlot, SkillKey>>)[slot] ?? null
+
+/** The slot a skill line draws its tool from. */
+export const slotForSkill = (skill: SkillKey): GatherSlot =>
+  (Object.keys(TOOL_SLOT_SKILL) as GatherSlot[]).find(
+    (slot) => TOOL_SLOT_SKILL[slot] === skill,
+  )!
+
+/** Slot names for the screen. The raw keys are lowercase and never reach it. */
+export const SLOT_LABEL: Record<EquipSlot, string> = {
+  axe: 'Axe',
+  pickaxe: 'Pickaxe',
+  bow: 'Bow',
+  hammer: 'Hammer',
+  sickle: 'Sickle',
+  armor: 'Armor',
+  boots: 'Boots',
+  gloves: 'Gloves',
+  weapon: 'Weapon',
+}
+
 // ------------------------------------------------------------- items §8.3
 
+/**
+ * Every gathering line carries the same five-step ladder -- village basic, city
+ * basic, crafted starter, crafted, NFT -- so no line is quietly weaker than
+ * another. The specialisation §7.2 asks for comes from the skill point cap,
+ * never from one line having better tools available than the rest.
+ */
 export const ITEMS: ItemDef[] = [
-  // -- Basic: gold shop, +3-5%, universal, §8.
+  // -- Basic: gold shop, +3-5%, §8.
   //    `station` is the smallest settlement that stocks the item -- villages
   //    carry the basics, better gear is a reason to walk to a city.
   {
-    key: 'stone_axe', name: 'Stone Axe', slot: 'tool', tier: 'basic', stat: 'yield',
+    key: 'stone_axe', name: 'Stone Axe', slot: 'axe', tier: 'basic', stat: 'yield',
     value: 0.03, palette: 'stone', goldPrice: 20, maxDurability: 40, station: 'village',
     description: 'A chipped edge lashed to a handle. Better than bare hands.',
+  },
+  {
+    key: 'chipped_pick', name: 'Chipped Pick', slot: 'pickaxe', tier: 'basic', stat: 'yield',
+    value: 0.03, palette: 'stone', goldPrice: 22, maxDurability: 40, station: 'village',
+    description: 'Second-hand, and shorter than it started. Still bites ore.',
+  },
+  {
+    key: 'crude_bow', name: 'Crude Bow', slot: 'bow', tier: 'basic', stat: 'yield',
+    value: 0.03, palette: 'wood', goldPrice: 24, maxDurability: 40, station: 'village',
+    description: 'Green stave, gut string. Close range or nothing.',
+  },
+  {
+    key: 'stone_mallet', name: 'Stone Mallet', slot: 'hammer', tier: 'basic', stat: 'yield',
+    value: 0.03, palette: 'stone', goldPrice: 20, maxDurability: 40, station: 'village',
+    description: 'A rock on a stick. It still splits badlands shale.',
+  },
+  {
+    key: 'bent_sickle', name: 'Bent Sickle', slot: 'sickle', tier: 'basic', stat: 'yield',
+    value: 0.03, palette: 'fiber', goldPrice: 18, maxDurability: 40, station: 'village',
+    description: 'Someone straightened it once. It did not take.',
+  },
+  {
+    key: 'iron_hatchet', name: 'Iron Hatchet', slot: 'axe', tier: 'basic', stat: 'yield',
+    value: 0.05, palette: 'iron', goldPrice: 90, maxDurability: 70, station: 'city',
+    description: 'Shop-grade steel. Reliable, unremarkable.',
+  },
+  {
+    key: 'miners_pick', name: "Miner's Pick", slot: 'pickaxe', tier: 'basic', stat: 'yield',
+    value: 0.05, palette: 'iron', goldPrice: 95, maxDurability: 70, station: 'city',
+    description: 'Guild pattern, guild price. Every seam in the range has met one.',
+  },
+  {
+    key: 'recurve_bow', name: 'Recurve Bow', slot: 'bow', tier: 'basic', stat: 'yield',
+    value: 0.05, palette: 'pelt', goldPrice: 95, maxDurability: 70, station: 'city',
+    description: 'Backed and glued. Drops a plains buck without the chase.',
+  },
+  {
+    key: 'iron_sledge', name: 'Iron Sledge', slot: 'hammer', tier: 'basic', stat: 'yield',
+    value: 0.05, palette: 'iron', goldPrice: 90, maxDurability: 70, station: 'city',
+    description: 'Heavy enough that the stone does most of the arguing.',
+  },
+  {
+    key: 'steel_sickle', name: 'Steel Sickle', slot: 'sickle', tier: 'basic', stat: 'yield',
+    value: 0.05, palette: 'iron', goldPrice: 85, maxDurability: 70, station: 'city',
+    description: 'Holds an edge through a full field, then wants a stone.',
   },
   {
     key: 'travel_cloak', name: 'Travel Cloak', slot: 'armor', tier: 'basic',
     stat: 'tripReduction', value: 0.04, palette: 'fiber', goldPrice: 65, maxDurability: 60,
     station: 'village',
-    description: 'Keeps the weather off. Shaves a little off every trip.',
+    description: 'Keeps the weather off, and a little off the clock on every hex.',
   },
   {
     key: 'hide_shoes', name: 'Hide Shoes', slot: 'boots', tier: 'basic',
@@ -263,24 +404,72 @@ export const ITEMS: ItemDef[] = [
     station: 'city',
     description: 'Soft-soled and quiet. Not built for the badlands.',
   },
-  {
-    key: 'iron_hatchet', name: 'Iron Hatchet', slot: 'tool', tier: 'basic', stat: 'yield',
-    value: 0.05, palette: 'iron', goldPrice: 90, maxDurability: 70, station: 'city',
-    description: 'Shop-grade steel. Reliable, unremarkable.',
-  },
 
-  // -- Crafted: tier 1-2 materials, +6-8%, universal, §8.3
+  // -- Crafted starter: one tier 2 line, +4%, §12 step 7.
+  //    The first thing a player makes on a line: cheap, short-lived, and
+  //    deliberately weaker than the city shop tool. It is what you can build
+  //    before you can afford to buy.
   {
-    key: 'wood_pickaxe', name: 'Wood Pickaxe', slot: 'tool', tier: 'crafted', stat: 'yield',
+    key: 'hewn_axe', name: 'Hewn Axe', slot: 'axe', tier: 'crafted', stat: 'yield',
     value: 0.04, palette: 'wood', station: 'village', maxDurability: 60,
     inputs: { planks: 4 },
     description: 'Your first real tool. It will not last, but it will teach.',
   },
   {
-    key: 'iron_pickaxe', name: 'Iron Pickaxe', slot: 'tool', tier: 'crafted', stat: 'yield',
+    key: 'wood_pickaxe', name: 'Wood Pickaxe', slot: 'pickaxe', tier: 'crafted', stat: 'yield',
+    value: 0.04, palette: 'wood', station: 'village', maxDurability: 60,
+    inputs: { planks: 4 },
+    description: 'Wood against rock. It lasts exactly as long as you would expect.',
+  },
+  {
+    key: 'shortbow', name: 'Shortbow', slot: 'bow', tier: 'crafted', stat: 'yield',
+    value: 0.04, palette: 'wood', station: 'village', maxDurability: 60,
+    inputs: { planks: 3, cloth: 2 },
+    description: 'Straight stave, woven string. Quiet, and quick to redraw.',
+  },
+  {
+    key: 'stone_maul', name: 'Stone Maul', slot: 'hammer', tier: 'crafted', stat: 'yield',
+    value: 0.04, palette: 'stone', station: 'village', maxDurability: 60,
+    inputs: { cut_stone: 3, planks: 2 },
+    description: 'Dressed head, seated cold. Stone breaks stone.',
+  },
+  {
+    key: 'reed_sickle', name: 'Reed Sickle', slot: 'sickle', tier: 'crafted', stat: 'yield',
+    value: 0.04, palette: 'fiber', station: 'village', maxDurability: 60,
+    inputs: { cloth: 3, planks: 2 },
+    description: 'Bound at the grip so it stops turning in a wet hand.',
+  },
+
+  // -- Crafted: tier 1-2 materials, +6-8%, §8.3
+  {
+    key: 'ironbound_axe', name: 'Ironbound Axe', slot: 'axe', tier: 'crafted', stat: 'yield',
+    value: 0.06, palette: 'iron', station: 'village', maxDurability: 120,
+    inputs: { ingots: 4, planks: 3 },
+    description: 'Wedged head, banded eye. Fells clean and comes back out.',
+  },
+  {
+    key: 'iron_pickaxe', name: 'Iron Pickaxe', slot: 'pickaxe', tier: 'crafted', stat: 'yield',
     value: 0.06, palette: 'iron', station: 'village', maxDurability: 120,
     inputs: { ingots: 5, planks: 3 },
     description: 'Balanced head, seasoned haft. The workhorse tool.',
+  },
+  {
+    key: 'sinew_longbow', name: 'Sinew Longbow', slot: 'bow', tier: 'crafted', stat: 'yield',
+    value: 0.06, palette: 'pelt', station: 'village', maxDurability: 120,
+    inputs: { leather: 4, cloth: 3 },
+    description: 'Sinew-backed and heavy to draw. The herd never hears it.',
+  },
+  {
+    key: 'banded_sledge', name: 'Banded Sledge', slot: 'hammer', tier: 'crafted', stat: 'yield',
+    value: 0.06, palette: 'iron', station: 'village', maxDurability: 120,
+    inputs: { ingots: 4, cut_stone: 4 },
+    description: 'Iron banding over a stone core. It takes the shock instead of you.',
+  },
+  {
+    key: 'toothed_sickle', name: 'Toothed Sickle', slot: 'sickle', tier: 'crafted', stat: 'yield',
+    value: 0.06, palette: 'iron', station: 'village', maxDurability: 120,
+    inputs: { ingots: 4, cloth: 3 },
+    description: 'Serrated inside the curve. It saws where a plain edge slides.',
   },
   {
     key: 'leather_armor', name: 'Leather Armor', slot: 'armor', tier: 'crafted',
@@ -302,11 +491,37 @@ export const ITEMS: ItemDef[] = [
   },
 
   // -- NFT: tier 3 + tier 4 materials, +12-15% hard cap, §8.3
+  //    Each line's top tool wants its own rare material and its own dungeon
+  //    shard, so kitting out a second line means crossing the map, §4.
   {
-    key: 'mythril_pickaxe', name: 'Mythril Pickaxe', slot: 'tool', tier: 'nft', stat: 'yield',
+    key: 'ironwood_axe', name: 'Ironwood Axe', slot: 'axe', tier: 'nft', stat: 'yield',
+    value: 0.12, palette: 'wood', station: 'capital', maxDurability: 200,
+    inputs: { ironwood: 3, reinforced_frame: 2, shard_verdant: 1 },
+    description: 'Cut from the thing it is meant to cut. Marketplace-tradeable.',
+  },
+  {
+    key: 'mythril_pickaxe', name: 'Mythril Pickaxe', slot: 'pickaxe', tier: 'nft', stat: 'yield',
     value: 0.12, palette: 'iron', station: 'capital', maxDurability: 200,
     inputs: { mythril_ore: 3, reinforced_frame: 2, essence: 1 },
     description: 'Rings like a bell on ore. Marketplace-tradeable.',
+  },
+  {
+    key: 'beastfang_bow', name: 'Beastfang Bow', slot: 'bow', tier: 'nft', stat: 'yield',
+    value: 0.12, palette: 'pelt', station: 'capital', maxDurability: 200,
+    inputs: { beastfang_hide: 3, silkweave_fiber: 2, shard_sanguine: 1 },
+    description: 'Strung with something that used to run. Marketplace-tradeable.',
+  },
+  {
+    key: 'obsidian_sledge', name: 'Obsidian Sledge', slot: 'hammer', tier: 'nft', stat: 'yield',
+    value: 0.12, palette: 'stone', station: 'capital', maxDurability: 200,
+    inputs: { obsidian_shard: 3, reinforced_frame: 2, shard_cinder: 1 },
+    description: 'Glass that lands like iron. Marketplace-tradeable.',
+  },
+  {
+    key: 'silkweave_sickle', name: 'Silkweave Sickle', slot: 'sickle', tier: 'nft', stat: 'yield',
+    value: 0.12, palette: 'fiber', station: 'capital', maxDurability: 200,
+    inputs: { silkweave_fiber: 3, reinforced_frame: 2, shard_zephyr: 1 },
+    description: 'The grass parts before it arrives. Marketplace-tradeable.',
   },
   {
     key: 'ironwood_armor', name: 'Ironwood Armor', slot: 'armor', tier: 'nft',

@@ -173,6 +173,8 @@ export const useGame = defineStore('game', () => {
   const equipment = computed(() => state.value?.equipment ?? [])
   const skills = computed(() => state.value?.skills ?? null)
   const bonuses = computed(() => state.value?.bonuses ?? null)
+  /** §8 -- yield is per gathering line now, never one number. */
+  const toolYield = computed(() => state.value?.toolYield ?? null)
   const jobs = computed<Job[]>(() => state.value?.jobs ?? [])
 
   /**
@@ -438,7 +440,7 @@ export const useGame = defineStore('game', () => {
     // state
     state, station, preview, panel, selected, busy, booted, log, now, view, tiles,
     // derived
-    character, timeScale, inventory, equipment, skills, bonuses, jobs, readyJobs,
+    character, timeScale, inventory, equipment, skills, bonuses, toolYield, jobs, readyJobs,
     activeJobs, miningJob, processingJob, underfoot, selectedTile,
     currentSettlement, shopStock, travelRange,
     travel, travelProgress, travelHexesWalked, travelRemainingMs,

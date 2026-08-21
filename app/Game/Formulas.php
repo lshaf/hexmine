@@ -25,9 +25,14 @@ final class Formulas
      * Rule 1 -- the total is then clamped to the hard ceiling of the best tier
      * present, so rarity buys durability and reliability, not power.
      *
+     * §8 gathering tools are line-locked: a bow does nothing to a tree. A tool
+     * counts only when `$line` is the skill line it serves, so passing null --
+     * "no line is being worked" -- leaves every tool out and returns what the
+     * player gets from gear that works anywhere.
+     *
      * @param  array<int,array{key:string,durability:int,equipped:bool}>  $items
      */
-    public static function aggregateStat(array $items, string $stat): float
+    public static function aggregateStat(array $items, string $stat, ?string $line = null): float
     {
         $values = [];
         $bestCap = Balance::STAT_CAP['basic'];
@@ -39,6 +44,10 @@ final class Formulas
             }
             $def = Catalog::item($item['key']);
             if ($def === null || $def['stat'] !== $stat) {
+                continue;
+            }
+            $toolLine = Catalog::skillForSlot($def['slot']);
+            if ($toolLine !== null && $toolLine !== $line) {
                 continue;
             }
 
