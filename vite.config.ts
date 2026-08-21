@@ -9,7 +9,12 @@ import vue from '@vitejs/plugin-vue'
 export default defineConfig({
   plugins: [
     laravel({
-      input: ['resources/css/app.css', 'resources/js/main.ts', 'resources/js/almanac.ts'],
+      input: [
+        'resources/css/app.css',
+        'resources/js/main.ts',
+        'resources/js/almanac.ts',
+        'resources/js/oddity.ts',
+      ],
       refresh: true,
     }),
     vue(),
