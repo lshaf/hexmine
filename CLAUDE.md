@@ -173,6 +173,48 @@ Not a tile type. **Temporary herd markers** spawn on open Plains/Grassland hexes
 after ~4h. Yields Pelt (Tier 1) + small Essence (Tier 4) — the only activity bridging the
 mining and raid material tracks. No party, no raid charge, just AP + time.
 
+### 5.6 Sight and travel — a fog, not a fence
+
+These were one number and are now two, and separating them is what makes the
+map worth walking.
+
+| | Rule |
+|---|---|
+| **Sight** | **2 hexes.** Base `Balance::SIGHT_RADIUS`, up to 4 through the Explorer chain (§7.5). |
+| **Sight while travelling** | **0.** You are between hexes, watching your feet. |
+| **Travel range** | **None.** Any hex on the map is walkable from any other. |
+
+**Travel has no reach limit and must not grow one.** Distance already costs the
+one currency an idle game cannot inflate — hours, at ten minutes a hex — so a
+level gate on top of it would be a second answer to a question the clock has
+already answered. The only refusal is the edge of the map.
+
+**Outside sight the map is not blank, it is unscouted.** Terrain is a pure
+function of `(col, row, seed)` (§5), so the client draws the land itself for
+free, at any distance, and draws a **settlement glyph** — tier only, no name —
+wherever anybody lives. What it does *not* have is anything the server alone
+knows: depletion timers, who is mining where, what a hex would pay. That is the
+whole of the difference between scouted ground and the rest.
+
+Three consequences, all deliberate:
+
+1. **The live-state query is a disc of nineteen tiles**, not the several hundred
+   that reach-as-sight scanned, and it does not grow with level. Sight is the
+   one number in the game no amount of play widens past `SIGHT_RADIUS +
+   SKILL_SIGHT_CAP`, and that ceiling is a query budget rather than a balance
+   one — cost goes as the square of the radius.
+2. **A journey costs no queries at all.** Sight closes to zero when the road
+   starts and opens when it ends, so a walk of two hundred hexes and a walk of
+   one both cost exactly two requests.
+3. **Costing a hex is bounded by the same disc.** The per-tile preview endpoint
+   refuses anything unscouted — otherwise it would be the map query in a slower
+   form: one tile per request, and nothing stopping a client from asking about
+   every hex on the map.
+
+The glyphs are what keep a fog navigable: you can always see *that* there is a
+capital over there, which is what makes deciding to walk to it possible, and
+never *what is happening* there, which is what makes arriving worth something.
+
 ---
 
 ## 6. Settlements — shared infrastructure, NOT per-player bases
@@ -246,11 +288,14 @@ accelerates an already-capped queue.
 things, not the character — this prevents power-account selling.
 
 ### 7.1 Level
-Level unlocks **capacity, not power**: AP pool, storage cap, travel range, access to
-higher-tier hexes and dungeon floors. A whale can out-scale logistics but never out-damage
-a grinder.
+Level unlocks **capacity, not power**: AP pool, storage cap, access to higher-tier hexes
+and dungeon floors. A whale can out-scale logistics but never out-damage a grinder.
 
-### 7.2 Skill trees (5, one per material line)
+Travel range is deliberately *not* on that list — there is no reach to unlock
+(§5.6). Nor is sight: the only thing that widens the eye is having walked
+(§7.5), which is the one reward in the game that cannot be bought.
+
+### 7.2 Gathering lines (5, one per material line)
 Woodcutting · Mining · Hunting · Quarrying · Harvesting
 
 Each reduces trip time / boosts yield **for its own material only**. XP comes from mining
@@ -275,6 +320,190 @@ Max total reduction = 30 min, so a 60-min tile at BiS lands exactly on the 30-mi
 
 **The floor clamp is mandatory and must be in the formula from day one.** Without it, any
 future buff/equipment tier creates a sub-30 or zero-time exploit.
+
+### 7.4 Jobs and their skill trees
+
+**Eleven jobs, three kinds.** Each has a tree of 30 nodes bought with skill
+points. What differs between the kinds is where the *job level* comes from.
+
+There is a **twelfth job that plays by none of these rules** — Explorer, §7.5.
+Everything below describes the eleven bought trees; read §7.5 before assuming a
+rule here covers all of them.
+
+| Job | Kind | Bench / role | Level comes from |
+|---|---|---|---|
+| Woodcutting | gathering | forest | its §7.2 skill level |
+| Mining | gathering | mountain | its §7.2 skill level |
+| Hunting | gathering | plains, tundra | its §7.2 skill level |
+| Quarrying | gathering | badlands | its §7.2 skill level |
+| Harvesting | gathering | grassland | its §7.2 skill level |
+| Smith | craft | weapon bench (§8.4) | forging a tool or weapon |
+| Armorer | craft | armor bench | making armor, boots or gloves |
+| Alchemist | craft | consumable bench | brewing a potion |
+| Shieldbearer | battle | defence | raiding with a shield |
+| Swordhand | battle | balance | raiding with a sword |
+| Runecaster | battle | offence | raiding with a focus |
+
+**A gathering job's level is not a new number.** It is the §7.2 skill level that
+line has always had — the same figure that takes up to 20 minutes off a trip
+(§7.3). One number, so there is never a second opinion about how good a
+woodcutter someone is, and the five gathering trees are playable the moment they
+exist rather than waiting on a new grind.
+
+That makes gathering the one kind whose level *does* grant power. It always did;
+§7.4.1 below is about the levels this system introduces.
+
+**Gathering `stat` nodes are line-locked**, exactly as tools are (§8 rule 1): a
+Woodcutting node counts in a forest and nowhere else. Without that, taking three
+gathering trees would stack yield on every trip at once, which is the shortcut
+the line-locked tool ladder exists to close. Craft and battle nodes are not
+line-locked; they have no line.
+
+**The three battle jobs are dormant.** Their trees exist and their gates work, but
+nothing can level them until raid combat does (§9, §14.2) — the same way the
+`weapon` slot exists and stays empty. They must not be given a stand-in XP source
+from mining; a battle job that levels by digging would make combat optional.
+
+#### 7.4.1 Two numbers, and only one of them is power
+
+- **Character level** — 1 to 100, one **skill point** per level. This is the only
+  source of points. 100 points buys three complete trees (30 each) with 10 left
+  over, which is deliberately just short of a fourth — out of **eleven** trees,
+  so the choice of which three is most of what a character is.
+- **Job level** — earned by doing that job's work. It **gates** nodes and, for
+  craft and battle jobs, does nothing else: no stat, no yield, no speed. It is
+  the proof you have done the work, not a reward for it. Gathering levels are the
+  exception noted above — they predate this system and still drive §7.3.
+
+Points are the scarce thing, and they are spent on *breadth*. Job levels are the
+slow thing, and they are earned on *depth*. Neither substitutes for the other:
+you cannot buy your way past a job level, and grinding a job to 30 gives you
+nothing until you spend a point.
+
+#### 7.4.2 Tree shape — 30 nodes, five tiers
+
+| Tier | Nodes | Job level | Prerequisite |
+|---|---|---|---|
+| 1 | 6 | 1 | none — open the moment the job exists |
+| 2 | 8 | 5 | one tier-1 node |
+| 3 | 8 | 12 | one tier-2 node |
+| 4 | 6 | 20 | one tier-3 node |
+| 5 | 2 | 28 | **two** tier-4 nodes |
+
+The capstones needing two parents is what makes a tree a tree rather than a list:
+a full 30-point investment is forced through choices, and a partial one has to
+decide which branch it is actually committing to.
+
+**Nodes are bought, never refunded.** A respec would turn the point cap into a
+suggestion and let one character be every specialist in turn, which is exactly
+what §7.2's cap exists to prevent.
+
+#### 7.4.3 What a node may do — and the ceiling, again
+
+This is the part that can break the game, so the rule is mechanical rather than
+a matter of judgement. A node's effect must be one of these, and nothing else:
+
+| Effect | What it does | Cap |
+|---|---|---|
+| `unlock` | Makes a recipe craftable at all | none — capability, not power |
+| `stat` | A `StatKey` percentage | **feeds the same aggregate and clamp as gear, options and buffs** |
+| `craftOption` | Chance of an extra rolled option (§8.0.1) on what you make | `SKILL_OPTION_CHANCE_CAP` |
+| `craftDurability` | Higher starting max durability on what you make | `SKILL_DURABILITY_CAP` |
+| `costReduction` | Fewer inputs per craft | `SKILL_COST_REDUCTION_CAP` |
+| `batch` | More output per craft or processing run | `SKILL_BATCH_CAP` |
+| `sight` | Whole hexes of sight (§5.6), on top of the base two | `SKILL_SIGHT_CAP` |
+
+**A skill point can never take a stat past +15%.** `stat` nodes feed the very same
+sum and clamp as equipment, rolled options and potions (§8.1 rule 1). What they
+buy is a *different road to the ceiling*, not a higher one — which is the point:
+a player deep in a tree reaches the same cap as one in full epic gear, and §8.1
+rule 4 stays true.
+
+The four caps that are not the stat ceiling exist to protect §11 and §5.6, not
+§8. `costReduction` and `batch` both thin a materials sink, and
+`craftDurability` thins the repair sink. Left uncapped, a maxed crafter would
+quietly switch off the loss the whole economy is balanced around.
+
+`sight` is the odd one, and its cap is the sharpest because sight is the radius
+of the map query — cost grows as the *square* of it. Two hexes is nineteen
+tiles, four is thirty-seven, ten would be two hundred and change.
+`SKILL_SIGHT_CAP` is a query budget rather than a balance one, and it is what
+lets sight be a reward at all instead of a scanner handed to anyone patient
+enough to walk. It is also a **count, not a percentage**, so like `unlock` it
+has nothing to do with the stat ceiling. It is capability.
+
+**`unlock` is the one with no cap, and that is deliberate** — it is where the
+trees grow. New materials, new biome variants and new equipment tiers arrive as
+new unlock nodes rather than as bigger numbers, so the trees can keep expanding
+without ever touching the ceiling.
+
+#### 7.4.4 Pacing — six months, and it does not move
+
+The target is **level 100 after roughly 180 days of unbroken play at game speed
+1**. Measured against real income — a career averages about 1,080 character XP a
+day, from 28 trips a day early and 48 late — that sizes the curve at:
+
+```
+xp_for_level(L) = round(40 + 2.1 * L^1.7)     // ~197,000 XP total, ~182 days
+job_xp_for_level(L) = round(17 * L^1.5)       // ~32,000 XP, ~1,600 crafts to job 30
+```
+
+The `40` floor is there so the first level costs about three mining trips rather
+than half of one.
+
+**XP is never passed through `Balance::scaled()`, and must never be.** Timers
+compress with `GAME_TIME_SCALE`; XP does not. A trip pays the same XP at speed 1
+and at speed 100 — which is what makes a fast clock a *testing* tool rather than
+a progression cheat, and what keeps the six-month figure meaningful. There is a
+test for this.
+
+### 7.5 Explorer — the road job
+
+**A twelfth job, of a fourth kind (`wayfaring`), and it breaks four of §7.4's
+rules on purpose.** It exists because §5.6 took the reach limit off the map: if
+any hex is walkable, a long walk has to pay out *something*, or the map is just
+a waiting room.
+
+| | Explorer | Every other job |
+|---|---|---|
+| Tree | **5 nodes, one per tier, a single chain** | 30 nodes, 6/8/8/6/2, branching |
+| Cost | **Nothing — granted at its job level** | 1 skill point each |
+| Levels from | **Hexes crossed** | Bench work, or raiding |
+| Capstone | **one parent** (a chain has no fork) | two parents |
+
+The chain, in order — the tier gates are §7.4.2's, unchanged:
+
+| Tier | Job level | Node | Effect |
+|---|---|---|---|
+| 1 | 1 | Long Stride | +10% travel speed |
+| 2 | 5 | High Ground | **+1 sight** |
+| 3 | 12 | Road Sense | +10% travel speed |
+| 4 | 20 | Horizon Line | **+1 sight** |
+| 5 | 28 | Second Wind | +5% travel speed |
+
+**Walking earns Explorer XP and no character XP.** Both halves are load-bearing.
+Without the first, a map with no reach limit is a long wait; without the second,
+the cheapest XP in the game is pressing *travel* and going to bed — and §2's
+whole argument is that idle time must not be a faucet.
+
+**Its nodes are granted, never bought, and that is only safe because there is
+exactly one such tree.** A second free tree would not be a new job, it would be
+a hole in the 100-point cap (§7.4.1). Five nodes is likewise the ceiling on what
+a free tree may be worth. Granted nodes are **derived from the job level and
+never stored** — a row would be a second place for "do you have this yet" to be
+answered, and the two would eventually disagree.
+
+**The travel bonus totals +25% against a +15% ceiling, and it is still clamped
+at +15%.** This is the one place a tree deliberately spends a whole stat by
+itself, so say it plainly: a maxed Explorer has `travelSpeed` spent for them and
+boots stop adding to it. That is the trade for a five-node tree that costs no
+points. What it does **not** do is pass the ceiling — those 25 points go into
+the same sum and the same clamp as gear, options and potions (§8.1 rule 1), and
+there is a test pinning it.
+
+**Sight is the reward that matters**, and it is capped at `SKILL_SIGHT_CAP` for
+the reason in §7.4.3: sight is a query radius, not a stat. Base 2 → 4 at the end
+of the chain, and no further, ever.
 
 ---
 
@@ -379,6 +608,10 @@ Rules, all mandatory:
   dramatically so, or the crafting-materials sink stalls at endgame.
 
 ### 8.3 Example recipes (starting values)
+
+`travelSpeed` **divides the travel clock** — +8% boots really are 8% faster over
+any distance. It used to buy hexes of reach, and §5.6 removed reach, so the stat
+now does the thing it is named after.
 
 Worn gear:
 ```
@@ -596,7 +829,16 @@ The working approach, after several failed attempts:
 - **Painter's algorithm** — sort tiles by screen Y before render so tall props (mountains,
   capital towers) correctly occlude tiles behind them.
 - **No alpha anywhere on the map.** Use solid desaturated fills for depleted tiles.
-  Transparency causes ghost-hex artifacts through neighbors.
+  Transparency causes ghost-hex artifacts through neighbors. Unscouted ground
+  (§5.6) is the same rule: a darker **solid** fill, never opacity.
+- **The dashed ring is the sight boundary, not a fence.** It marks where the
+  scouting report stops, and it vanishes entirely on the road, where sight is
+  zero. Every hex outside it is still walkable — the map must never imply
+  otherwise.
+- **Beyond sight a tile gets its terrain colour and, if anybody lives there, a
+  settlement glyph — tier only, no name.** Nothing else: no props, no slot pips,
+  no labels. The glyph is what makes deciding to walk somewhere possible; the
+  absence of everything else is what makes arriving worth something.
 - Tiling: flat-top hexes, `colStep = W * 0.75`, `rowStep = H`, odd columns offset by `H/2`.
 - **Layout with inline styles, not Tailwind arbitrary values** (`w-[390px]` etc. silently
   failed in the artifact sandbox and collapsed the viewport to zero height). Use a flex

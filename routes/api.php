@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\MapController;
 use App\Http\Controllers\Api\MiningController;
 use App\Http\Controllers\Api\SettlementController;
 use App\Http\Controllers\Api\ShopController;
+use App\Http\Controllers\Api\SkillTreeController;
 use App\Http\Controllers\Api\StateController;
 use App\Http\Middleware\ResolveCharacter;
 use Illuminate\Support\Facades\Route;
@@ -48,6 +49,10 @@ Route::middleware(ResolveCharacter::class)->group(function () {
     Route::post('/shop/sales', [ShopController::class, 'sell']);
 
     Route::post('/crafting', [CraftingController::class, 'store']);
+
+    // §7.4 -- the tree is static and player-independent, so it is its own GET.
+    Route::get('/jobs-tree', [SkillTreeController::class, 'index']);
+    Route::post('/jobs-tree/nodes', [SkillTreeController::class, 'store']);
 
     Route::post('/equipment/{item}/equip', [EquipmentController::class, 'equip'])->whereNumber('item');
     Route::post('/equipment/{item}/unequip', [EquipmentController::class, 'unequip'])->whereNumber('item');

@@ -9,9 +9,10 @@
  * them can tell you that ironwood is contested-ring only, or that a warbow
  * wants a reinforced frame you cannot make at a village.
  *
- * It talks to nothing. Both catalogs are static data mirrored between PHP and
- * TS, so the whole page is a pure read of `catalog.ts` and `sources.ts` -- no
- * request, and correct even standing in an empty hex.
+ * It talks to nothing, which is why it is its own page (/almanac) rather than a
+ * panel over the map. Both catalogs are static data mirrored between PHP and
+ * TS, so the whole screen is a pure read of `catalog.ts` and `sources.ts` -- no
+ * store, no request, and correct with no character at all.
  *
  * The structural device is the provenance rail: every entry carries the same
  * two labelled lines, FROM and FEEDS, colour-coded by which of the five roads
@@ -20,7 +21,6 @@
  * saying something true about scrap.
  */
 import { computed, ref, watch } from 'vue'
-import { useGame } from '@/stores/game'
 import {
   MATERIALS,
   RARITY_LABEL,
@@ -48,8 +48,6 @@ import { BIOME_LABEL } from '@/theme/palette'
 import { itemIcon, materialIcon } from '@/icons/procedural'
 import SvgIcon from '@/components/SvgIcon.vue'
 import type { EquipSlot, ItemDef, Material, MaterialTier } from '@/game/types'
-
-const game = useGame()
 
 type Half = 'materials' | 'equipment'
 
@@ -230,15 +228,6 @@ const materialCount = computed(() =>
 
 const itemCount = computed(() => groups.value.reduce((n, g) => n + g.entries.length, 0))
 
-// ---------------------------------------------------------------------- held
-
-const heldItems = computed(() => {
-  const counts: Record<string, number> = {}
-  for (const owned of game.equipment) counts[owned.key] = (counts[owned.key] ?? 0) + 1
-  for (const [key, qty] of Object.entries(game.consumables)) counts[key] = qty
-  return counts
-})
-
 /** What the thing is, in one line: where it goes, what it serves, how long. */
 function nature(item: ItemDef): string {
   if (item.consumable) {
@@ -310,9 +299,6 @@ function nature(item: ItemDef): string {
                   </span>
                   <strong class="name">{{ entry.mat.name }}</strong>
                 </div>
-                <span v-if="game.held(entry.mat.key)" class="have" title="In your bag right now">
-                  <em>held</em>{{ game.held(entry.mat.key) }}
-                </span>
               </div>
 
               <p class="tiny muted desc">{{ entry.mat.description }}</p>
@@ -420,14 +406,9 @@ function nature(item: ItemDef): string {
                     {{ entry.item.name }}
                   </strong>
                 </div>
-                <div class="tail">
-                  <span class="chip tiny" :class="entry.item.tradeable ? 'chip-nft' : ''">
-                    {{ formatPercent(entry.item.value) }} {{ STAT_LABEL[entry.item.stat] }}
-                  </span>
-                  <span v-if="heldItems[entry.item.key]" class="have" title="In your kit right now">
-                    <em>held</em>{{ heldItems[entry.item.key] }}
-                  </span>
-                </div>
+                <span class="chip tiny" :class="entry.item.tradeable ? 'chip-nft' : ''">
+                  {{ formatPercent(entry.item.value) }} {{ STAT_LABEL[entry.item.stat] }}
+                </span>
               </div>
 
               <p class="tiny muted desc">{{ entry.item.description }}</p>
@@ -481,9 +462,9 @@ function nature(item: ItemDef): string {
 </template>
 
 <style scoped>
-/* The panel hands over a flush, full-height box (`wide`), so scrolling and
-   padding belong to this component -- the bar has to stay put while the entries
-   move under it. */
+/* The page hands over the height left under its title strip, and nothing else:
+   scrolling and padding belong here, because the bar has to stay put while the
+   entries move under it. */
 .almanac {
   display: flex;
   flex-direction: column;
@@ -553,8 +534,11 @@ function nature(item: ItemDef): string {
   display: flex;
   align-items: center;
   gap: 7px;
+  /* Capped: on a wide screen an uncapped field runs the width of the page and
+     reads as a form, when what the bar is is an instrument. */
   flex: 1 1 200px;
   min-width: 160px;
+  max-width: 420px;
   padding: 0 10px;
   border: 1px solid var(--line);
   background: var(--ink-panel);
@@ -706,36 +690,6 @@ section + section {
 .name {
   font-size: 13px;
   line-height: 1.25;
-}
-
-.tail {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-/* What you are holding right now, so the almanac doubles as a checklist. */
-.have {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 4px;
-  padding: 2px 6px;
-  background: var(--ink-raised);
-  border: 1px solid #4a3a2a;
-  color: var(--copper);
-  font-size: 11px;
-  font-weight: 700;
-  text-align: center;
-  clip-path: polygon(4px 0, 100% 0, 100% calc(100% - 4px), calc(100% - 4px) 100%, 0 100%, 0 4px);
-}
-
-.have em {
-  font-size: 8px;
-  font-style: normal;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: #8a6a48;
 }
 
 .desc {

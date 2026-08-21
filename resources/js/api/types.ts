@@ -41,8 +41,13 @@ export interface CharacterDto {
   row: number
   storageUsed: number
   storageCap: number
-  /** Hexes the character can reach in one move, §7.1. */
-  travelRange: number
+  /**
+   * §5.6 -- how far the character can see, in hexes. Two standing still, zero
+   * on the road. Not a reach: every hex on the map is walkable.
+   */
+  sight: number
+  /** §8.3 -- wall-clock ms to cross one hex at this character's pace. */
+  travelPerHexMs: number
   /** §12 -- index into the tutorial script; -1 once finished. */
   tutorialStep: number
 }
@@ -107,6 +112,69 @@ export interface PlayerState {
   consumables: Record<string, number>
   /** §8.5 -- effects running right now. Expiry is a server-clock deadline. */
   buffs: ActiveBuff[]
+  /** §7.4.1 -- one point per character level, spent on tree nodes. */
+  skillPoints: SkillPoints
+  /** §7.4 -- one row per job. A level here gates nodes and grants nothing. */
+  jobLevels: JobLevel[]
+  /** §7.4.2 -- node keys bought. Bought, never refunded. */
+  nodes: string[]
+}
+
+export interface SkillPoints {
+  total: number
+  spent: number
+  available: number
+}
+
+export interface JobLevel {
+  key: string
+  level: number
+  xp: number
+  xpToNext: number
+}
+
+/** §7.4.3 -- what a node does. One of six kinds, and nothing else. */
+export type NodeEffect =
+  | { kind: 'stat'; stat: StatKey; value: number }
+  | { kind: 'unlock'; target: string }
+  | { kind: 'craftOption'; value: number }
+  | { kind: 'craftDurability'; value: number }
+  | { kind: 'costReduction'; value: number }
+  | { kind: 'batch'; value: number }
+  /** §7.5 -- whole hexes of sight, on top of the base two. Not a percentage. */
+  | { kind: 'sight'; value: number }
+
+export interface JobDef {
+  name: string
+  kind: 'craft' | 'battle'
+  source: string
+  palette: string
+  description: string
+}
+
+export interface NodeDef {
+  job: string
+  tier: number
+  jobLevel: number
+  name: string
+  effect: NodeEffect
+  requires: string[]
+  description: string
+}
+
+/**
+ * §7.4 -- the trees, served rather than mirrored into catalog.ts. Static and
+ * identical for everyone, so it is fetched once when the panel first opens
+ * instead of riding along with every state refresh.
+ */
+export interface SkillTree {
+  jobs: Record<string, JobDef>
+  nodes: Record<string, NodeDef>
+  tierJobLevel: Record<number, number>
+  tierSize: Record<number, number>
+  /** §7.5 -- jobs whose nodes are granted by job level, never bought. */
+  automatic: string[]
+  jobMaxLevel: number
 }
 
 /** Server-computed preview of what a trip on this tile would cost and give. */
@@ -127,6 +195,12 @@ export interface TilePreview {
   note: string | null
   material: MaterialKey | null
   apCost: number
+  /**
+   * §5.6 -- true when the hex is outside sight, and everything above it is
+   * therefore blank rather than zero. The server will not cost an unscouted
+   * hex, so the card reports the walk instead of the seam.
+   */
+  unseen: boolean
 }
 
 /**
@@ -208,6 +282,11 @@ export interface GameApi {
   ): Promise<ActionResult<{ dropped: number }>>
   /** §8.5 -- drink one, starting a timed buff. */
   useConsumable(item: string): Promise<ActionResult<ActiveBuff>>
+
+  /** §7.4 -- the static tree. Fetched once, never per action. */
+  getSkillTree(): Promise<SkillTree>
+  /** §7.4 -- spend one point. Every gate is checked server-side. */
+  buyNode(nodeKey: string): Promise<ActionResult<{ node: string; points: SkillPoints }>>
 }
 
 export class ApiError extends Error {

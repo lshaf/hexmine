@@ -37,23 +37,59 @@ final class GameLoopTest extends TestCase
         $this->character = $this->game->createCharacter($player);
     }
 
+    /**
+     * Wind a journey's clock back, so time appears to have passed.
+     *
+     * Both ends move together, and that is not tidiness. The journey's pace is
+     * read back from the gap between them (§8.3, so that changing boots mid-walk
+     * cannot move the hex a stop lands on), which means rewinding only the start
+     * would not simulate a walk -- it would fabricate a slower journey than the
+     * one that was actually set out on.
+     */
+    private function rewind(Character $character, int $ms): void
+    {
+        $character->travel_started_at = (int) $character->travel_started_at - $ms;
+        $character->travel_ends_at = (int) $character->travel_ends_at - $ms;
+        $character->save();
+    }
+
     /** Wind a journey's clock back so it has already landed, then settle it. */
     private function arrive(Character $character): void
     {
-        $span = (int) $character->travel_ends_at - (int) $character->travel_started_at;
-        $character->travel_started_at = (int) $character->travel_started_at - $span;
-        $character->travel_ends_at = (int) $character->travel_ends_at - $span;
-        $character->save();
+        $this->rewind(
+            $character,
+            (int) $character->travel_ends_at - (int) $character->travel_started_at,
+        );
 
         $this->game->settle($character);
+    }
+
+    /**
+     * The pace of the journey under way, read back from its own clock.
+     *
+     * Not Balance::TRAVEL_MS_PER_HEX any more: §8.3 makes travelSpeed divide the
+     * clock, and every character has some of it from the first Explorer node
+     * (§7.5), so there is no single figure a test can assume.
+     */
+    private function perHex(Character $character): int
+    {
+        $hexes = \App\Game\HexGeometry::distance(
+            (int) $character->col,
+            (int) $character->row,
+            (int) $character->travel_to_col,
+            (int) $character->travel_to_row,
+        );
+
+        return intdiv(
+            (int) $character->travel_ends_at - (int) $character->travel_started_at,
+            max(1, $hexes),
+        );
     }
 
     /** Pretend the walker has been going for this many whole hexes. */
     private function walkFor(Character $character, int $hexes): void
     {
-        $perHex = Balance::scaled(Balance::TRAVEL_MS_PER_HEX);
-        $character->travel_started_at = (int) $character->travel_started_at - ($hexes * $perHex + 5);
-        $character->save();
+        $this->rewind($character, $hexes * $this->perHex($character) + 5);
     }
 
     /** §5 -- ten minutes of ground per hex, and the map is crossed on foot. */
@@ -67,10 +103,16 @@ final class GameLoopTest extends TestCase
 
         $this->assertSame($distance, $travel['hexes']);
         $this->assertSame($distance + 1, count($travel['path']), 'the road includes both ends');
-        $this->assertSame(
-            $distance * Balance::scaled(Balance::TRAVEL_MS_PER_HEX),
-            $travel['endsAt'] - $travel['startedAt'],
-        );
+
+        // §8.3 -- ten minutes a hex divided by whatever travelSpeed the walker
+        // carries. Even a fresh character has some: Explorer's first node is
+        // granted the moment the job exists (§7.5).
+        $pace = Balance::scaled(Balance::travelMsPerHex(
+            $this->game->bonuses($this->character)['travelSpeed'],
+        ));
+
+        $this->assertSame($distance * $pace, $travel['endsAt'] - $travel['startedAt']);
+        $this->assertSame($pace, $travel['perHexMs']);
 
         // Still standing where the journey began: you are not there yet.
         $this->assertSame($from['col'], $this->character->col);
@@ -95,9 +137,8 @@ final class GameLoopTest extends TestCase
         $path = $travel['path'];
 
         // Three hexes of walking, plus most of a fourth that buys nothing.
-        $perHex = Balance::scaled(Balance::TRAVEL_MS_PER_HEX);
-        $this->character->travel_started_at = (int) $this->character->travel_started_at - (3 * $perHex + (int) ($perHex * 0.9));
-        $this->character->save();
+        $perHex = $this->perHex($this->character);
+        $this->rewind($this->character, 3 * $perHex + (int) ($perHex * 0.9));
 
         $stop = $this->game->cancelTravel($this->character);
 
@@ -149,7 +190,7 @@ final class GameLoopTest extends TestCase
         $this->assertSame('wood', $tile['material']);
         $this->assertSame('outer', $tile['ring']);
 
-        $range = Balance::travelRange(1);
+        $range = Balance::SPAWN_VILLAGE_RADIUS;
         $found = null;
         for ($dc = -$range; $dc <= $range && ! $found; $dc++) {
             for ($dr = -$range; $dr <= $range && ! $found; $dr++) {
@@ -160,7 +201,7 @@ final class GameLoopTest extends TestCase
             }
         }
 
-        $this->assertNotNull($found, 'no woodcutting village within level-1 travel range');
+        $this->assertNotNull($found, 'no woodcutting village within spawn radius');
     }
 
     public function test_mining_spends_ap_and_yields_on_collect(): void
@@ -192,6 +233,454 @@ final class GameLoopTest extends TestCase
         $this->assertGreaterThan(0, $result['gained']['branch']);
         $this->assertArrayNotHasKey('wood', $result['gained']);
         $this->assertSame(0, GameJob::count());
+    }
+
+    /**
+     * §7.4.4 -- a fast clock is a testing tool, never a progression cheat.
+     *
+     * Timers go through Balance::scaled(); XP must not. If XP ever picked up the
+     * time scale, GAME_TIME_SCALE=100 would pay a hundred times the progression
+     * per real hour and the six-month pacing target would mean nothing. This
+     * pins the rule at the one place it would break: the collect that pays out.
+     */
+    public function test_xp_does_not_move_with_the_game_clock(): void
+    {
+        $earned = [];
+
+        foreach ([1, 100] as $scale) {
+            config(['game.time_scale' => $scale]);
+            $this->assertSame($scale, Balance::timeScale());
+
+            $player = Player::create(['wallet' => "0xclock{$scale}", 'session_id' => "clock{$scale}"]);
+            $character = $this->game->createCharacter($player);
+
+            $job = $this->game->startMining($character, $character->col, $character->row);
+            $job->update(['ends_at' => $this->game->now() - 1, 'quantity' => 5]);
+
+            $before = $character->fresh()->xp;
+            $this->game->collectJob($character->fresh(), $job->id);
+            $earned[$scale] = $character->fresh()->xp - $before;
+        }
+
+        config(['game.time_scale' => 1]);
+
+        $this->assertGreaterThan(0, $earned[1], 'a finished trip paid no XP at all');
+        $this->assertSame(
+            $earned[1],
+            $earned[100],
+            'XP moved with the game clock -- a fast clock must compress timers, not progression',
+        );
+    }
+
+    /**
+     * §7.4.4 -- the level curve is sized against measured income, so a change to
+     * it should have to argue with this test rather than slip through.
+     *
+     * ~1,080 character XP a day is what an unbroken career averages at speed 1
+     * (28 mining trips a day unequipped, 48 on the 30-minute floor, plus the
+     * processing those hauls feed). The target is level 100 at about six months.
+     */
+    public function test_the_level_curve_lands_on_the_six_month_target(): void
+    {
+        $this->assertSame(100, Balance::MAX_LEVEL);
+
+        $total = 0;
+        for ($level = 1; $level < Balance::MAX_LEVEL; $level++) {
+            $total += Balance::xpForLevel($level);
+        }
+
+        $days = $total / 1078.0;
+        $this->assertGreaterThan(150, $days, "level 100 reachable in only {$days} days");
+        $this->assertLessThan(220, $days, "level 100 takes {$days} days, well past six months");
+
+        // The first level should cost a few trips, not a fraction of one: a
+        // character that gains four levels on its first haul has no curve at all.
+        $firstTrip = 5 * 4 * 0.6;
+        $this->assertGreaterThan(
+            2 * $firstTrip,
+            Balance::xpForLevel(1),
+            'level 2 arrives in under two mining trips',
+        );
+
+        // Monotonic, or later levels would be cheaper than earlier ones.
+        for ($level = 2; $level < Balance::MAX_LEVEL; $level++) {
+            $this->assertGreaterThan(Balance::xpForLevel($level - 1), Balance::xpForLevel($level));
+        }
+    }
+
+    /**
+     * §7.4.1 -- 100 levels buys three complete 30-node trees and 10 spare. The
+     * spare is deliberate: it is enough to dabble, never enough for a fourth
+     * job, which is what keeps a character a specialist.
+     */
+    public function test_skill_points_buy_three_trees_and_no_more(): void
+    {
+        $this->assertSame(1, Balance::skillPointsFor(1), 'level 1 starts with a point');
+        $this->assertSame(100, Balance::skillPointsFor(Balance::MAX_LEVEL));
+
+        $treesAffordable = intdiv(Balance::skillPointsFor(Balance::MAX_LEVEL), 30);
+        $this->assertSame(3, $treesAffordable);
+        $this->assertSame(10, Balance::skillPointsFor(Balance::MAX_LEVEL) - 3 * 30);
+    }
+
+    /** §7.4.1 -- job levels gate nodes and are reachable by doing the work. */
+    public function test_job_curve_is_reachable_by_crafting(): void
+    {
+        $this->assertSame(30, Balance::JOB_MAX_LEVEL);
+
+        $total = 0;
+        for ($level = 1; $level < Balance::JOB_MAX_LEVEL; $level++) {
+            $total += Balance::jobXpForLevel($level);
+        }
+
+        // A craft pays 10 x (rarity rank + 1): common 10 through epic 40.
+        $crafts = $total / 20;
+        $this->assertGreaterThan(500, $crafts, 'a job maxes in a handful of crafts');
+        $this->assertLessThan(4000, $crafts, "job 30 needs {$crafts} crafts, which nobody will do");
+    }
+
+    // ------------------------------------------------------------- jobs §7.4
+
+    /** Put a job at a level so its tier gates open, without crafting for hours. */
+    private function setJobLevel(string $job, int $level): void
+    {
+        $this->character->jobLevels()->where('job_key', $job)->update(['level' => $level]);
+    }
+
+    /** Put materials in the bag without mining for them. */
+    private function give(array $materials): void
+    {
+        $add = new \ReflectionMethod($this->game, 'addMaterial');
+        foreach ($materials as $key => $qty) {
+            $add->invoke($this->game, $this->character->fresh(), $key, $qty);
+        }
+    }
+
+    /** Buy nodes directly, for tests that care about the effect not the gate. */
+    private function grantNodes(array $keys): void
+    {
+        foreach ($keys as $key) {
+            \App\Models\CharacterNode::create([
+                'character_id' => $this->character->id,
+                'node_key' => $key,
+            ]);
+        }
+    }
+
+    public function test_every_job_exists_from_the_start_at_level_one(): void
+    {
+        // Three benches, three battle roles, and the road (§7.5). The five
+        // gathering lines have no row: their level is the CharacterSkill one.
+        $this->assertCount(7, $this->character->jobLevels()->get());
+
+        foreach ($this->character->jobLevels()->get() as $job) {
+            $this->assertSame(1, $job->level, "{$job->job_key} did not start at level 1");
+            $this->assertSame(0, $job->xp);
+        }
+    }
+
+    /**
+     * §7.2 as a job -- the level is the skill level, not a second number.
+     *
+     * Working a forest raises Woodcutting, and that same figure is what gates
+     * the Woodcutting tree. Two numbers would be two things to keep in step.
+     */
+    public function test_a_gathering_job_reads_the_skill_level_it_already_had(): void
+    {
+        $this->character->skills()->where('skill_key', 'woodcutting')->update(['level' => 13]);
+
+        $levels = new \ReflectionMethod($this->game, 'jobLevels');
+        $this->assertSame(13, $levels->invoke($this->game, $this->character->fresh())['woodcutting']);
+
+        // And no second row was invented to hold it.
+        $this->assertFalse(
+            $this->character->jobLevels()->where('job_key', 'woodcutting')->exists(),
+            'a gathering job grew its own level row alongside the skill',
+        );
+    }
+
+    /**
+     * §8 rule 1, applied to trees. A Woodcutting node pays out in a forest and
+     * nowhere else, exactly as an axe does.
+     *
+     * Without this, three gathering trees would stack yield on every trip at
+     * once -- which is precisely the shortcut the line-locked tool ladder is
+     * built to prevent.
+     */
+    public function test_a_gathering_node_only_counts_on_its_own_line(): void
+    {
+        $this->character->level = Balance::MAX_LEVEL;
+        $this->character->save();
+
+        // Every yield node the Woodcutting tree carries.
+        $keys = [];
+        foreach (\App\Game\Jobs::nodesFor('woodcutting') as $key => $node) {
+            if ($node['effect']['kind'] === 'stat' && $node['effect']['stat'] === 'yield') {
+                $keys[] = $key;
+            }
+        }
+        $this->assertNotEmpty($keys);
+        $this->grantNodes($keys);
+
+        $fresh = $this->character->fresh();
+        $inForest = $this->game->bonuses($fresh, 'woodcutting')['yield'];
+        $inMountain = $this->game->bonuses($fresh, 'mining')['yield'];
+        $anywhere = $this->game->bonuses($fresh)['yield'];
+
+        $this->assertGreaterThan(0, $inForest, 'a full woodcutting tree did nothing in a forest');
+        $this->assertSame(0.0, $inMountain, 'woodcutting nodes paid out on a mountain seam');
+        $this->assertSame(0.0, $anywhere, 'woodcutting nodes paid out with no line in mind');
+    }
+
+    /** §7.4.1 -- points are levels, spent is counted from the rows themselves. */
+    public function test_points_come_from_levels_and_spending_is_counted_not_stored(): void
+    {
+        $this->character->level = 12;
+        $this->character->save();
+
+        $points = $this->game->skillPoints($this->character->fresh());
+        $this->assertSame(12, $points['total']);
+        $this->assertSame(0, $points['spent']);
+        $this->assertSame(12, $points['available']);
+
+        $this->grantNodes(['smith.whetstone_round', 'smith.cold_shut_eye']);
+
+        $points = $this->game->skillPoints($this->character->fresh());
+        $this->assertSame(2, $points['spent']);
+        $this->assertSame(10, $points['available']);
+    }
+
+    public function test_a_tier_one_node_is_buyable_immediately(): void
+    {
+        $this->character->level = 3;
+        $this->character->save();
+
+        $result = $this->game->buyNode($this->character->fresh(), 'smith.hammer_sense');
+
+        $this->assertSame('smith.hammer_sense', $result['node']);
+        $this->assertSame(1, $result['points']['spent']);
+        $this->assertTrue(
+            $this->character->fresh()->nodes()->where('node_key', 'smith.hammer_sense')->exists(),
+        );
+    }
+
+    public function test_a_node_cannot_be_bought_twice(): void
+    {
+        $this->character->level = 5;
+        $this->character->save();
+        $this->game->buyNode($this->character->fresh(), 'smith.hammer_sense');
+
+        try {
+            $this->game->buyNode($this->character->fresh(), 'smith.hammer_sense');
+            $this->fail('bought the same node twice');
+        } catch (\App\Game\GameException $e) {
+            $this->assertSame('owned', $e->errorCode);
+        }
+    }
+
+    public function test_buying_needs_a_point_to_spend(): void
+    {
+        // Level 1 grants exactly one point; spend it, then try again.
+        $this->game->buyNode($this->character->fresh(), 'smith.hammer_sense');
+
+        try {
+            $this->game->buyNode($this->character->fresh(), 'smith.cold_shut_eye');
+            $this->fail('bought a node with no points left');
+        } catch (\App\Game\GameException $e) {
+            $this->assertSame('no_points', $e->errorCode);
+        }
+    }
+
+    /** §7.4.1 -- a job level is a gate, and it cannot be bought past. */
+    public function test_a_deep_node_needs_the_job_level(): void
+    {
+        $this->character->level = 60;
+        $this->character->save();
+        $this->grantNodes(['smith.hammer_sense']);
+
+        try {
+            $this->game->buyNode($this->character->fresh(), 'smith.anvil_song');
+            $this->fail('reached a tier 2 node at job level 1');
+        } catch (\App\Game\GameException $e) {
+            $this->assertSame('job_level', $e->errorCode);
+        }
+
+        $this->setJobLevel('smith', 5);
+        $result = $this->game->buyNode($this->character->fresh(), 'smith.anvil_song');
+        $this->assertSame('smith.anvil_song', $result['node']);
+    }
+
+    /** §7.4.2 -- and the parent has to be owned, whatever the job level says. */
+    public function test_a_node_needs_its_parent_first(): void
+    {
+        $this->character->level = 60;
+        $this->character->save();
+        $this->setJobLevel('smith', Balance::JOB_MAX_LEVEL);
+
+        try {
+            $this->game->buyNode($this->character->fresh(), 'smith.anvil_song');
+            $this->fail('bought a tier 2 node with no parent');
+        } catch (\App\Game\GameException $e) {
+            $this->assertSame('requires', $e->errorCode);
+        }
+    }
+
+    /** §7.4.2 -- a capstone takes two parents, which is what makes it a tree. */
+    public function test_a_capstone_needs_both_of_its_parents(): void
+    {
+        $this->character->level = 100;
+        $this->character->save();
+        $this->setJobLevel('smith', Balance::JOB_MAX_LEVEL);
+
+        $capstone = \App\Game\Jobs::node('smith.the_named_blade');
+        $this->assertCount(2, $capstone['requires']);
+
+        $this->grantNodes([$capstone['requires'][0]]);
+
+        try {
+            $this->game->buyNode($this->character->fresh(), 'smith.the_named_blade');
+            $this->fail('bought a capstone with only one parent');
+        } catch (\App\Game\GameException $e) {
+            $this->assertSame('requires', $e->errorCode);
+        }
+
+        $this->grantNodes([$capstone['requires'][1]]);
+        $this->game->buyNode($this->character->fresh(), 'smith.the_named_blade');
+        $this->assertTrue(
+            $this->character->fresh()->nodes()->where('node_key', 'smith.the_named_blade')->exists(),
+        );
+    }
+
+    /** §7.4 -- the bench that made it is the job that learns from it. */
+    public function test_crafting_teaches_the_job_whose_bench_made_it(): void
+    {
+        $this->standAtWoodcuttingVillage();
+        $this->give(['planks' => 8]);
+
+        $before = $this->character->jobLevels()->where('job_key', 'smith')->first()->xp;
+        $this->game->craftItem($this->character->fresh(), 'hewn_axe');
+        $after = $this->character->fresh()->jobLevels()->where('job_key', 'smith')->first()->xp;
+
+        $this->assertGreaterThan($before, $after, 'forging an axe taught the Smith nothing');
+
+        // And nobody else's job moved.
+        foreach (['armorer', 'alchemist'] as $other) {
+            $this->assertSame(
+                0,
+                $this->character->fresh()->jobLevels()->where('job_key', $other)->first()->xp,
+                "{$other} learned from a weapon craft",
+            );
+        }
+    }
+
+    /**
+     * §7.4 -- the battle jobs are dormant, and dormancy has to be enforced.
+     *
+     * They level by raiding and by nothing else. If mining or crafting could
+     * move them, combat would become optional -- which is exactly the hole the
+     * empty `weapon` slot and these three trees are being careful about.
+     */
+    public function test_nothing_outside_a_raid_can_level_a_battle_job(): void
+    {
+        $this->standAtWoodcuttingVillage();
+        $this->give(['planks' => 8, 'cloth' => 8, 'leather' => 8]);
+
+        $this->game->craftItem($this->character->fresh(), 'hewn_axe');
+        $this->game->craftItem($this->character->fresh(), 'work_gloves');
+
+        // Settlements sit on worked ground, so step off it before digging.
+        $open = $this->openNeighbour($this->character->col, $this->character->row);
+        $this->character->update($open);
+        $this->character->refresh();
+
+        $job = $this->game->startMining($this->character->fresh(), $open['col'], $open['row']);
+        $job->update(['ends_at' => $this->game->now() - 1]);
+        $this->game->collectJob($this->character->fresh(), $job->id);
+
+        foreach (['shieldbearer', 'swordhand', 'runecaster'] as $battle) {
+            $row = $this->character->fresh()->jobLevels()->where('job_key', $battle)->first();
+            $this->assertSame(1, $row->level, "{$battle} levelled without a raid");
+            $this->assertSame(0, $row->xp, "{$battle} earned XP without a raid");
+        }
+    }
+
+    /**
+     * §8.1 rule 1, and the reason 90 skill points are allowed to exist at all.
+     *
+     * Gear, potions and bought nodes are three roads to the same +15%. This
+     * buys every stat node in a tree, drinks on top, and asserts the total is
+     * still clamped -- because clamping the tree separately and adding it after
+     * would let two clamped halves total 30%.
+     */
+    public function test_a_full_tree_plus_gear_plus_a_potion_still_stops_at_the_ceiling(): void
+    {
+        $this->character->level = Balance::MAX_LEVEL;
+        $this->character->save();
+
+        // Every node in the two trees that carry `yield`, bought outright.
+        $keys = [];
+        foreach (['smith', 'alchemist'] as $job) {
+            foreach (array_keys(\App\Game\Jobs::nodesFor($job)) as $key) {
+                $keys[] = $key;
+            }
+        }
+        $this->grantNodes($keys);
+
+        // Best-in-slot on the line, plus a running potion on the same stat.
+        \App\Models\CharacterItem::create([
+            'character_id' => $this->character->id,
+            'item_key' => 'ironwood_axe',
+            'durability' => 200,
+            'equipped' => true,
+            'options' => [['stat' => 'yield', 'value' => 0.03]],
+        ]);
+        $this->character->buffs()->create([
+            'item_key' => 'forest_draught',
+            'stat' => 'yield',
+            'value' => 0.03,
+            'expires_at' => $this->game->now() + 600000,
+        ]);
+
+        $bonuses = $this->game->bonuses($this->character->fresh(), 'woodcutting');
+
+        foreach ($bonuses as $stat => $value) {
+            $this->assertLessThanOrEqual(
+                Balance::STAT_CEILING + 1e-9,
+                $value,
+                sprintf('%s reached %.4f, past the +15%% ceiling', $stat, $value),
+            );
+        }
+
+        // And the ceiling is actually being pressed against, not missed by luck.
+        $this->assertEqualsWithDelta(Balance::STAT_CEILING, $bonuses['yield'], 1e-9);
+    }
+
+    /**
+     * §7.4.3 -- a discount is a discount, never a hole. Cost reduction must not
+     * take any input to zero, or the §11 materials sink stops draining.
+     */
+    public function test_cost_reduction_never_makes_a_craft_free(): void
+    {
+        $this->character->level = Balance::MAX_LEVEL;
+        $this->character->save();
+        $this->standAtWoodcuttingVillage();
+
+        // Every cost node the Smith tree has.
+        $keys = [];
+        foreach (\App\Game\Jobs::nodesFor('smith') as $key => $node) {
+            if ($node['effect']['kind'] === 'costReduction') {
+                $keys[] = $key;
+            }
+        }
+        $this->grantNodes($keys);
+
+        $this->give(['planks' => 40]);
+        $before = $this->game->held($this->character->fresh(), 'planks');
+        $this->game->craftItem($this->character->fresh(), 'hewn_axe');
+        $spent = $before - $this->game->held($this->character->fresh(), 'planks');
+
+        $this->assertGreaterThan(0, $spent, 'a maxed Smith crafted out of thin air');
+        $this->assertLessThan(4, $spent, 'the discount did nothing at all');
     }
 
     /**
@@ -977,26 +1466,249 @@ final class GameLoopTest extends TestCase
     }
 
     /**
-     * Sight is the character's travel range, and it is a server rule rather than
-     * a rendering choice: a client that pans across the map must not be able to
+     * §5.6 -- sight is two hexes, and it is a server rule rather than a
+     * rendering choice: a client that pans across the map must not be able to
      * learn where everyone else is mining.
      */
-    public function test_the_map_endpoint_sees_only_as_far_as_you_can_reach(): void
+    public function test_the_map_endpoint_sees_only_two_hexes(): void
     {
-        $range = $this->game->travelRange($this->character);
+        $sight = $this->game->sightRadius($this->character);
+        $this->assertSame(Balance::SIGHT_RADIUS, $sight);
 
-        // Somebody working a hex well beyond sight.
+        // Somebody working a hex just outside it -- three hexes away, which the
+        // old reach-as-sight rule would have shown and this one must not.
         $far = $this->game->createCharacter(Player::create(['wallet' => '0xfar']));
-        $far->update(['col' => $this->character->col + $range + 6, 'row' => $this->character->row]);
+        $far->update(['col' => $this->character->col + $sight + 1, 'row' => $this->character->row]);
         $this->game->startMining($far, (int) $far->col, (int) $far->row);
 
         $this->assertSame([], $this->game->mapMutations($this->character)['occupied']);
 
-        // Walk toward them and the same hex becomes knowable -- once you get there.
-        $this->game->travelTo($this->character, $this->character->col + $range, $this->character->row);
+        // Walk one hex and the same tile is knowable. Sight follows the
+        // character, never the camera.
+        $this->game->travelTo($this->character, (int) $this->character->col + 1, (int) $this->character->row);
         $this->arrive($this->character);
+
         $seen = $this->game->mapMutations($this->character->fresh())['occupied'];
         $this->assertSame([[(int) $far->col, (int) $far->row, 1]], $seen);
+    }
+
+    /**
+     * §5.6 -- on the road you are watching your feet.
+     *
+     * This is also what makes a long walk free: sight of zero means the map
+     * query has nothing to scan, so a journey of two hundred hexes costs the
+     * same two requests as a journey of one.
+     */
+    public function test_sight_closes_to_nothing_while_travelling(): void
+    {
+        // Somebody working the hex right next to you -- plainly in sight.
+        $near = $this->game->createCharacter(Player::create(['wallet' => '0xnear']));
+        $near->update(['col' => (int) $this->character->col + 1, 'row' => (int) $this->character->row]);
+        $this->game->startMining($near, (int) $near->col, (int) $near->row);
+
+        $this->assertCount(1, $this->game->mapMutations($this->character)['occupied']);
+
+        $this->game->travelTo($this->character, (int) $this->character->col + 4, (int) $this->character->row);
+
+        $this->assertSame(0, $this->game->sightRadius($this->character));
+        $this->assertSame([], $this->game->mapMutations($this->character)['occupied']);
+
+        // And it comes back the moment the walking stops.
+        $this->arrive($this->character);
+        $this->assertSame(
+            Balance::SIGHT_RADIUS,
+            $this->game->sightRadius($this->character->fresh()),
+        );
+    }
+
+    /**
+     * §5.6 -- the preview endpoint is bounded by the same disc.
+     *
+     * Without this it would be the map query in a slower form: one tile per
+     * request, but nothing stopping a client from asking about every hex on the
+     * map and reading off the haul, the timer and the miners on each.
+     */
+    public function test_a_hex_outside_sight_will_not_be_costed(): void
+    {
+        $col = (int) $this->character->col + Balance::SIGHT_RADIUS + 1;
+        $row = (int) $this->character->row;
+
+        $preview = $this->game->previewTile($this->character, $col, $row);
+
+        $this->assertTrue($preview['unseen']);
+        $this->assertFalse($preview['canMine']);
+        $this->assertNull($preview['material'], 'an unscouted hex must not name its seam');
+        $this->assertSame(0, $preview['yield']);
+        $this->assertSame(0, $preview['seconds']);
+
+        // The hex underfoot is distance 0, so it stays costed regardless.
+        $underfoot = $this->game->previewTile(
+            $this->character,
+            (int) $this->character->col,
+            (int) $this->character->row,
+        );
+        $this->assertFalse($underfoot['unseen']);
+    }
+
+    /**
+     * §5.6 -- there is no reach any more. Anywhere on the map is walkable,
+     * scouted or not, and the only thing it costs is the clock.
+     */
+    public function test_travel_reaches_any_hex_on_the_map_however_far(): void
+    {
+        $far = [
+            'col' => (int) $this->character->col + 120,
+            'row' => (int) $this->character->row,
+        ];
+
+        $travel = $this->game->travelTo($this->character, $far['col'], $far['row']);
+
+        $this->assertGreaterThan(Balance::SIGHT_RADIUS, $travel['hexes']);
+        $this->assertGreaterThan(0, $travel['endsAt'] - $travel['startedAt']);
+
+        $this->arrive($this->character);
+        $this->assertSame($far['col'], (int) $this->character->col);
+    }
+
+    /** The edge of the map is the one place a road cannot go. */
+    public function test_travel_refuses_to_leave_the_map(): void
+    {
+        $this->expectException(\App\Game\GameException::class);
+        $this->game->travelTo($this->character, -1, (int) $this->character->row);
+    }
+
+    // ------------------------------------------------------------ explorer §7.5
+
+    /** Put the road-job at a level, the way walking eventually would. */
+    private function explorerAt(int $level): void
+    {
+        $this->character->jobLevels()
+            ->where('job_key', 'explorer')
+            ->update(['level' => $level, 'xp' => 0]);
+        $this->character->unsetRelation('jobLevels');
+    }
+
+    /**
+     * §7.5 -- the road pays the Explorer and nobody else.
+     *
+     * Both halves matter. Walking has to level *something*, or a map with no
+     * reach limit is just a long wait; and it must not level the character, or
+     * the cheapest XP in the game would be pressing travel and going to bed.
+     */
+    public function test_walking_levels_the_explorer_and_never_the_character(): void
+    {
+        $before = $this->character->jobLevels()->where('job_key', 'explorer')->first();
+        $characterXp = (int) $this->character->xp;
+
+        $travel = $this->game->travelTo(
+            $this->character,
+            (int) $this->character->col + 6,
+            (int) $this->character->row,
+        );
+        $this->arrive($this->character);
+
+        $after = $this->character->jobLevels()->where('job_key', 'explorer')->first();
+
+        $this->assertGreaterThan(
+            (int) $before->xp,
+            (int) $after->xp,
+            'a six-hex walk taught the explorer nothing',
+        );
+        $this->assertSame($characterXp, (int) $this->character->fresh()->xp, 'travel paid character XP');
+
+        // Six hexes is 30 XP, which is already past the 17 that job level 2
+        // costs -- so the row shows level 2 and the remainder, not the total.
+        $earned = $travel['hexes'] * Balance::EXPLORER_XP_PER_HEX;
+        $this->assertSame(2, (int) $after->level);
+        $this->assertSame($earned - Balance::jobXpForLevel(1), (int) $after->xp);
+    }
+
+    /** Stopping short pays for the hexes that happened, and no more. */
+    public function test_a_journey_abandoned_pays_for_the_ground_covered(): void
+    {
+        $this->game->travelTo($this->character, (int) $this->character->col + 6, (int) $this->character->row);
+        $this->rewind($this->character, 2 * $this->perHex($this->character) + 5);
+
+        $stop = $this->game->cancelTravel($this->character);
+
+        $this->assertSame(2, $stop['hexes']);
+        $this->assertSame(
+            2 * Balance::EXPLORER_XP_PER_HEX,
+            (int) $this->character->jobLevels()->where('job_key', 'explorer')->value('xp'),
+        );
+    }
+
+    /**
+     * §7.5 -- the chain is granted, and granted means free.
+     *
+     * If a wayfaring node ever cost a point, the hundred-point cap (§7.4.1)
+     * would quietly become ninety-five, and the tree that is supposed to reward
+     * walking would start competing with the benches instead.
+     */
+    public function test_explorer_skills_arrive_unbought_and_cost_no_points(): void
+    {
+        $this->assertContains('explorer.long_stride', $this->game->ownedNodes($this->character));
+        $this->assertNotContains('explorer.high_ground', $this->game->ownedNodes($this->character));
+        $this->assertSame(0, $this->game->skillPoints($this->character)['spent']);
+
+        $this->explorerAt(5);
+
+        $this->assertContains('explorer.high_ground', $this->game->ownedNodes($this->character));
+        $this->assertSame(
+            0,
+            $this->game->skillPoints($this->character)['spent'],
+            'a granted node was billed to the point ledger',
+        );
+    }
+
+    /** And what is granted is not for sale, however many points you are holding. */
+    public function test_an_explorer_skill_cannot_be_bought(): void
+    {
+        $this->character->update(['level' => 40]);
+        $this->explorerAt(30);
+
+        $this->expectException(\App\Game\GameException::class);
+        $this->game->buyNode($this->character->fresh(), 'explorer.horizon_line');
+    }
+
+    /** §7.5 -- two hexes of eye, earned one at a time, and capped. */
+    public function test_the_explorer_chain_widens_sight_and_then_stops(): void
+    {
+        $this->assertSame(Balance::SIGHT_RADIUS, $this->game->sightRadius($this->character));
+
+        $this->explorerAt(5);
+        $this->assertSame(Balance::SIGHT_RADIUS + 1, $this->game->sightRadius($this->character->fresh()));
+
+        $this->explorerAt(Balance::JOB_MAX_LEVEL);
+        $this->assertSame(
+            Balance::SIGHT_RADIUS + Balance::SKILL_SIGHT_CAP,
+            $this->game->sightRadius($this->character->fresh()),
+            'sight passed the cap that keeps the map query small',
+        );
+    }
+
+    /**
+     * §8.1 rule 1 -- the ceiling holds even here.
+     *
+     * The chain writes 10 + 10 + 5 on its nodes, which is 25 against a 15
+     * ceiling, and that overshoot is deliberate: it is what a free five-node
+     * tree is worth. What it must never do is *pass* the ceiling, because the
+     * ceiling is the one rule every other stat source is balanced against.
+     */
+    public function test_a_maxed_explorer_still_stops_at_the_ceiling(): void
+    {
+        $this->explorerAt(Balance::JOB_MAX_LEVEL);
+
+        $written = array_sum(array_map(
+            fn (array $n) => $n['effect']['kind'] === 'stat' ? $n['effect']['value'] : 0,
+            \App\Game\Jobs::nodesFor('explorer'),
+        ));
+
+        $this->assertGreaterThan(Balance::STAT_CEILING, $written, 'the chain no longer overshoots');
+        $this->assertSame(
+            Balance::STAT_CEILING,
+            $this->game->bonuses($this->character->fresh())['travelSpeed'],
+        );
     }
 
     /** The generation parameters the client needs, and nothing player-specific. */
@@ -1027,7 +1739,7 @@ final class GameLoopTest extends TestCase
 
     private function standAtWoodcuttingVillage(): array
     {
-        $range = Balance::travelRange(1);
+        $range = Balance::SPAWN_VILLAGE_RADIUS;
 
         for ($dc = -$range; $dc <= $range; $dc++) {
             for ($dr = -$range; $dr <= $range; $dr++) {
@@ -1041,7 +1753,7 @@ final class GameLoopTest extends TestCase
             }
         }
 
-        $this->fail('spawn guarantee broken: no woodcutting village in level-1 range');
+        $this->fail('spawn guarantee broken: no woodcutting village in spawn radius');
     }
 
     /** One hex at a time: mine, wait, claim. No queue of hexes. */

@@ -36,6 +36,8 @@ import type {
   GameApi,
   MapMutations,
   PlayerState,
+  SkillPoints,
+  SkillTree,
   StationState,
   TilePreview,
   TravelStop,
@@ -152,6 +154,16 @@ export class HttpDriver implements GameApi {
 
   sellMaterial(material: MaterialKey, quantity: number) {
     return post<ActionResult<{ gold: number }>>('/shop/sales', { material, quantity })
+  }
+
+  getSkillTree(): Promise<SkillTree> {
+    return request<SkillTree>('/jobs-tree')
+  }
+
+  buyNode(nodeKey: string): Promise<ActionResult<{ node: string; points: SkillPoints }>> {
+    return post<ActionResult<{ node: string; points: SkillPoints }>>('/jobs-tree/nodes', {
+      node: nodeKey,
+    })
   }
 
   craftItem(itemKey: string): Promise<ActionResult<OwnedItem>> {

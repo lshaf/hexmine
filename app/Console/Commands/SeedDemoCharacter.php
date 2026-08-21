@@ -347,7 +347,7 @@ class SeedDemoCharacter extends Command
     /** @return array<string,mixed>|null */
     private function nearestSettlementRunning(Character $character, string $line): ?array
     {
-        $range = Balance::travelRange($character->level);
+        $range = Balance::SPAWN_VILLAGE_RADIUS;
 
         for ($dc = -$range; $dc <= $range; $dc++) {
             for ($dr = -$range; $dr <= $range; $dr++) {

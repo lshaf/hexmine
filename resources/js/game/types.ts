@@ -123,7 +123,10 @@ export type StatKey =
   | 'tripReduction'
   | 'travelSpeed'
   | 'processingSpeed'
+  /** §7.4 -- the two battle stats. Dormant until raid combat exists, and
+   *  clamped by the same STAT_CEILING as everything else when it does. */
   | 'power'
+  | 'defence'
 
 export interface ItemDef {
   key: string

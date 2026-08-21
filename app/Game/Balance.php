@@ -89,7 +89,14 @@ final class Balance
     public const AP_REGEN_MS = 4 * self::MINUTE;
     public const BASE_STORAGE = 120;
     public const STORAGE_PER_LEVEL = 40;
-    public const MAX_LEVEL = 60;
+    /**
+     * §7.4.1 -- 100 levels, and one skill point each. The cap is the point: 100
+     * points buys three complete 30-node trees with 10 spare, deliberately just
+     * short of a fourth.
+     */
+    public const MAX_LEVEL = 100;
+
+    public const SKILL_POINTS_PER_LEVEL = 1;
 
     // -------------------------------------------------------------- skills §7.2
 
@@ -97,6 +104,62 @@ final class Balance
 
     /** Cap total points so characters specialise, §7.2. */
     public const SKILL_TOTAL_POINT_CAP = 90;
+
+    // ---------------------------------------------------------------- jobs §7.4
+
+    /**
+     * §7.4.1 -- a job level gates tree nodes and does nothing else. It grants no
+     * stat, no yield, no speed. Levelling a job to 30 is worth exactly nothing
+     * until a point is spent, which is what keeps points the scarce thing.
+     */
+    public const JOB_MAX_LEVEL = 30;
+
+    /** §7.4 -- what one craft teaches, by what was made: common 10 ... epic 40. */
+    public const JOB_XP_PER_RARITY_RANK = 10;
+
+    /**
+     * §7.4.3 -- caps on the node effects that are NOT stats.
+     *
+     * Stat nodes need no cap of their own: they feed the same aggregate and the
+     * same STAT_CEILING clamp as gear, options and potions, so a skill point can
+     * never take a stat past +15%.
+     *
+     * These four can, though, and each one thins a §11 sink rather than a power
+     * curve -- cheaper crafts and bigger batches drain the materials sink, and
+     * tougher gear drains the repair sink. Uncapped, a maxed crafter would
+     * quietly switch off the loss the whole economy is balanced around.
+     */
+    public const SKILL_OPTION_CHANCE_CAP = 0.35;
+
+    public const SKILL_DURABILITY_CAP = 0.25;
+
+    public const SKILL_COST_REDUCTION_CAP = 0.15;
+
+    public const SKILL_BATCH_CAP = 2;
+
+    /**
+     * §7.5 -- how many hexes of sight the Explorer chain can add, on top of the
+     * base two.
+     *
+     * A fifth cap, and it guards the same kind of thing the four above do: not a
+     * power curve but a cost. Sight is the radius of the one query the map makes
+     * (§5.6), and its cost is the square of that radius -- two hexes is nineteen
+     * tiles, four is thirty-seven, ten would be two hundred. The cap is what
+     * lets sight be a reward at all without handing a scanner to anyone patient
+     * enough to walk.
+     */
+    public const SKILL_SIGHT_CAP = 2;
+
+    /**
+     * §7.5 -- Explorer XP for one hex crossed.
+     *
+     * Flat, and never run through scaled(): §7.4.4 forbids XP tracking the game
+     * clock, and a hex is a distance rather than a duration, so there is nothing
+     * here for a fast dev clock to compress. Five a hex puts the first sight
+     * node about sixty hexes out and the last a few thousand -- a number of
+     * journeys, not a number of days.
+     */
+    public const EXPLORER_XP_PER_HEX = 5;
 
     // ------------------------------------------------------------- storage §11.1
 
@@ -244,14 +307,76 @@ final class Balance
     /**
      * §5 -- one hex of ground, on foot. Distance is what makes a destination a
      * decision rather than a click, so the cost is paid per hex crossed.
+     *
+     * It is also the *only* thing that costs: there is no reach limit. Any hex
+     * on the map is walkable from any other, and the far ones are expensive in
+     * the one currency an idle game cannot inflate -- hours. A gate on top of
+     * that would be a second answer to a question distance already answers.
      */
     public const TRAVEL_MS_PER_HEX = 10 * self::MINUTE;
 
+    // ------------------------------------------------------------------- sight
+
+    /**
+     * §5.6 -- how far a prospector can actually see. Two hexes, and that is the
+     * whole of it.
+     *
+     * Sight used to be reach, which made it wide enough that the live-state
+     * query behind it was a scan of a couple of hundred hexes on every move.
+     * Two is a disc of nineteen. The map beyond it is not blank -- terrain is
+     * derived from the seed and settlement glyphs are drawn everywhere (§13.2)
+     * -- it is merely *unscouted*: no depletion, no miners, no haul figures.
+     * That is what makes walking somewhere worth doing.
+     */
+    public const SIGHT_RADIUS = 2;
+
+    /**
+     * §5.6 -- sight on the road. You are between hexes, watching your feet.
+     *
+     * Zero is also what makes the whole journey free of queries: a moving
+     * character asks the server nothing until it stops.
+     */
+    public const SIGHT_TRAVELLING = 0;
+
+    /**
+     * §5.4 + §12 -- how far a fresh spawn may be from the village whose
+     * woodcutting line its tutorial needs.
+     *
+     * This is a *generation* constraint, not a rule the player ever meets. It
+     * was level-1 reach back when reach existed; it stays a number of its own
+     * so that shrinking sight cannot quietly strand every new character six
+     * hexes from the only place that turns their wood into planks.
+     */
+    public const SPAWN_VILLAGE_RADIUS = 6;
+
     // ------------------------------------------------------------------ curves
 
+    /**
+     * §7.4.4 -- sized against measured income, not picked.
+     *
+     * A career averages ~1,080 character XP a day at game speed 1 (28 mining
+     * trips a day unequipped, 48 on the 30-minute floor, plus the processing
+     * those hauls feed). ~197,000 XP total against that rate puts level 100 at
+     * roughly 182 days of unbroken play, which is the six-month target.
+     *
+     * The flat 40 is a floor so the first level costs about three mining trips
+     * rather than half of one.
+     */
     public static function xpForLevel(int $level): int
     {
-        return (int) round(80 * $level ** 1.55);
+        return (int) round(40 + 2.1 * $level ** 1.7);
+    }
+
+    /** §7.4.4 -- ~32,000 XP to job 30, about 1,600 crafts. */
+    public static function jobXpForLevel(int $level): int
+    {
+        return (int) round(17 * $level ** 1.5);
+    }
+
+    /** §7.4.1 -- every level is one point, so this is just the level. */
+    public static function skillPointsFor(int $level): int
+    {
+        return $level * self::SKILL_POINTS_PER_LEVEL;
     }
 
     public static function skillXpForLevel(int $level): int
@@ -269,10 +394,18 @@ final class Balance
         return self::BASE_STORAGE + ($level - 1) * self::STORAGE_PER_LEVEL;
     }
 
-    /** §7.1 -- level unlocks travel range. Capacity, never power. */
-    public static function travelRange(int $level, float $travelSpeedBonus = 0.0): int
+    /**
+     * §8.3 -- what boots are for, now that reach is not gated.
+     *
+     * `travelSpeed` used to buy hexes of range; with the range gone it buys the
+     * thing the stat is named after. A speed bonus divides the clock rather
+     * than subtracting from it, so +8% boots really are 8% faster over any
+     * distance, and the §8.1 ceiling caps the saving at 15% like every other
+     * stat.
+     */
+    public static function travelMsPerHex(float $travelSpeedBonus = 0.0): int
     {
-        return 6 + (int) floor($level * 0.8) + (int) round($travelSpeedBonus * 20);
+        return (int) round(self::TRAVEL_MS_PER_HEX / (1 + max(0.0, $travelSpeedBonus)));
     }
 
     public static function settlementSpeed(string $tier): float
@@ -294,7 +427,14 @@ final class Balance
         return max(1, (int) config('game.time_scale', 1));
     }
 
-    /** Scale a real duration in ms into whatever clock this environment runs. */
+    /**
+     * Scale a real duration in ms into whatever clock this environment runs.
+     *
+     * **Durations only. Never XP.** (§7.4.4) A fast clock is a testing tool, and
+     * the moment XP goes through here a fast clock becomes a progression cheat
+     * and the six-month pacing figure stops meaning anything. GameLoopTest pins
+     * this.
+     */
     public static function scaled(int $ms): int
     {
         return max(1000, (int) round($ms / self::timeScale()));

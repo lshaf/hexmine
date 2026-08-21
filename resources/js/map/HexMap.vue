@@ -34,7 +34,8 @@ const props = defineProps<{
   centerRow: number
   characterCol: number
   characterRow: number
-  travelRange: number
+  /** §5.6 -- hexes of sight. Two standing still, zero on the road. */
+  sight: number
   selected: { col: number; row: number } | null
   jobs: Job[]
   travel: TravelState | null
@@ -56,10 +57,14 @@ const emit = defineEmits<{
  * the network.
  *
  * What the camera does not move is SIGHT. Live state -- worked-out tiles, who
- * is mining where -- is scoped server-side to the character's travel range, so
- * outside that radius there is genuinely nothing to draw but the land itself
- * and whether anybody lives on it. The dashed ring is that boundary: the edge
- * of what you can reach and, equally, of what you can see.
+ * is mining where -- is scoped server-side to two hexes around the character
+ * (§5.6), so outside that small disc there is genuinely nothing to draw but the
+ * land itself and whether anybody lives on it. The dashed ring is that
+ * boundary, and it is a fog line, not a fence: every hex on the map is walkable
+ * whether or not it has been scouted.
+ *
+ * On the road sight is zero and the ring disappears with it -- the whole world
+ * goes to glyphs until the walking stops.
  */
 const viewport = ref({ w: 900, h: 620 })
 const pan = ref({ x: 0, y: 0 })
@@ -172,7 +177,7 @@ interface RenderTile {
   props: string
   herd: string
   depleted: boolean
-  inRange: boolean
+  inSight: boolean
   onBoundary: boolean
   isSelected: boolean
   slotsUsed: number
@@ -223,18 +228,18 @@ const renderTiles = computed<RenderTile[]>(() =>
     const depleted = tile.regrowsAt > props.now
     const base = depleted ? depletedColor(tile.biome) : BIOME_COLOR[tile.biome]
     const distance = hexDistance(props.characterCol, props.characterRow, tile.col, tile.row)
-    const inRange = distance <= props.travelRange
+    const inSight = distance <= props.sight
 
-    // Out of range is communicated with a darker SOLID fill, never opacity --
+    // Unscouted is communicated with a darker SOLID fill, never opacity --
     // see the no-alpha rule above.
-    const top = inRange ? base : shade(base, -0.42)
+    const top = inSight ? base : shade(base, -0.42)
     const isSelected =
       props.selected?.col === tile.col && props.selected?.row === tile.row
     const rare = tile.material !== undefined && RARE_KEYS.has(tile.material)
 
     // Everything below the fill is either live state the server only sends for
     // tiles in sight, or ornament that would bury the pips out there.
-    const mark = inRange
+    const mark = inSight
       ? null
       : (tile.dungeon ? MARK.dungeon : tile.settlement ? MARK[tile.settlement.tier] : null) ?? null
 
@@ -247,16 +252,18 @@ const renderTiles = computed<RenderTile[]>(() =>
       top,
       side: shade(top, -0.4),
       edge: shade(top, -0.2),
-      props: inRange ? tileProps(tile, depleted) : '',
-      herd: inRange ? herdProp(tile) : '',
+      props: inSight ? tileProps(tile, depleted) : '',
+      herd: inSight ? herdProp(tile) : '',
       depleted,
-      inRange,
-      onBoundary: distance === props.travelRange,
+      inSight,
+      // No ring at all when sight is zero: on the road the boundary would be
+      // the hex you just left, which is not a boundary, it is a memory.
+      onBoundary: props.sight > 0 && distance === props.sight,
       isSelected,
-      slotsUsed: inRange ? tile.slotsUsed : 0,
-      label: inRange ? (tile.settlement?.name ?? tile.dungeon?.name ?? null) : null,
+      slotsUsed: inSight ? tile.slotsUsed : 0,
+      label: inSight ? (tile.settlement?.name ?? tile.dungeon?.name ?? null) : null,
       jobState: jobsByTile.value.get(`${tile.col},${tile.row}`) ?? 'none',
-      rare: inRange && rare,
+      rare: inSight && rare,
       mark,
     }
   }),
@@ -341,7 +348,7 @@ const SLOT_PIP_Y = HEX_H / 2 - 4
         <path :d="HEX_SIDE_PATH" :fill="t.side" />
         <path :d="HEX_TOP_PATH" :fill="t.top" :stroke="t.edge" stroke-width="1" />
 
-        <!-- Travel-range boundary: a stroked hex ring, no fill, no alpha. -->
+        <!-- Sight boundary: a stroked hex ring, no fill, no alpha. -->
         <path
           v-if="t.onBoundary"
           :d="HEX_TOP_PATH"

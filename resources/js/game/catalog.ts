@@ -285,10 +285,13 @@ export const recipesForLines = (lines: SkillKey[]): Recipe[] =>
  *  and must never reach the screen. */
 export const STAT_LABEL: Record<StatKey, string> = {
   yield: 'yield',
-  tripReduction: 'mine time',
+  // 'off' matters: every use of this is a reduction shown with a + sign, and
+  // "+3% mine time" reads as more digging rather than less.
+  tripReduction: 'off mine time',
   travelSpeed: 'travel',
   processingSpeed: 'processing',
   power: 'power',
+  defence: 'defence',
 }
 
 /**

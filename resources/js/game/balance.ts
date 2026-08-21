@@ -24,12 +24,24 @@ export const MAP = {
   rows: 500,
   seed: 0x5eed_1a3f,
   /** Biome lattice, §5.3. Cell size in tiles, and how many cells make up one
-   *  coherent region. Tuned against travel range: patches must be small enough
-   *  that a second biome is reachable from a low-level character. */
+   *  coherent region. Patches must be small enough that a second biome is a
+   *  short walk from a fresh spawn -- there is no reach limit (§5.6), but there
+   *  is a clock, and a new character should not owe it a day for a second
+   *  material. */
   biomeCell: 9,
   biomeRegionCells: 5,
   /** Normalised radius boundaries for the ring layout, §5.2. */
   rings: { center: 0.08, inner: 0.34, mid: 0.64 },
+  /**
+   * §5.6 -- documentation only, and pointedly so. Sight is published per
+   * character in the state payload (`character.sight`) because it changes with
+   * the Explorer chain and drops to zero on the road; reading these numbers
+   * instead of that field is how the fog and the server end up disagreeing.
+   */
+  sightRadius: 2,
+  sightTravelling: 0,
+  /** §5 -- ten minutes of ground per hex, before travelSpeed divides it. */
+  travelMsPerHex: 10 * MINUTE,
 } as const
 
 export const MINING = {
@@ -81,9 +93,48 @@ export const CHARACTER = {
   apRegenMs: 4 * MINUTE,
   baseStorage: 120,
   storagePerLevel: 40,
-  /** Levelling curve: xp needed for level n. */
-  xpForLevel: (level: number) => Math.round(80 * Math.pow(level, 1.55)),
-  maxLevel: 60,
+  /**
+   * §7.4.4 -- sized against measured income, not picked. ~197,000 XP to level
+   * 100 against a career average of ~1,080 char XP a day is roughly 182 days of
+   * unbroken play at game speed 1. The flat 40 is a floor so the first level
+   * costs about three mining trips rather than half of one.
+   *
+   * XP is never scaled by the game clock: a trip pays the same at speed 1 and
+   * speed 100, which is what keeps a fast clock a testing tool.
+   */
+  xpForLevel: (level: number) => Math.round(40 + 2.1 * Math.pow(level, 1.7)),
+  /** §7.4.1 -- 100 levels, one skill point each. */
+  maxLevel: 100,
+  skillPointsPerLevel: 1,
+} as const
+
+/**
+ * §7.4 -- the eleven bought jobs, plus Explorer (§7.5), which is bought by
+ * nobody. A job level gates tree nodes and does nothing else: no stat, no
+ * yield, no speed. Points are the scarce thing and are spent on breadth; job
+ * levels are the slow thing and are earned on depth.
+ */
+export const JOBS = {
+  maxLevel: 30,
+  xpForLevel: (level: number) => Math.round(17 * Math.pow(level, 1.5)),
+  xpPerRarityRank: 10,
+  /**
+   * §7.4.3 -- caps on the node effects that are not stats. Stat nodes need no
+   * cap of their own; they feed the same aggregate and the same statCeiling
+   * clamp as gear, options and potions, so a point can never pass +15%. These
+   * four thin a §11 sink instead, which is why each is bounded.
+   */
+  optionChanceCap: 0.35,
+  durabilityCap: 0.25,
+  costReductionCap: 0.15,
+  batchCap: 2,
+  /**
+   * §7.5 -- extra hexes of sight from the Explorer chain. A query budget rather
+   * than a balance one: cost goes as the square of the radius.
+   */
+  sightCap: 2,
+  /** §7.5 -- Explorer XP per hex crossed. Never scaled by the game clock. */
+  explorerXpPerHex: 5,
 } as const
 
 export const SKILLS = {

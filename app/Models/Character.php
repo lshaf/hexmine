@@ -64,6 +64,25 @@ class Character extends Model
         return $this->hasMany(CharacterBuff::class);
     }
 
+    /**
+     * §7.4.1 -- one row per job, level only. Gates nodes, grants nothing.
+     *
+     * Deliberately not `jobs()`: that name is already taken by the running
+     * mining and processing tasks above, and the two would be a nasty thing to
+     * confuse. A GameJob is work in progress; a CharacterJob is a trade you have
+     * levelled.
+     */
+    public function jobLevels(): HasMany
+    {
+        return $this->hasMany(CharacterJob::class);
+    }
+
+    /** §7.4.2 -- the tree nodes bought. Spent points is the count of these. */
+    public function nodes(): HasMany
+    {
+        return $this->hasMany(CharacterNode::class);
+    }
+
     public function jobs(): HasMany
     {
         return $this->hasMany(GameJob::class);

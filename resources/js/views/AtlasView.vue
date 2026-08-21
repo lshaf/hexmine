@@ -308,23 +308,19 @@ function draw(): void {
     ctx.fillText(mark.name, x, top)
   }
 
-  // You, and how far you can walk.
+  /*
+   * You. Just you.
+   *
+   * There used to be a ring here for how far you could walk, and there is no
+   * such distance any more (§5.6) -- every hex on this map is reachable, and
+   * what it costs is hours rather than permission. Sight is the only radius
+   * left and it is two hexes, which at any zoom that fits a ring of capitals on
+   * screen is a fraction of a pixel. A ring drawn at its minimum legible size
+   * would be claiming a reach the character does not have.
+   */
   const char = game.character
   if (char) {
     const { x, y } = toCanvas(char.col, char.row)
-    ctx.beginPath()
-    ctx.ellipse(
-      x,
-      y,
-      Math.max(6, game.travelRange * pxPerCol.value),
-      Math.max(5, game.travelRange * pxPerRow.value),
-      0,
-      0,
-      Math.PI * 2,
-    )
-    ctx.strokeStyle = '#c1793f'
-    ctx.lineWidth = 1.4
-    ctx.stroke()
 
     ctx.beginPath()
     ctx.arc(x, y, 4, 0, Math.PI * 2)

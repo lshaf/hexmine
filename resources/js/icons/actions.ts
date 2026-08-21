@@ -19,6 +19,20 @@ export const ACTION_PATHS: Record<string, string> = {
   zoomOut: 'M6 12h12 M6 10.4v3.2 M18 10.4v3.2',
   locate: 'M7 12 9.5 7.7h5L17 12l-2.5 4.3h-5Z M12 2.6v2.8 M12 18.6v2.8 M2.6 12h2.8 M18.6 12h2.8',
   close: 'M6 6l12 12 M18 6 6 18',
+  /* §7.4 -- a trade branching into what it teaches. One root, two limbs: the
+     shape every tree in the panel actually has. */
+  skills: 'M12 20v-6 M12 14 7 9.5V4 M12 14l5-4.5V4 M12 20.5a1.6 1.6 0 1 0 0 3.2 1.6 1.6 0 0 0 0-3.2',
+
+  /* §7.4.3 -- one glyph per effect kind. What a node *does* is the only thing
+     worth encoding on 180 nodes; drawing 180 pictures would say less. */
+  effectStat: 'M4 18h16 M7 14.5l4-5 3 3 4.5-6.5',
+  effectUnlock: 'M8 10.5V7a4 4 0 0 1 7.4-2 M5 10.5h14V20H5Z',
+  effectCraftOption: 'M5 8h14 M5 13h11 M5 18h6 M17.5 15v5.5 M14.8 17.8h5.4',
+  effectCraftDurability: 'M12 3.5 19 6.6v5.2c0 4.1-3 6.7-7 7.7-4-1-7-3.6-7-7.7V6.6Z',
+  effectCostReduction: 'M4 7h16 M4 12.5h10 M4 18h5',
+  effectBatch: 'M4 9h9v9H4Z M8 9V5h9v9h-4',
+  // §7.5 -- sight: a horizon with the eye above it. Distance, not vision.
+  effectSight: 'M3 17h18 M12 5.5c3.6 0 6 3.2 6 3.2s-2.4 3.2-6 3.2-6-3.2-6-3.2 2.4-3.2 6-3.2Z M12 7.6v2.2',
   /* An arch with a doorway in it. Dungeons are the one place tier 4 comes
      from, so the almanac needs a glyph for them even though raiding is not
      built yet. */

@@ -26,18 +26,55 @@ const game = useGame()
 
 const tile = computed(() => game.selectedTile)
 const preview = computed(() => game.preview)
-const mat = computed(() => (preview.value?.material ? MATERIALS[preview.value.material] : null))
+
+const distance = computed(() => {
+  const char = game.character
+  return char && tile.value ? hexDistance(char.col, char.row, tile.value.col, tile.value.row) : 0
+})
 
 const open = ref(false)
+
+/**
+ * What the map's glyph says, in words. Out of sight a settlement is a tier and
+ * nothing else (§5.6), so this is the whole of what the card may call it.
+ */
+const TIER_LABEL: Record<string, string> = {
+  village: 'A village',
+  city: 'A city',
+  capital: 'A capital',
+}
 
 const depleted = computed(() => Boolean(tile.value && tile.value.regrowsAt > game.now))
 
 /**
- * The server costs a trip for any workable hex, standing on it or not, so the
- * card can be read as a scouting report: what this seam is worth, and what it
- * would take. Whether you may act on it is a separate line.
+ * §5.6 -- outside two hexes there is no scouting report, because there is no
+ * scouting. The card falls back to what the seed already told this device: the
+ * lie of the land, whether anybody lives there, and how long the walk is.
+ *
+ * Derived from distance rather than from `preview` being null, so it does not
+ * flicker through "unscouted" while a request for a hex in sight is in flight.
  */
-const trip = computed(() => (preview.value && preview.value.seconds > 0 ? preview.value : null))
+const unseen = computed(() => distance.value > game.sight)
+
+/**
+ * The seam's icon, and only while there is a seam to show.
+ *
+ * Gated on sight rather than on `preview` alone: setting off drops sight to
+ * zero without clearing the selection, and a material icon left standing over
+ * "unscouted" would be the card contradicting itself.
+ */
+const mat = computed(() =>
+  !unseen.value && preview.value?.material ? MATERIALS[preview.value.material] : null,
+)
+
+/**
+ * The server costs a trip for any workable hex in sight, standing on it or not,
+ * so the card can be read as a scouting report: what this seam is worth, and
+ * what it would take. Whether you may act on it is a separate line.
+ */
+const trip = computed(() =>
+  !unseen.value && preview.value && preview.value.seconds > 0 ? preview.value : null,
+)
 
 /** Honest game time explains the rule; wall time is what you actually wait. */
 const gameTime = (seconds: number) => seconds * 1000
@@ -51,21 +88,21 @@ const onSelected = computed(() => {
   return Boolean(char && tile.value && char.col === tile.value.col && char.row === tile.value.row)
 })
 
-const distance = computed(() => {
-  const char = game.character
-  return char && tile.value ? hexDistance(char.col, char.row, tile.value.col, tile.value.row) : 0
-})
-
 /** A trip pins you to the hex you are working until you claim or drop it. */
 const working = computed(() => game.miningJob)
 
+/**
+ * §5.6 -- distance is not a gate any more. Every hex on the map can be walked
+ * to, scouted or not; the only things that stop you are already being there and
+ * being busy with something else.
+ */
 const canTravel = computed(
-  () =>
-    Boolean(tile.value) &&
-    !onSelected.value &&
-    !working.value &&
-    !game.travel &&
-    distance.value <= game.travelRange,
+  () => Boolean(tile.value) && !onSelected.value && !working.value && !game.travel,
+)
+
+/** What the walk actually costs, which is the decision now that reach is not. */
+const eta = computed(() =>
+  tile.value ? game.travelEta(tile.value.col, tile.value.row) : 0,
 )
 
 const travelHint = computed(() => {
@@ -76,13 +113,27 @@ const travelHint = computed(() => {
       ? 'Claim your haul before you move on'
       : 'You are working this hex — claim or drop it first'
   }
-  if (distance.value > game.travelRange) return 'Out of range — move in shorter hops'
-  return `${distance.value} hexes`
+  return `${distance.value} hexes · ${formatSpan(eta.value)}`
 })
 
+/**
+ * Unscouted ground is named by what the glyph on the map already says and no
+ * more: a tier, or the biome under it. Withholding the settlement's name is not
+ * decoration -- the map draws a pip out there rather than a label, and a card
+ * that quietly knew better would make the pip a lie.
+ */
 const title = computed(() => {
   const t = tile.value
   if (!t) return ''
+
+  if (unseen.value) {
+    return t.settlement
+      ? (TIER_LABEL[t.settlement.tier] ?? BIOME_LABEL[t.biome])
+      : t.dungeon
+        ? 'A way down'
+        : BIOME_LABEL[t.biome]
+  }
+
   return t.settlement?.name ?? t.dungeon?.name ?? BIOME_LABEL[t.biome]
 })
 
@@ -122,6 +173,17 @@ watch(tile, () => {
               <span class="readout">{{ tile.slotsUsed }}/2</span>
             </span>
           </span>
+          <span v-else-if="unseen" class="stats">
+            <span class="stat">
+              <span class="label">Walk</span>
+              <span class="readout">{{ distance }} hex</span>
+            </span>
+            <span class="stat">
+              <span class="label">Takes</span>
+              <span class="readout">{{ formatSpan(eta) }}</span>
+            </span>
+          </span>
+
           <span v-else class="reason tiny">
             {{ depleted ? `Regrows in ${formatDuration(tile.regrowsAt - game.now)}` : preview?.reason }}
           </span>
@@ -145,9 +207,18 @@ watch(tile, () => {
         />
         </div>
 
+        <!-- §5.6 -- not a refusal and not an error: there is simply nothing to
+             report from here. Says what walking there would buy you. -->
+        <p v-if="unseen" class="tiny bare">
+          Unscouted. Sight reaches {{ game.sight }}
+          {{ game.sight === 1 ? 'hex' : 'hexes' }}<template v-if="game.travel">
+            — and nothing at all while you are on the road</template>. Walk there
+          to see the seam, who is on it, and what it pays.
+        </p>
+
         <!-- Workable hex, wrong place to be standing. Says the next move
              rather than repeating what the greyed button already implies. -->
-        <p v-if="trip && !trip.canMine" class="tiny blocked">
+        <p v-else-if="trip && !trip.canMine" class="tiny blocked">
           {{ trip.reason }}
         </p>
 

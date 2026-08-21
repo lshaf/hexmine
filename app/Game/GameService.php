@@ -8,7 +8,9 @@ use App\Models\Character;
 use App\Models\CharacterBuff;
 use App\Models\CharacterConsumable;
 use App\Models\CharacterItem;
+use App\Models\CharacterJob;
 use App\Models\CharacterMaterial;
+use App\Models\CharacterNode;
 use App\Models\CharacterSkill;
 use App\Models\GameJob;
 use App\Models\Player;
@@ -43,9 +45,10 @@ class GameService
      *
      * It also has to guarantee the §12 tutorial is completable from where it
      * drops you: a forest tile in the outer ring, with a village running the
-     * woodcutting line inside level-1 travel range. Villages run only 1 of 5
-     * lines (§6), so unconstrained spawns leave most players with no reachable
-     * way to turn wood into planks.
+     * woodcutting line a short walk away. Villages run only 1 of 5 lines (§6),
+     * so unconstrained spawns leave most players with no nearby way to turn
+     * wood into planks -- and with sight down to two hexes (§5.6) they would
+     * not even be able to see that there is one.
      *
      * @return array{col:int,row:int}
      */
@@ -57,7 +60,7 @@ class GameService
         $startRow = (int) round(Balance::MAP_ROWS / 2 + sin($angle) * $radius * (Balance::MAP_ROWS / 2));
 
         $fallback = ['col' => $startCol, 'row' => $startRow];
-        $range = Balance::travelRange(1);
+        $range = Balance::SPAWN_VILLAGE_RADIUS;
 
         for ($ring = 0; $ring < 70; $ring++) {
             for ($dc = -$ring; $dc <= $ring; $dc++) {
@@ -133,6 +136,27 @@ class GameService
                 CharacterSkill::create([
                     'character_id' => $character->id,
                     'skill_key' => $skill,
+                    'level' => 1,
+                    'xp' => 0,
+                ]);
+            }
+
+            // §7.4 -- every job exists from the start at level 1, including the
+            // three dormant battle ones. A tree you can look at and cannot yet
+            // afford is information; a tree that appears out of nowhere later is
+            // a surprise.
+            // §7.4 -- a row per job that needs one. The five gathering jobs are
+            // deliberately absent: their level is the CharacterSkill level above,
+            // so giving them a second row would be two places to disagree about
+            // one number.
+            foreach (Jobs::JOBS as $job => $def) {
+                if ($def['kind'] === Jobs::GATHERING) {
+                    continue;
+                }
+
+                CharacterJob::create([
+                    'character_id' => $character->id,
+                    'job_key' => $job,
                     'level' => 1,
                     'xp' => 0,
                 ]);
@@ -358,6 +382,28 @@ class GameService
     }
 
     /**
+     * §8.0.1 -- turn a chance into a count of extra option rolls.
+     *
+     * Server-rolled from a seed like every other outcome, and shared by the
+     * bazaar and by a Smith's bench so the two cannot drift into different
+     * ideas of what "sometimes" means.
+     */
+    private function extraRoll(Character $character, float $chance, int $salt): int
+    {
+        if ($chance <= 0) {
+            return 0;
+        }
+
+        $roll = Hash::rand01(Hash::hash2(
+            (int) $character->id,
+            $this->now() % 100000,
+            Balance::MAP_SEED ^ $salt,
+        ));
+
+        return $roll < $chance ? 1 : 0;
+    }
+
+    /**
      * §8.0.1 -- the capital bazaar's extra slot. A capital stocks nothing a city
      * does not; what it sometimes adds is a line on top, and it is the only
      * place a common item ever carries one.
@@ -399,10 +445,29 @@ class GameService
             $buffs[$buff->stat] = ($buffs[$buff->stat] ?? 0) + $buff->value;
         }
 
+        // §7.4.3 -- bought tree nodes are a third contributor to the very same
+        // sum, and go under the very same ceiling. This is the whole balance
+        // argument for letting 90 skill points exist: a point buys a different
+        // road to +15%, never a higher one. Clamping the tree separately and
+        // adding it afterwards would let two clamped halves total 30%.
+        $effects = $this->nodeEffects($character);
+        $tree = $effects['stats'];
+
+        // A gathering line's nodes only count on that line's own work, so they
+        // join the sum only when a line is being asked about.
+        if ($line !== null) {
+            foreach ($effects['byLine'][$line] ?? [] as $stat => $value) {
+                $tree[$stat] = ($tree[$stat] ?? 0) + $value;
+            }
+        }
+
         $out = [];
-        foreach (['yield', 'tripReduction', 'travelSpeed', 'processingSpeed', 'power'] as $stat) {
+        foreach (['yield', 'tripReduction', 'travelSpeed', 'processingSpeed', 'power', 'defence'] as $stat) {
             $gear = Formulas::aggregateStat($items, $stat, $line);
-            $out[$stat] = min(Balance::STAT_CEILING, $gear + ($buffs[$stat] ?? 0));
+            $out[$stat] = min(
+                Balance::STAT_CEILING,
+                $gear + ($buffs[$stat] ?? 0) + ($tree[$stat] ?? 0),
+            );
         }
 
         return $out;
@@ -510,9 +575,31 @@ class GameService
         return $out;
     }
 
-    public function travelRange(Character $character): int
+    /**
+     * §5.6 -- how far this character can see, right now.
+     *
+     * Two hexes standing still, nothing at all on the road, and up to four for
+     * an Explorer deep enough into the chain (§7.5). Deliberately untouched by
+     * level or gear: the only thing that widens the eye is having walked, which
+     * is the one behaviour worth paying for here and the only one whose reward
+     * cannot be bought.
+     */
+    public function sightRadius(Character $character): int
     {
-        return Balance::travelRange($character->level, $this->bonuses($character)['travelSpeed']);
+        if ($this->isTravelling($character)) {
+            return Balance::SIGHT_TRAVELLING;
+        }
+
+        // §7.5 -- the one thing that widens it, already capped.
+        return Balance::SIGHT_RADIUS + $this->nodeEffects($character)['sight'];
+    }
+
+    /** §8.3 -- the character's own walking pace, in wall-clock ms per hex. */
+    public function travelMsPerHex(Character $character): int
+    {
+        return Balance::scaled(
+            Balance::travelMsPerHex($this->bonuses($character)['travelSpeed']),
+        );
     }
 
     /**
@@ -719,19 +806,22 @@ class GameService
      * seed already gives them: which tiles are worked out, and who is standing
      * on them.
      *
-     * Scoped to sight, and sight is the character's travel range -- you see
-     * exactly as far as you can act. That is why this takes no coordinates. The
+     * Scoped to sight (§5.6), which is two hexes and takes no arguments. The
      * camera can be dragged anywhere and costs nothing, because terrain is
      * derived (§5); but live state follows the character, not the camera, so a
      * client cannot walk a viewport parameter across the map to harvest where
      * everyone is mining. Nothing outside sight is knowable, not merely undrawn.
+     *
+     * Two hexes is nineteen tiles rather than the several hundred that reach-
+     * as-sight scanned, and a character on the road sees zero -- so the walk
+     * itself costs no queries at all, however long it is.
      *
      * @return array{depleted:array<int,array{0:int,1:int,2:int}>,occupied:array<int,array{0:int,1:int,2:int}>}
      */
     public function mapMutations(Character $character): array
     {
         $now = $this->now();
-        $range = $this->travelRange($character);
+        $range = $this->sightRadius($character);
         $centerCol = (int) $character->col;
         $centerRow = (int) $character->row;
 
@@ -770,10 +860,45 @@ class GameService
         return ['depleted' => $depleted, 'occupied' => $occupied];
     }
 
-    /** Server-computed preview of what a trip here would cost and give. */
+    /**
+     * Server-computed preview of what a trip here would cost and give.
+     *
+     * Bounded by sight (§5.6), and that bound is the point: a costed hex names
+     * its material, its haul and how many people are already on it, which is
+     * exactly the live state the two-hex disc exists to withhold. Without the
+     * check this endpoint would be the map query in a slower form -- one tile
+     * per request, but no limit on how many hexes a client asks about.
+     *
+     * The hex underfoot is distance 0, so it survives a sight of zero and the
+     * dock keeps working on the road.
+     */
     public function previewTile(Character $character, int $col, int $row): array
     {
         $now = $this->now();
+
+        $distance = HexGeometry::distance((int) $character->col, (int) $character->row, $col, $row);
+
+        if ($distance > $this->sightRadius($character)) {
+            return [
+                'canMine' => false,
+                'reason' => $this->isTravelling($character)
+                    ? 'You are watching your feet. Nothing is scouted until you stop.'
+                    : 'Too far to make out. Walk there and see for yourself.',
+                'seconds' => 0,
+                'baseSeconds' => 0,
+                'skillReduction' => 0,
+                'equipReduction' => 0,
+                'clamped' => false,
+                'yield' => 0,
+                'material' => null,
+                'skill' => null,
+                'scrap' => false,
+                'note' => null,
+                'apCost' => Balance::MINING_AP_COST,
+                'unseen' => true,
+            ];
+        }
+
         $tile = $this->buildTile($col, $row, $now);
 
         $base = [
@@ -790,6 +915,7 @@ class GameService
             'scrap' => false,
             'note' => null,
             'apCost' => Balance::MINING_AP_COST,
+            'unseen' => false,
         ];
 
         if ($tile['material'] === null) {
@@ -850,11 +976,8 @@ class GameService
             $reason = $working->isReady($now)
                 ? 'Your haul is waiting. Claim it before working anything else.'
                 : 'You are already working a hex. Finish that one first.';
-        } elseif ((int) $character->col !== $col || (int) $character->row !== $row) {
-            $distance = HexGeometry::distance($character->col, $character->row, $col, $row);
-            $reason = $distance > $this->travelRange($character)
-                ? 'Out of travel range. Move in shorter hops, or level up to reach further.'
-                : 'You are standing elsewhere. Travel to this hex to work it.';
+        } elseif ($distance !== 0) {
+            $reason = 'You are standing elsewhere. Travel to this hex to work it.';
         } elseif ($character->ap < Balance::MINING_AP_COST) {
             $reason = 'Not enough action points.';
         }
@@ -880,6 +1003,7 @@ class GameService
             'scrap' => $bare,
             'note' => $note,
             'apCost' => Balance::MINING_AP_COST,
+            'unseen' => false,
         ];
     }
 
@@ -1201,15 +1325,16 @@ class GameService
             );
         }
 
+        // Anywhere on the map, seen or not (§5.6). Distance is the whole cost:
+        // the far side of the world is a walk of days, which is a decision the
+        // clock enforces on its own. The only refusal left is the map's edge.
+        if ($col < 0 || $col >= Balance::MAP_COLS || $row < 0 || $row >= Balance::MAP_ROWS) {
+            throw new GameException('There is nothing past the edge of the map.', 'off_map');
+        }
+
         $distance = HexGeometry::distance($character->col, $character->row, $col, $row);
         if ($distance === 0) {
             throw new GameException('You are already standing here.', 'blocked');
-        }
-        if ($distance > $this->travelRange($character)) {
-            throw new GameException(
-                'Out of travel range. Move in shorter hops, or level up to reach further.',
-                'out_of_range',
-            );
         }
 
         // Whatever you were helping with, you are not helping with it any more.
@@ -1219,7 +1344,7 @@ class GameService
         $character->travel_to_col = $col;
         $character->travel_to_row = $row;
         $character->travel_started_at = $now;
-        $character->travel_ends_at = $now + $distance * Balance::scaled(Balance::TRAVEL_MS_PER_HEX);
+        $character->travel_ends_at = $now + $distance * $this->travelMsPerHex($character);
         $character->save();
 
         return $this->travelState($character);
@@ -1240,7 +1365,7 @@ class GameService
             throw new GameException('You are not going anywhere.', 'not_travelling');
         }
 
-        $perHex = Balance::scaled(Balance::TRAVEL_MS_PER_HEX);
+        $perHex = $this->journeyPerHex($character);
         $path = $this->travelPath($character);
         $elapsed = max(0, $this->now() - (int) $character->travel_started_at);
 
@@ -1250,6 +1375,7 @@ class GameService
         $character->col = $stop['col'];
         $character->row = $stop['row'];
         $this->clearTravel($character);
+        $this->grantExplorerXp($character, $steps);
 
         $settlement = WorldGen::settlementAt($character->col, $character->row);
         if ($settlement !== null) {
@@ -1264,6 +1390,21 @@ class GameService
             'hexes' => $steps,
             'settlement' => $settlement,
         ];
+    }
+
+    /**
+     * The pace of the journey actually under way, derived from its own clock.
+     *
+     * Read back rather than recomputed, so swapping boots mid-walk cannot move
+     * the hex a stop would land on: the departure time, the arrival time and
+     * the floor that turns one into the other are all the same arithmetic.
+     */
+    private function journeyPerHex(Character $character): int
+    {
+        $hexes = max(1, count($this->travelPath($character)) - 1);
+        $span = (int) $character->travel_ends_at - (int) $character->travel_started_at;
+
+        return max(1, intdiv($span, $hexes));
     }
 
     /** True while the character is somewhere between two hexes. */
@@ -1304,7 +1445,7 @@ class GameService
             'toRow' => (int) $character->travel_to_row,
             'startedAt' => (int) $character->travel_started_at,
             'endsAt' => (int) $character->travel_ends_at,
-            'perHexMs' => Balance::scaled(Balance::TRAVEL_MS_PER_HEX),
+            'perHexMs' => $this->journeyPerHex($character),
             'hexes' => count($path) - 1,
             'path' => array_map(fn (array $hex) => [$hex['col'], $hex['row']], $path),
             'destinationName' => $settlement['name'] ?? null,
@@ -1318,9 +1459,12 @@ class GameService
             return false;
         }
 
+        $hexes = count($this->travelPath($character)) - 1;
+
         $character->col = (int) $character->travel_to_col;
         $character->row = (int) $character->travel_to_row;
         $this->clearTravel($character);
+        $this->grantExplorerXp($character, $hexes);
 
         $settlement = WorldGen::settlementAt($character->col, $character->row);
         if ($settlement !== null) {
@@ -1504,18 +1648,39 @@ class GameService
                 $this->requireSettlement($character, 'craft', $def['station']);
             }
 
+            // §7.4.3 -- a Smith's cheaper crafts do not make an Armorer's
+            // cheaper, so the discount is read from the job whose bench this is.
+            // Never below one of anything: a free craft is not a discount, it is
+            // a hole in the §11 materials sink.
+            $effects = $this->craftEffects($character, $this->jobForItem($def));
+            $inputs = [];
             foreach ($def['inputs'] as $key => $qty) {
+                $inputs[$key] = max(1, (int) round($qty * (1 - $effects['costReduction'])));
+            }
+
+            foreach ($inputs as $key => $qty) {
                 if ($this->held($character, $key) < $qty) {
                     $name = Catalog::material($key)['name'] ?? $key;
                     throw new GameException("Not enough {$name}.", 'insufficient');
                 }
             }
-            foreach ($def['inputs'] as $key => $qty) {
+            foreach ($inputs as $key => $qty) {
                 $this->takeMaterial($character, $key, $qty);
             }
 
             $this->fireTutorial($character, 'craft');
             $character->save();
+
+            // §7.4 -- the bench that made it is the job that learns from it, and
+            // a better piece teaches more: common 10 through epic 40.
+            $jobKey = $this->jobForItem($def);
+            if ($jobKey !== null) {
+                $this->grantJobXp(
+                    $character,
+                    $jobKey,
+                    Balance::JOB_XP_PER_RARITY_RANK * (Balance::rarityRank($def['rarity']) + 1),
+                );
+            }
 
             // §8.5 -- a potion stacks on a shelf. It has no durability to track
             // and no slot to sit in, so it never becomes a CharacterItem.
@@ -1538,15 +1703,332 @@ class GameService
                 return $row;
             }
 
+            // §7.4.3 -- a better-made thing lasts longer. Capped, because
+            // durability is the repair sink and this thins it.
+            $durability = (int) round($def['maxDurability'] * (1 + $effects['craftDurability']));
+
             return CharacterItem::create([
                 'character_id' => $character->id,
                 'item_key' => $itemKey,
-                'durability' => $def['maxDurability'],
+                'durability' => $durability,
                 'equipped' => false,
-                'options' => $this->rollFor($character, $def),
+                'options' => $this->rollFor($character, $def, $this->extraRoll(
+                    $character,
+                    $effects['craftOption'],
+                    0x5c11,
+                )),
             ]);
         });
     }
+
+    // ------------------------------------------------------------------ jobs §7.4
+
+    /**
+     * §7.4.1 -- points come from character levels and nothing else.
+     *
+     * Spent is counted from the rows rather than stored, so the two can never
+     * drift apart. There is no refund: §7.4.2 makes buying permanent, because a
+     * respec would turn the 100-point cap into a suggestion.
+     *
+     * @return array{total:int,spent:int,available:int}
+     */
+    public function skillPoints(Character $character): array
+    {
+        $total = Balance::skillPointsFor($character->level);
+        $spent = $character->nodes()->count();
+
+        return [
+            'total' => $total,
+            'spent' => $spent,
+            'available' => max(0, $total - $spent),
+        ];
+    }
+
+    /**
+     * Job levels, keyed by job.
+     *
+     * Two sources on purpose. Craft and battle jobs keep their own row; the five
+     * gathering jobs read the skill level they have always had (§7.2), which is
+     * the same number that takes time off a trip (§7.3). Reusing it means a
+     * gathering tree is playable the moment it exists, and means there is never
+     * a second opinion about how good a woodcutter someone is.
+     */
+    private function jobLevels(Character $character): array
+    {
+        $levels = $character->jobLevels()->pluck('level', 'job_key')->all();
+
+        foreach ($character->skills()->get() as $skill) {
+            if (isset(Jobs::JOBS[$skill->skill_key])) {
+                $levels[$skill->skill_key] = $skill->level;
+            }
+        }
+
+        return $levels;
+    }
+
+    /** Job levels for the state payload, both kinds folded into one list. */
+    public function jobLevelPayload(Character $character): array
+    {
+        $out = [];
+
+        foreach ($this->jobLevels($character) as $key => $level) {
+            $isGathering = Jobs::JOBS[$key]['kind'] === Jobs::GATHERING;
+
+            $out[] = [
+                'key' => $key,
+                'level' => $level,
+                'xp' => $isGathering
+                    ? (int) ($character->skills()->where('skill_key', $key)->value('xp') ?? 0)
+                    : (int) ($character->jobLevels()->where('job_key', $key)->value('xp') ?? 0),
+                'xpToNext' => $isGathering
+                    ? Balance::skillXpForLevel($level)
+                    : Balance::jobXpForLevel($level),
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * §7.4 -- a craft teaches the job whose bench made it, and a walk teaches
+     * the only job that learns from walking (§7.5).
+     *
+     * Two kinds are deliberately unreachable from here. Gathering jobs read
+     * their CharacterSkill level instead (§7.2), so writing a row for one would
+     * create a second opinion about a number that already exists. Battle jobs
+     * level by raiding (§9) and by nothing else; giving them a stand-in source
+     * would make combat optional, which is the whole reason the slot and the
+     * trees are dormant rather than absent.
+     */
+    private function grantJobXp(Character $character, string $jobKey, int $amount): void
+    {
+        $def = Jobs::JOBS[$jobKey] ?? null;
+        if ($def === null || $amount <= 0) {
+            return;
+        }
+        if ($def['kind'] === Jobs::GATHERING || $def['kind'] === Jobs::BATTLE) {
+            return;
+        }
+
+        // firstOrCreate rather than first: createCharacter seeds a row per job,
+        // but a character made before a job existed has none, and the first
+        // walk should start the trade rather than quietly discard the XP.
+        $row = $character->jobLevels()->firstOrCreate(
+            ['job_key' => $jobKey],
+            ['level' => 1, 'xp' => 0],
+        );
+
+        $result = Formulas::applyXp(
+            $row->level,
+            $row->xp,
+            $amount,
+            Balance::JOB_MAX_LEVEL,
+            fn (int $l) => Balance::jobXpForLevel($l),
+        );
+
+        $row->level = $result['level'];
+        $row->xp = $result['xp'];
+        $row->save();
+    }
+
+    /**
+     * §7.5 -- what a walk is worth.
+     *
+     * Explorer XP and no character XP, which is the whole shape of the system:
+     * walking cannot level you, so nobody walks to grind, and the only thing it
+     * advances is the ability to walk further and see more of what you walked
+     * to. Paid on hexes actually crossed, so a journey abandoned halfway pays
+     * for the half that happened -- the same arithmetic that decides which hex
+     * you are standing on when you stop.
+     */
+    private function grantExplorerXp(Character $character, int $hexes): void
+    {
+        if ($hexes <= 0) {
+            return;
+        }
+
+        $this->grantJobXp($character, 'explorer', $hexes * Balance::EXPLORER_XP_PER_HEX);
+    }
+
+    /** The job a crafted item teaches, from its category (§8.4). */
+    private function jobForItem(array $def): ?string
+    {
+        $category = Catalog::category($def);
+
+        foreach (Jobs::JOBS as $key => $job) {
+            if ($job['kind'] === Jobs::CRAFT && $job['source'] === $category) {
+                return $key;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * §7.4.3 -- what this character's bought nodes add up to.
+     *
+     * Returned as a bundle rather than applied here, because the pieces land in
+     * different places: `stat` joins the gear aggregate inside its clamp, the
+     * rest apply at the craft site. Each non-stat total is clamped to its own
+     * cap, which is what keeps a maxed tree from switching off a §11 sink.
+     *
+     * @return array{stats:array<string,float>,unlocks:array<int,string>,byJob:array<string,array<string,float>>}
+     */
+    public function nodeEffects(Character $character): array
+    {
+        $stats = [];
+        $byLine = [];
+        $unlocks = [];
+        $byJob = [];
+        $sight = 0;
+
+        foreach ($this->ownedNodes($character) as $key) {
+            $node = Jobs::node($key);
+            if ($node === null) {
+                continue;
+            }
+
+            $effect = $node['effect'];
+            $job = $node['job'];
+
+            switch ($effect['kind']) {
+                case 'stat':
+                    // §8 rule 1 again: a gathering node pays out on its own line
+                    // and no other, exactly as that line's tool does. Three
+                    // gathering trees must not stack yield on every trip.
+                    if (Jobs::JOBS[$job]['kind'] === Jobs::GATHERING) {
+                        $line = Jobs::JOBS[$job]['source'];
+                        $byLine[$line][$effect['stat']] =
+                            ($byLine[$line][$effect['stat']] ?? 0) + $effect['value'];
+                        break;
+                    }
+
+                    $stats[$effect['stat']] = ($stats[$effect['stat']] ?? 0) + $effect['value'];
+                    break;
+                case 'unlock':
+                    $unlocks[] = $effect['target'];
+                    break;
+                case 'sight':
+                    // §7.5 -- hexes, not a percentage, so it has nothing to do
+                    // with the stat ceiling and everything to do with the query
+                    // cap it is bounded by.
+                    $sight += (int) $effect['value'];
+                    break;
+                default:
+                    $byJob[$job][$effect['kind']] = ($byJob[$job][$effect['kind']] ?? 0) + $effect['value'];
+            }
+        }
+
+        // Stats are NOT clamped here. They are handed to the same aggregate as
+        // gear so they share one falloff and one ceiling (§8.1 rule 1); clamping
+        // twice would let the sum of two clamped halves pass the cap.
+        $caps = [
+            'costReduction' => Balance::SKILL_COST_REDUCTION_CAP,
+            'craftDurability' => Balance::SKILL_DURABILITY_CAP,
+            'craftOption' => Balance::SKILL_OPTION_CHANCE_CAP,
+            'batch' => Balance::SKILL_BATCH_CAP,
+        ];
+        foreach ($byJob as $job => $kinds) {
+            foreach ($kinds as $kind => $value) {
+                $byJob[$job][$kind] = min($value, $caps[$kind] ?? $value);
+            }
+        }
+
+        return [
+            'stats' => $stats,
+            'byLine' => $byLine,
+            'unlocks' => $unlocks,
+            'byJob' => $byJob,
+            'sight' => min($sight, Balance::SKILL_SIGHT_CAP),
+        ];
+    }
+
+    /**
+     * §7.4 + §7.5 -- every node this character has, however it got there.
+     *
+     * Two sources, and only one of them is a table. Bought nodes are rows;
+     * wayfaring nodes are a function of a job level and are never written down,
+     * because a granted row would be a second place for "do you have this yet"
+     * to be answered and the two would eventually disagree. It also means the
+     * point ledger stays honest: `skillPoints()` counts rows, so a granted node
+     * cannot cost a point by accident.
+     *
+     * @return array<int,string>
+     */
+    public function ownedNodes(Character $character): array
+    {
+        return array_merge(
+            $character->nodes()->pluck('node_key')->all(),
+            Jobs::granted($this->jobLevels($character)),
+        );
+    }
+
+    /** One job's capped craft effects, or zeroes. */
+    private function craftEffects(Character $character, ?string $jobKey): array
+    {
+        $zero = ['costReduction' => 0.0, 'craftDurability' => 0.0, 'craftOption' => 0.0, 'batch' => 0.0];
+        if ($jobKey === null) {
+            return $zero;
+        }
+
+        return array_merge($zero, $this->nodeEffects($character)['byJob'][$jobKey] ?? []);
+    }
+
+    /**
+     * §7.4 -- buy one node.
+     *
+     * Every gate is checked here and nowhere else that matters: the client draws
+     * the tree, the server decides what may be bought (§16). The unique index on
+     * (character, node) is the last line of defence against a doubled request.
+     */
+    public function buyNode(Character $character, string $nodeKey): array
+    {
+        return DB::transaction(function () use ($character, $nodeKey) {
+            $node = Jobs::node($nodeKey);
+            if ($node === null) {
+                throw new GameException('No such skill.', 'not_found');
+            }
+
+            if (Jobs::isAutomatic($node['job'])) {
+                $name = Jobs::JOBS[$node['job']]['name'];
+                throw new GameException(
+                    "{$name} skills are not bought. {$node['name']} arrives at {$name} level {$node['jobLevel']}.",
+                    'granted',
+                );
+            }
+
+            if ($character->nodes()->where('node_key', $nodeKey)->exists()) {
+                throw new GameException("You already have {$node['name']}.", 'owned');
+            }
+
+            $points = $this->skillPoints($character);
+            if ($points['available'] < 1) {
+                throw new GameException('No skill points left. Level up first.', 'no_points');
+            }
+
+            $jobLevel = $this->jobLevels($character)[$node['job']] ?? 1;
+            if ($jobLevel < $node['jobLevel']) {
+                $name = Jobs::JOBS[$node['job']]['name'];
+                throw new GameException(
+                    "{$node['name']} needs {$name} level {$node['jobLevel']}. You are level {$jobLevel}.",
+                    'job_level',
+                );
+            }
+
+            foreach ($node['requires'] as $parentKey) {
+                if (! $character->nodes()->where('node_key', $parentKey)->exists()) {
+                    $parent = Jobs::node($parentKey);
+                    throw new GameException("{$node['name']} needs {$parent['name']} first.", 'requires');
+                }
+            }
+
+            CharacterNode::create(['character_id' => $character->id, 'node_key' => $nodeKey]);
+
+            return ['node' => $nodeKey, 'points' => $this->skillPoints($character->fresh())];
+        });
+    }
+
+    // ------------------------------------------------------------- end jobs §7.4
 
     // --------------------------------------------------------------- equipment
 
@@ -1726,10 +2208,15 @@ class GameService
                 'row' => $character->row,
                 'storageUsed' => (int) $character->materials->sum('quantity'),
                 'storageCap' => Balance::storageCap($character->level),
-                // How far the character can reach, §7.1. Published rather than
-                // recomputed client-side so the map's range ring and the rule
-                // that rejects a trip are always the same number.
-                'travelRange' => $this->travelRange($character),
+                // §5.6 -- how far the character can see. There is no reach to
+                // publish any more: every hex is walkable. Sight is published
+                // rather than mirrored client-side so the fog on the map and
+                // the endpoints that refuse to cost an unscouted hex are always
+                // the same number, and so it can drop to zero on the road.
+                'sight' => $this->sightRadius($character),
+                // §8.3 -- the character's pace, for costing a walk before it is
+                // taken. Already wall-clock: the dev clock is applied here.
+                'travelPerHexMs' => $this->travelMsPerHex($character),
                 'tutorialStep' => $character->tutorial_step,
             ],
             'skills' => $skills,
@@ -1761,6 +2248,14 @@ class GameService
             // and the dock is only ever about here.
             'underfoot' => $this->previewTile($character, $character->col, $character->row),
             'shopStock' => $this->shopStock($character),
+            // §7.4 -- what the tree panel needs about *this* character. The tree
+            // itself is static and comes from GET /api/jobs instead, so it is
+            // fetched once rather than on every state refresh.
+            'skillPoints' => $this->skillPoints($character),
+            // Not 'jobs': that key is already the running mining and processing
+            // work above, and a duplicate here silently clobbered it.
+            'jobLevels' => $this->jobLevelPayload($character),
+            'nodes' => $this->ownedNodes($character),
             'bonuses' => $this->bonuses($character),
             'toolYield' => $this->toolYieldByLine($character),
             // §8.5 -- what is on the shelf, and what is running right now.

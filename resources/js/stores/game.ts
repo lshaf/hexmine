@@ -14,7 +14,13 @@ import { defineStore } from 'pinia'
 import { computed, ref, shallowRef, watch } from 'vue'
 import { api } from '@/api/client'
 import { ApiError } from '@/api/types'
-import type { MapMutations, PlayerState, StationState, TilePreview } from '@/api/types'
+import type {
+  MapMutations,
+  PlayerState,
+  SkillTree,
+  StationState,
+  TilePreview,
+} from '@/api/types'
 import type {
   Job,
   MaterialKey,
@@ -29,7 +35,7 @@ import { configureWorld, generateTile } from '@/game/worldgen'
 import { hexDistance, visibleTiles } from '@/map/hexGeometry'
 
 /** Which overlay is open over the map, if any. */
-export type PanelKey = 'bag' | 'craft' | 'shop' | 'hero' | 'atlas' | 'almanac'
+export type PanelKey = 'bag' | 'craft' | 'shop' | 'hero' | 'atlas' | 'skills'
 
 export interface LogEntry {
   id: number
@@ -76,10 +82,10 @@ export const useGame = defineStore('game', () => {
    * and asks the server for nothing.
    *
    * What it does NOT move is sight. Live state -- depletion, who is mining
-   * where -- is scoped server-side to the character's travel range, so the
-   * camera can wander and still learn nothing it should not. Out there the map
-   * shows what the seed says and no more: the lie of the land, and whether
-   * anybody lives on it.
+   * where -- is scoped server-side to a two-hex disc around the character
+   * (§5.6), so the camera can wander and still learn nothing it should not.
+   * Out there the map shows what the seed says and no more: the lie of the
+   * land, and whether anybody lives on it.
    */
   const view = ref({ col: 0, row: 0, w: 900, h: 620 })
 
@@ -129,9 +135,9 @@ export const useGame = defineStore('game', () => {
   }
 
   /*
-   * Sight belongs to the character, not the camera, so moving is the only thing
-   * that changes what can be known. Watching the position rather than patching
-   * travelTo means the two can never disagree about where you are.
+   * Sight belongs to the character, not the camera, so the camera never
+   * recentres itself. Watching the position rather than patching travelTo means
+   * the two can never disagree about where you are.
    */
   watch(
     // Reads the raw state rather than the `character` computed: this getter runs
@@ -145,11 +151,41 @@ export const useGame = defineStore('game', () => {
       // followed with a fetch of its own.
       if (!key || !previous) return
       centreOnCharacter()
-      void refreshMutations()
     },
   )
 
-  /** Live state for the tiles in sight. Panning never calls this. */
+  /*
+   * Two things change what is knowable: where you stand, and whether you are
+   * standing at all. Setting off drops sight to zero (§5.6) without moving you
+   * a hex, so the position watcher above would miss it and the map would keep
+   * drawing a scouting report the server has stopped vouching for.
+   *
+   * Fetching on the edge rather than on a timer is what makes the walk free:
+   * one call when the road starts, one when it ends, and nothing in between
+   * however far it is.
+   */
+  watch(
+    () => {
+      const char = state.value?.character
+      if (!char) return ''
+      return `${char.col},${char.row},${state.value?.travel ? 'road' : 'still'}`
+    },
+    async (key, previous) => {
+      if (!key || !previous) return
+      await refreshMutations()
+
+      // What was in sight a moment ago may not be now, and the other way round.
+      // Re-asking about the selection is what stops the card sitting on a
+      // scouting report the character has walked away from -- or showing
+      // "unscouted" for a hex they are now standing next to.
+      if (selected.value) await select(selected.value.col, selected.value.row)
+    },
+  )
+
+  /**
+   * Live state for the nineteen tiles in sight (§5.6). Panning never calls
+   * this, and neither does walking -- only arriving and setting off do.
+   */
   async function refreshMutations(): Promise<void> {
     mutations.value = await api.getMap()
     rebuildTiles()
@@ -178,6 +214,30 @@ export const useGame = defineStore('game', () => {
   /** §8.5 -- the shelf and what is running off it. */
   const consumables = computed(() => state.value?.consumables ?? {})
   const buffs = computed(() => state.value?.buffs ?? [])
+
+  /**
+   * §7.4 -- the trades.
+   *
+   * `tree` is the static catalog: the same 180 rows for every player, so it is
+   * fetched once and lazily the first time the panel opens rather than riding
+   * along with every state refresh. What is per-character -- points, job levels,
+   * owned nodes -- arrives in the state like everything else.
+   */
+  const tree = shallowRef<SkillTree | null>(null)
+  const skillPoints = computed(
+    () => state.value?.skillPoints ?? { total: 0, spent: 0, available: 0 },
+  )
+  const jobLevels = computed(() => state.value?.jobLevels ?? [])
+  const ownedNodes = computed(() => new Set(state.value?.nodes ?? []))
+
+  async function loadTree(): Promise<void> {
+    if (tree.value) return
+    tree.value = await api.getSkillTree()
+  }
+
+  async function buyNode(nodeKey: string): Promise<void> {
+    await act(() => api.buyNode(nodeKey))
+  }
   const jobs = computed<Job[]>(() => state.value?.jobs ?? [])
 
   /**
@@ -213,8 +273,26 @@ export const useGame = defineStore('game', () => {
   /** What the settlement underfoot stocks. Empty out in the field. */
   const shopStock = computed<string[]>(() => state.value?.shopStock ?? [])
 
-  /** §7.1 -- level-gated reach, straight from the server. */
-  const travelRange = computed(() => character.value?.travelRange ?? 0)
+  /**
+   * §5.6 -- how far the character can see. Zero while walking, which is what
+   * darkens the map for the length of a journey.
+   *
+   * There is no companion "how far can I go": every hex on the map is walkable
+   * and the only cost is the clock, so the map has a fog boundary where it used
+   * to have a reach boundary.
+   */
+  const sight = computed(() => character.value?.sight ?? 0)
+
+  /** §8.3 -- wall-clock ms per hex at this character's pace. */
+  const travelPerHexMs = computed(() => character.value?.travelPerHexMs ?? 0)
+
+  /** What a walk to this hex would cost in real time, before taking it. */
+  const travelEta = (col: number, row: number): number => {
+    const char = character.value
+    if (!char) return 0
+
+    return hexDistance(char.col, char.row, col, row) * travelPerHexMs.value
+  }
 
   /** The journey under way, §5. Null whenever the character is standing still. */
   const travel = computed<TravelState | null>(() => state.value?.travel ?? null)
@@ -320,19 +398,24 @@ export const useGame = defineStore('game', () => {
   }
 
   /**
-   * Selecting asks the server what a trip here would cost, so it is bounded by
-   * sight for the same reason the map is: a tap outside it would be a query
-   * outside it. Nothing out there is actionable anyway -- sight and travel range
-   * are the same radius -- so a stray tap just clears the selection.
+   * Point at a hex. Any hex -- you can walk to all of them (§5.6), so a tap
+   * across the map is a destination, not a mistake to be swallowed.
+   *
+   * What it does not do is ask about one it cannot see. The server would refuse
+   * to cost it anyway, and skipping the round trip is most of why sight shrank:
+   * dragging the camera and tapping around it now costs nothing at all. Out
+   * there the card reads the seed and the distance, both of which are already
+   * on this device.
    */
   async function select(col: number, row: number): Promise<void> {
+    selected.value = { col, row }
+
     const char = state.value?.character
-    if (char && hexDistance(char.col, char.row, col, row) > travelRange.value) {
-      clearSelection()
+    if (char && hexDistance(char.col, char.row, col, row) > sight.value) {
+      preview.value = null
       return
     }
 
-    selected.value = { col, row }
     preview.value = await api.previewTile(col, row)
   }
 
@@ -455,8 +538,9 @@ export const useGame = defineStore('game', () => {
     // derived
     character, timeScale, inventory, equipment, skills, bonuses, toolYield, jobs, readyJobs,
     consumables, buffs,
+    tree, skillPoints, jobLevels, ownedNodes,
     activeJobs, miningJob, processingJob, underfoot, selectedTile,
-    currentSettlement, shopStock, travelRange,
+    currentSettlement, shopStock, sight, travelPerHexMs, travelEta,
     travel, travelProgress, travelHexesWalked, travelRemainingMs,
     currentStep, tutorialDone, tutorialProgress, TUTORIAL_OUTRO,
     // helpers
@@ -466,6 +550,7 @@ export const useGame = defineStore('game', () => {
     select, clearSelection,
     startMining, collect, abandon, travelTo, cancelTravel, startProcessing, buy,
     sell, craft, equip, unequip, repair, discard, discardMaterial, drink, openPanel, closePanel,
+    loadTree, buyNode,
     openStation, closeStation,
   }
 })

@@ -35,7 +35,7 @@ import CraftView from '@/views/CraftView.vue'
 import ShopView from '@/views/ShopView.vue'
 import HeroView from '@/views/HeroView.vue'
 import AtlasView from '@/views/AtlasView.vue'
-import AlmanacView from '@/views/AlmanacView.vue'
+import SkillsView from '@/views/SkillsView.vue'
 import { ACTION_PATHS } from '@/icons/actions'
 
 const game = useGame()
@@ -47,9 +47,8 @@ const PANELS = {
   shop: { title: 'Trader', component: ShopView, wide: false },
   hero: { title: 'Prospector', component: HeroView, wide: false },
   atlas: { title: 'Atlas', component: AtlasView, wide: true },
-  // Wide and flush: the almanac is a long reference and owns its own scroll,
-  // so the filter bar can stay put while the entries move under it.
-  almanac: { title: 'Almanac', component: AlmanacView, wide: true },
+  // §7.4 -- six trees of thirty. Wide, because a seam of nodes needs room.
+  skills: { title: 'Jobs', component: SkillsView, wide: false },
 } as const
 
 const panel = computed(() => (game.panel ? PANELS[game.panel] : null))
@@ -88,7 +87,7 @@ onMounted(() => {
         :center-row="game.view.row"
         :character-col="game.character.col"
         :character-row="game.character.row"
-        :travel-range="game.travelRange"
+        :sight="game.sight"
         :selected="game.selected"
         :jobs="game.jobs"
         :travel="game.travel"
@@ -108,7 +107,7 @@ onMounted(() => {
       <div class="corner top-right">
         <div class="screens">
           <HexAction icon="atlas" label="Atlas" @activate="game.openPanel('atlas')" />
-          <HexAction icon="almanac" label="Almanac" @activate="game.openPanel('almanac')" />
+          <HexAction icon="skills" label="Jobs" @activate="game.openPanel('skills')" />
           <HexAction icon="bag" label="Bag" @activate="game.openPanel('bag')" />
           <HexAction icon="hero" label="Hero" @activate="game.openPanel('hero')" />
         </div>
@@ -326,7 +325,7 @@ onMounted(() => {
   }
 
   /*
-   * Four screens do not fit beside the instrument cluster on a phone, and the
+   * The screens do not fit beside the instrument cluster on a phone, and the
    * captions were already wider than their own cells. Drop to icons and tighten
    * the cells -- every button keeps its aria-label and title, so nothing is lost
    * but the ink. Selectors outrank HexAction's own so this does not depend on
