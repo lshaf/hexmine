@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Game\Balance;
 use App\Game\GameService;
 use App\Game\WorldGen;
 use Illuminate\Console\Command;
@@ -34,14 +35,25 @@ class GenerateWorldgenFixture extends Command
 ",
         );
 
+        // Strides coprime with the map so 240 samples spread over the whole
+        // sheet, and sized from Balance rather than pinned to one map: sampling
+        // coordinates that fall off the map would leave the guard testing
+        // nothing.
+        $cols = Balance::MAP_COLS;
+        $rows = Balance::MAP_ROWS;
+
         $coords = [];
         for ($i = 0; $i < 240; $i++) {
-            $coords[] = [($i * 977) % 5000, ($i * 613 + 31) % 5000];
+            $coords[] = [($i * 977) % $cols, ($i * 613 + 31) % $rows];
         }
-        $coords[] = [2500, 2376];
-        $coords[] = [1316, 550];
+
+        // The four that have to be in every fixture: a dungeon mouth, the dead
+        // centre, and both corners.
+        $mouth = WorldGen::dungeonSites()[0];
+        $coords[] = [$mouth['col'], $mouth['row']];
+        $coords[] = [intdiv($cols, 2), intdiv($rows, 2)];
         $coords[] = [0, 0];
-        $coords[] = [4999, 4999];
+        $coords[] = [$cols - 1, $rows - 1];
 
         $lines = [];
         foreach ($coords as [$col, $row]) {

@@ -130,7 +130,13 @@ cross-map travel — same design pressure as biome-locked mining.
 ## 5. Map
 
 ### 5.1 Structure
-- Hex grid, ~5000×5000
+- Hex grid, ~5000×5000 at ship scale
+
+> **Currently set to a 500×500 test map** — `Balance::MAP_COLS/MAP_ROWS` are 500,
+> and that is the only value that differs from ship. Everything else is a
+> fraction of the map radius or an absolute hex count, so it scales on its own.
+> Ship value: 5000 × 5000.
+
 - **Exactly 2 mining slots per hex.** When both are full, the tile is closed to others.
 - Tiles are **depletable**, then **regrow after ~9h** (tune). Depleted tiles keep their
   biome color (drained, not dead) and show remnant/sapling props.

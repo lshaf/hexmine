@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
+use App\Game\Balance;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -44,8 +45,8 @@ class SettlementController extends GameController
         $character = $this->character($request);
 
         $validated = $request->validate([
-            'col' => ['required', 'integer', 'min:0', 'max:4999'],
-            'row' => ['required', 'integer', 'min:0', 'max:4999'],
+            'col' => ['required', 'integer', 'min:0', 'max:'.(Balance::MAP_COLS - 1)],
+            'row' => ['required', 'integer', 'min:0', 'max:'.(Balance::MAP_ROWS - 1)],
         ]);
 
         $travel = $this->game->travelTo($character, (int) $validated['col'], (int) $validated['row']);

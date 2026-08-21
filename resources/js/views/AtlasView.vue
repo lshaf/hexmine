@@ -34,7 +34,7 @@ const game = useGame()
 
 /*
  * Zoom is expressed as pixels per hex column, so the labels mean something: at
- * 6 you can see individual hexes, at 0.18 the 5000-column map fits a laptop.
+ * 6 you can see individual hexes, at 0.2 a whole wide map fits a laptop.
  */
 const ZOOMS = [
   { px: 6, label: 'Local' },

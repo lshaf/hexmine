@@ -23,8 +23,8 @@ final class Balance
 
     // ---------------------------------------------------------------- map §5
 
-    public const MAP_COLS = 5000;
-    public const MAP_ROWS = 5000;
+    public const MAP_COLS = 500;
+    public const MAP_ROWS = 500;
     public const MAP_SEED = 0x5eed1a3f;
 
     /** Biome lattice, §5.3. Cell size in tiles, and cells per coherent region. */

@@ -89,12 +89,25 @@ console.log(`tiles: ${lines.length} checked`)
  * brute force, so check that against the slow path over a few boxes -- one per
  * ring, since the tier a site is allowed to be depends on where it lands.
  */
+const span = Math.min(config.cols, config.rows)
+
+/**
+ * Placed as fractions of the map, not fixed coordinates: a box that falls off
+ * the edge is not a test. settlementAt() has no bounds guard and
+ * settlementMarksIn() does, so an off-map box reports every settlement in it as
+ * "missing" and drowns any real disagreement in noise.
+ */
 const BOXES = [
-  { col: 120, row: 200, w: 90, h: 90 },
-  { col: 1200, row: 1400, w: 80, h: 80 },
-  { col: 2400, row: 2400, w: 120, h: 120 },
-  { col: 3900, row: 800, w: 100, h: 100 },
-]
+  { col: 0.02, row: 0.04, w: 0.18, h: 0.18 }, // outer rim, villages
+  { col: 0.24, row: 0.28, w: 0.16, h: 0.16 }, // mid ring, cities
+  { col: 0.48, row: 0.48, w: 0.24, h: 0.24 }, // dead centre, capitals
+  { col: 0.78, row: 0.16, w: 0.2, h: 0.2 }, // the far rim
+].map((b) => ({
+  col: Math.round(b.col * span),
+  row: Math.round(b.row * span),
+  w: Math.round(b.w * span),
+  h: Math.round(b.h * span),
+}))
 
 let boxed = 0
 

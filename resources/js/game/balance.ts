@@ -18,9 +18,10 @@ export const HOUR = 60 * MINUTE
  */
 
 export const MAP = {
-  /** ~5000x5000 tiles, §5.1. */
-  cols: 5000,
-  rows: 5000,
+  /** §5.1. Server-authoritative: the client is handed cols/rows by
+   *  GET /api/world, so these are documentation, not the source of truth. */
+  cols: 500,
+  rows: 500,
   seed: 0x5eed_1a3f,
   /** Biome lattice, §5.3. Cell size in tiles, and how many cells make up one
    *  coherent region. Tuned against travel range: patches must be small enough
