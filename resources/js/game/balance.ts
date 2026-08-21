@@ -100,8 +100,41 @@ export const STORAGE = {
 } as const
 
 export const EQUIPMENT = {
-  /** Hard cap per slot regardless of rarity, §8.1 rule 1. */
-  statCap: { basic: 0.05, crafted: 0.08, nft: 0.15 } as const,
+  /**
+   * The rarity ladder, §8.1 rule 1. Rarity walks up to a single global ceiling
+   * rather than every tier sharing one: the best a stat can ever reach is
+   * `unique`, and nothing -- no future rarity, no rolled option, no buff -- may
+   * be allowed past it.
+   */
+  statCap: {
+    common: 0.03,
+    uncommon: 0.05,
+    rare: 0.08,
+    epic: 0.11,
+    legendary: 0.14,
+    unique: 0.15,
+  } as const,
+  /** The hard ceiling for the whole game. Read this, never `statCap.unique`. */
+  statCeiling: 0.15,
+  /**
+   * §8.0 -- how far up the ladder each workbench reaches. A village will never
+   * make an epic no matter what materials you carry to it, which is most of what
+   * makes a capital worth the walk. `guild` is defined but unreachable until
+   * guild halls exist (§10).
+   */
+  stationRarityCap: {
+    village: 'common',
+    city: 'uncommon',
+    capital: 'epic',
+    guild: 'legendary',
+  } as const,
+  /** Gold buys the bottom two rungs and nothing else, §3.2. */
+  shopRarityCap: 'uncommon',
+  /**
+   * §8.5 -- how long a potion holds. Buffs expire, and that expiry IS the sink
+   * (§11.1): a permanent effect would only accumulate.
+   */
+  buffMs: 30 * 60 * 1000,
   /** Diminishing returns on stacking, §8.1 rule 2: the nth item of the same
    *  stat contributes value * falloff^(n-1). */
   stackFalloff: 0.5,

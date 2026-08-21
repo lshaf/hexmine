@@ -105,8 +105,118 @@ final class Balance
 
     // ----------------------------------------------------------- equipment §8.1
 
-    /** Hard cap per slot regardless of rarity, §8.1 rule 1. */
-    public const STAT_CAP = ['basic' => 0.05, 'crafted' => 0.08, 'nft' => 0.15];
+    /**
+     * The rarity ladder, §8.1 rule 1. Rarity walks up to a single global ceiling
+     * rather than every tier sharing one: the best a stat can ever reach is
+     * `unique`, and nothing -- no future rarity, no rolled option, no buff -- may
+     * be allowed past it.
+     */
+    public const STAT_CAP = [
+        'common' => 0.03,
+        'uncommon' => 0.05,
+        'rare' => 0.08,
+        'epic' => 0.11,
+        'legendary' => 0.14,
+        'unique' => 0.15,
+    ];
+
+    /** The hard ceiling for the whole game. Read this, never `STAT_CAP['unique']`. */
+    public const STAT_CEILING = 0.15;
+
+    /** Ordered weakest-first, so a rarity can be compared against a station's reach. */
+    public const RARITIES = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'unique'];
+
+    public static function rarityRank(string $rarity): int
+    {
+        $rank = array_search($rarity, self::RARITIES, true);
+
+        return $rank === false ? 0 : $rank;
+    }
+
+    /**
+     * §8.0 -- how far up the ladder each workbench reaches. A village will never
+     * make an epic no matter what materials you carry to it, which is most of
+     * what makes a capital worth the walk.
+     *
+     * `guild` is defined but unreachable: guild halls do not exist yet (§10), and
+     * naming the gate now is what stops legendary leaking out of a capital.
+     */
+    public const STATION_RARITY_CAP = [
+        'village' => 'common',
+        'city' => 'uncommon',
+        'capital' => 'epic',
+        'guild' => 'legendary',
+    ];
+
+    /** Gold buys the bottom two rungs and nothing else, §3.2. */
+    public const SHOP_RARITY_CAP = 'uncommon';
+
+    // -------------------------------------------------------------- options §8.0.1
+
+    /**
+     * How many bonus lines each rung rolls. Uncommon is the only one that may
+     * roll nothing, which is what makes an uncommon with a line feel found
+     * rather than issued.
+     */
+    public const OPTION_ROLLS = [
+        'common' => 0,
+        'uncommon' => 1,
+        'rare' => 1,
+        'epic' => 2,
+        'legendary' => 3,
+        'unique' => 3,
+    ];
+
+    /** Chance each of an uncommon's slots actually fills. Higher rungs always do. */
+    public const OPTION_CHANCE_UNCOMMON = 0.5;
+
+    /**
+     * A rolled line is worth 1-3%. Small on purpose: options are variety, not a
+     * second power ladder, and they are clamped by STAT_CEILING like everything
+     * else (§8.1 rule 1).
+     */
+    public const OPTION_MIN = 0.01;
+
+    public const OPTION_MAX = 0.03;
+
+    /**
+     * The capital bazaar, §8.0.1. A capital stocks the same common and uncommon
+     * goods as a city -- its edge is that some of that stock comes pre-rolled,
+     * even at common, which is the one place a common item can carry a line.
+     */
+    public const CAPITAL_SHOP_OPTION_CHANCE = 0.5;
+
+    // --------------------------------------------------------- consumables §8.5
+
+    /**
+     * Buffs expire, and that is the sink (§11.1). A consumable with a permanent
+     * effect would only accumulate, which the design's north star forbids
+     * outright -- if a potion is ever made permanent, it stops being a sink and
+     * becomes another power ladder.
+     */
+    public const BUFF_MS = 30 * self::MINUTE;
+
+    /** How many of one potion a character may hold. Stops hoarding a stat. */
+    public const CONSUMABLE_STACK_CAP = 20;
+
+    public static function stationReaches(string $stationTier, string $rarity): bool
+    {
+        $reach = self::STATION_RARITY_CAP[$stationTier] ?? 'common';
+
+        return self::rarityRank($rarity) <= self::rarityRank($reach);
+    }
+
+    /** The smallest station that can make this rarity, or null if none can. */
+    public static function stationForRarity(string $rarity): ?string
+    {
+        foreach (self::STATION_RARITY_CAP as $tier => $reach) {
+            if (self::rarityRank($rarity) <= self::rarityRank($reach)) {
+                return $tier;
+            }
+        }
+
+        return null;
+    }
 
     /** Diminishing returns on stacking, §8.1 rule 2. */
     public const STACK_FALLOFF = 0.5;

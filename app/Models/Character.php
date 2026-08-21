@@ -52,6 +52,18 @@ class Character extends Model
         return $this->hasMany(CharacterItem::class);
     }
 
+    /** §8.5 -- stackable, never equipped. */
+    public function consumables(): HasMany
+    {
+        return $this->hasMany(CharacterConsumable::class);
+    }
+
+    /** §8.5 -- timed effects. Expiry is compared, never ticked. */
+    public function buffs(): HasMany
+    {
+        return $this->hasMany(CharacterBuff::class);
+    }
+
     public function jobs(): HasMany
     {
         return $this->hasMany(GameJob::class);

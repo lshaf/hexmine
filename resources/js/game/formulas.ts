@@ -9,7 +9,7 @@
 import { CHARACTER, EQUIPMENT, MINING, PROCESSING, SKILLS } from './balance'
 import { ITEM_BY_KEY, skillForSlot } from './catalog'
 import type {
-  EquipTier,
+  Rarity,
   ItemDef,
   OwnedItem,
   SettlementTier,
@@ -39,28 +39,38 @@ export function aggregateStat(
   stat: StatKey,
   line: SkillKey | null = null,
 ): number {
-  const contributions = items
-    .filter((it) => it.equipped && it.durability > 0)
-    .map((it) => ITEM_BY_KEY[it.key])
-    .filter((def): def is ItemDef => Boolean(def) && def.stat === stat)
-    .filter((def) => {
-      const toolLine = skillForSlot(def.slot)
-      return toolLine === null || toolLine === line
-    })
+  // §8.0.1 -- a rolled line is just another contributor: same falloff, same cap,
+  // and it inherits its item's line-lock, which is what stops five equipped
+  // tools stacking five copies of the same bonus.
+  const contributions: Array<{ def: ItemDef; value: number }> = []
+
+  for (const owned of items) {
+    if (!owned.equipped || owned.durability <= 0) continue
+    const def = ITEM_BY_KEY[owned.key]
+    if (!def) continue
+
+    const toolLine = def.slot ? skillForSlot(def.slot) : null
+    if (toolLine !== null && toolLine !== line) continue
+
+    if (def.stat === stat) contributions.push({ def, value: def.value })
+    for (const option of owned.options ?? []) {
+      if (option.stat === stat) contributions.push({ def, value: option.value })
+    }
+  }
 
   if (contributions.length === 0) return 0
 
   const total = contributions
-    .map((def) => def.value)
+    .map((c) => c.value)
     .sort((a, b) => b - a)
     .reduce((sum, value, index) => sum + value * EQUIPMENT.stackFalloff ** index, 0)
 
-  const bestTier = contributions.reduce<EquipTier>(
-    (best, def) => (EQUIPMENT.statCap[def.tier] > EQUIPMENT.statCap[best] ? def.tier : best),
-    'basic',
+  const best = contributions.reduce<Rarity>(
+    (top, c) => (EQUIPMENT.statCap[c.def.rarity] > EQUIPMENT.statCap[top] ? c.def.rarity : top),
+    'common',
   )
 
-  return Math.min(total, EQUIPMENT.statCap[bestTier])
+  return Math.min(total, EQUIPMENT.statCap[best])
 }
 
 /** Salvage returned when an item is discarded, §8.2. */
@@ -75,7 +85,7 @@ export function salvageYield(def: ItemDef): Partial<Record<string, number>> {
 
 /** Repair cost, §8.2: cheaper than crafting new, but not dramatically so. */
 export function repairCost(def: ItemDef, missingDurability: number): Record<string, number> {
-  const fraction = missingDurability / def.maxDurability
+  const fraction = missingDurability / (def.maxDurability ?? 1)
   const out: Record<string, number> = {}
   for (const [key, qty] of Object.entries(def.inputs ?? {})) {
     const amount = Math.ceil((qty as number) * fraction * EQUIPMENT.repairCostRate)
@@ -113,7 +123,7 @@ export function tripTime(
   const skillProgress = Math.min(1, skillLevel / SKILLS.maxLevel)
   const skillReduction = Math.round(MINING.maxSkillReductionSeconds * skillProgress)
 
-  const equipProgress = Math.min(1, equipTripReduction / EQUIPMENT.statCap.nft)
+  const equipProgress = Math.min(1, equipTripReduction / EQUIPMENT.statCeiling)
   const equipReduction = Math.round(MINING.maxEquipReductionSeconds * equipProgress)
 
   const raw = baseSeconds - skillReduction - equipReduction

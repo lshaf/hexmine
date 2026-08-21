@@ -22,8 +22,10 @@ final class Formulas
      * contributor is worth value * falloff^(n-1). This is what stops a whale
      * buying three identical bundles for linear scaling.
      *
-     * Rule 1 -- the total is then clamped to the hard ceiling of the best tier
-     * present, so rarity buys durability and reliability, not power.
+     * Rule 1 -- the total is then clamped to the ceiling of the best *rarity*
+     * present. Rarity climbs toward a single global ceiling (Balance::STAT_CEILING)
+     * and nothing may pass it: not a future rarity, not a rolled option, not a
+     * buff. That ceiling is what keeps a whale within reach of a grinder.
      *
      * §8 gathering tools are line-locked: a bow does nothing to a tree. A tool
      * counts only when `$line` is the skill line it serves, so passing null --
@@ -35,25 +37,48 @@ final class Formulas
     public static function aggregateStat(array $items, string $stat, ?string $line = null): float
     {
         $values = [];
-        $bestCap = Balance::STAT_CAP['basic'];
+        $bestCap = Balance::STAT_CAP['common'];
         $found = false;
 
         foreach ($items as $item) {
             if (! $item['equipped'] || $item['durability'] <= 0) {
                 continue;
             }
+            // Not filtered on the base stat here: §8.0.1 lets an item reach a
+            // stat it was never built for, through a rolled line.
             $def = Catalog::item($item['key']);
-            if ($def === null || $def['stat'] !== $stat) {
+            if ($def === null) {
                 continue;
             }
-            $toolLine = Catalog::skillForSlot($def['slot']);
+            $toolLine = Catalog::skillForSlot($def['slot'] ?? '');
             if ($toolLine !== null && $toolLine !== $line) {
                 continue;
             }
 
-            $values[] = $def['value'];
+            // §8.0.1 -- a rolled line is just another contributor. It goes into
+            // the same falloff and under the same cap, so options can add
+            // variety without ever becoming a second power ladder. Note they
+            // inherit the line-lock from their item, which is what stops five
+            // equipped tools stacking five copies of the same bonus.
+            $contributions = [];
+            if ($def['stat'] === $stat) {
+                $contributions[] = $def['value'];
+            }
+            foreach ($item['options'] ?? [] as $option) {
+                if (($option['stat'] ?? null) === $stat) {
+                    $contributions[] = (float) $option['value'];
+                }
+            }
+
+            if ($contributions === []) {
+                continue;
+            }
+
+            foreach ($contributions as $value) {
+                $values[] = $value;
+            }
             $found = true;
-            $cap = Balance::STAT_CAP[$def['tier']];
+            $cap = Balance::STAT_CAP[$def['rarity']];
             if ($cap > $bestCap) {
                 $bestCap = $cap;
             }
@@ -71,6 +96,56 @@ final class Formulas
         }
 
         return min($total, $bestCap);
+    }
+
+    /**
+     * §8.0.1 -- roll an item's bonus lines.
+     *
+     * Seeded rather than random so an outcome can be reproduced from its inputs,
+     * the same way §16 treats every other roll in the game. `$extra` is the
+     * capital bazaar's bonus slot, which is the one way a common item ever
+     * carries a line.
+     *
+     * @return array<int,array{stat:string,value:float}>
+     */
+    public static function rollOptions(array $def, int $seed, int $extra = 0): array
+    {
+        $slots = (Balance::OPTION_ROLLS[$def['rarity']] ?? 0) + $extra;
+        if ($slots <= 0) {
+            return [];
+        }
+
+        $pool = Catalog::optionStatsFor($def['slot'] ?? '');
+        $out = [];
+        $used = [];
+
+        for ($i = 0; $i < $slots; $i++) {
+            // Uncommon may come up empty; everything above it always fills.
+            if ($def['rarity'] === 'uncommon' && $i < Balance::OPTION_ROLLS['uncommon']) {
+                if (Hash::rand01(Hash::hash2($seed, 900 + $i, Balance::MAP_SEED)) >= Balance::OPTION_CHANCE_UNCOMMON) {
+                    continue;
+                }
+            }
+
+            // One line per stat: two "+2% yield" rows on one item reads as a bug.
+            $choices = array_values(array_diff($pool, $used));
+            if ($choices === []) {
+                break;
+            }
+
+            $pick = $choices[Hash::randInt(Hash::hash2($seed, 910 + $i, Balance::MAP_SEED), 0, count($choices) - 1)];
+            $used[] = $pick;
+
+            $steps = (int) round((Balance::OPTION_MAX - Balance::OPTION_MIN) * 100);
+            $roll = Hash::randInt(Hash::hash2($seed, 920 + $i, Balance::MAP_SEED), 0, $steps);
+
+            $out[] = [
+                'stat' => $pick,
+                'value' => round(Balance::OPTION_MIN + $roll / 100, 2),
+            ];
+        }
+
+        return $out;
     }
 
     /** Salvage returned when an item is discarded, §8.2. */
@@ -118,7 +193,7 @@ final class Formulas
         $skillProgress = min(1.0, $skillLevel / Balance::SKILL_MAX_LEVEL);
         $skillReduction = (int) round(Balance::MINING_MAX_SKILL_REDUCTION * $skillProgress);
 
-        $equipProgress = min(1.0, $equipTripReduction / Balance::STAT_CAP['nft']);
+        $equipProgress = min(1.0, $equipTripReduction / Balance::STAT_CEILING);
         $equipReduction = (int) round(Balance::MINING_MAX_EQUIP_REDUCTION * $equipProgress);
 
         $raw = $baseSeconds - $skillReduction - $equipReduction;

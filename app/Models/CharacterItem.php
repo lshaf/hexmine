@@ -8,7 +8,12 @@ use Illuminate\Database\Eloquent\Model;
 
 class CharacterItem extends Model
 {
-    protected $fillable = ['character_id', 'item_key', 'durability', 'equipped'];
+    protected $fillable = ['character_id', 'item_key', 'durability', 'equipped', 'options'];
 
-    protected $casts = ['durability' => 'integer', 'equipped' => 'boolean'];
+    /** §8.0.1 -- `options` is the rolled bonus lines, a list of {stat, value}. */
+    protected $casts = [
+        'durability' => 'integer',
+        'equipped' => 'boolean',
+        'options' => 'array',
+    ];
 }

@@ -11,6 +11,7 @@
  *     invite desync; an idle game with long timers cannot afford it.
  */
 import type {
+  ActiveBuff,
   Job,
   MaterialKey,
   OwnedItem,
@@ -102,6 +103,10 @@ export interface PlayerState {
   bonuses: Record<StatKey, number>
   /** What each line's equipped tool is worth on its own trips, §8. */
   toolYield: Record<SkillKey, number>
+  /** §8.5 -- potions on the shelf, keyed by item. */
+  consumables: Record<string, number>
+  /** §8.5 -- effects running right now. Expiry is a server-clock deadline. */
+  buffs: ActiveBuff[]
 }
 
 /** Server-computed preview of what a trip on this tile would cost and give. */
@@ -196,6 +201,13 @@ export interface GameApi {
   unequipItem(ownedId: string): Promise<ActionResult<null>>
   repairItem(ownedId: string): Promise<ActionResult<null>>
   discardItem(ownedId: string): Promise<ActionResult<null>>
+  /** §11.1 -- tip materials out. Nothing comes back; you are buying room. */
+  discardMaterial(
+    material: MaterialKey,
+    quantity: number,
+  ): Promise<ActionResult<{ dropped: number }>>
+  /** §8.5 -- drink one, starting a timed buff. */
+  useConsumable(item: string): Promise<ActionResult<ActiveBuff>>
 }
 
 export class ApiError extends Error {

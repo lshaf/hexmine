@@ -26,7 +26,7 @@ structured so botting is *economically pointless* rather than technically preven
 |---|---|
 | No grind→NFT faucet | NFTs are **never** dropped by mining or raiding. Only bought/traded on marketplace or crafted from capped rare mats. |
 | No P2P resource trade | Direct player-to-player resource transfer does **not exist**. Removes the laundering/arbitrage vector entirely. |
-| Gold has no NFT bridge | Gold buys *basic* items only. Gold can never be converted to NFT value. |
+| Gold has no NFT bridge | Gold buys *common and uncommon* only. Gold can never be converted to NFT value. |
 | Sybil cost | One-time character mint fee per wallet + **wallet must hold a minimum crypto balance for ≥7 continuous days** before it can act. |
 | Soft caps | Storage caps, per-wallet rare-material caps, AP regen limits. A bot with 1000 wallets gets 1000× capped, non-liquid output. |
 | Server authority | All timers are **server-side**. Client never asserts elapsed time. |
@@ -50,7 +50,7 @@ The three currencies are strictly separated. No backdoor converts one into anoth
 - **In-game only**, NPC-facing, freely inflatable/deflatable by design (no on-chain consequence)
 - Faucets: selling excess resources to NPC (deliberately bad rate), monster gold drops, quests/dailies
 - Sinks: NPC repair, basic equipment, settlement upgrades, **guild capital bidding** (largest sink)
-- Buys **basic tier items only** — never convertible to NFT
+- Buys **common and uncommon only** (§8.0) — never convertible to NFT
 
 ### 3.3 NFT
 - The *only* externally tradeable value
@@ -235,11 +235,51 @@ future buff/equipment tier creates a sub-30 or zero-time exploit.
 
 ## 8. Equipment
 
-| Tier | Source | Materials | Stat ceiling |
-|---|---|---|---|
-| Basic | Gold (NPC shop) | none | +3–5% |
-| Crafted | Player crafting | Tier 1–2 | +6–8% |
-| NFT | Marketplace / rare crafting | Tier 3 + Tier 4 | +12–15% (hard cap) |
+Equipment has **two axes that are not the same thing**, and conflating them is the
+easiest way to break the economy:
+
+- **Rarity** — six rungs, sets the power ceiling, the colour, and where the thing
+  can be made.
+- **Tradeable** — whether it is an NFT (§3.3). Not implied by rarity.
+
+### 8.0 The rarity ladder
+
+| Rarity | Colour | Stat ceiling | Option rolls | Bench | Shop | Tradeable |
+|---|---|---|---|---|---|---|
+| Common | grey | +3% | 0 | village | village+ | no |
+| Uncommon | green | +5% | 0–1 | city | city+ | no |
+| Rare | blue | +8% | 1 | capital | never | no |
+| Epic | violet | +11% | 2 | capital | never | **yes** |
+| Legendary | gold | +14% | 3 | guild hall | never | **yes** |
+| Unique | ember | +15% | 3 + fixed perk | never | never | no — soulbound |
+
+**+15% is the hard ceiling for the whole game.** Rarity climbs toward it; nothing
+— no future rarity, no rolled option, no buff — may pass it. Read
+`Balance::STAT_CEILING`, never the top rung.
+
+**A bench reaches exactly as far as its tier**, whatever materials you carry to
+it: village → common, city → uncommon, capital → rare and epic, guild hall →
+legendary. That is most of what makes a capital worth the walk.
+
+Gold buys **common and uncommon only**, at any settlement tier. A capital's shop
+edge over a city is *options*, not rarity (§8.0.1).
+
+**Unique is soulbound, and that is not negotiable.** It is the strongest thing in
+the game and it drops from dungeons — §2 forbids a grind→NFT faucet, so a
+tradeable drop would be exactly the hole the threat model exists to close.
+Tradeability stops at legendary. Unique is prestige, not liquidity.
+
+### 8.0.1 Options — rolled bonus lines
+
+Higher rarities roll extra stat lines when made or bought, so two of the same item
+are never identical. Counts are in the table above.
+
+- Rolled **server-side** from a seed, like every other outcome.
+- Small values (+1–3%), drawn from the same `StatKey` pool.
+- **Options are inside the ceiling, not on top of it.** They feed the same
+  aggregate and clamp as the base stat. An option that breached the cap would
+  reintroduce pay-to-win through the back door.
+- The capital shop sometimes stocks pre-rolled goods. Villages and cities never do.
 
 ### 8.0 Slots — a gathering tool per line, and combat kept separate
 
@@ -274,15 +314,17 @@ Rules, all mandatory:
    *(Raid combat is not yet designed — see §14.2. The slot exists and stays empty.)*
 
 ### 8.1 Anti-imbalance rules (all mandatory)
-1. **Hard % cap per slot** regardless of rarity. Rarity changes *durability and reliability*,
-   not the power ceiling.
+1. **One global % ceiling per stat**, +15%, and rarity climbs toward it. Nothing may
+   pass it: not a rarity, not an option roll, not a buff, not a future tier. The
+   ceiling is the load-bearing rule — rarity is only how far up you have climbed.
 2. **Diminishing returns on stacking** — a 2nd yield item gives less than the 1st. Blocks
    buying 3 identical bundles for linear scaling.
 3. **Durability decays with use** (raiding drains faster than mining). Equipment is never
    "buy once, dominate forever."
-4. NFT gear and best gold/crafted gear sit on the **same capped power curve**, differing in
-   acquisition speed and durability cost. This is what keeps F2P viable — and F2P viability
-   is what sustains the active playerbase that drives NFT demand.
+4. The gap from common to unique is **12 points, not an order of magnitude**, and every
+   rarity below unique is reachable by crafting without spending. That is what keeps F2P
+   viable — and F2P viability is what sustains the active playerbase that drives NFT
+   demand. If a change widens that gap, it is wrong.
 
 ### 8.2 Repair vs discard
 - At 0 durability equipment becomes **broken/inactive**, not destroyed
@@ -327,6 +369,35 @@ Beastfang Bow     = 3 Beastfang + 2 Silkweave + 1 Sanguine Shard          [NFT]
 Every NFT tool wants its line's rare material **and** its line's dungeon shard, so
 kitting out a second line is a cross-map project, not a shopping trip — the same
 pressure §4 puts on Shards.
+
+### 8.4 Three craft benches
+
+Crafting is split into **weapon**, **armor** and **consumable**. The category is
+derived from the slot, never stored: a thing's category is already implied by
+where it is worn, and a second field would only be somewhere for the two to
+disagree.
+
+| Category | Slots | Notes |
+|---|---|---|
+| Weapon | axe · pickaxe · bow · hammer · sickle · weapon | The five gathering tools plus the dormant raid slot |
+| Armor | armor · boots · gloves | Worn gear, never line-locked |
+| Consumable | *none* | Having no slot is exactly what makes it the third category |
+
+### 8.5 Consumables — potions and buffs
+
+- **Stackable, never equipped.** They live in their own table, not with
+  equipment: a potion has no durability and no slot, so a row per object would
+  be wrong.
+- Using one spends it and starts a **timed buff** on one stat.
+- **Buffs expire, and that expiry is the sink** (§11.1). Nothing here may ever be
+  permanent — a permanent effect only accumulates, which the north star forbids.
+- **One buff per stat.** A second of the same kind refreshes the clock rather
+  than stacking, or a player could bank an afternoon of potions into one window.
+- Buffs feed the same aggregate as gear and are **clamped by the same ceiling**.
+  A potion that could push a stat past `STAT_CEILING` would be a power ladder
+  you can drink.
+- Expiry is an absolute server-clock deadline, compared and never ticked — an
+  hour offline and an hour idle must produce the same result (§16).
 
 ---
 
@@ -459,11 +530,17 @@ nothing else.
 | Axis | Encoding |
 |---|---|
 | Equipment slot | One base silhouette (axe, pickaxe, bow, hammer, sickle, armor, boots, gloves, weapon) |
-| Tier | Fill treatment: flat grey (basic) → solid color (crafted) → gradient + border glow (NFT) |
-| Material | Accent color: wood=brown, iron=steel, pelt=tan, stone=slate, fiber=cream |
-| Rarity | Hex-shaped border frame, ornamentation increases per tier |
+| Rarity | Six colours: grey → green → blue → violet → gold → ember. Owns the hex frame and the glow; ornamentation starts at rare. |
+| Material | Accent stays on the body, so "what it is made of" and "how good it is" never compete for the same colour |
 
 ### 13.2 Map rendering (critical implementation notes)
+
+**Settlement tiers are told apart by shape category, not by size.** At a 58x34 hex
+you often see only one settlement, so there is nothing to compare a height
+against. Village is a *scatter* of unaligned huts, city is an *enclosure* — a wide
+toothed wall with a gate — and capital is a *spire* with a gold pennant. Keep that
+distinction categorical if these are ever redrawn.
+
 The working approach, after several failed attempts:
 
 - **Bake the tilt into the geometry.** Hexes are drawn squashed (58×34 px, not equilateral)

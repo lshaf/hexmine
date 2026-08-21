@@ -64,7 +64,7 @@ const equipped = computed(() => {
   for (const item of game.equipment) {
     if (!item.equipped) continue
     const def = ITEM_BY_KEY[item.key]
-    if (def) map[def.slot] = item
+    if (def?.slot) map[def.slot] = item
   }
   return map
 })
@@ -78,7 +78,7 @@ const skillPointsUsed = computed(() =>
 const def = (item: OwnedItem) => ITEM_BY_KEY[item.key]!
 
 const durabilityPercent = (item: OwnedItem) =>
-  (item.durability / def(item).maxDurability) * 100
+  (item.durability / (def(item).maxDurability ?? 1)) * 100
 
 /** Yield is missing on purpose: §8 makes it a number per line, not one number. */
 const statKeys: StatKey[] = ['tripReduction', 'travelSpeed', 'processingSpeed']
@@ -138,7 +138,7 @@ const statKeys: StatKey[] = ['tripReduction', 'travelSpeed', 'processingSpeed']
           <SvgIcon
             :svg="itemIcon({
               slot: def(equipped[slot.key]!).slot,
-              tier: def(equipped[slot.key]!).tier,
+              rarity: def(equipped[slot.key]!).rarity,
               palette: def(equipped[slot.key]!).palette,
               size: 30,
             })"
@@ -147,11 +147,23 @@ const statKeys: StatKey[] = ['tripReduction', 'travelSpeed', 'processingSpeed']
           />
           <div class="grow">
             <div class="row-between">
-              <strong class="tiny">{{ def(equipped[slot.key]!).name }}</strong>
-              <span class="chip tiny" :class="def(equipped[slot.key]!).tier === 'nft' ? 'chip-nft' : ''">
+              <strong class="tiny" :class="`rarity-${def(equipped[slot.key]!).rarity}`">{{ def(equipped[slot.key]!).name }}</strong>
+              <span class="chip tiny" :class="def(equipped[slot.key]!).tradeable ? 'chip-nft' : ''">
                 {{ formatPercent(def(equipped[slot.key]!).value) }}
               </span>
             </div>
+            <!-- §8.0.1 -- rolled lines. Listed under the base stat because that
+                 is what they are: extra, on top of what the item is for. -->
+            <div v-if="equipped[slot.key]!.options?.length" class="rolled">
+              <span
+                v-for="(option, i) in equipped[slot.key]!.options"
+                :key="i"
+                class="tiny mono roll"
+              >
+                {{ formatPercent(option.value) }} {{ STAT_LABEL[option.stat] }}
+              </span>
+            </div>
+
             <div class="row" style="gap: 7px; margin-top: 5px">
               <div class="bar grow" :class="durabilityPercent(equipped[slot.key]!) < 25 ? 'bar-ember' : ''">
                 <span :style="{ width: `${durabilityPercent(equipped[slot.key]!)}%` }" />
@@ -202,13 +214,13 @@ const statKeys: StatKey[] = ['tripReduction', 'travelSpeed', 'processingSpeed']
       <h3 class="head" style="margin-bottom: 8px">Stowed</h3>
       <div v-for="item in stowed" :key="item.id" class="slot-row">
         <SvgIcon
-          :svg="itemIcon({ slot: def(item).slot, tier: def(item).tier, palette: def(item).palette, size: 30 })"
+          :svg="itemIcon({ slot: def(item).slot, rarity: def(item).rarity, palette: def(item).palette, size: 30 })"
           boxed
           :size="30"
         />
         <div class="grow">
           <div class="row-between">
-            <strong class="tiny">{{ def(item).name }}</strong>
+            <strong class="tiny" :class="`rarity-${def(item).rarity}`">{{ def(item).name }}</strong>
             <span class="tiny mono muted">{{ item.durability }}/{{ def(item).maxDurability }}</span>
           </div>
           <div class="tiny muted">
@@ -216,6 +228,11 @@ const statKeys: StatKey[] = ['tripReduction', 'travelSpeed', 'processingSpeed']
               Broken — inactive until repaired, never destroyed.
             </template>
             <template v-else>{{ formatPercent(def(item).value) }} {{ STAT_LABEL[def(item).stat] }}</template>
+          </div>
+          <div v-if="item.options?.length" class="rolled">
+            <span v-for="(option, i) in item.options" :key="i" class="tiny mono roll">
+              {{ formatPercent(option.value) }} {{ STAT_LABEL[option.stat] }}
+            </span>
           </div>
         </div>
         <div class="row-actions">
@@ -355,6 +372,22 @@ const statKeys: StatKey[] = ['tripReduction', 'travelSpeed', 'processingSpeed']
 
 .line-cell.bare {
   opacity: 0.5;
+}
+
+/* Rolled lines sit apart from the base stat and read as a set, so two items of
+   the same recipe can be compared at a glance. */
+.rolled {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 5px;
+}
+
+.roll {
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  background: #1c2519;
+  color: #b7d6a4;
 }
 
 .slot-row {

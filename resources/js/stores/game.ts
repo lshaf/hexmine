@@ -175,6 +175,9 @@ export const useGame = defineStore('game', () => {
   const bonuses = computed(() => state.value?.bonuses ?? null)
   /** §8 -- yield is per gathering line now, never one number. */
   const toolYield = computed(() => state.value?.toolYield ?? null)
+  /** §8.5 -- the shelf and what is running off it. */
+  const consumables = computed(() => state.value?.consumables ?? {})
+  const buffs = computed(() => state.value?.buffs ?? [])
   const jobs = computed<Job[]>(() => state.value?.jobs ?? [])
 
   /**
@@ -428,6 +431,16 @@ export const useGame = defineStore('game', () => {
     await act(() => api.discardItem(ownedId), 'info')
   }
 
+  /** §11.1 -- tip materials out to make room. Nothing comes back for them. */
+  async function discardMaterial(material: MaterialKey, quantity: number): Promise<void> {
+    await act(() => api.discardMaterial(material, quantity), 'info')
+  }
+
+  /** §8.5 -- drink a potion, starting a timed buff. */
+  async function drink(item: string): Promise<void> {
+    await act(() => api.useConsumable(item))
+  }
+
   function openPanel(next: PanelKey): void {
     panel.value = next
   }
@@ -441,6 +454,7 @@ export const useGame = defineStore('game', () => {
     state, station, preview, panel, selected, busy, booted, log, now, view, tiles,
     // derived
     character, timeScale, inventory, equipment, skills, bonuses, toolYield, jobs, readyJobs,
+    consumables, buffs,
     activeJobs, miningJob, processingJob, underfoot, selectedTile,
     currentSettlement, shopStock, travelRange,
     travel, travelProgress, travelHexesWalked, travelRemainingMs,
@@ -451,7 +465,7 @@ export const useGame = defineStore('game', () => {
     boot, setView, setViewport, centreOnCharacter, refreshMutations, refreshState,
     select, clearSelection,
     startMining, collect, abandon, travelTo, cancelTravel, startProcessing, buy,
-    sell, craft, equip, unequip, repair, discard, openPanel, closePanel,
+    sell, craft, equip, unequip, repair, discard, discardMaterial, drink, openPanel, closePanel,
     openStation, closeStation,
   }
 })

@@ -12,8 +12,8 @@
  *   material -> accent colour
  *   rarity   -> hex frame, ornamentation grows per tier
  */
-import { GOLD, MATERIAL_PALETTE, TIER_TREATMENT, VELLUM_DIM, shade } from '@/theme/palette'
-import type { EquipSlot, EquipTier, Material, MaterialTier } from '@/game/types'
+import { GOLD, MATERIAL_PALETTE, RARITY_TREATMENT, VELLUM_DIM, shade } from '@/theme/palette'
+import type { EquipSlot, Material, MaterialTier, Rarity } from '@/game/types'
 
 const VIEW = 40
 const C = VIEW / 2
@@ -31,7 +31,9 @@ const nextId = () => `g${++gradientSeq}`
  * always drawn in `edge`, the working head in `fill`, so the material accent
  * always lands on the part that meets the ground.
  */
-const SILHOUETTE: Record<EquipSlot, (fill: string, edge: string) => string> = {
+type IconShape = EquipSlot | 'potion'
+
+const SILHOUETTE: Record<IconShape, (fill: string, edge: string) => string> = {
   // Woodcutting. A bearded bit hung off one side of the haft: the beard hooking
   // low is what stops it reading as a symmetrical lens.
   axe: (fill, edge) => `
@@ -99,6 +101,16 @@ const SILHOUETTE: Record<EquipSlot, (fill: string, edge: string) => string> = {
     <rect x="12.5" y="26" width="15" height="2.6" rx="1.2" fill="${edge}"/>
     <rect x="18.6" y="28.6" width="2.8" height="6" rx="1.2" fill="${edge}"/>
     <circle cx="20" cy="34" r="1.9" fill="${edge}"/>`,
+
+  // §8.5 consumables. A round bulb -- the only closed curve in the set, and the
+  // only shape with no handle, because a potion is the one thing you do not hold
+  // to work with.
+  potion: (fill, edge) => `
+    <rect x="17.2" y="4.4" width="5.6" height="3.6" rx="1.2" fill="${edge}"/>
+    <rect x="18" y="7.6" width="4" height="8" fill="${edge}"/>
+    <path d="M18 15.4 Q9.6 19.6 9.6 25.6 Q9.6 33.4 20 33.4 Q30.4 33.4 30.4 25.6 Q30.4 19.6 22 15.4 Z"
+          fill="${fill}" stroke="${edge}" stroke-width="1.2" stroke-linejoin="round"/>
+    <path d="M11.4 23.6 Q20 26.4 28.6 23.6" fill="none" stroke="${edge}" stroke-width="1"/>`,
 }
 
 // -------------------------------------------------------------- hex framing
@@ -132,28 +144,38 @@ function hexFrame(stroke: string, ornate: boolean): string {
 // ------------------------------------------------------------------ public
 
 export interface IconOptions {
-  slot: EquipSlot
-  tier: EquipTier
+  /** Absent for consumables (§8.5), which have no slot and draw as a flask. */
+  slot?: EquipSlot
+  rarity: Rarity
   palette: keyof typeof MATERIAL_PALETTE
   size?: number
 }
 
-/** Full SVG markup for an equipment icon. */
-export function itemIcon({ slot, tier, palette, size = 40 }: IconOptions): string {
-  const treatment = TIER_TREATMENT[tier]
+/**
+ * Full SVG markup for an equipment icon.
+ *
+ * Two colours are doing two different jobs and must not be confused: the
+ * **material accent** says what the thing is made of, the **rarity colour** says
+ * how good it is. Rarity owns the frame and the glow, because that is what a
+ * player scans a list for; the material keeps the body.
+ *
+ * `common` is the exception -- it takes the rarity grey for its body too, so the
+ * cheapest gear looks like what it is no matter what it is made of.
+ */
+export function itemIcon({ slot, rarity, palette, size = 40 }: IconOptions): string {
+  const treatment = RARITY_TREATMENT[rarity]
   const accent = MATERIAL_PALETTE[palette]
   const id = nextId()
 
   let fill: string
   let defs = ''
 
-  if (tier === 'basic') {
-    // Flat grey: basic gear should look like what it is.
+  if (rarity === 'common') {
     fill = treatment.fill
-  } else if (tier === 'crafted') {
+  } else if (!treatment.glow) {
     fill = accent
   } else {
-    // NFT: gradient plus a border glow, §13.1.
+    // Epic and up: gradient body plus a border glow, §13.1.
     defs = `<defs>
       <linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1">
         <stop offset="0%" stop-color="${shade(accent, 0.34)}"/>
@@ -168,13 +190,13 @@ export function itemIcon({ slot, tier, palette, size = 40 }: IconOptions): strin
     fill = `url(#${id})`
   }
 
-  const edge = tier === 'nft' ? GOLD : shade(tier === 'basic' ? treatment.fill : accent, -0.42)
-  const frame = hexFrame(tier === 'nft' ? GOLD : tier === 'crafted' ? shade(accent, 0.1) : '#5a625c', tier !== 'basic')
-  const body = SILHOUETTE[slot](fill, edge)
+  const edge = shade(rarity === 'common' ? treatment.fill : accent, -0.42)
+  const frame = hexFrame(treatment.color, treatment.ornate)
+  const body = SILHOUETTE[slot ?? 'potion'](fill, edge)
 
   return `<svg viewBox="0 0 ${VIEW} ${VIEW}" width="${size}" height="${size}" role="img" aria-hidden="true">
     ${defs}${frame}
-    <g${tier === 'nft' ? ` filter="url(#${id}f)"` : ''}>${body}</g>
+    <g${treatment.glow ? ` filter="url(#${id}f)"` : ''}>${body}</g>
   </svg>`
 }
 

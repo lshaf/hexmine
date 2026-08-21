@@ -20,6 +20,8 @@
  *   POST   /api/settlements/{settlement}/processing   {recipe,batches}
  *   POST   /api/travel                        {col,row}
  *   DELETE /api/travel
+ *   POST   /api/inventory/discards            {material,quantity}
+ *   POST   /api/inventory/drinks              {item}
  *   POST   /api/shop/purchases                {item}
  *   POST   /api/shop/sales                    {material,quantity}
  *   POST   /api/crafting                      {item}
@@ -40,7 +42,7 @@ import type {
 } from './types'
 import type { WorldConfig } from '@/game/worldgen'
 import { ApiError } from './types'
-import type { Job, MaterialKey, OwnedItem, TravelState } from '@/game/types'
+import type { ActiveBuff, Job, MaterialKey, OwnedItem, TravelState } from '@/game/types'
 
 const BASE = '/api'
 
@@ -170,5 +172,13 @@ export class HttpDriver implements GameApi {
 
   discardItem(ownedId: string): Promise<ActionResult<null>> {
     return del<ActionResult<null>>(`/equipment/${ownedId}`)
+  }
+
+  discardMaterial(material: MaterialKey, quantity: number) {
+    return post<ActionResult<{ dropped: number }>>('/inventory/discards', { material, quantity })
+  }
+
+  useConsumable(item: string) {
+    return post<ActionResult<ActiveBuff>>('/inventory/drinks', { item })
   }
 }

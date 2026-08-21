@@ -94,44 +94,120 @@ function herd(x: number, y: number): string {
 
 // ------------------------------------------------------------- settlements
 
+/*
+ * The three settlement tiers, §6.
+ *
+ * These have to be told apart while the map is moving, at roughly 40px inside a
+ * 58x34 hex, often with only one of them on screen -- so size cannot be the
+ * signal. You cannot compare a height against a settlement that is not there.
+ *
+ * Each tier gets a different *kind* of shape instead:
+ *
+ *   village   scatter      loose huts, unaligned, no enclosing line -> dots
+ *   city      enclosure    a wide crenellated wall with a gate      -> a toothed bar
+ *   capital   spire        one dominant vertical with a pennant     -> a tall mark
+ *
+ * That is a categorical difference, not a quantitative one, which is why it
+ * survives being small. Pale walls do the other half of the work: nothing
+ * organic on this map is near vellum, so masonry reads as human-made instantly.
+ */
 const ROOF = '#8f4f3c'
 const WALL = '#d6cbb0'
 const STONE = '#8b8f93'
+/** Cities roof in slate, not terracotta -- colder, and institutional. */
+const SLATE = '#5f6b72'
+const PENNANT = '#d8b34a'
 
-function hut(x: number, y: number, scale = 1): string {
+function hut(x: number, y: number, scale = 1, roof = ROOF): string {
   const w = 9 * scale
   const h = 7 * scale
   return (
     rect(x - w / 2, y - h, w, h, WALL) +
-    poly(`${x},${y - h - 6 * scale} ${x + w / 2 + 1.5},${y - h} ${x - w / 2 - 1.5},${y - h}`, ROOF) +
+    poly(`${x},${y - h - 6 * scale} ${x + w / 2 + 1.5},${y - h} ${x - w / 2 - 1.5},${y - h}`, roof) +
     rect(x - 1.2 * scale, y - 3.4 * scale, 2.4 * scale, 3.4 * scale, shade(WALL, -0.55))
   )
 }
 
-function tower(x: number, y: number, height: number): string {
-  const w = 11
+/** A gabled roof with no walls -- for buildings standing behind a city wall. */
+function gable(x: number, y: number, scale: number, roof: string): string {
+  const w = 8 * scale
+  return poly(`${x},${y - 7 * scale} ${x + w},${y} ${x - w},${y}`, roof)
+}
+
+/**
+ * The city wall: a run of masonry with teeth along the top and a gate through
+ * it. The teeth are the tell -- no terrain prop on this map has a repeating
+ * hard edge, so a toothed horizontal reads as "city" even at a glance.
+ */
+function rampart(y: number, halfWidth: number, height: number): string {
+  const top = y - height
+  let out = rect(-halfWidth, top, halfWidth * 2, height, STONE)
+  // Lit face along the bottom, so the wall does not read as a flat slab.
+  out += rect(-halfWidth, y - height * 0.4, halfWidth * 2, height * 0.4, shade(STONE, -0.2))
+
+  // Few and chunky. Seven fine teeth vanished at map scale -- five fat ones
+  // survive, and the tooth rhythm is the whole point of the shape.
+  const teeth = 5
+  const step = (halfWidth * 2) / teeth
+  for (let i = 0; i < teeth; i++) {
+    out += rect(-halfWidth + i * step + step * 0.1, top - 4.4, step * 0.6, 4.6, STONE)
+  }
+
+  // Gate: the one opening in the run, and the darkest thing on the tile.
+  out += rect(-4, y - 8.5, 8, 8.5, '#221d1a')
+  out += poly(`0,${y - 12.4} 4,${y - 8.5} -4,${y - 8.5}`, '#221d1a')
+
+  return out
+}
+
+/**
+ * The capital's spire. Deliberately the tallest thing on the map -- taller than
+ * a mountain peak (22) -- so the painter's sort (§13.2) makes it occlude hard.
+ */
+function spire(x: number, y: number, height: number): string {
+  const w = 9
+  const topW = 6
+  const top = y - height
   return (
-    rect(x - w / 2, y - height, w, height, STONE) +
-    rect(x - w / 2, y - height, w / 2, height, shade(STONE, 0.14)) +
-    // crenellations
-    rect(x - w / 2 - 1.5, y - height - 4, w + 3, 4, shade(STONE, -0.2)) +
-    poly(`${x + w / 2 + 1.5},${y - height - 4} ${x + w / 2 + 10},${y - height} ${x + w / 2 + 1.5},${y - height + 5}`, '#b8453f')
+    // Tapered shaft, drawn as a trapezoid so it narrows with height.
+    poly(
+      `${x - w / 2},${y} ${x + w / 2},${y} ${x + topW / 2},${top} ${x - topW / 2},${top}`,
+      STONE,
+    ) +
+    poly(
+      `${x - w / 2},${y} ${x},${y} ${x},${top} ${x - topW / 2},${top}`,
+      shade(STONE, 0.14),
+    ) +
+    // Spike roof.
+    poly(`${x},${top - 11} ${x + topW / 2 + 1.6},${top} ${x - topW / 2 - 1.6},${top}`, SLATE) +
+    // Mast and pennant. The only cloth on the map, and the only gold: §10 makes
+    // capitals the thing guilds spend their gold to hold.
+    rect(x - 0.6, top - 19, 1.2, 9, shade(STONE, -0.3)) +
+    poly(`${x + 0.6},${top - 19} ${x + 9},${top - 16.4} ${x + 0.6},${top - 13.8}`, PENNANT)
   )
 }
 
 function settlementProp(tier: SettlementTier, seed: number): string {
   if (tier === 'village') {
-    return hut(-7, 6) + hut(6, 9, 0.85) + (rand01(seed) > 0.5 ? hut(1, 2, 0.7) : '')
-  }
-  if (tier === 'city') {
+    // Scatter: spread wide enough that they read as separate marks. Any closer
+    // and three huts become one blob, which is the city's read, not this one.
     return (
-      hut(-13, 8, 0.9) + hut(12, 9, 0.9) + tower(0, 10, 16) + hut(-2, 13, 0.7)
+      hut(-14, 9, 0.78) +
+      hut(12, 6, 0.72) +
+      hut(-1, 13, 0.68) +
+      (rand01(seed) > 0.5 ? hut(6, 15, 0.55) : '')
     )
   }
-  // Capital: the tallest silhouette on the map. It should occlude aggressively.
-  return (
-    tower(-11, 11, 20) + tower(11, 12, 17) + tower(0, 13, 30) + hut(-18, 13, 0.7) + hut(18, 13, 0.7)
-  )
+
+  if (tier === 'city') {
+    // Enclosure: one steep roof rising behind the wall, in a slate dark enough
+    // to separate from the masonry, then the wall cropping its feet.
+    return gable(-2, 3, 1.5, shade(SLATE, -0.3)) + rampart(12, 20, 9)
+  }
+
+  // Capital: one mark and its footing. The flanking huts were an accessory --
+  // they only muddied the base into the same grey lump a city makes.
+  return rect(-15, 6, 30, 6, shade(STONE, -0.24)) + spire(0, 6, 34)
 }
 
 /** Dungeon entrance, §9.1 -- sited in the barren capital ring. */

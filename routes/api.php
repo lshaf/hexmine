@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\CraftingController;
 use App\Http\Controllers\Api\EquipmentController;
+use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\MapController;
 use App\Http\Controllers\Api\MiningController;
 use App\Http\Controllers\Api\SettlementController;
@@ -39,6 +40,9 @@ Route::middleware(ResolveCharacter::class)->group(function () {
     Route::post('/settlements/{settlement}/processing', [SettlementController::class, 'processing']);
     Route::post('/travel', [SettlementController::class, 'travel']);
     Route::delete('/travel', [SettlementController::class, 'cancelTravel']);
+
+    Route::post('/inventory/discards', [InventoryController::class, 'discard']);
+    Route::post('/inventory/drinks', [InventoryController::class, 'drink']);
 
     Route::post('/shop/purchases', [ShopController::class, 'purchase']);
     Route::post('/shop/sales', [ShopController::class, 'sell']);

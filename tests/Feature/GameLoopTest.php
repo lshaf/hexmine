@@ -337,7 +337,7 @@ final class GameLoopTest extends TestCase
     {
         // Maxed skill and best-in-slot gear: 30 minutes of reduction against a
         // 60 minute tile lands exactly on the floor, and never under it.
-        $trip = \App\Game\Formulas::tripTime(3600, Balance::SKILL_MAX_LEVEL, Balance::STAT_CAP['nft']);
+        $trip = \App\Game\Formulas::tripTime(3600, Balance::SKILL_MAX_LEVEL, Balance::STAT_CEILING);
         $this->assertSame(Balance::MINING_FLOOR_SECONDS, $trip['total']);
 
         // Even absurd inputs cannot breach it.
@@ -361,7 +361,7 @@ final class GameLoopTest extends TestCase
         );
 
         $this->assertLessThan($one * 3, $three, 'three identical items scaled linearly');
-        $this->assertLessThanOrEqual(Balance::STAT_CAP['crafted'], $three);
+        $this->assertLessThanOrEqual(Balance::STAT_CAP['rare'], $three);
     }
 
     /** §8 -- a tool pays out on its own line and on no other. */
@@ -411,23 +411,274 @@ final class GameLoopTest extends TestCase
         foreach (\App\Game\Catalog::TOOL_SLOT_SKILL as $slot => $line) {
             $tools = array_filter(
                 \App\Game\Catalog::items(),
-                fn (array $def) => $def['slot'] === $slot,
+                fn (array $def) => ($def['slot'] ?? null) === $slot,
             );
 
-            $tiers = array_count_values(array_column($tools, 'tier'));
-            $this->assertSame(2, $tiers['basic'] ?? 0, "{$line} is missing a shop tool");
-            $this->assertSame(2, $tiers['crafted'] ?? 0, "{$line} is missing a crafted tool");
-            $this->assertSame(1, $tiers['nft'] ?? 0, "{$line} is missing its NFT tool");
+            // Two commons (bought and made), two uncommons (bought and made),
+            // one epic. Rare has no craftable yet -- see docs/rarity-plan.md
+            // step 5, which fills the capital bench.
+            $rarities = array_count_values(array_column($tools, 'rarity'));
+            $this->assertSame(2, $rarities['common'] ?? 0, "{$line} is missing a common tool");
+            $this->assertSame(2, $rarities['uncommon'] ?? 0, "{$line} is missing an uncommon tool");
+            $this->assertSame(1, $rarities['epic'] ?? 0, "{$line} is missing its epic tool");
 
             $ceilings[$line] = max(array_column($tools, 'value'));
             $this->assertLessThanOrEqual(
-                Balance::STAT_CAP['nft'],
+                Balance::STAT_CEILING,
                 $ceilings[$line],
-                "{$line} tops out above the hard cap",
+                "{$line} tops out above the hard ceiling",
             );
         }
 
         $this->assertCount(1, array_unique($ceilings), 'one line reaches higher than the rest');
+    }
+
+    /**
+     * §8.1 -- the rarity ladder. Rarity now climbs toward a single global
+     * ceiling instead of every tier sharing one, so the thing worth guarding is
+     * that nothing ever gets past that ceiling.
+     */
+    public function test_no_item_can_out_climb_its_rarity_or_the_global_ceiling(): void
+    {
+        $this->assertSame(
+            Balance::STAT_CEILING,
+            max(Balance::STAT_CAP),
+            'a rarity was allowed past the global ceiling',
+        );
+
+        // The ladder must rise. A flat or inverted rung makes rarity meaningless.
+        $previous = 0.0;
+        foreach (Balance::RARITIES as $rarity) {
+            $cap = Balance::STAT_CAP[$rarity];
+            $this->assertGreaterThan($previous, $cap, "{$rarity} does not beat the rung below it");
+            $previous = $cap;
+        }
+
+        foreach (\App\Game\Catalog::items() as $key => $def) {
+            $this->assertContains($def['rarity'], Balance::RARITIES, "{$key} has no rarity");
+            $this->assertLessThanOrEqual(
+                Balance::STAT_CAP[$def['rarity']],
+                $def['value'],
+                "{$key} claims more than {$def['rarity']} allows",
+            );
+        }
+    }
+
+    /**
+     * §2 / §3.3 -- rarity is not tradeability. `unique` is the strongest thing
+     * in the game and must stay soulbound: a dungeon drop that was an NFT would
+     * be exactly the grind→external-value faucet the threat model exists to close.
+     */
+    public function test_tradeable_items_are_never_dropped_rarities(): void
+    {
+        foreach (\App\Game\Catalog::items() as $key => $def) {
+            $this->assertArrayHasKey('tradeable', $def, "{$key} does not say whether it is an NFT");
+
+            if ($def['tradeable']) {
+                $this->assertNotSame('unique', $def['rarity'], "{$key} is a tradeable unique");
+                $this->assertArrayHasKey('inputs', $def, "{$key} is tradeable but is not crafted");
+                $this->assertArrayNotHasKey('goldPrice', $def, "{$key} bridges gold to NFT value");
+
+                // §3.3 -- an NFT is crafted from tier 3 + tier 4, never tier 1-2 alone.
+                $topTier = max(array_map(
+                    fn (string $m) => \App\Game\Catalog::materialTier($m),
+                    array_keys($def['inputs']),
+                ));
+                $this->assertGreaterThanOrEqual(3, $topTier, "{$key} is tradeable off common materials");
+            }
+        }
+    }
+
+    /**
+     * §8.0.1 -- rolled lines are variety, never a second power ladder. This is
+     * the guardrail: an option must be unable to push a stat past the ceiling,
+     * or pay-to-win walks back in through the side door.
+     */
+    public function test_rolled_options_cannot_breach_the_ceiling(): void
+    {
+        // Three epics, each stuffed with the fattest legal rolls on one stat.
+        $fat = array_fill(0, 3, [
+            'key' => 'mythril_pickaxe',
+            'durability' => 10,
+            'equipped' => true,
+            'options' => array_fill(0, 3, ['stat' => 'yield', 'value' => Balance::OPTION_MAX]),
+        ]);
+
+        $total = \App\Game\Formulas::aggregateStat($fat, 'yield', 'mining');
+
+        $this->assertLessThanOrEqual(Balance::STAT_CAP['epic'], $total, 'options beat the rarity cap');
+        $this->assertLessThanOrEqual(Balance::STAT_CEILING, $total, 'options beat the global ceiling');
+    }
+
+    /** §8.0.1 -- a rolled line can reach a stat the item was never built for. */
+    public function test_an_option_can_add_a_stat_the_item_does_not_have(): void
+    {
+        $kit = [[
+            'key' => 'iron_pickaxe',
+            'durability' => 10,
+            'equipped' => true,
+            'options' => [['stat' => 'tripReduction', 'value' => 0.02]],
+        ]];
+
+        // The pickaxe is a yield tool, yet it now shaves trip time on its line.
+        $this->assertSame(0.02, \App\Game\Formulas::aggregateStat($kit, 'tripReduction', 'mining'));
+        // ...and nowhere else, because options inherit the line-lock.
+        $this->assertSame(0.0, \App\Game\Formulas::aggregateStat($kit, 'tripReduction', 'woodcutting'));
+    }
+
+    /** §8.0.1 -- how many lines each rung rolls, and commons roll none. */
+    public function test_option_counts_follow_the_rarity_ladder(): void
+    {
+        foreach (['common' => 'stone_axe', 'rare' => null, 'epic' => 'mythril_pickaxe'] as $rarity => $key) {
+            if ($key === null) {
+                continue;
+            }
+
+            $def = \App\Game\Catalog::item($key);
+            $rolled = \App\Game\Formulas::rollOptions($def, 12345);
+
+            $this->assertCount(
+                Balance::OPTION_ROLLS[$rarity],
+                $rolled,
+                "{$key} rolled the wrong number of lines",
+            );
+
+            foreach ($rolled as $option) {
+                $this->assertGreaterThanOrEqual(Balance::OPTION_MIN, $option['value']);
+                $this->assertLessThanOrEqual(Balance::OPTION_MAX, $option['value']);
+                $this->assertContains($option['stat'], \App\Game\Catalog::optionStatsFor($def['slot']));
+            }
+
+            // One line per stat: two "+2% yield" rows on one item reads as a bug.
+            $stats = array_column($rolled, 'stat');
+            $this->assertSame($stats, array_unique($stats), "{$key} rolled a stat twice");
+        }
+
+        // The capital bazaar is the one way a common ever carries a line.
+        $bazaar = \App\Game\Formulas::rollOptions(\App\Game\Catalog::item('stone_axe'), 999, 1);
+        $this->assertCount(1, $bazaar);
+    }
+
+    /**
+     * §8.5 -- a potion is spent, starts a timed effect, and the effect expiring
+     * is the sink (§11.1). Nothing here may be permanent.
+     */
+    public function test_drinking_starts_a_buff_that_expires_on_its_own(): void
+    {
+        $this->character->consumables()->create(['item_key' => 'forest_draught', 'quantity' => 2]);
+
+        $before = $this->game->bonuses($this->character->fresh(), 'woodcutting')['yield'];
+        $buff = $this->game->useConsumable($this->character->fresh(), 'forest_draught');
+
+        $this->assertSame('yield', $buff['stat']);
+        $this->assertGreaterThan($this->game->now(), $buff['expiresAt'], 'the buff was born expired');
+        $this->assertSame(1, $this->game->heldConsumable($this->character->fresh(), 'forest_draught'));
+
+        $during = $this->game->bonuses($this->character->fresh(), 'woodcutting')['yield'];
+        $this->assertGreaterThan($before, $during, 'drinking did nothing');
+
+        // Wind the clock past the deadline: nothing ticks, so the buff simply
+        // stops counting the moment it is read after expiry.
+        $this->character->buffs()->update(['expires_at' => $this->game->now() - 1]);
+        $this->character->unsetRelation('buffs');
+
+        $after = $this->game->bonuses($this->character->fresh(), 'woodcutting')['yield'];
+        $this->assertSame($before, $after, 'an expired buff was still paying out');
+        $this->assertSame([], $this->game->liveBuffs($this->character->fresh()));
+    }
+
+    /** §8.5 -- a second of the same kind refreshes the clock, never stacks. */
+    public function test_a_second_potion_refreshes_rather_than_stacks(): void
+    {
+        $this->character->consumables()->create(['item_key' => 'forest_draught', 'quantity' => 3]);
+
+        $this->game->useConsumable($this->character->fresh(), 'forest_draught');
+        $once = $this->game->bonuses($this->character->fresh(), 'woodcutting')['yield'];
+
+        $this->game->useConsumable($this->character->fresh(), 'forest_draught');
+        $twice = $this->game->bonuses($this->character->fresh(), 'woodcutting')['yield'];
+
+        $this->assertSame($once, $twice, 'two potions stacked into a bigger bonus');
+        $this->assertCount(1, $this->game->liveBuffs($this->character->fresh()));
+    }
+
+    /** §8.1 rule 1 -- a buff is inside the ceiling like everything else. */
+    public function test_a_buff_cannot_push_a_stat_past_the_ceiling(): void
+    {
+        // Best legal gear, then drink on top of it.
+        \App\Models\CharacterItem::create([
+            'character_id' => $this->character->id,
+            'item_key' => 'mythril_pickaxe',
+            'durability' => 100,
+            'equipped' => true,
+            'options' => [['stat' => 'yield', 'value' => Balance::OPTION_MAX]],
+        ]);
+        $this->character->consumables()->create(['item_key' => 'prospectors_flask', 'quantity' => 1]);
+        $this->game->useConsumable($this->character->fresh(), 'prospectors_flask');
+
+        $this->assertLessThanOrEqual(
+            Balance::STAT_CEILING,
+            $this->game->bonuses($this->character->fresh(), 'mining')['yield'],
+        );
+    }
+
+    /**
+     * §8.4 -- every craftable falls into exactly one bench, and consumables are
+     * the ones with no slot at all.
+     */
+    public function test_every_craftable_belongs_to_one_category(): void
+    {
+        $seen = [];
+
+        foreach (\App\Game\Catalog::items() as $key => $def) {
+            $category = \App\Game\Catalog::category($def);
+            $this->assertContains($category, \App\Game\Catalog::CATEGORIES, "{$key} has no bench");
+            $seen[$category] = true;
+
+            if ($category === 'consumable') {
+                $this->assertTrue(! empty($def['consumable']), "{$key} has no slot but is not a consumable");
+                $this->assertArrayNotHasKey('maxDurability', $def, "{$key} is drunk but wears out");
+            } else {
+                $this->assertArrayHasKey('maxDurability', $def, "{$key} is worn but never wears out");
+            }
+        }
+
+        $this->assertSame(
+            \App\Game\Catalog::CATEGORIES,
+            array_keys($seen),
+            'a bench has nothing on it',
+        );
+    }
+
+    /**
+     * §8.0 / §9 / §10 -- legendary and unique are defined but unreachable.
+     *
+     * Guild halls and dungeons are not built. The gates have to exist anyway:
+     * without them a capital would quietly become the top of the ladder, and
+     * §2's hardest rule -- no grind→NFT faucet -- has no teeth if a drop rarity
+     * can leak out of a workbench.
+     */
+    public function test_legendary_and_unique_are_reachable_from_nowhere(): void
+    {
+        foreach (\App\Game\Catalog::items() as $key => $def) {
+            $this->assertNotSame('legendary', $def['rarity'], "{$key} is legendary but guilds do not exist");
+            $this->assertNotSame('unique', $def['rarity'], "{$key} is unique but dungeons do not exist");
+        }
+
+        // The gates themselves are defined, and point somewhere no player is.
+        $this->assertSame('guild', Balance::stationForRarity('legendary'));
+        $this->assertNull(Balance::stationForRarity('unique'), 'a bench can reach unique');
+
+        foreach (['village', 'city', 'capital'] as $tier) {
+            $this->assertFalse(
+                Balance::stationReaches($tier, 'legendary'),
+                "a {$tier} can forge legendary work",
+            );
+            $this->assertFalse(
+                Balance::stationReaches($tier, 'unique'),
+                "a {$tier} can forge unique work",
+            );
+        }
     }
 
     /** §8 -- only the tool that did the work wears out. */
@@ -471,6 +722,60 @@ final class GameLoopTest extends TestCase
                 );
             }
         }
+    }
+
+    /**
+     * §11.1 -- throwing things away.
+     *
+     * Unlike selling, this needs no trader: out in the field the only thing
+     * worth having is the room. Nothing comes back for it, or it would just be a
+     * worse shop that works everywhere.
+     */
+    public function test_materials_can_be_thrown_away_anywhere_and_return_nothing(): void
+    {
+        $add = new \ReflectionMethod($this->game, 'addMaterial');
+        $add->setAccessible(true);
+        $add->invoke($this->game, $this->character, 'branch', 20);
+
+        $this->assertNull($this->game->currentSettlement($this->character), 'this test wants open country');
+        $goldBefore = (int) $this->character->gold;
+
+        $dropped = $this->game->discardMaterial($this->character, 'branch', 5);
+        $this->assertSame(5, $dropped);
+        $this->assertSame(15, $this->game->held($this->character->fresh(), 'branch'));
+        $this->assertSame($goldBefore, (int) $this->character->fresh()->gold, 'discarding paid out');
+
+        // Asking for more than you carry drops what you carry, rather than failing.
+        $this->assertSame(15, $this->game->discardMaterial($this->character->fresh(), 'branch', 999));
+        $this->assertSame(0, $this->game->held($this->character->fresh(), 'branch'));
+
+        // And once the stack is gone there is nothing left to throw.
+        try {
+            $this->game->discardMaterial($this->character->fresh(), 'branch', 1);
+            $this->fail('threw away material that was not held');
+        } catch (\App\Game\GameException $e) {
+            $this->assertSame('insufficient', $e->errorCode);
+        }
+    }
+
+    /** Anything the trader refuses can still be dropped -- that is the point. */
+    public function test_unsellable_materials_can_still_be_thrown_away(): void
+    {
+        $add = new \ReflectionMethod($this->game, 'addMaterial');
+        $add->setAccessible(true);
+        $add->invoke($this->game, $this->character, 'relic', 3);
+
+        $this->standAtWoodcuttingVillage();
+
+        try {
+            $this->game->sellMaterial($this->character->fresh(), 'relic', 1);
+            $this->fail('the trader bought a raid material');
+        } catch (\App\Game\GameException $e) {
+            $this->assertSame('not_sellable', $e->errorCode);
+        }
+
+        $this->assertSame(3, $this->game->discardMaterial($this->character->fresh(), 'relic', 3));
+        $this->assertSame(0, $this->game->held($this->character->fresh(), 'relic'));
     }
 
     /** You cannot trade in the middle of a forest. §6 puts the trader at a settlement. */
@@ -519,6 +824,104 @@ final class GameLoopTest extends TestCase
 
         $this->expectException(\App\Game\GameException::class);
         $this->game->buyItem($this->character, 'iron_hatchet');
+    }
+
+    /**
+     * §8.0 -- every workbench reaches exactly as far as its tier allows, and no
+     * recipe is stranded somewhere nothing can make it.
+     */
+    public function test_every_recipe_sits_at_a_bench_that_can_actually_make_it(): void
+    {
+        foreach (\App\Game\Catalog::items() as $key => $def) {
+            if (! isset($def['inputs'])) {
+                continue;
+            }
+
+            $station = $def['station'] ?? 'village';
+            $this->assertTrue(
+                Balance::stationReaches($station, $def['rarity']),
+                "{$key} is {$def['rarity']} but sits at a {$station} bench",
+            );
+
+            // ...and it is at the *smallest* bench that can reach it, so nothing
+            // is quietly harder to get than the ladder says.
+            $this->assertSame(
+                Balance::stationForRarity($def['rarity']),
+                $station,
+                "{$key} could be made somewhere smaller than a {$station}",
+            );
+        }
+    }
+
+    /** §8.0 -- a village bench refuses work above its rung, whatever you carry. */
+    public function test_a_village_bench_refuses_anything_above_common(): void
+    {
+        $village = $this->standAtWoodcuttingVillage();
+        $this->assertSame('village', $village['tier']);
+
+        $add = new \ReflectionMethod($this->game, 'addMaterial');
+        $add->setAccessible(true);
+        foreach (['ingots' => 40, 'planks' => 40, 'cloth' => 40, 'leather' => 40] as $key => $qty) {
+            $add->invoke($this->game, $this->character, $key, $qty);
+        }
+
+        // Common is fine here.
+        $this->game->craftItem($this->character->fresh(), 'hewn_axe');
+
+        // Uncommon is not, even with every material in the bag.
+        try {
+            $this->game->craftItem($this->character->fresh(), 'iron_pickaxe');
+            $this->fail('a village bench forged an uncommon pickaxe');
+        } catch (\App\Game\GameException $e) {
+            $this->assertSame('station', $e->errorCode);
+            $this->assertStringContainsString('city', $e->getMessage());
+        }
+    }
+
+    /** §3.2 -- gold stops at uncommon, at every settlement tier. */
+    public function test_no_shop_anywhere_stocks_above_uncommon(): void
+    {
+        foreach (\App\Game\Catalog::items() as $key => $def) {
+            if (! isset($def['goldPrice'])) {
+                continue;
+            }
+
+            $this->assertLessThanOrEqual(
+                Balance::rarityRank(Balance::SHOP_RARITY_CAP),
+                Balance::rarityRank($def['rarity']),
+                "{$key} is sold for gold at {$def['rarity']}",
+            );
+            $this->assertFalse($def['tradeable'], "{$key} bridges gold to NFT value");
+        }
+    }
+
+    /**
+     * §8.0 -- better gear costs more, and the ladder must not invert. A common
+     * priced above an uncommon makes the whole rarity signal a lie at the till.
+     */
+    public function test_shop_prices_climb_with_rarity(): void
+    {
+        $byRarity = [];
+        foreach (\App\Game\Catalog::items() as $key => $def) {
+            if (isset($def['goldPrice'])) {
+                $byRarity[$def['rarity']][$key] = $def['goldPrice'];
+            }
+        }
+
+        $ceilingBelow = 0;
+        foreach (Balance::RARITIES as $rarity) {
+            if (! isset($byRarity[$rarity])) {
+                continue;
+            }
+
+            $cheapest = min($byRarity[$rarity]);
+            $this->assertGreaterThan(
+                $ceilingBelow,
+                $cheapest,
+                "the cheapest {$rarity} undercuts the priciest rung below it",
+            );
+            $ceilingBelow = max($byRarity[$rarity]);
+        }
     }
 
     /** §3.3 -- gold must never bridge to NFT-tier value. */

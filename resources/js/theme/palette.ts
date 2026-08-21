@@ -80,9 +80,20 @@ export const MATERIAL_PALETTE = {
   raid: VIOLET,
 } as const
 
-/** Tier treatment for equipment icons, §13.1. */
-export const TIER_TREATMENT = {
-  basic: { fill: '#6f7671', stroke: '#8d948e', glow: false },
-  crafted: { fill: COPPER, stroke: '#e0a06a', glow: false },
-  nft: { fill: VIOLET, stroke: GOLD, glow: true },
+/**
+ * §8.1 -- rarity treatment for equipment icons. Rarity is the one thing a player
+ * reads at a glance across the shop, the bag and the hero sheet, so it gets a
+ * colour of its own rather than a shade of the material accent.
+ *
+ * The ramp is drawn from the §13.3 palette so it never fights the map: stone
+ * grey, forest green, mountain slate, violet, gold, ember. Ordered weakest to
+ * strongest, and `ornate` is what earns the second hex frame on the icon.
+ */
+export const RARITY_TREATMENT = {
+  common: { color: '#8d948e', fill: '#6f7671', glow: false, ornate: false },
+  uncommon: { color: '#6f9a5e', fill: '#5f8058', glow: false, ornate: false },
+  rare: { color: '#6f9ec4', fill: '#5d84a6', glow: false, ornate: true },
+  epic: { color: VIOLET, fill: VIOLET, glow: true, ornate: true },
+  legendary: { color: GOLD, fill: GOLD, glow: true, ornate: true },
+  unique: { color: EMBER, fill: EMBER, glow: true, ornate: true },
 } as const

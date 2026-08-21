@@ -258,6 +258,30 @@ button:focus-visible,
   background: #1f1a2a;
 }
 
+/*
+ * §8.1 -- the rarity ladder. One colour per rung, matching RARITY_TREATMENT in
+ * theme/palette.ts so an item name and its icon frame always agree. Any screen
+ * that names an item should tint it: rarity is the thing players scan for.
+ */
+.rarity-common {
+  color: #8d948e;
+}
+.rarity-uncommon {
+  color: #6f9a5e;
+}
+.rarity-rare {
+  color: #6f9ec4;
+}
+.rarity-epic {
+  color: #a186c8;
+}
+.rarity-legendary {
+  color: var(--gold);
+}
+.rarity-unique {
+  color: #d4726c;
+}
+
 .chip-off {
   color: #7b8580;
   background: #1a201d;

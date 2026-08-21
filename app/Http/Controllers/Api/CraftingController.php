@@ -18,14 +18,25 @@ class CraftingController extends GameController
             'item' => ['required', 'string'],
         ]);
 
-        $item = $this->game->craftItem($character, $validated['item']);
-        $name = Catalog::item($item->item_key)['name'];
+        $made = $this->game->craftItem($character, $validated['item']);
+        $def = Catalog::item($made->item_key);
+
+        // §8.4 -- a potion comes back as a stack, not an object. It has no id
+        // worth handing out, no durability and no slot, so it reports a count.
+        if (! empty($def['consumable'])) {
+            return $this->respond(
+                $character,
+                ['key' => $made->item_key, 'quantity' => $made->quantity],
+                "Brewed {$def['name']}. You have {$made->quantity}.",
+            );
+        }
 
         return $this->respond($character, [
-            'id' => (string) $item->id,
-            'key' => $item->item_key,
-            'durability' => $item->durability,
-            'equipped' => $item->equipped,
-        ], "Crafted {$name}.");
+            'id' => (string) $made->id,
+            'key' => $made->item_key,
+            'durability' => $made->durability,
+            'equipped' => $made->equipped,
+            'options' => $made->options ?? [],
+        ], "Crafted {$def['name']}.");
     }
 }

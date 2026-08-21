@@ -33,6 +33,7 @@ class ShopController extends GameController
             'key' => $item->item_key,
             'durability' => $item->durability,
             'equipped' => $item->equipped,
+            'options' => $item->options ?? [],
         ], "Bought {$name}.");
     }
 

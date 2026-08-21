@@ -100,7 +100,22 @@ export interface Skill {
  */
 export type GatherSlot = 'axe' | 'pickaxe' | 'bow' | 'hammer' | 'sickle'
 export type EquipSlot = GatherSlot | 'armor' | 'boots' | 'gloves' | 'weapon'
-export type EquipTier = 'basic' | 'crafted' | 'nft'
+
+/**
+ * §8.1 -- the rarity ladder. Ordered weakest to strongest; rarity sets the power
+ * ceiling, the colour, and which station can make the thing.
+ *
+ * Rarity is NOT tradeability. `unique` is the strongest and is soulbound; `epic`
+ * and `legendary` are the tradeable ones. Read `ItemDef.tradeable` for that, and
+ * see §2 for why a drop must never be an NFT.
+ */
+export type Rarity =
+  | 'common'
+  | 'uncommon'
+  | 'rare'
+  | 'epic'
+  | 'legendary'
+  | 'unique'
 
 /** What an item modifies. All are capped per slot, §8.1. */
 export type StatKey =
@@ -113,8 +128,21 @@ export type StatKey =
 export interface ItemDef {
   key: string
   name: string
-  slot: EquipSlot
-  tier: EquipTier
+  /**
+   * §8.5 -- absent on consumables, which is what makes them the third craft
+   * category: a potion is never worn, so it has nowhere to go.
+   */
+  slot?: EquipSlot
+  /** True for potions and buffs. They are spent, not equipped. */
+  consumable?: boolean
+  rarity: Rarity
+  /**
+   * §3.3 -- whether this is an NFT, the only externally tradeable value. Kept
+   * apart from rarity on purpose: `unique` is the strongest thing in the game
+   * and is soulbound, because §2 forbids a grind→NFT faucet and a dungeon drop
+   * would be exactly that.
+   */
+  tradeable: boolean
   stat: StatKey
   /** Fractional bonus, e.g. 0.06 = +6%. */
   value: number
@@ -125,8 +153,27 @@ export interface ItemDef {
   inputs?: Partial<Record<MaterialKey, number>>
   /** Station required to craft, §6. */
   station?: SettlementTier
-  maxDurability: number
+  /** Absent on consumables: nothing that is drunk wears out. */
+  maxDurability?: number
   description: string
+}
+
+/** §8.5 -- a timed effect running right now. */
+export interface ActiveBuff {
+  key: string
+  stat: StatKey
+  value: number
+  /** Server-clock deadline. The client counts down against it, never ticks it. */
+  expiresAt: number
+}
+
+/**
+ * §8.0.1 -- one rolled bonus line. Server-rolled and stored per instance, so two
+ * of the same recipe are never the same object.
+ */
+export interface ItemOption {
+  stat: StatKey
+  value: number
 }
 
 export interface OwnedItem {
@@ -134,6 +181,8 @@ export interface OwnedItem {
   key: string
   durability: number
   equipped: boolean
+  /** Rolled lines. Empty for commons, unless a capital bazaar added one. */
+  options: ItemOption[]
 }
 
 // ---------------------------------------------------------------- processing

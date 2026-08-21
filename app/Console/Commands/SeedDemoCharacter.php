@@ -6,6 +6,7 @@ namespace App\Console\Commands;
 
 use App\Game\Balance;
 use App\Game\Catalog;
+use App\Game\Formulas;
 use App\Game\GameService;
 use App\Game\HexGeometry;
 use App\Game\Tutorial;
@@ -76,13 +77,25 @@ class SeedDemoCharacter extends Command
      */
     private const ITEMS = [
         ['key' => 'ironbound_axe', 'durability' => 88, 'equipped' => true],
-        ['key' => 'iron_pickaxe', 'durability' => 74, 'equipped' => true],
+        ['key' => 'mythril_pickaxe', 'durability' => 168, 'equipped' => true],
         ['key' => 'crude_bow', 'durability' => 31, 'equipped' => true],
         ['key' => 'leather_armor', 'durability' => 108, 'equipped' => true],
         ['key' => 'work_gloves', 'durability' => 61, 'equipped' => true],
         ['key' => 'reinforced_boots', 'durability' => 140, 'equipped' => false],
         ['key' => 'stone_maul', 'durability' => 44, 'equipped' => false],
         ['key' => 'stone_axe', 'durability' => 0, 'equipped' => false],
+    ];
+
+    /**
+     * §8.5 -- a shelf of potions, one already running so the "Refresh" state on
+     * the bag has something to render.
+     *
+     * @var array<string,int>
+     */
+    private const CONSUMABLES = [
+        'forest_draught' => 4,
+        'road_tonic' => 2,
+        'quarry_salts' => 3,
     ];
 
     private const LEVEL = 8;
@@ -203,15 +216,36 @@ class SeedDemoCharacter extends Command
         $character->jobs()->delete();
         $character->items()->delete();
         $character->materials()->delete();
+        $character->consumables()->delete();
+        $character->buffs()->delete();
+
+        foreach (self::CONSUMABLES as $key => $qty) {
+            $character->consumables()->create(['item_key' => $key, 'quantity' => $qty]);
+        }
+
+        // One already running, so the bag's "Refresh" state has something to show.
+        $draught = Catalog::item('forest_draught');
+        $character->buffs()->create([
+            'item_key' => 'forest_draught',
+            'stat' => $draught['stat'],
+            'value' => $draught['value'],
+            'expires_at' => $now + Balance::scaled(Balance::BUFF_MS),
+        ]);
 
         $materials = self::MATERIALS;
 
-        foreach (self::ITEMS as $item) {
+        // §8.0.1 -- roll each item's bonus lines rather than leaving them bare,
+        // so the hero sheet has rolled lines to render. Seeded per index, so a
+        // reseed produces the same kit and screenshots stay comparable.
+        foreach (self::ITEMS as $index => $item) {
+            $def = Catalog::item($item['key']);
+
             CharacterItem::create([
                 'character_id' => $character->id,
                 'item_key' => $item['key'],
                 'durability' => $item['durability'],
                 'equipped' => $item['equipped'],
+                'options' => Formulas::rollOptions($def, 31 + $index),
             ]);
         }
 

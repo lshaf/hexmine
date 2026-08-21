@@ -3,7 +3,7 @@
  * NPC trader, §3.2.
  *
  * Two halves, and the split is the whole point: gold comes in at a deliberately
- * poor rate, and gold buys basic-tier items only. Nothing here ever touches
+ * poor rate, and gold buys the bottom two rarities only. Nothing here touches
  * anything tradeable -- gold has no bridge to NFT value (§3.3).
  */
 import { computed, ref } from 'vue'
@@ -31,7 +31,7 @@ const sellable = computed(() => {
 /** Only what this settlement stocks, §3.2 -- the server decides, we render it. */
 const catalog = computed(() => shopItems().filter((i) => game.shopStock.includes(i.key)))
 
-/** Stocked elsewhere: shown greyed so the tier ladder is visible, not hidden. */
+/** Stocked elsewhere: shown greyed so the ladder is visible, not hidden. */
 const elsewhere = computed(() => shopItems().filter((i) => !game.shopStock.includes(i.key)))
 
 const atSettlement = computed(() => game.currentSettlement !== null)
@@ -97,8 +97,8 @@ const owned = (key: string) => game.equipment.filter((e) => e.key === key).lengt
       <!-- -------------------------------------------------------- buy -->
       <template v-else>
         <p class="tiny muted lead">
-          Basic tier only. Cheap, weak, universally available — and it will never
-          be worth anything outside the game.
+          Common and uncommon only. Gold never reaches past the second rung of
+          the ladder, and never buys anything worth something outside the game.
         </p>
 
         <div v-if="!catalog.length" class="inset empty">
@@ -107,7 +107,7 @@ const owned = (key: string) => game.equipment.filter((e) => e.key === key).lengt
 
         <div v-for="item in catalog" :key="item.key" class="inset row-item">
           <SvgIcon
-            :svg="itemIcon({ slot: item.slot, tier: item.tier, palette: item.palette, size: 30 })"
+            :svg="itemIcon({ slot: item.slot, rarity: item.rarity, palette: item.palette, size: 30 })"
             boxed
             :size="30"
           />
@@ -139,7 +139,7 @@ const owned = (key: string) => game.equipment.filter((e) => e.key === key).lengt
           </p>
           <div v-for="item in elsewhere" :key="item.key" class="list-item locked">
             <SvgIcon
-              :svg="itemIcon({ slot: item.slot, tier: item.tier, palette: item.palette, size: 26 })"
+              :svg="itemIcon({ slot: item.slot, rarity: item.rarity, palette: item.palette, size: 26 })"
               boxed
               :size="26"
             />

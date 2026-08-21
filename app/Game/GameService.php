@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace App\Game;
 
 use App\Models\Character;
+use App\Models\CharacterBuff;
+use App\Models\CharacterConsumable;
 use App\Models\CharacterItem;
 use App\Models\CharacterMaterial;
 use App\Models\CharacterSkill;
 use App\Models\GameJob;
 use App\Models\Player;
 use App\Models\TileState;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -289,6 +292,38 @@ class GameService
         return (int) $character->materials()->sum('quantity');
     }
 
+    /**
+     * Tip materials out on the ground, §11.1.
+     *
+     * Nothing comes back. Selling is what pays, and selling needs a trader --
+     * this is for the pile of scrap filling your bag three hexes from anywhere,
+     * where the only thing worth having is the room. Giving it a salvage return
+     * would make it a worse shop that works everywhere, which is not a decision
+     * anyone should have to weigh.
+     *
+     * @return int how many were actually thrown away
+     */
+    public function discardMaterial(Character $character, string $materialKey, int $quantity): int
+    {
+        return DB::transaction(function () use ($character, $materialKey, $quantity) {
+            if (Catalog::material($materialKey) === null) {
+                throw new GameException('Unknown material.', 'not_found');
+            }
+
+            $held = $this->held($character, $materialKey);
+            if ($held <= 0) {
+                throw new GameException('You are not carrying any.', 'insufficient');
+            }
+
+            // Asking to drop more than you have drops what you have, rather than
+            // failing: the intent is unambiguous and refusing it is just rude.
+            $count = min($held, max(1, $quantity));
+            $this->takeMaterial($character, $materialKey, $count);
+
+            return $count;
+        });
+    }
+
     // -------------------------------------------------------------- equipment
 
     /** @return array<int,array{key:string,durability:int,equipped:bool}> */
@@ -298,7 +333,49 @@ class GameService
             'key' => $i->item_key,
             'durability' => $i->durability,
             'equipped' => $i->equipped,
+            'options' => $i->options ?? [],
         ])->all();
+    }
+
+    /**
+     * §8.0.1 -- roll a new item's bonus lines.
+     *
+     * The seed mixes the wallet, the item and the clock so two players crafting
+     * the same recipe in the same second do not get the same roll, and so a
+     * given outcome can still be reproduced from what produced it.
+     *
+     * @return array<int,array{stat:string,value:float}>
+     */
+    private function rollFor(Character $character, array $def, int $extra = 0): array
+    {
+        $seed = Hash::hash2(
+            (int) $character->id + $this->now() % 100000,
+            crc32($def['name']),
+            Balance::MAP_SEED,
+        );
+
+        return Formulas::rollOptions($def, $seed, $extra);
+    }
+
+    /**
+     * §8.0.1 -- the capital bazaar's extra slot. A capital stocks nothing a city
+     * does not; what it sometimes adds is a line on top, and it is the only
+     * place a common item ever carries one.
+     */
+    private function bazaarBonus(Character $character): int
+    {
+        $here = $this->currentSettlement($character);
+        if ($here === null || $here['tier'] !== 'capital') {
+            return 0;
+        }
+
+        $roll = Hash::rand01(Hash::hash2(
+            (int) $character->id,
+            $this->now() % 100000,
+            Balance::MAP_SEED ^ 0xba2a,
+        ));
+
+        return $roll < Balance::CAPITAL_SHOP_OPTION_CHANCE ? 1 : 0;
     }
 
     /**
@@ -313,13 +390,86 @@ class GameService
     {
         $items = $this->itemRows($character);
 
-        return [
-            'yield' => Formulas::aggregateStat($items, 'yield', $line),
-            'tripReduction' => Formulas::aggregateStat($items, 'tripReduction', $line),
-            'travelSpeed' => Formulas::aggregateStat($items, 'travelSpeed', $line),
-            'processingSpeed' => Formulas::aggregateStat($items, 'processingSpeed', $line),
-            'power' => Formulas::aggregateStat($items, 'power', $line),
-        ];
+        // §8.5 -- a live buff is another contributor to the same aggregate, and
+        // is clamped by the same ceiling. A potion that could push a stat past
+        // STAT_CEILING would be a power ladder you can drink, which §8.1 rule 1
+        // exists to prevent.
+        $buffs = [];
+        foreach ($this->liveBuffs($character) as $buff) {
+            $buffs[$buff->stat] = ($buffs[$buff->stat] ?? 0) + $buff->value;
+        }
+
+        $out = [];
+        foreach (['yield', 'tripReduction', 'travelSpeed', 'processingSpeed', 'power'] as $stat) {
+            $gear = Formulas::aggregateStat($items, $stat, $line);
+            $out[$stat] = min(Balance::STAT_CEILING, $gear + ($buffs[$stat] ?? 0));
+        }
+
+        return $out;
+    }
+
+    // ------------------------------------------------------- consumables §8.5
+
+    /** How many of a potion the character is carrying. */
+    public function heldConsumable(Character $character, string $key): int
+    {
+        return (int) ($character->consumables()->where('item_key', $key)->value('quantity') ?? 0);
+    }
+
+    /**
+     * Buffs that have not run out, §8.5.
+     *
+     * Expired rows are deleted on read rather than swept by a job: this is the
+     * same lazy-settlement idea as AP regen (§16), and it means a buff cannot
+     * linger just because nobody looked.
+     *
+     * @return array<int,\App\Models\CharacterBuff>
+     */
+    public function liveBuffs(Character $character): array
+    {
+        $now = $this->now();
+        $character->buffs()->where('expires_at', '<=', $now)->delete();
+        $character->unsetRelation('buffs');
+
+        return $character->buffs()->where('expires_at', '>', $now)->get()->all();
+    }
+
+    /**
+     * Drink one. §11.1 -- the buff expiring is the sink, which is why nothing
+     * here is permanent and why a second flask refreshes rather than stacks.
+     *
+     * @return array{stat:string,value:float,expiresAt:int}
+     */
+    public function useConsumable(Character $character, string $key): array
+    {
+        return DB::transaction(function () use ($character, $key) {
+            $def = Catalog::item($key);
+            if ($def === null || empty($def['consumable'])) {
+                throw new GameException('That is not something you can use.', 'not_found');
+            }
+
+            $row = $character->consumables()->where('item_key', $key)->first();
+            if ($row === null || $row->quantity < 1) {
+                throw new GameException("You have no {$def['name']}.", 'insufficient');
+            }
+
+            $row->quantity -= 1;
+            $row->quantity > 0 ? $row->save() : $row->delete();
+
+            $now = $this->now();
+            $expiresAt = $now + Balance::scaled(Balance::BUFF_MS);
+
+            // One buff per stat. Drinking a second of the same kind restarts the
+            // clock instead of stacking -- stacking would let a player bank an
+            // afternoon of potions into one enormous window.
+            CharacterBuff::updateOrCreate(
+                ['character_id' => $character->id, 'stat' => $def['stat']],
+                ['item_key' => $key, 'value' => $def['value'], 'expires_at' => $expiresAt],
+            );
+            $character->unsetRelation('buffs');
+
+            return ['stat' => $def['stat'], 'value' => $def['value'], 'expiresAt' => $expiresAt];
+        });
     }
 
     /**
@@ -382,7 +532,7 @@ class GameService
             if ($def === null) {
                 continue;
             }
-            $toolLine = Catalog::skillForSlot($def['slot']);
+            $toolLine = Catalog::skillForSlot($def['slot'] ?? '');
             if ($toolLine !== null && $toolLine !== $line) {
                 continue;
             }
@@ -1249,6 +1399,12 @@ class GameService
             if (! isset($def['goldPrice'])) {
                 continue;
             }
+            // §3.2 -- gold reaches the bottom two rungs and stops. This is the
+            // rule that keeps gold from ever bridging to NFT value, so it is
+            // checked here rather than left to the catalog getting it right.
+            if (Balance::rarityRank($def['rarity']) > Balance::rarityRank(Balance::SHOP_RARITY_CAP)) {
+                continue;
+            }
             if (Catalog::STATION_RANK[$def['station'] ?? 'village'] > $rank) {
                 continue;
             }
@@ -1283,6 +1439,7 @@ class GameService
                 'item_key' => $itemKey,
                 'durability' => $def['maxDurability'],
                 'equipped' => false,
+                'options' => $this->rollFor($character, $def, $this->bazaarBonus($character)),
             ]);
         });
     }
@@ -1319,12 +1476,28 @@ class GameService
 
     // ------------------------------------------------------------------- craft
 
-    public function craftItem(Character $character, string $itemKey): CharacterItem
+    /** @return CharacterItem|CharacterConsumable a new object, or the grown stack */
+    public function craftItem(Character $character, string $itemKey): Model
     {
         return DB::transaction(function () use ($character, $itemKey) {
             $def = Catalog::item($itemKey);
             if ($def === null || ! isset($def['inputs'])) {
                 throw new GameException('Not craftable.', 'not_found');
+            }
+
+            $here = $this->requireSettlement($character, 'craft');
+
+            // §8.0 -- the bench's reach, checked against rarity rather than the
+            // item's own `station`. Both gates agree today; rarity goes first
+            // because it can say *why*, and because it is the one that still
+            // holds when someone adds a recipe and forgets to set a station.
+            if (! Balance::stationReaches($here['tier'], $def['rarity'])) {
+                $needs = Balance::stationForRarity($def['rarity']);
+                $reason = $needs === null
+                    ? "{$def['name']} is never crafted. It only drops."
+                    : "A {$here['tier']} bench cannot make {$def['rarity']} work. That needs a {$needs}.";
+
+                throw new GameException($reason, 'station');
             }
 
             if (isset($def['station'])) {
@@ -1344,11 +1517,33 @@ class GameService
             $this->fireTutorial($character, 'craft');
             $character->save();
 
+            // §8.5 -- a potion stacks on a shelf. It has no durability to track
+            // and no slot to sit in, so it never becomes a CharacterItem.
+            if (! empty($def['consumable'])) {
+                $row = CharacterConsumable::firstOrNew([
+                    'character_id' => $character->id,
+                    'item_key' => $itemKey,
+                ]);
+
+                if ($row->quantity >= Balance::CONSUMABLE_STACK_CAP) {
+                    throw new GameException(
+                        "You cannot carry more than {$row->quantity} {$def['name']}.",
+                        'at_cap',
+                    );
+                }
+
+                $row->quantity = min(Balance::CONSUMABLE_STACK_CAP, (int) $row->quantity + 1);
+                $row->save();
+
+                return $row;
+            }
+
             return CharacterItem::create([
                 'character_id' => $character->id,
                 'item_key' => $itemKey,
                 'durability' => $def['maxDurability'],
                 'equipped' => false,
+                'options' => $this->rollFor($character, $def),
             ]);
         });
     }
@@ -1550,6 +1745,7 @@ class GameService
                 'key' => $i->item_key,
                 'durability' => $i->durability,
                 'equipped' => $i->equipped,
+                'options' => $i->options ?? [],
             ])->values()->all(),
             'jobs' => $character->jobs->map(fn (GameJob $j) => $this->jobPayload($j))->values()->all(),
             'presenceAt' => $character->presence_settlement_id,
@@ -1567,6 +1763,17 @@ class GameService
             'shopStock' => $this->shopStock($character),
             'bonuses' => $this->bonuses($character),
             'toolYield' => $this->toolYieldByLine($character),
+            // §8.5 -- what is on the shelf, and what is running right now.
+            'consumables' => $character->consumables()
+                ->where('quantity', '>', 0)
+                ->pluck('quantity', 'item_key')
+                ->all(),
+            'buffs' => array_map(fn (CharacterBuff $b) => [
+                'key' => $b->item_key,
+                'stat' => $b->stat,
+                'value' => $b->value,
+                'expiresAt' => $b->expires_at,
+            ], $this->liveBuffs($character)),
         ];
     }
 }
