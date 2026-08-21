@@ -29,7 +29,7 @@ import { configureWorld, generateTile } from '@/game/worldgen'
 import { hexDistance, visibleTiles } from '@/map/hexGeometry'
 
 /** Which overlay is open over the map, if any. */
-export type PanelKey = 'bag' | 'craft' | 'shop' | 'hero' | 'atlas'
+export type PanelKey = 'bag' | 'craft' | 'shop' | 'hero' | 'atlas' | 'almanac'
 
 export interface LogEntry {
   id: number

@@ -19,4 +19,12 @@ export const ACTION_PATHS: Record<string, string> = {
   zoomOut: 'M6 12h12 M6 10.4v3.2 M18 10.4v3.2',
   locate: 'M7 12 9.5 7.7h5L17 12l-2.5 4.3h-5Z M12 2.6v2.8 M12 18.6v2.8 M2.6 12h2.8 M18.6 12h2.8',
   close: 'M6 6l12 12 M18 6 6 18',
+  /* An arch with a doorway in it. Dungeons are the one place tier 4 comes
+     from, so the almanac needs a glyph for them even though raiding is not
+     built yet. */
+  dungeon: 'M4 21V11a8 8 0 0 1 16 0v10 M9 21v-8a3 3 0 0 1 6 0v8',
+  /* A specimen plate: one hex sample, its annotation lines, and the rules of
+     the entry below it. Built from the map's own shape rather than a book,
+     because what this catalogues is hexes and what comes off them. */
+  almanac: 'M7 4 11 6.3v4.6L7 13.2 3 10.9V6.3Z M14.5 7h6.5 M14.5 11h6.5 M3 17.5h18 M3 21h12',
 }
