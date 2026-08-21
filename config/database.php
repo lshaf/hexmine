@@ -38,10 +38,23 @@ return [
             'database' => env('DB_DATABASE', database_path('database.sqlite')),
             'prefix' => '',
             'foreign_key_constraints' => env('DB_FOREIGN_KEYS', true),
-            'busy_timeout' => null,
-            'journal_mode' => null,
-            'synchronous' => null,
-            'transaction_mode' => 'DEFERRED',
+
+            // Two players race for the last slot on a hex (GameService::1028)
+            // and for the last of five at a station (§6.1). On the default
+            // rollback journal a writer blocks every reader and the loser gets
+            // "database is locked" instead of waiting its turn, so the race is
+            // decided by who retried rather than who was first.
+            //
+            // WAL lets readers through while a write is open; busy_timeout
+            // makes a blocked writer wait instead of throwing. IMMEDIATE takes
+            // the write lock at BEGIN rather than at the first write, so a
+            // transaction that will conflict fails at the start of its work
+            // instead of after it -- no upgrade deadlock between two open
+            // transactions.
+            'busy_timeout' => env('DB_BUSY_TIMEOUT', 5000),
+            'journal_mode' => env('DB_JOURNAL_MODE', 'WAL'),
+            'synchronous' => env('DB_SYNCHRONOUS', 'NORMAL'),
+            'transaction_mode' => env('DB_TRANSACTION_MODE', 'IMMEDIATE'),
         ],
 
         'mysql' => [

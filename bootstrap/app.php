@@ -18,6 +18,16 @@ return Application::configure(basePath: dirname(__DIR__))
         // rather than token-based. statefulApi() brings sessions and CSRF to the
         // /api group; there is no CORS config because there is no second origin.
         $middleware->statefulApi();
+
+        // Behind a tunnel (Cloudflare, ngrok) or any reverse proxy, TLS is
+        // terminated upstream and the app is reached over plain HTTP on
+        // localhost. Untrusted, Laravel would believe the request really is
+        // insecure and generate http:// asset URLs into an https:// page --
+        // which the browser blocks as mixed content, leaving a blank #app.
+        //
+        // The proxy list is '*' because the only hop is the tunnel client on
+        // this machine; there is no public ingress that could spoof the header.
+        $middleware->trustProxies(at: '*');
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
