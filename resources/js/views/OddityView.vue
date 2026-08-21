@@ -13,7 +13,9 @@
  * same shade() the map itself uses -- so the tiles here are not an illustration
  * of hexes, they are hexes. That matters for a proposal whose whole argument is
  * "two forest hexes should stop being the same forest hex": the reader is
- * looking at the real thing with four tiles changed.
+ * looking at the real thing, drawn twice -- once as the map draws it, and
+ * once as the server reports it inside sight. Nothing was added to the
+ * terrain to make the second panel possible, which is the argument.
  */
 import { computed } from 'vue'
 import {
@@ -115,6 +117,19 @@ const PRIZE_RING = HEX_TOP_PATH.replace(/-?\d+(\.\d+)?/g, (n) =>
 
 /* ------------------------------------------------- legend and the document */
 
+const FIELD_PANELS = [
+  {
+    title: 'What the map draws — at any distance',
+    reveal: false,
+    alt: 'A fragment of the hex map: a forest belt meeting mountain. Every tile of a biome looks identical; two are depleted.',
+  },
+  {
+    title: 'What the server reports — inside sight only',
+    reveal: true,
+    alt: 'The same fragment with its oddity revealed: two rich tiles, one forage tile and one prize tile among the plain ones.',
+  },
+]
+
 const LEGEND: Array<{ feature: Feature; name: string; note: string }> = [
   { feature: 'plain', name: 'Plain', note: '55% · grade at base' },
   { feature: 'rich', name: 'Rich', note: '25% · grade at 2×' },
@@ -125,7 +140,7 @@ const LEGEND: Array<{ feature: Feature; name: string; note: string }> = [
 const ASKS = [
   {
     ask: 'More materials in every tier; every hex has oddity drops',
-    how: 'A second roll per trip against the tile’s own oddity table. Twenty new materials across T0–T3; T4 reached through Essence traces.',
+    how: 'A second roll per trip against the tile’s own oddity table. Twenty-two new materials across T0–T3; T4 reached through Essence traces.',
     at: '§4, §5.1',
   },
   {
@@ -145,7 +160,7 @@ const ASKS = [
   },
   {
     ask: 'Rare items on some tiles, so tiles within a biome differ',
-    how: 'A seeded feature per tile, above — derived from (col, row, seed) like everything else on the map.',
+    how: 'A seeded feature per tile — invisible, blended in among ordinary ground of the same biome, and learned by scouting rather than by looking.',
     at: '§5.1, §5.3',
   },
 ]
@@ -185,11 +200,13 @@ const CLASSES = [
   },
 ]
 
+/** No `props` or `colour` field anywhere here, and that is the point: a feature
+ *  changes the table a hex rolls against, never the hex. §13.2 is untouched. */
 const FEATURE_ROWS = [
-  { name: 'Plain', weight: '55%', effect: 'Grade at base rate. No feature roll.', where: 'anywhere' },
-  { name: 'Rich', weight: '25%', effect: 'Grade at 2×, feature roll live.', where: 'anywhere' },
-  { name: 'Forage', weight: '15%', effect: 'Forage verb pays 2×; grade halved.', where: 'anywhere' },
-  { name: 'Prize', weight: '5%', effect: 'Unlocks the T3 prize roll.', where: 'inner ring only — elsewhere this weight folds into Rich' },
+  { name: 'Plain', weight: '55%', effect: 'Grade at base rate. No feature roll.', where: 'anywhere', tell: 'none' },
+  { name: 'Rich', weight: '25%', effect: 'Grade at 2×, feature roll live.', where: 'anywhere', tell: 'none' },
+  { name: 'Forage', weight: '15%', effect: 'Forage verb pays 2×; grade halved.', where: 'anywhere', tell: 'none' },
+  { name: 'Prize', weight: '5%', effect: 'Unlocks the T3 prize roll.', where: 'inner ring only — elsewhere this weight folds into Rich', tell: 'none' },
 ]
 
 const REAGENTS = [
@@ -200,20 +217,40 @@ const REAGENTS = [
   { name: 'Blue Nettle', key: 'blue_nettle', biome: 'grassland' as Biome, feeds: 'Road Tonic' },
 ]
 
+/**
+ * §4.0 -- a second thing bare hands can come away with, per biome. Every one of
+ * these sells for 1 gold, and that is forced rather than chosen: raws sell for
+ * 2-3 (Catalog.php), and §4.0 requires every raw to sell for MORE than scrap. A
+ * 2-gold scrap would tie wood, stone and fiber and collapse the gap that is the
+ * whole argument for buying a first tool.
+ *
+ * So these add texture, never value: what a tile hands you by hand reads as
+ * belonging to that tile, and is still worth almost nothing.
+ */
+const SCRAP = [
+  { name: 'Deadfall', key: 'deadfall', biome: 'forest' as Biome, beside: 'Branch', what: 'Rotted limb off the floor. Too far gone to plank.' },
+  { name: 'Slag', key: 'slag', biome: 'mountain' as Biome, beside: 'Ore Chips', what: 'Spoil from an old working. Somebody already took the iron.' },
+  { name: 'Bone Splinter', key: 'bone_splinter', biome: 'plains' as Biome, beside: 'Torn Hide', what: 'Picked clean long before you got there.' },
+  { name: 'Ash', key: 'ash', biome: 'badlands' as Biome, beside: 'Gravel', what: 'Scraped from a burn scar. The trader takes it by weight.' },
+  { name: 'Thistle', key: 'thistle', biome: 'grassland' as Biome, beside: 'Chaff', what: 'Cut and bundled. Nothing spins it.' },
+]
+
 const GRADES = [
   { name: 'Resin', key: 'resin', biome: 'forest' as Biome, price: 5, into: 'Pitch' },
   { name: 'Coal', key: 'coal', biome: 'mountain' as Biome, price: 6, into: 'Coke' },
   { name: 'Sinew', key: 'sinew', biome: 'plains' as Biome, price: 6, into: 'Cord' },
   { name: 'Saltpetre', key: 'saltpetre', biome: 'badlands' as Biome, price: 5, into: 'Flux' },
-  { name: 'Pollen', key: 'pollen', biome: 'grassland' as Biome, price: 4, into: 'Dye' },
+  { name: 'Pollen', key: 'pollen', biome: 'grassland' as Biome, price: 4, into: 'Wax' },
 ]
 
 const REFINED = [
-  { name: 'Pitch', key: 'pitch', from: '3 Resin', line: 'Woodcutting', use: 'Repair: bows and hafted tools' },
-  { name: 'Coke', key: 'coke', from: '3 Coal', line: 'Mining', use: 'Repair: all ingot gear; smith recipes' },
-  { name: 'Cord', key: 'cord', from: '3 Sinew', line: 'Hunting', use: 'Repair: bows; armorer recipes' },
-  { name: 'Flux', key: 'flux', from: '3 Saltpetre', line: 'Quarrying', use: 'Repair: cut-stone gear; smelting' },
-  { name: 'Dye', key: 'dye', from: '3 Pollen', line: 'Harvesting', use: 'Cosmetic recolours; cloth recipes' },
+  { name: 'Pitch', key: 'pitch', from: '3 Resin', line: 'Woodcutting', repair: 'Bows, hafted tools', opens: 'Pitch-hafted tool line — a second axe and hammer at crafted rung' },
+  { name: 'Coke', key: 'coke', from: '3 Coal', line: 'Mining', repair: 'All ingot gear', opens: 'High-carbon steel: the smith bench’s alternative weapon line' },
+  { name: 'Cord', key: 'cord', from: '3 Sinew', line: 'Hunting', repair: 'Bows', opens: 'Laminated bows; strapped armor at the armorer bench' },
+  { name: 'Flux', key: 'flux', from: '3 Saltpetre', line: 'Quarrying', repair: 'Cut-stone gear', opens: 'Alloyed ingots — cheaper smelting, and the banded tool line' },
+  { name: 'Wax', key: 'wax', from: '3 Pollen', line: 'Harvesting', repair: 'Cloth and leather gear', opens: 'Waxed cloth armor; sealed potions that hold a longer buff' },
+  { name: 'Salve', key: 'salve', from: '2 Wax + 2 Pitch', line: 'cross-combo', repair: '—', opens: 'The consumable bench’s own input: every potion above common' },
+  { name: 'Scale', key: 'scale', from: '2 Coke + 2 Cord', line: 'cross-combo', repair: 'Plate and scaled armor', opens: 'The armor bench’s own input: every armor above common' },
 ]
 
 const PRIZES = [
@@ -222,6 +259,31 @@ const PRIZES = [
   { name: 'Fangcrown', key: 'fangcrown', biome: 'plains' as Biome, recipe: 'Legendary bow line' },
   { name: 'Glasstear', key: 'glasstear', biome: 'badlands' as Biome, recipe: 'Legendary hammer line' },
   { name: 'Ghostsilk', key: 'ghostsilk', biome: 'grassland' as Biome, recipe: 'Legendary sickle line' },
+]
+
+/**
+ * Pattern x material = variant. The material contributes one FIXED option --
+ * the same on every copy, never rolled -- so two axes at the same rung differ
+ * in kind rather than in quality. §8.0 rule 4 survives because no variant is
+ * better than its siblings; it is a sidegrade with a different signature.
+ *
+ * The stat pool is the post-swap tool pool: cooldown, tripReduction, oddity.
+ * Worn patterns also reach travelSpeed and processingSpeed.
+ */
+const MATERIAL_PERKS = [
+  { mat: 'Pitch', line: 'Woodcutting', perk: '+2% tripReduction', why: 'A sealed haft does not slacken; the swing stays true for longer.' },
+  { mat: 'Coke', line: 'Mining', perk: '+2% cooldown', why: 'Harder steel takes a faster turnaround without dulling.' },
+  { mat: 'Cord', line: 'Hunting', perk: '+2% oddity', why: 'A bound grip reads the cut, and finds what is in it.' },
+  { mat: 'Flux', line: 'Quarrying', perk: '+3% durability', why: 'Not a StatKey and deliberately so — the one perk that buys wear, not power.' },
+  { mat: 'Wax', line: 'Harvesting', perk: '+2% travelSpeed', why: 'Worn patterns only. A waxed boot sheds the ground.' },
+]
+
+const VARIANTS = [
+  { pattern: 'Axe', base: 'Hewn Axe — 4 Planks', pitch: 'Pitch-Hewn Axe', coke: 'Coked Axe', cord: '—', flux: 'Fluxed Axe', wax: '—' },
+  { pattern: 'Pickaxe', base: 'Iron Pickaxe — 5 Ingots + 3 Planks', pitch: 'Pitched Pick', coke: 'Coked Pick', cord: '—', flux: 'Fluxed Pick', wax: '—' },
+  { pattern: 'Bow', base: 'Sinew Longbow — 4 Leather + 3 Cloth', pitch: 'Pitched Longbow', coke: '—', cord: 'Corded Longbow', flux: '—', wax: 'Waxed Longbow' },
+  { pattern: 'Armor', base: 'Leather Armor — 6 Leather + 2 Cloth', pitch: '—', coke: 'Coked Plate', cord: 'Corded Armor', flux: '—', wax: 'Waxed Armor' },
+  { pattern: 'Boots', base: 'Reinforced Boots — 4 Cut Stone + 3 Leather', pitch: '—', coke: '—', cord: 'Corded Boots', flux: 'Fluxed Boots', wax: 'Waxed Boots' },
 ]
 
 const TOOL_MATRIX = [
@@ -264,16 +326,16 @@ const SINKS = [
     tier: 'T1',
     rank: 'uncommon' as const,
     faucet: 'Oddity roll',
-    sink: 'Processing into T2; storage decay over cap',
-    quality: 'Good — two independent sinks, one of them passive.',
+    sink: 'Processing into T2; bag pressure to sell or drop',
+    quality: 'Good — two independent sinks, one of them forced by the bag.',
   },
   {
-    group: '5 refined',
+    group: '7 refined',
     tier: 'T2',
     rank: 'rare' as const,
     faucet: 'Processing only',
-    sink: 'Equipment repair — §8.2',
-    quality: 'Good, and it fixes a standing problem: repair currently competes with crafting for the same five refined materials.',
+    sink: 'Equipment repair — §8.2 — and the alternative recipe lines',
+    quality: 'Good, and it fixes a standing problem: repair currently competes with crafting for the same five refined materials. Two sinks now, and the second one destroys them too.',
   },
   {
     group: '5 prizes',
@@ -293,6 +355,18 @@ const SINKS = [
   },
 ]
 
+const SUMMARY = [
+  { of: 'New materials', n: '22', note: '5 forage reagents · 5 grade raws · 7 refined · 5 tile prizes. No new T4.' },
+  { of: 'New scrap', n: '5', note: 'Outside the 42, as the existing five sit outside the 20. Sells at 1g, feeds nothing.' },
+  { of: 'Catalog keys', n: '29 → 56', note: '93% larger, hand-mirrored across PHP and TypeScript, currently unguarded.' },
+  { of: 'New verb', n: '1', note: 'Forage. Second job kind, second action on a hex, its own UI.' },
+  { of: 'Stats retired', n: '1', note: 'yield, as a gear stat. Skill-based yield is untouched.' },
+  { of: 'Stats added', n: '2', note: 'cooldown and oddity. Both capped by the same STAT_CEILING.' },
+  { of: 'Rules moved', n: '1', note: 'The §7.3 floor, 30 min → 20. The clamp itself stays mandatory.' },
+  { of: 'Migration rows', n: '~89', note: 'Plus the item catalog, plus the gathering trees regenerated.' },
+  { of: 'Decisions', n: '9', note: 'One settled (5). Two are architectural rather than design: 3 and 9.' },
+]
+
 const DECISIONS = [
   {
     q: 'Which cooldown, and does the §7.3 floor move?',
@@ -305,8 +379,8 @@ const DECISIONS = [
     rec: 'Accept. Skill-based yield is untouched, so idle players keep the larger of the two yield sources and lose only the gear slice.',
   },
   {
-    q: 'Twenty new materials at once, or phased?',
-    body: '29 → 49 is a 69% larger catalog, hand-mirrored across PHP and TypeScript, with no parity test guarding the item half of it.',
+    q: 'Twenty-two new materials at once, or phased?',
+    body: '29 → 56 catalog keys is a 93% larger catalog, hand-mirrored across PHP and TypeScript, with no parity test guarding the item half of it.',
     rec: 'Phase it, per the build order below — and land the catalog parity test before phase 2, not after.',
   },
   {
@@ -316,18 +390,28 @@ const DECISIONS = [
   },
   {
     q: 'Is a tile’s feature public, or does it cost a query?',
-    body: 'Seed-derived means the client can label every Rich and Prize tile on the map, unscouted or not — which makes the map worth reading, and makes the §5.6 fog thinner than it was.',
-    rec: 'Public feature, server-side roll. Knowing a hex is Rich is a reason to walk there; what it just paid someone else is the thing fog should keep.',
+    body: 'SETTLED — the feature is never drawn, and is reported only for ground inside the sight disc. Richer tiles are blended in among ordinary ones of the same biome, so the terrain layer and §13.2 are untouched. Two things have to hold for that to mean anything. It must not derive from the public MAP_SEED, or the client computes the whole map offline and the fog is decoration — a server-only salt fixes that at no storage cost. And the hint must ride in the /api/map disc response rather than per-tile preview, or finding good ground costs nineteen requests where it costs one.',
+    rec: 'Invisible, salted, and carried in the disc response. Add FEATURE_SALT alongside MAP_SEED, never ship it to the client, and extend the array /api/map already returns.',
   },
   {
     q: 'Confirm the two §4 rules this rewrites.',
-    body: 'The “20 materials, plus 5 scrap” headline becomes “40, plus 5 scrap, plus 4 raid”. And §4.0’s “scrap reaches no other tier” stays true only because reagents are deliberately not scrap.',
-    rec: 'Rewrite the §4 headline; keep §4.0 exactly as written and let forage sit beside it.',
+    body: '§4 counts material classes — 20, four of which are raid — while the catalog counts keys, 29, because the single Shard class is five element-typed keys. Twenty-two new classes makes the headline “42 total, plus 10 scrap”, with raid still inside the 42; stated in keys that is 29 → 56, of which five are the new scrap. Watch the units: “40, plus 5 scrap, plus 4 raid” counted raid twice and only looked right because 40 + 5 + 4 landed on the old key total by coincidence. And §4.0’s “scrap reaches no other tier” stays true for all ten, and stays true of reagents only because they are deliberately not scrap.',
+    rec: 'Rewrite the §4 headline to “42 total, plus 10 scrap” and name the unit it counts; keep §4.0 exactly as written and let forage sit beside it.',
   },
   {
     q: 'Forage as a separate verb, or a mode of mining?',
     body: 'A separate verb needs a second action on the hex, a second job kind in the trip system, and its own UI. A mode would be cheaper — but it means unequipping, which §8.0 rule 3 forbids by name.',
     rec: 'Separate verb. The more expensive build, and the only one that does not contradict a mandatory rule.',
+  },
+  {
+    q: 'May common-tier gear carry a fixed option, when §8.0 gives it zero rolls?',
+    body: 'Village gear is common, and §8.0’s table says common rolls no options at all. A fixed option is a different column from a rolled one — Unique already reads “3 + fixed perk”, so the precedent for separating them exists — but if the table does not say so out loud the two get read as one budget, and the first person to add a rolled line to a village item breaks the rung.',
+    rec: 'Allow it, and give §8.0 a separate “fixed perk” column so the distinction lives in the table rather than in someone’s memory.',
+  },
+  {
+    q: 'Patterns and modifiers, or twenty-five item rows?',
+    body: 'Five patterns × five materials is 25 tool variants before worn gear is counted. As rows that is ~50 new entries hand-mirrored across Catalog.php and catalog.ts — the file decision 3 already flags as unguarded — landing straight after the catalog grew 29 → 56.',
+    rec: 'Patterns and modifiers, resolved at craft time. Ten rows instead of fifty, and §8.4 already sets the precedent by deriving bench category from slot rather than storing it.',
   },
 ]
 
@@ -338,7 +422,7 @@ const PHASES = [
   },
   {
     name: 'Oddity rolls — grade and feature',
-    body: 'The 25% and 6% tables, five T1 raws, five T2 refined, tool-rarity gating, and repair costs moved onto the new T2s. The catalog parity test lands here, before the catalog doubles.',
+    body: 'The 25% and 6% tables, five T1 raws, seven T2 refined, tool-rarity gating, and repair costs moved onto the new T2s. The catalog parity test lands here, before the catalog doubles.',
   },
   {
     name: 'yield → cooldown',
@@ -358,22 +442,29 @@ const PHASES = [
       <!-- ─────────────────────────────────────────────────── the thesis -->
       <section class="lede">
         <p class="tiny muted intro">
-          Two forest hexes are currently the same forest hex. This gives each tile a
-          table of its own — a second, smaller reward rolled on top of the haul, where
+          Two forest hexes are currently the same forest hex. They will go on
+          <em>looking</em> the same — and stop being the same. This gives each tile a
+          table of its own, a second and smaller reward rolled on top of the haul, where
           what the table <em>can</em> pay is gated by the tool in your hand and how often
-          it pays is shifted by rolled options and potions. Alongside it: twenty new
-          materials, a bare-handed <em>forage</em> verb that potions depend on, and the
-          retirement of the <code>yield</code> stat in favour of cooldown.
+          it pays is shifted by rolled options and potions. Nothing on the map advertises
+          which hex is which: the richer ground is blended in among ordinary ground of
+          the same biome, and scouting is the only thing that separates them. Alongside
+          it: twenty-two new materials, a bare-handed <em>forage</em> verb that potions
+          depend on, and the retirement of the <code>yield</code> stat in favour of
+          cooldown.
         </p>
       </section>
 
       <section class="field-block">
+        <div class="field-pair">
+        <div v-for="panel in FIELD_PANELS" :key="panel.title" class="field-panel">
+          <span class="label">{{ panel.title }}</span>
         <div class="field-hold">
           <svg
             class="field"
             :viewBox="viewBox"
             role="img"
-            aria-label="A fragment of the hex map: a forest belt meeting mountain, with two rich tiles, one forage tile and one prize tile among the plain ones."
+            :aria-label="panel.alt"
           >
             <g v-for="t in field" :key="t.key" :transform="`translate(${t.x},${t.y})`">
               <path :d="HEX_SIDE_PATH" :fill="t.side" />
@@ -385,15 +476,16 @@ const PHASES = [
                 <path d="M0,-8 L3.4,-1.6 L-3.4,-1.6 Z" :fill="t.light" />
               </template>
 
-              <!-- Copper reads “more of it”, gold reads “rarity” — §13.1. -->
-              <template v-if="t.feature === 'rich'">
+              <!-- Copper reads “more of it”, gold reads “rarity” — §13.1. These are
+                   drawn ONLY in the scouted panel; the map itself never shows them. -->
+              <template v-if="panel.reveal && t.feature === 'rich'">
                 <circle cx="-5" cy="-3" r="1.9" :fill="COPPER" />
                 <circle cx="0" cy="3" r="1.9" :fill="COPPER" />
                 <circle cx="5" cy="-3" r="1.9" :fill="COPPER" />
               </template>
 
               <g
-                v-else-if="t.feature === 'forage'"
+                v-else-if="panel.reveal && t.feature === 'forage'"
                 stroke="#cdd8ae"
                 stroke-width="1.5"
                 stroke-linecap="round"
@@ -404,12 +496,14 @@ const PHASES = [
                 <path d="M6,5 C6,0 7,-2 8,-4" />
               </g>
 
-              <template v-else-if="t.feature === 'prize'">
+              <template v-else-if="panel.reveal && t.feature === 'prize'">
                 <path :d="PRIZE_RING" fill="none" :stroke="GOLD" stroke-width="1.7" stroke-linejoin="round" />
                 <circle cx="0" cy="0" r="2.4" :fill="GOLD" />
               </template>
             </g>
           </svg>
+        </div>
+        </div>
         </div>
 
         <div class="legend">
@@ -451,10 +545,14 @@ const PHASES = [
         </div>
 
         <p class="tiny muted caption">
-          A forest belt meeting mountain, drawn through <code>hexGeometry.ts</code> and
-          <code>palette.ts</code> — the same geometry and the same shading the map uses.
-          Every tile here is the biome material it always was; what changed is that four
-          of them are now worth choosing. The two drained tiles are depleted, as today.
+          The same nine-by-four fragment twice, drawn through <code>hexGeometry.ts</code>
+          and <code>palette.ts</code> — the same geometry and the same shading the map
+          uses. <strong>They are the same four tiles in both panels.</strong> The left is
+          what the client draws at any distance; the right is what the server reports for
+          ground inside your sight disc. Nothing was added to the terrain to make the
+          right-hand panel possible, and nothing is missing from the left-hand one — the
+          difference is entirely what has been scouted. The two drained tiles are
+          depleted, as today, and they are the one thing the map <em>does</em> show.
         </p>
       </section>
 
@@ -490,7 +588,8 @@ const PHASES = [
           <code>tripYield()</code> — and then rolls <strong>once</strong> against the tile’s
           oddity table. At most one oddity per trip. That cap is what keeps this a
           texture change rather than a second economy: the main haul stays the thing you
-          plan around, and the oddity is the reason one hex beats its neighbour.
+          plan around, and the oddity is the reason one hex quietly beats its neighbour
+          without ever looking different from it.
         </p>
 
         <div class="sheet-hold">
@@ -512,32 +611,80 @@ const PHASES = [
 
         <p class="tiny muted prose">
           The tile’s feature comes from its own hash, exactly the way it already draws
-          <code>baseSeconds</code> and <code>baseYield</code>. Nothing is stored and nothing
-          is queried — which also means the client can derive it, and that is a decision
-          rather than a detail.
+          <code>baseSeconds</code> and <code>baseYield</code>. Nothing is stored.
+          <strong>Nothing is drawn, either</strong> — the feature changes what a hex pays,
+          never what it looks like. Richer ground is blended in among ordinary ground of
+          the same biome, and the terrain layer is untouched.
+        </p>
+
+        <p class="tiny muted prose">
+          That is the difference between a map you read and a map you <em>work</em>. A
+          visible Prize tile turns the inner ring into a queue at a known address; an
+          invisible one means the way to find good ground is to go and scout it, which is
+          the behaviour §5.2 wants out of the contested band anyway. It also costs §13.2
+          nothing: no new tile props, no new legend, no third thing competing with rarity
+          and material for the same colour.
         </p>
 
         <div class="sheet-hold">
           <table class="sheet">
-            <thead><tr><th>Feature</th><th class="right">Weight</th><th>Effect on the table</th><th>Where</th></tr></thead>
+            <thead><tr><th>Feature</th><th class="right">Weight</th><th>Effect on the table</th><th>Where</th><th>Visible tell</th></tr></thead>
             <tbody>
               <tr v-for="f in FEATURE_ROWS" :key="f.name">
                 <td class="lead">{{ f.name }}</td>
                 <td class="right readout">{{ f.weight }}</td>
                 <td>{{ f.effect }}</td>
                 <td class="muted">{{ f.where }}</td>
+                <td class="muted">{{ f.tell }}</td>
               </tr>
             </tbody>
           </table>
         </div>
 
         <div class="flag">
-          <span class="label warn">Decide this — decision 5</span>
+          <span class="label warn">Settled — decision 5</span>
           <p class="tiny muted">
-            A seed-derived feature is <strong>public</strong>: the client can compute it for
-            any hex on the map, unscouted ones included. That is either the best thing
-            about this system or a hole in the fog just built in §5.6, depending on what
-            fog is meant to mean. The roll itself stays server-side either way.
+            The feature is <strong>never drawn on the map</strong> and is served only for
+            ground inside the sight disc, which §5.6 already bounds and already refuses to
+            report on when unscouted. Terrain gains nothing: no prop, no tint, no glyph. A
+            hex with a fortune in it looks exactly like the one beside it until somebody
+            walks close enough to be told.
+          </p>
+          <p class="tiny muted">
+            <strong>Put the hint in the disc response, not in per-tile preview.</strong>
+            This is the part that can quietly go wrong. If a player has to preview each
+            hex to find the good one, a nineteen-tile disc costs nineteen requests where
+            it costs one today — the exact multiplication §5.6 sized the disc to avoid,
+            and it grows as the square of sight. <code>/api/map</code> already returns
+            <code>depleted</code> and <code>occupied</code> for the whole disc in a single
+            call; the feature belongs in that same array. One request, nineteen answers,
+            unchanged budget. Per-tile preview then reports the feature it was already
+            going to describe, rather than being the only way to learn it.
+          </p>
+          <p class="tiny muted">
+            <strong>One consequence, and it is load-bearing:</strong> the feature must
+            <em>not</em> derive from the public map seed. Terrain is a pure function of
+            <code>(col, row, MAP_SEED)</code> and the client is handed that seed at boot —
+            so a seed-derived feature is computable offline for all 40,000 tiles, and
+            routing it through an endpoint would only change what an honest client
+            displays. Deriving it from a <strong>server-only salt</strong> instead —
+            <code>hash(col, row, FEATURE_SALT)</code> — keeps it a pure function with no
+            storage, while making the preview endpoint the only way to learn it. That is
+            what turns “the player will think it came from the server” into “it did”.
+          </p>
+          <p class="tiny muted">
+            <strong>The salt touches the feature and nothing else.</strong> Biome, ring and
+            terrain stay derived from the public <code>MAP_SEED</code> exactly as today,
+            because §5.6 depends on the client drawing land it has never visited for free —
+            salt them and the map cannot render past the sight disc. The salt is a second,
+            private input used for one roll, not a change to how the world is generated.
+          </p>
+          <p class="tiny muted">
+            <strong>Cost is one hash per tile asked about</strong>, computed and thrown
+            away: one for a preview, at most sixty-one for a full-sight map call, and none
+            at all for a tile nobody looks at. No table, no row per feature, no migration —
+            which is the reason to derive it rather than roll it once and store it for all
+            40,000 tiles.
           </p>
         </div>
       </section>
@@ -545,15 +692,53 @@ const PHASES = [
       <!-- ─────────────────────────────────────────────────── materials -->
       <section>
         <header class="head">
-          <span class="label">Amends §4 — “20 plus 5 scrap” becomes 40, plus 5 scrap, plus 4 raid</span>
-          <h2>Twenty new materials</h2>
+          <span class="label">Amends §4 — “20 plus 5 scrap” becomes “42 plus 10 scrap”, raid still inside the 42</span>
+          <h2>Twenty-two new materials</h2>
         </header>
 
         <p class="tiny muted prose">
-          The catalog holds 29 today. This adds 20, for 49. Each group exists because it
-          has a sink, not because a tier looked thin — §11’s north star is what shaped the
-          list, and the audit is two sections down.
+          The catalog holds 29 keys today. This adds 22 materials and 5 more scrap, for
+          56. Each group exists because it has a sink, not because a tier looked thin —
+          §11’s north star is what shaped the list, and the audit is two sections down.
+          The scrap is the one exception, and it is honest about it: it has no sink
+          because it has no value to sink.
         </p>
+
+        <h3 class="sub">Five more scrap — texture, not value</h3>
+        <p class="tiny muted prose">
+          A second thing bare hands can come away with in each biome, so what a tile
+          hands you reads as belonging to that tile rather than to a table of five.
+          These sit <strong>outside the forty</strong>, exactly as the existing scrap sits
+          outside the twenty: no recipe takes them, no tier reaches them, and the only
+          thing they do is sell.
+        </p>
+        <div class="sheet-hold">
+          <table class="sheet">
+            <thead><tr><th>Scrap</th><th>Key</th><th>Biome</th><th>Beside</th><th>What it is</th></tr></thead>
+            <tbody>
+              <tr v-for="m in SCRAP" :key="m.key">
+                <td class="lead"><span class="pip" :style="{ background: BIOME_COLOR[m.biome] }" />{{ m.name }}</td>
+                <td><code>{{ m.key }}</code></td>
+                <td class="nowrap muted">{{ m.biome }}</td>
+                <td class="nowrap muted">{{ m.beside }}</td>
+                <td>{{ m.what }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="flag">
+          <span class="label warn">§4.0 leaves no room to price these</span>
+          <p class="tiny muted">
+            All ten scrap sell for <strong>1 gold</strong>, and that is forced rather than
+            chosen. Raw materials sell for <strong>2–3</strong> today, and §4.0 requires
+            every raw to sell for <em>more</em> than scrap — it calls that gap “a rule, not
+            a tuning value”, because it is the entire argument for buying a first tool. A
+            2-gold scrap would tie wood, stone and fiber and collapse it. So a Rich hex
+            cannot pay a toolless player better, and should not: the feature is what the
+            tool is <em>for</em>.
+          </p>
+        </div>
 
         <h3 class="sub">Forage reagents — bare hands only</h3>
         <p class="tiny muted prose">
@@ -576,9 +761,10 @@ const PHASES = [
 
         <h3 class="sub">Grade oddities — the T1 raws a trip turns up</h3>
         <p class="tiny muted prose">
-          Non-tradeable and decay-over-cap like every other raw. Each refines into exactly
-          one T2 below, which gives them a processing sink from day one rather than
-          sitting in bags waiting for a recipe.
+          Non-tradeable, and they take up a strap like every other raw. Each refines into
+          exactly one T2 below, which gives them a processing sink from day one rather than
+          sitting in bags waiting for a recipe — and the bag (§7.6) is what makes sitting
+          there cost something.
         </p>
         <div class="sheet-hold">
           <table class="sheet">
@@ -599,24 +785,51 @@ const PHASES = [
         <p class="tiny muted prose">
           Keeping T2 unreachable by dropping is deliberate: “refined means someone
           processed it” is the rule that makes settlements matter, and an oddity that
-          skipped the bench would quietly weaken §6. These five carry the
-          <strong>repair</strong> sink, which today competes with crafting for the same five
-          refined materials and would stop doing so.
+          skipped the bench would quietly weaken §6. Each carries two jobs. It takes over
+          the <strong>repair</strong> sink, which today competes with crafting for the same
+          five refined materials and would stop doing so — and it <strong>opens an
+          alternative recipe line</strong>, so the reward for working a Rich hex is a
+          second way to build a tool, a weapon, a set of armor or a potion, rather than
+          more of the numbers you already had.
         </p>
         <div class="sheet-hold">
           <table class="sheet">
-            <thead><tr><th>Material</th><th>Key</th><th>From</th><th>Line</th><th>Consumed by</th></tr></thead>
+            <thead><tr><th>Material</th><th>Key</th><th>From</th><th>Line</th><th>Repairs</th><th>Opens</th></tr></thead>
             <tbody>
               <tr v-for="m in REFINED" :key="m.key">
                 <td class="lead">{{ m.name }}</td>
                 <td><code>{{ m.key }}</code></td>
                 <td class="nowrap">{{ m.from }}</td>
                 <td class="nowrap muted">{{ m.line }}</td>
-                <td>{{ m.use }}</td>
+                <td class="muted">{{ m.repair }}</td>
+                <td>{{ m.opens }}</td>
               </tr>
             </tbody>
           </table>
         </div>
+
+        <p class="tiny muted prose">
+          <strong>No cosmetic tier here.</strong> A recolour is a material whose sink is
+          taste, and taste does not consume anything twice — the ask was more ways to
+          build, so every one of these ends in a bench.
+        </p>
+
+        <p class="tiny muted prose">
+          The last two are <strong>cross-combos</strong>, and they exist because §8.4 has
+          three benches while the five gathering lines only ever fed two of them. Weapons
+          had Pitch, Coke and Flux; armor had Cord and Wax between other jobs; the
+          consumable bench had reagents and no refined input at all. <strong>Salve</strong>
+          gives the alchemist one and <strong>Scale</strong> gives the armorer one, so each
+          bench owns a material rather than borrowing the weapon bench’s.
+        </p>
+
+        <p class="tiny muted prose">
+          Being cross-combos is also what keeps them off the village ladder. A village runs
+          one line and cannot make either, exactly as it cannot make a Reinforced Frame
+          today — so Salve and Scale are a <em>city</em> speciality sitting one rung above
+          the five single-line variants, and the §6 tier ladder gains a rung instead of
+          being flattened.
+        </p>
 
         <h3 class="sub">T3 tile prizes — inner ring, wallet-capped</h3>
         <p class="tiny muted prose">
@@ -668,7 +881,7 @@ const PHASES = [
         <div class="sheet-hold">
           <table class="sheet">
             <thead>
-              <tr><th>Tool for the line</th><th>Main haul</th><th class="right">Grade</th><th class="right">Feature</th><th class="right">Prize</th></tr>
+              <tr><th>Tool for the line</th><th>Main reward</th><th class="right">Grade</th><th class="right">Feature</th><th class="right">Prize</th></tr>
             </thead>
             <tbody>
               <tr v-for="t in TOOL_MATRIX" :key="t.tool">
@@ -705,6 +918,121 @@ const PHASES = [
             gathering-tool ladder in §8.3 would stop being a ladder.
           </li>
         </ul>
+      </section>
+
+      <!-- ─────────────────────────────────────────────────── variants -->
+      <section>
+        <header class="head">
+          <span class="label">Amends §8.0.1 options, §8.3 recipes, §6 settlements</span>
+          <h2>Variants — one pattern, five materials, five specialities</h2>
+        </header>
+
+        <p class="tiny muted prose">
+          A recipe today makes one thing. This makes a recipe a <strong>pattern</strong> —
+          axe, bow, armor — that any of the five new T2 refined can finish, and the
+          material decides which <strong>fixed option</strong> the result carries. Not
+          rolled: the same on every copy, known before you craft it. Two axes at the same
+          rung stop being the same axe.
+        </p>
+
+        <div class="sheet-hold">
+          <table class="sheet">
+            <thead><tr><th>Material</th><th>Line</th><th>Fixed option</th><th>Why that one</th></tr></thead>
+            <tbody>
+              <tr v-for="m in MATERIAL_PERKS" :key="m.mat">
+                <td class="lead">{{ m.mat }}</td>
+                <td class="nowrap muted">{{ m.line }}</td>
+                <td class="nowrap readout">{{ m.perk }}</td>
+                <td>{{ m.why }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 class="sub">Sidegrades, never rungs</h3>
+        <ul class="rules">
+          <li class="on">
+            <strong>Every variant sits on the rung its pattern sat on</strong> — same
+            rarity, same base stat, same recipe cost but for the material swap. What
+            differs is the signature, never the quality. §8.0 rule 4 says specialisation
+            must come from the skill point cap and never from one line being offered
+            better tools; a sidegrade is the only shape that obeys it.
+          </li>
+          <li class="on">
+            <strong>A fixed option is inside the ceiling like everything else.</strong> It
+            feeds the same aggregate and the same <code>STAT_CEILING</code> clamp as base
+            stats, rolled options, tree nodes and potions. Being deterministic buys
+            predictability, not headroom.
+          </li>
+          <li>
+            <strong>Open:</strong> §8.0 gives common <em>zero</em> option rolls, and village
+            gear is common. A fixed option is a different column from a rolled one — the
+            precedent is Unique’s “3 + fixed perk” — but the table has to say so out loud
+            or the two will be read as the same budget. This is decision 8.
+          </li>
+        </ul>
+
+        <h3 class="sub">Where the village speciality comes from</h3>
+        <p class="tiny muted prose">
+          Nothing new on the map, and no new field on a settlement. §6 already says a
+          <strong>village runs 1 of the 5 processing lines</strong> — so it can make exactly
+          one of the five T2 refined, and therefore exactly one family of variants. The
+          speciality is not granted to a village; it is the rule it already lives under,
+          finally producing something visible.
+        </p>
+
+        <div class="sheet-hold">
+          <table class="sheet">
+            <thead>
+              <tr><th>Pattern</th><th>Base recipe today</th><th>Pitch</th><th>Coke</th><th>Cord</th><th>Flux</th><th>Wax</th></tr>
+            </thead>
+            <tbody>
+              <tr v-for="v in VARIANTS" :key="v.pattern">
+                <td class="lead">{{ v.pattern }}</td>
+                <td class="muted nowrap">{{ v.base }}</td>
+                <td>{{ v.pitch }}</td>
+                <td>{{ v.coke }}</td>
+                <td>{{ v.cord }}</td>
+                <td>{{ v.flux }}</td>
+                <td>{{ v.wax }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <ul class="rules">
+          <li class="on">
+            <strong>A village is worth walking to for what it is, not what tier it is.</strong>
+            A woodcutting village is the only place a Pitch-Hewn Axe exists; a mining
+            village is the only source of a Coked Pick. Cities run 2 lines and reach 2
+            families, capitals run all 5 — so the tier ladder is untouched and the
+            variety sits underneath it.
+          </li>
+          <li class="on">
+            <strong>It gives the outer ring a reason to be visited at all.</strong> Today
+            the map’s only pull is inward, toward capitals and dungeons; §5.2 wants two
+            opposing pulls. A speciality that exists nowhere else is an outward one.
+          </li>
+        </ul>
+
+        <div class="flag">
+          <span class="label warn">Do not store these as rows — decision 9</span>
+          <p class="tiny muted">
+            Five patterns × five materials is <strong>25 tool variants</strong>, and worn
+            patterns add more. Hand-listing them would put roughly fifty new rows into
+            <code>Catalog.php</code> and fifty hand-mirrored copies into
+            <code>catalog.ts</code> — into the very file decision 3 flags as having no
+            parity test, immediately after the catalog already grew 29 → 56.
+          </p>
+          <p class="tiny muted">
+            Store the <strong>pattern</strong> and the <strong>material modifier</strong>
+            instead — five plus five — and resolve <code>(pattern, material)</code> at
+            craft time, exactly as §8.4 derives a bench category from a slot rather than
+            storing it. Ten rows rather than fifty, the sixth material multiplies for
+            free, and there is one place for a fixed option to be defined rather than
+            twenty-five places for two of them to disagree.
+          </p>
+        </div>
       </section>
 
       <!-- ─────────────────────────────────────────────────── forage -->
@@ -826,9 +1154,11 @@ trip   = clamp(timed, FLOOR, CEILING)                // FLOOR 30 min → 20 min<
         </header>
 
         <p class="tiny muted prose">
-          “A game that only accumulates is a spreadsheet.” Fifteen of the twenty new
+          “A game that only accumulates is a spreadsheet.” Seventeen of the twenty-two new
           materials are consumed by something that destroys them; the other five are
-          wallet-capped so they cannot accumulate in the first place.
+          wallet-capped so they cannot accumulate in the first place. The five new scrap
+          are outside this table and outside the forty: selling is the only thing they do,
+          so gold is their sink and they never enter the economy §11 has to balance.
         </p>
 
         <div class="sheet-hold">
@@ -853,7 +1183,8 @@ trip   = clamp(timed, FLOOR, CEILING)                // FLOOR 30 min → 20 min<
       <section>
         <header class="head">
           <span class="label">Your call — the build order references these by number</span>
-          <h2>Seven decisions before any of this is written</h2>
+          <h2>Nine decisions before any of this is written</h2>
+          <p class="tiny muted">Decision 5 is settled; the remaining eight are open.</p>
         </header>
 
         <div class="decisions">
@@ -891,8 +1222,87 @@ trip   = clamp(timed, FLOOR, CEILING)                // FLOOR 30 min → 20 min<
         </div>
       </section>
 
+      <!-- ─────────────────────────────────────────────────── summary -->
+      <section>
+        <header class="head">
+          <span class="label">The whole proposal on one screen</span>
+          <h2>Summary</h2>
+        </header>
+
+        <div class="sheet-hold">
+          <table class="sheet">
+            <thead><tr><th>What</th><th class="right">How much</th><th>Note</th></tr></thead>
+            <tbody>
+              <tr v-for="r in SUMMARY" :key="r.of">
+                <td class="lead nowrap">{{ r.of }}</td>
+                <td class="right readout nowrap">{{ r.n }}</td>
+                <td>{{ r.note }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 class="sub">What it buys</h3>
+        <ul class="rules">
+          <li class="on">
+            <strong>Two hexes of the same biome stop being the same hex — without
+            looking different.</strong> That is the whole thesis, and the tile feature is
+            the only part that delivers it. Because it is never drawn, the way to find
+            good ground is to go and scout it, which is the behaviour §5.2 wants out of
+            the contested band. It also costs §13.2 nothing: no new props, no new legend.
+          </li>
+          <li class="on">
+            <strong>Every bench owns a material.</strong> Weapons get Pitch, Coke and Flux;
+            armor gets Cord, Wax and Scale; the consumable bench gets reagents and Salve.
+            Before this, §8.4’s three benches shared one set of five refined.
+          </li>
+          <li class="on">
+            <strong>A village becomes somewhere, not just a tier.</strong> One processing
+            line means one variant family, which no other village of that line-mix sells —
+            and it costs no new map data, because §6 already said it.
+          </li>
+          <li class="on">
+            <strong>The repair sink stops competing with crafting</strong> for the same five
+            refined materials, which is a standing problem in §8.2 that this fixes as a
+            side effect rather than as its purpose.
+          </li>
+        </ul>
+
+        <h3 class="sub">What it costs, honestly</h3>
+        <ul class="rules">
+          <li>
+            <strong>The catalog nearly doubles</strong> — 29 keys to 56 — in a file with no
+            parity test, right after the jobs plan already flagged the mirror as overdue.
+            Decision 3 phases it and decision 9 keeps the item half from multiplying;
+            neither removes the risk, they only bound it.
+          </li>
+          <li>
+            <strong>One north-star argument is genuinely lost.</strong> Cooldown pays the
+            player who comes back to spend it, and §1 is an idle game. Decision 2 is the
+            only one here that cannot be mitigated into comfort — it is a trade, and it
+            should be taken deliberately or not at all.
+          </li>
+          <li>
+            <strong>Forage is a second verb, with everything that implies</strong> — a job
+            kind, an action on the hex, a UI, and a fifteen-minute number with no measured
+            basis behind it. It is the cheapest phase to ship and the easiest to get wrong
+            quietly.
+          </li>
+        </ul>
+
+        <div class="flag">
+          <span class="label warn">If only one thing ships</span>
+          <p class="tiny muted">
+            <strong>Phase 1.</strong> Forage plus the tile feature is self-contained: no
+            stat retired, no existing drop touched, no equipment changed, and no migration.
+            It answers the potion ask, it makes tiles differ, and it is reversible. Every
+            argument on this page that could turn out wrong lives in phases 2 to 4.
+          </p>
+        </div>
+      </section>
+
       <footer class="foot tiny muted">
-        Proposal for CLAUDE.md — nothing here is implemented, and none of these twenty
+        Proposal for CLAUDE.md — nothing here is implemented, and none of these twenty-two
         materials exist in <code>catalog.ts</code>. Every number is a starting value for
         tuning, per the design doc’s own standing rule. Percentages in the oddity tables
         are per trip, before the <code>oddity</code> stat is applied.
@@ -907,6 +1317,27 @@ trip   = clamp(timed, FLOOR, CEILING)                // FLOOR 30 min → 20 min<
   height: 100%;
   min-height: 0;
   overflow-y: auto;
+}
+
+/* This is a document, not the HUD. The global .tiny/.label/.muted sizes are
+   tuned for dense game panels read in glances -- 11.5px body and 9.5px
+   letter-spaced caps -- and at the length of this page they stop being
+   readable. Overridden here rather than globally, because every other screen
+   still wants the dense values. */
+.doc :deep(.tiny) {
+  font-size: 13.5px;
+  line-height: 1.7;
+}
+
+.doc :deep(.label) {
+  font-size: 10.5px;
+  letter-spacing: 0.13em;
+}
+
+/* Long-form body text sits between vellum and vellum-dim: dim enough to stay
+   secondary to headings, light enough to read a paragraph of. */
+.doc :deep(.muted) {
+  color: #ddd2b6;
 }
 
 .col {
@@ -929,9 +1360,9 @@ section {
 }
 
 .intro {
-  font-size: 13.5px;
-  line-height: 1.62;
-  max-width: 76ch;
+  font-size: 15px;
+  line-height: 1.65;
+  max-width: 68ch;
 }
 
 .head {
@@ -949,9 +1380,12 @@ section {
   margin-top: 6px;
 }
 
+/* 68ch keeps the line count per paragraph honest while the larger type makes
+   the block physically wider, so prose no longer reads as a torn-off ribbon
+   next to the full-width tables. */
 .prose {
-  max-width: 76ch;
-  line-height: 1.6;
+  max-width: 68ch;
+  line-height: 1.7;
 }
 
 code {
@@ -961,6 +1395,28 @@ code {
 }
 
 /* ------------------------------------------------------------------ field */
+
+/* The two panels are the same four tiles, so they have to be comparable at a
+   glance -- side by side above the fold where the column allows it, stacked
+   only when it does not. */
+.field-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.field-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+}
+
+@media (max-width: 900px) {
+  .field-pair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
 
 .field-block {
   gap: 16px;
@@ -980,7 +1436,7 @@ code {
 .field {
   display: block;
   width: 100%;
-  min-width: 460px;
+  min-width: 0;
   height: auto;
 }
 
@@ -1031,7 +1487,7 @@ code {
   width: 100%;
   min-width: 620px;
   border-collapse: collapse;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .sheet th {
@@ -1039,20 +1495,20 @@ code {
   padding: 9px 12px;
   background: var(--ink-panel);
   border-bottom: 1px solid var(--hud-line-soft);
-  font-size: 9.5px;
+  font-size: 10.5px;
   font-weight: 700;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--vellum-dim);
   white-space: nowrap;
 }
 
 .sheet td {
-  padding: 9px 12px;
+  padding: 10px 12px;
   border-bottom: 1px solid var(--hud-line-soft);
   vertical-align: top;
-  color: var(--vellum-dim);
-  line-height: 1.5;
+  color: #ddd2b6;
+  line-height: 1.6;
 }
 
 .sheet tbody tr:last-child td {
@@ -1098,24 +1554,31 @@ code {
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 11px;
-  max-width: 78ch;
+  gap: 13px;
+  max-width: 68ch;
 }
 
+/* Absolute marker in a padded gutter, NOT a grid.
+   `display: grid` here made every inline child its own grid item -- each
+   <strong>, each <code>, each run of text between them -- so a single rule
+   stacked down alternating rows and whatever landed in the 18px column broke
+   to one word per line. Items were rendering 500-1000px tall. Normal inline
+   flow is what a paragraph with a bullet actually wants. */
 .rules li {
-  display: grid;
-  grid-template-columns: 18px 1fr;
-  align-items: start;
-  font-size: 12px;
-  line-height: 1.6;
-  color: var(--vellum-dim);
+  position: relative;
+  padding-left: 18px;
+  font-size: 13.5px;
+  line-height: 1.7;
+  color: #ddd2b6;
 }
 
 .rules li::before {
   content: '';
+  position: absolute;
+  left: 0;
+  top: 0.55em;
   width: 9px;
   height: 10px;
-  margin-top: 0.5em;
   background: var(--hud-line);
   clip-path: var(--hex-clip);
 }

@@ -32,8 +32,8 @@ import { ACTION_PATHS } from '@/icons/actions'
         </div>
         <p class="tiny muted">
           Amends §4 · §5.1 · §7.3 · §8.0 · §8.1 · §11. A second roll on every worked
-          hex, twenty new materials, a bare-handed forage verb, and retiring the
-          <code>yield</code> stat for cooldown — with seven decisions to settle first.
+          hex, twenty-two new materials, a bare-handed forage verb, and retiring the
+          <code>yield</code> stat for cooldown — with nine decisions, one now settled.
         </p>
       </div>
 
