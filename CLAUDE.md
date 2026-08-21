@@ -140,11 +140,18 @@ cross-map travel — same design pressure as biome-locked mining.
 |---|---|
 | Outer | Villages (dense), safe mining (low yield), most spawns |
 | Mid | Cities, mixed safe/contested mining |
-| Inner | Contested PvP-yield mining, **rare materials spawn here** |
-| Center (capital ring) | **Barren of resources.** Capitals + dungeon entrances only. |
+| Inner (capital ring) | **Capitals.** Contested PvP-yield mining, **rare materials spawn here** |
+| Center | **Barren of everything.** Dungeon entrances and nothing else — no settlement stands here. |
 
 The two opposing pulls (outward for resources, inward for processing + dungeons)
 force constant traffic through the contested middle ring. This is intentional.
+
+**Capitals stand in the contested ring, not the dead centre**, and that is the
+sharpest version of the same pull: the best bench in the game, the only one that
+runs all five lines and reaches epic, sits on ground other prospectors are
+working. You cannot process at the top tier without walking into the PvP band.
+The centre stays reserved for dungeon mouths, so the last step inward is a raid,
+never an errand.
 
 ### 5.3 Biomes
 Clustered regions (Voronoi-style from seed points), **not** random noise — players need a
@@ -172,10 +179,42 @@ cognitive load from an idle game.
 |---|---|---|---|
 | Village | 1 of 5 | Outer ring | Slowest, cheapest |
 | City | 2 of 5 | Mid ring | Moderate |
-| Capital | All 5 | Center ring | Fastest, most expensive, adjacent to dungeons |
+| Capital | All 5 | Inner (contested) ring | Fastest, most expensive, one ring out from the dungeons |
 
 Village count > City count > Capital count. This is a **cost curve outcome**, not a map-slot
 system — no extra implementation needed, just tune upgrade costs.
+
+### 6.0 Minimum spacing — a floor, not an average
+
+Two settlements of the same tier are **never closer than**:
+
+| Tier | Minimum gap |
+|---|---|
+| Village | 8 hexes |
+| City | 11 hexes |
+| Capital | 15 hexes |
+
+This is guaranteed **by construction, not by chance**. Sites sit on a lattice of
+one candidate per cell, and the window a site may occupy inside its cell is
+narrower than the cell and centred in it — so two neighbouring sites cannot
+close on each other past the leftover margin. A site free to roam its whole cell
+can sit against the shared edge of two cells, which is what previously put
+villages on touching hexes.
+
+The floor sets the ceiling on density: raising a gap thins that tier out, and
+the only lever left is the per-cell spawn chance. Village spacing costs about
+40% of the village count, which is the intended trade.
+
+**Where two tiers could crowd, the higher tier's gap wins and the lower tier is
+the one that yields** — a village keeps a city's 11 hexes, not its own 8, and a
+city is never moved by a village. Only that one pair can ever meet: villages and
+cities share the mid/outer boundary, while the barren inner ring keeps capitals
+and cities far apart by construction.
+
+Cross-tier cannot be guaranteed the way same-tier is, because the two tiers sit
+on lattices of different sizes and no choice of window separates them. It is a
+rejection instead — the lower-tier site is simply dropped — which costs one
+small lattice scan, and only for a candidate that has already earned its place.
 
 Because village/city players are always missing process lines, they stay dependent on
 dungeon loot and the NPC gold shop. This keeps every system relevant at every tier.

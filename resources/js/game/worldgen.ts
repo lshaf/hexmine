@@ -1,7 +1,7 @@
 /**
  * Client-side world generation, §5.
  *
- * The map is ~5000x5000 = 25 million tiles and none of it is stored or shipped.
+ * The map is cols x rows as the server declares it, and none of it is stored.
  * Every tile is a pure function of (col, row, seed), so the client derives
  * terrain locally and the server only sends what it cannot know: which tiles are
  * worked out and which have miners on them.
@@ -19,6 +19,7 @@
  * `npm run parity` checks this file against the very same fixture; run both.
  */
 import { hash2, rand01, randInt } from './hash'
+import { hexDistance } from '@/map/hexGeometry'
 import type { Biome, MaterialKey, Ring, Settlement, SettlementTier, SkillKey, Tile } from './types'
 
 export interface WorldConfig {
@@ -207,22 +208,138 @@ export const coarseRegionHexes = (): number => cfg().biomeCell * cfg().biomeRegi
 // --------------------------------------------------------------- settlements
 
 /**
- * Settlements sit on a jittered lattice: one candidate site per cell gives
- * minimum spacing without storing anything. Cell size per tier is what produces
- * "villages > cities > capitals" in count -- §6 calls that a cost-curve
- * outcome, and this is the generation half of it.
+ * Settlements sit on a jittered lattice: one candidate site per cell, so a
+ * region can be enumerated without storing anything. Cell size per tier is what
+ * produces "villages > cities > capitals" in count -- §6 calls that a
+ * cost-curve outcome, and this is the generation half of it.
+ *
+ * `minGap` is the guaranteed floor on the distance between two settlements of
+ * the same tier, in hexes. A cell alone does not give one: a site free to land
+ * anywhere in its cell can sit against the shared edge of two cells, which put
+ * villages on touching hexes. `siteOffset` narrows the window instead.
  */
-const LATTICE: Record<SettlementTier, { cell: number; chance: number; salt: number }> = {
-  village: { cell: 7, chance: 0.55, salt: 0x1111 },
-  city: { cell: 14, chance: 0.45, salt: 0x2222 },
-  capital: { cell: 26, chance: 0.7, salt: 0x3333 },
+const LATTICE: Record<
+  SettlementTier,
+  { cell: number; minGap: number; chance: number; salt: number }
+> = {
+  village: { cell: 11, minGap: 8, chance: 0.8, salt: 0x1111 },
+  city: { cell: 14, minGap: 11, chance: 0.45, salt: 0x2222 },
+  capital: { cell: 26, minGap: 15, chance: 0.7, salt: 0x3333 },
 }
 
+/**
+ * Where inside its cell a site sits, on one axis.
+ *
+ * The window a site may choose from is narrower than the cell and centred in
+ * it, leaving a margin at each edge. Two sites in neighbouring cells are then
+ * at least `cell - window + 1` apart on that axis -- which is `minGap` -- and
+ * hex distance is never less than the larger axial difference, so the floor
+ * holds diagonally too.
+ *
+ * Mirrored in WorldGen::siteOffset. The parity fixture pins both.
+ */
+function siteOffset(cell: number, minGap: number, h: number): number {
+  const window = cell - minGap + 1
+  const margin = Math.floor((cell - window) / 2)
+  return margin + randInt(h, 0, window - 1)
+}
+
+/**
+ * §5.2 -- which tier, if any, each concentric ring carries.
+ *
+ * Capitals sit in the contested ring, not the dead centre: the walk to a capital
+ * bench is meant to cross ground other prospectors are working, and the centre
+ * is reserved for dungeon mouths alone. Both of those rings are PvP ground.
+ */
 const TIER_FOR_RING: Record<Ring, SettlementTier | null> = {
   outer: 'village',
   mid: 'city',
-  inner: null, // contested mining ground, no safe infrastructure
-  center: 'capital',
+  inner: 'capital', // contested, and where the best bench stands
+  center: null, // dungeon mouths only, and barren of everything else
+}
+
+/** Weakest first. A tier yields to everything above it and to nothing below. */
+const TIER_ORDER: SettlementTier[] = ['village', 'city', 'capital']
+
+const TIERS_ABOVE = Object.fromEntries(
+  TIER_ORDER.map((tier, i) => [tier, TIER_ORDER.slice(i + 1)]),
+) as Record<SettlementTier, SettlementTier[]>
+
+/** Where a tier's candidate sits inside one cell. Position only -- this says
+ *  nothing about whether the cell actually fills. */
+function siteIn(tier: SettlementTier, cellCol: number, cellRow: number): [number, number] {
+  const c = cfg()
+  const { cell, minGap, salt } = LATTICE[tier]
+  return [
+    cellCol * cell + siteOffset(cell, minGap, hash2(cellCol, cellRow, c.seed ^ salt)),
+    cellRow * cell + siteOffset(cell, minGap, hash2(cellRow, cellCol, c.seed ^ (salt + 1))),
+  ]
+}
+
+/** Not every cell gets a settlement -- that is what makes density feel organic. */
+function cellFills(tier: SettlementTier, cellCol: number, cellRow: number): boolean {
+  const c = cfg()
+  const { chance, salt } = LATTICE[tier]
+  return rand01(hash2(cellCol, cellRow, c.seed ^ (salt + 2))) <= chance
+}
+
+/**
+ * The settlement of this tier standing in this cell, or null.
+ *
+ * Everything a site has to pass except the crowding test, which is deliberately
+ * left out: this is what `crowdedByBetter` asks about its *neighbours*, and
+ * putting it here would recurse.
+ */
+function settledSite(
+  tier: SettlementTier,
+  cellCol: number,
+  cellRow: number,
+): [number, number] | null {
+  if (!cellFills(tier, cellCol, cellRow)) return null
+
+  const [col, row] = siteIn(tier, cellCol, cellRow)
+  // A site generated for one ring but landing in another is not a settlement of
+  // that tier -- tiers never bleed across ring boundaries.
+  if (TIER_FOR_RING[ringOf(col, row)] !== tier) return null
+
+  return [col, row]
+}
+
+/**
+ * §6.0 -- where two tiers could crowd, the *higher* tier's gap applies and the
+ * lower tier is the one that yields. A village keeps a city's 11 hexes rather
+ * than its own 8; a city is never moved by a village.
+ *
+ * Same-tier spacing is guaranteed by construction (see `siteOffset`). This one
+ * cannot be, because the two tiers sit on lattices of different sizes and no
+ * choice of window separates them. So it is a rejection instead, costing one
+ * small lattice scan per higher tier -- and only for a candidate that has
+ * already earned its place, which is a few dozen tiles in every ten thousand.
+ *
+ * Not recursive, and it does not need to be: a capital can only ever suppress a
+ * city, and the whole barren inner ring lies between those two tiers, so that
+ * pair never comes within reach. Revisit if §5.2 moves a ring boundary.
+ */
+function crowdedByBetter(tier: SettlementTier, col: number, row: number): boolean {
+  for (const above of TIERS_ABOVE[tier]) {
+    const { cell, minGap } = LATTICE[above]
+
+    // Hex distance is never below the larger axial difference, so anything
+    // within minGap hexes is also within minGap columns and rows -- these are
+    // every cell that could hold one. Negative cells hold nothing: their sites
+    // would land off the map.
+    const cxMin = Math.max(0, Math.floor((col - minGap) / cell))
+    const cyMin = Math.max(0, Math.floor((row - minGap) / cell))
+
+    for (let cx = cxMin; cx <= Math.floor((col + minGap) / cell); cx++) {
+      for (let cy = cyMin; cy <= Math.floor((row + minGap) / cell); cy++) {
+        const site = settledSite(above, cx, cy)
+        if (site && hexDistance(col, row, site[0], site[1]) < minGap) return true
+      }
+    }
+  }
+
+  return false
 }
 
 /** §6 -- village runs 1 of 5 lines, city 2, capital all 5. */
@@ -257,28 +374,24 @@ function nameFor(col: number, row: number, tier: SettlementTier): string {
 
 /** The settlement on this tile, if any. Pure function of position. */
 export function settlementAt(col: number, row: number): Settlement | undefined {
-  const c = cfg()
   const ring = ringOf(col, row)
   const tier = TIER_FOR_RING[ring]
   if (!tier) return undefined
 
-  const { cell, chance, salt } = LATTICE[tier]
+  const { cell } = LATTICE[tier]
   const cellCol = Math.floor(col / cell)
   const cellRow = Math.floor(row / cell)
 
-  const hc = hash2(cellCol, cellRow, c.seed ^ salt)
-  const hr = hash2(cellRow, cellCol, c.seed ^ (salt + 1))
-  const siteCol = cellCol * cell + randInt(hc, 0, cell - 1)
-  const siteRow = cellRow * cell + randInt(hr, 0, cell - 1)
+  // Cheapest rejection first, and it turns away almost every tile: this one is
+  // not the site its cell chose.
+  const [siteCol, siteRow] = siteIn(tier, cellCol, cellRow)
   if (siteCol !== col || siteRow !== row) return undefined
 
-  // Not every cell gets a settlement -- that is what makes density feel organic.
-  const hp = hash2(cellCol, cellRow, c.seed ^ (salt + 2))
-  if (rand01(hp) > chance) return undefined
+  if (!cellFills(tier, cellCol, cellRow)) return undefined
 
-  // A site generated in one ring but landing in another is rejected, so tiers
-  // never bleed across ring boundaries.
-  if (ringOf(siteCol, siteRow) !== ring) return undefined
+  // The ring test settledSite() makes is already satisfied here: `tier` was
+  // read from this tile's own ring, and the site is this tile.
+  if (crowdedByBetter(tier, col, row)) return undefined
 
   return {
     id: `s_${col}_${row}`,
@@ -321,21 +434,19 @@ export function settlementMarksIn(
   const out: SettlementMark[] = []
 
   for (const tier of tiers) {
-    const { cell, chance, salt } = LATTICE[tier]
+    const { cell } = LATTICE[tier]
 
     for (let cx = Math.floor(colMin / cell); cx <= Math.floor(colMax / cell); cx++) {
       for (let cy = Math.floor(rowMin / cell); cy <= Math.floor(rowMax / cell); cy++) {
-        // Cheapest rejection first: most cells hold nothing.
-        if (rand01(hash2(cx, cy, c.seed ^ (salt + 2))) > chance) continue
+        // Cheapest rejections first: most cells hold nothing, and crowding is
+        // the only test here that costs a lattice scan of its own.
+        const site = settledSite(tier, cx, cy)
+        if (!site) continue
 
-        const col = cx * cell + randInt(hash2(cx, cy, c.seed ^ salt), 0, cell - 1)
-        const row = cy * cell + randInt(hash2(cy, cx, c.seed ^ (salt + 1)), 0, cell - 1)
-
+        const [col, row] = site
         if (col < colMin || col > colMax || row < rowMin || row > rowMax) continue
         if (col < 0 || row < 0 || col >= c.cols || row >= c.rows) continue
-        // A site generated for one ring but landing in another is not a
-        // settlement of that tier -- tiers never bleed across ring boundaries.
-        if (TIER_FOR_RING[ringOf(col, row)] !== tier) continue
+        if (crowdedByBetter(tier, col, row)) continue
 
         out.push({ col, row, tier, name: nameFor(col, row, tier) })
       }

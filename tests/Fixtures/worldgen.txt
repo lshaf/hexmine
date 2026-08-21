@@ -235,7 +235,7 @@
 3618,3473|forest|mid|wood|2996|4|-|-|2233846065
 4595,4086|grassland|outer|fiber|2906|7|-|-|452795803
 572,4699|mountain|outer|iron_ore|2170|3|-|-|1448531386
-1549,312|plains|outer|-|2262|5|Embergate:village:hunting|-|3635790972
+1549,312|plains|outer|pelt|2262|5|-|-|3635790972
 2526,925|mountain|mid|iron_ore|1928|3|-|-|412618618
 3503,1538|badlands|mid|stone|3183|4|-|-|3629194861
 2500,2376|mountain|center|-|2641|3|-|rootvault|3565795697

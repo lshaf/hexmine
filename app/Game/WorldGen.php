@@ -7,7 +7,7 @@ namespace App\Game;
 /**
  * Deterministic world generation, §5. Port of `frontend/src/game/worldgen.ts`.
  *
- * The map is ~5000x5000 = 25 million tiles and none of it is stored. Every tile
+ * The map is Balance::MAP_COLS x MAP_ROWS and none of it is stored. Every tile
  * is a pure function of (col, row, seed), so the client derives identical
  * terrain without the server shipping a map. Only *mutations* -- depletion
  * timers and occupied slots -- ever reach a table.
@@ -163,23 +163,150 @@ final class WorldGen
     // ---------------------------------------------------------- settlements
 
     /**
-     * Settlements sit on a jittered lattice: one candidate site per cell gives
-     * minimum spacing without storing anything. Cell size per tier is what
-     * produces "villages > cities > capitals" in count -- §6 calls that a cost
-     * curve outcome, and this is the generation half of it.
+     * Settlements sit on a jittered lattice: one candidate site per cell, so a
+     * region can be enumerated without storing anything. Cell size per tier is
+     * what produces "villages > cities > capitals" in count -- §6 calls that a
+     * cost curve outcome, and this is the generation half of it.
+     *
+     * `minGap` is the guaranteed floor on the distance between two settlements
+     * of the same tier, in hexes. A cell alone does not give one: a site free to
+     * land anywhere in its cell can sit against the shared edge of two cells,
+     * which put villages on touching hexes. self::siteOffset narrows the window.
      */
     private const LATTICE = [
-        'village' => ['cell' => 7, 'chance' => 0.55, 'salt' => 0x1111],
-        'city' => ['cell' => 14, 'chance' => 0.45, 'salt' => 0x2222],
-        'capital' => ['cell' => 26, 'chance' => 0.7, 'salt' => 0x3333],
+        'village' => ['cell' => 11, 'minGap' => 8, 'chance' => 0.8, 'salt' => 0x1111],
+        'city' => ['cell' => 14, 'minGap' => 11, 'chance' => 0.45, 'salt' => 0x2222],
+        'capital' => ['cell' => 26, 'minGap' => 15, 'chance' => 0.7, 'salt' => 0x3333],
     ];
 
+    /**
+     * Where inside its cell a site sits, on one axis.
+     *
+     * The window a site may choose from is narrower than the cell and centred
+     * in it, leaving a margin at each edge. Two sites in neighbouring cells are
+     * then at least `cell - window + 1` apart on that axis -- which is `minGap`
+     * -- and hex distance is never less than the larger axial difference, so the
+     * floor holds diagonally too.
+     *
+     * Mirrored in worldgen.ts siteOffset(). The parity fixture pins both.
+     */
+    private static function siteOffset(int $cell, int $minGap, int $h): int
+    {
+        $window = $cell - $minGap + 1;
+        $margin = intdiv($cell - $window, 2);
+
+        return $margin + Hash::randInt($h, 0, $window - 1);
+    }
+
+    /**
+     * §5.2 -- which tier, if any, each concentric ring carries.
+     *
+     * Capitals sit in the contested ring, not the dead centre: the walk to a
+     * capital bench is meant to cross ground other prospectors are working, and
+     * the centre is reserved for dungeon mouths alone. Both of those rings are
+     * PvP ground.
+     */
     private const TIER_FOR_RING = [
         'outer' => 'village',
         'mid' => 'city',
-        'inner' => null, // contested mining ground, no safe infrastructure
-        'center' => 'capital',
+        'inner' => 'capital', // contested, and where the best bench stands
+        'center' => null,     // dungeon mouths only, and barren of everything else
     ];
+
+    /** Weakest first. A tier yields to everything above it and to nothing below. */
+    private const TIER_ORDER = ['village', 'city', 'capital'];
+
+    /** Where a tier's candidate sits inside one cell. Position only -- this says
+     *  nothing about whether the cell actually fills. */
+    private static function siteIn(string $tier, int $cellCol, int $cellRow): array
+    {
+        ['cell' => $cell, 'minGap' => $minGap, 'salt' => $salt] = self::LATTICE[$tier];
+
+        return [
+            $cellCol * $cell + self::siteOffset($cell, $minGap, Hash::hash2($cellCol, $cellRow, Balance::MAP_SEED ^ $salt)),
+            $cellRow * $cell + self::siteOffset($cell, $minGap, Hash::hash2($cellRow, $cellCol, Balance::MAP_SEED ^ ($salt + 1))),
+        ];
+    }
+
+    /** Not every cell gets a settlement -- that is what makes density organic. */
+    private static function cellFills(string $tier, int $cellCol, int $cellRow): bool
+    {
+        ['chance' => $chance, 'salt' => $salt] = self::LATTICE[$tier];
+
+        return Hash::rand01(Hash::hash2($cellCol, $cellRow, Balance::MAP_SEED ^ ($salt + 2))) <= $chance;
+    }
+
+    /**
+     * The settlement of this tier standing in this cell, or null.
+     *
+     * Everything a site has to pass except the crowding test, which is
+     * deliberately left out: that is what self::crowdedByBetter asks about its
+     * *neighbours*, and putting it here would recurse.
+     */
+    private static function settledSite(string $tier, int $cellCol, int $cellRow): ?array
+    {
+        if (! self::cellFills($tier, $cellCol, $cellRow)) {
+            return null;
+        }
+
+        [$col, $row] = self::siteIn($tier, $cellCol, $cellRow);
+
+        // A site generated for one ring but landing in another is not a
+        // settlement of that tier -- tiers never bleed across ring boundaries.
+        if (self::TIER_FOR_RING[self::ringOf($col, $row)] !== $tier) {
+            return null;
+        }
+
+        return [$col, $row];
+    }
+
+    /**
+     * §6.0 -- where two tiers could crowd, the *higher* tier's gap applies and
+     * the lower tier is the one that yields. A village keeps a city's 11 hexes
+     * rather than its own 8; a city is never moved by a village.
+     *
+     * Same-tier spacing is guaranteed by construction (see self::siteOffset).
+     * This one cannot be, because the two tiers sit on lattices of different
+     * sizes and no choice of window separates them. So it is a rejection
+     * instead, costing one small lattice scan per higher tier -- and only for a
+     * candidate that has already earned its place, which is a few dozen tiles
+     * in every ten thousand.
+     *
+     * Not recursive, and it does not need to be: a capital can only ever
+     * suppress a city, and the whole barren inner ring lies between those two
+     * tiers, so that pair never comes within reach. Revisit if §5.2 moves a
+     * ring boundary.
+     *
+     * Mirrored in worldgen.ts crowdedByBetter(). The parity fixture pins both.
+     */
+    private static function crowdedByBetter(string $tier, int $col, int $row): bool
+    {
+        $rank = array_search($tier, self::TIER_ORDER, true);
+
+        foreach (array_slice(self::TIER_ORDER, $rank + 1) as $above) {
+            ['cell' => $cell, 'minGap' => $minGap] = self::LATTICE[$above];
+
+            // Hex distance is never below the larger axial difference, so
+            // anything within minGap hexes is also within minGap columns and
+            // rows -- these are every cell that could hold one. Negative cells
+            // hold nothing: their sites would land off the map.
+            $cxMin = max(0, (int) floor(($col - $minGap) / $cell));
+            $cyMin = max(0, (int) floor(($row - $minGap) / $cell));
+            $cxMax = (int) floor(($col + $minGap) / $cell);
+            $cyMax = (int) floor(($row + $minGap) / $cell);
+
+            for ($cx = $cxMin; $cx <= $cxMax; $cx++) {
+                for ($cy = $cyMin; $cy <= $cyMax; $cy++) {
+                    $site = self::settledSite($above, $cx, $cy);
+                    if ($site !== null && HexGeometry::distance($col, $row, $site[0], $site[1]) < $minGap) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
 
     /** §6 -- village runs 1 of 5 lines, city 2, capital all 5. */
     private static function linesFor(string $tier, int $col, int $row): array
@@ -226,28 +353,24 @@ final class WorldGen
             return null;
         }
 
-        ['cell' => $cell, 'chance' => $chance, 'salt' => $salt] = self::LATTICE[$tier];
+        $cell = self::LATTICE[$tier]['cell'];
         $cellCol = (int) floor($col / $cell);
         $cellRow = (int) floor($row / $cell);
 
-        $hc = Hash::hash2($cellCol, $cellRow, Balance::MAP_SEED ^ $salt);
-        $hr = Hash::hash2($cellRow, $cellCol, Balance::MAP_SEED ^ ($salt + 1));
-        $siteCol = $cellCol * $cell + Hash::randInt($hc, 0, $cell - 1);
-        $siteRow = $cellRow * $cell + Hash::randInt($hr, 0, $cell - 1);
-
+        // Cheapest rejection first, and it turns away almost every tile: this
+        // one is not the site its cell chose.
+        [$siteCol, $siteRow] = self::siteIn($tier, $cellCol, $cellRow);
         if ($siteCol !== $col || $siteRow !== $row) {
             return null;
         }
 
-        // Not every cell gets a settlement -- that is what makes density organic.
-        $hp = Hash::hash2($cellCol, $cellRow, Balance::MAP_SEED ^ ($salt + 2));
-        if (Hash::rand01($hp) > $chance) {
+        if (! self::cellFills($tier, $cellCol, $cellRow)) {
             return null;
         }
 
-        // A site generated in one ring but landing in another is rejected, so
-        // tiers never bleed across ring boundaries.
-        if (self::ringOf($siteCol, $siteRow) !== $ring) {
+        // The ring test self::settledSite makes is already satisfied here:
+        // $tier was read from this tile's own ring, and the site is this tile.
+        if (self::crowdedByBetter($tier, $col, $row)) {
             return null;
         }
 
