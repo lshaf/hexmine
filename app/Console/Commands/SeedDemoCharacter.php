@@ -224,13 +224,13 @@ class SeedDemoCharacter extends Command
             $character->consumables()->create(['item_key' => $key, 'quantity' => $qty]);
         }
 
-        // One already running, so the bag's "Refresh" state has something to show.
+        // One already armed, so the HUD's charge strip has something to show.
         $draught = Catalog::item('forest_draught');
         $character->buffs()->create([
             'item_key' => 'forest_draught',
             'stat' => $draught['stat'],
+            'scope' => $draught['scope'] ?? 'global',
             'value' => $draught['value'],
-            'expires_at' => $now + Balance::scaled(Balance::BUFF_MS),
         ]);
 
         $materials = self::MATERIALS;

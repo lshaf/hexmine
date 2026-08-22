@@ -10,6 +10,14 @@ export type Biome = 'forest' | 'mountain' | 'plains' | 'badlands' | 'grassland'
 /** Concentric ring layout, §5.2. Drives generation, not just cosmetics. */
 export type Ring = 'outer' | 'mid' | 'inner' | 'center'
 
+/**
+ * §5.3 -- standing water, and the one kind of ground no verb answers to.
+ *
+ * A lake is a blob and a waterway is a line, which is the whole of the
+ * difference: they carry the same rule and draw differently.
+ */
+export type WaterKind = 'lake' | 'river'
+
 /** Offset (odd-q) coordinates. Flat-top hexes, odd columns pushed down H/2. */
 export interface Coord {
   col: number
@@ -155,12 +163,24 @@ export type VariantKey =
   | 'grassland_rare'
   | 'grassland_epic'
 
+/**
+ * §4 Tier 1 -- the alchemist's second stock. What LIVES on a kind of ground, as
+ * against what grows on it: hunted with a bow, never gathered by hand.
+ */
+export type CritterKey =
+  | 'glimmermoth'
+  | 'rockmite'
+  | 'dustleveret'
+  | 'ashnewt'
+  | 'fenlark'
+
 export type MaterialKey =
   | ScrapKey
   | JunkKey
   | RawKey
   | GradeRawKey
   | ReagentKey
+  | CritterKey
   | ComponentKey
   | RefinedKey
   | GradeRefinedKey
@@ -173,6 +193,8 @@ export interface Material {
   tier: MaterialTier
   /** Which craft bench the component was named for. Flavour: nothing reads it. */
   bench?: 'weapon' | 'armor'
+  /** §4 -- alchemy stock that is an animal rather than a plant. */
+  critter?: boolean
   /** Biome lock for tier 1 and tier 3. Raid + refined materials are unlocked. */
   biome?: Biome
   /** Accent colour for the procedural icon system, §13.1. */
@@ -305,21 +327,25 @@ export interface ItemDef {
   description: string
 }
 
-/** §8.5 -- a timed effect running right now. */
+/**
+ * §8.5 -- a charge that has been drunk and is waiting on its action.
+ *
+ * There is no clock. It is armed until the action it names is taken, and taking
+ * that action spends it -- so the only thing the client has to render is that it
+ * is there, and what it is waiting for.
+ */
 export interface ActiveBuff {
   key: string
   stat: StatKey
   /**
-   * §8.5 -- the action this buff applies to. `global` is the unscoped case,
+   * §8.5 -- the action this charge applies to. `global` is the unscoped case,
    * which is what every buff was before potions were locked to one action.
    *
-   * The bag has to show it: two live buffs on the same stat are not a
+   * The HUD has to show it: two charges on the same stat are not a
    * contradiction, they are two different things you are better at.
    */
   scope: BuffScope | 'global'
   value: number
-  /** Server-clock deadline. The client counts down against it, never ticks it. */
-  expiresAt: number
 }
 
 /**
@@ -360,16 +386,22 @@ export interface Recipe {
 
 // ---------------------------------------------------------------- jobs
 
-export type JobKind = 'mining' | 'processing'
+export type JobKind = 'mining' | 'hunting' | 'processing'
 export type JobStatus = 'active' | 'ready'
 
-export interface MiningJob {
+/**
+ * A trip out on a hex, §5. Mining and hunting are the same job to everything
+ * that reads one -- both pin the character to a hex until it is claimed or
+ * dropped -- and they differ only in what the haul is drawn from (§4).
+ */
+export interface FieldJob {
   id: string
-  kind: 'mining'
+  kind: 'mining' | 'hunting'
   status: JobStatus
   col: number
   row: number
-  slot: 0 | 1
+  /** §5.5 -- a herd is not one of the hex's two seats, so a hunt takes none. */
+  slot: 0 | 1 | null
   material: MaterialKey
   quantity: number
   startedAt: number
@@ -394,7 +426,7 @@ export interface ProcessingJob {
   skill: SkillKey
 }
 
-export type Job = MiningJob | ProcessingJob
+export type Job = FieldJob | ProcessingJob
 
 // --------------------------------------------------------------- travelling
 
@@ -440,6 +472,8 @@ export interface Tile {
   settlement?: Settlement
   /** Dungeon entrance, §9.1. Exactly five exist, in the capital ring. */
   dungeon?: { key: string; name: string }
+  /** §5.3 -- standing water. Never mined, never gathered, never grazed. */
+  water?: WaterKind
   /** Temporary herd marker, §5.5. */
   herdUntil?: number
   /** Elevation prop seed so mountains/trees render deterministically. */

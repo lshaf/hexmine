@@ -70,7 +70,6 @@ export const HUNTING = {
   markerLifetimeMs: 4 * HOUR,
   baseSeconds: 25 * 60,
   peltYield: [2, 5] as const,
-  essenceChance: 0.35,
 } as const
 
 export const PROCESSING = {
@@ -192,11 +191,6 @@ export const EQUIPMENT = {
   } as const,
   /** Gold buys the bottom two rungs and nothing else, §3.2. */
   shopRarityCap: 'uncommon',
-  /**
-   * §8.5 -- how long a potion holds. Buffs expire, and that expiry IS the sink
-   * (§11.1): a permanent effect would only accumulate.
-   */
-  buffMs: 30 * 60 * 1000,
   /** Diminishing returns on stacking, §8.1 rule 2: the nth item of the same
    *  stat contributes value * falloff^(n-1). */
   stackFalloff: 0.5,

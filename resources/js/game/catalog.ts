@@ -7,7 +7,9 @@ import { ECONOMY, EQUIPMENT } from './balance'
 import { CONSUMABLES, JUNK, REAGENTS } from './alchemy'
 import { COMPONENTS } from './components'
 import { TOP_TIER } from './toptier'
+import { CRITTERS } from './critters'
 import {
+  BIOME_VARIANTS,
   VARIANT_PROCESSING,
   VARIANT_RAW,
   VARIANT_REFINED,
@@ -26,6 +28,7 @@ import type {
   RawKey,
   ReagentKey,
   ComponentKey,
+  CritterKey,
   GradeRawKey,
   GradeRefinedKey,
   Recipe,
@@ -45,8 +48,13 @@ export const MATERIALS: Record<MaterialKey, Material> = {
   // Reagents and craft components are Tier 1 raw, junk is Tier 0; none of them
   // is typed here so the catalogs cannot drift.
   ...Object.fromEntries(
-    [...REAGENTS, ...COMPONENTS, ...JUNK, ...VARIANT_RAW, ...VARIANT_REFINED].map((m) => [m.key, m]),
-  ) as Record<ReagentKey | ComponentKey | JunkKey | GradeRawKey | GradeRefinedKey, Material>,
+    [...REAGENTS, ...COMPONENTS, ...CRITTERS, ...JUNK, ...VARIANT_RAW, ...VARIANT_REFINED].map(
+      (m) => [m.key, m],
+    ),
+  ) as Record<
+    ReagentKey | ComponentKey | CritterKey | JunkKey | GradeRawKey | GradeRefinedKey,
+    Material
+  >,
 
   // Tier 0 -- Scrap, §4.0. What bare hands bring back when you have no tool for
   // the line. Sells for a copper, feeds no recipe, and exists only to make the
@@ -331,6 +339,22 @@ export const SCOPE_LABEL: Record<BuffScope | 'global', string> = {
   global: 'everywhere',
 }
 
+/**
+ * §8.5 -- the same action named as the thing you do, rather than as a place a
+ * bonus applies. A charge is spent by one of these, so anything counting them
+ * ("one woodcutting trip", "one journey") needs the noun, not the clause.
+ */
+export const SCOPE_ACTION: Record<BuffScope | 'global', string> = {
+  woodcutting: 'woodcutting trip',
+  mining: 'mining trip',
+  hunting: 'hunt',
+  quarrying: 'quarrying trip',
+  harvesting: 'harvesting trip',
+  travel: 'journey',
+  processing: 'bench run',
+  global: 'action',
+}
+
 export const STAT_LABEL: Record<StatKey, string> = {
   yield: 'yield',
   // 'off' matters: every use of this is a reduction shown with a + sign, and
@@ -425,6 +449,32 @@ export const RARITY_LABEL: Record<Rarity, string> = {
   legendary: 'Legendary',
   unique: 'Unique',
 }
+
+/**
+ * §5.3 -- the rung a material sits on, which the ground already decided.
+ *
+ * The variant ladder answers it for everything the map gives up: base ground is
+ * common, the two better grades are uncommon and rare, and contested ground is
+ * the Tier 3 epic. Refining carries that rung across rather than starting a
+ * second ladder -- Bentwood is as rare as the Heartoak it was steamed out of --
+ * and the raid tier sits above all of it. Everything left is common: scrap,
+ * junk, the three bench stocks and the base refined line.
+ *
+ * Derived, never stored, for the reason §8.4 gives about craft category. A
+ * field would only be somewhere for the catalog and the ground to disagree.
+ */
+const RARITY_BY_MATERIAL: Record<string, Rarity> = {}
+
+for (const variants of Object.values(BIOME_VARIANTS)) {
+  for (const variant of variants) RARITY_BY_MATERIAL[variant.material] = variant.grade
+}
+
+for (const recipe of RECIPES) {
+  RARITY_BY_MATERIAL[recipe.output] = RARITY_BY_MATERIAL[recipe.input] ?? 'common'
+}
+
+export const materialRarity = (mat: Material): Rarity =>
+  mat.tier === 4 ? 'legendary' : (RARITY_BY_MATERIAL[mat.key] ?? 'common')
 
 /** Slot names for the screen. The raw keys are lowercase and never reach it. */
 export const SLOT_LABEL: Record<EquipSlot, string> = {
@@ -695,7 +745,7 @@ export const ITEMS: ItemDef[] = [
     description: 'The grass parts before it arrives. Marketplace-tradeable.',
   },
   // -- Consumables, §8.5. No slot and no durability: a potion is spent, it
-  //    starts a timed buff, and the buff expiring is the sink (§11.1).
+  //    arms the action it names, and taking that action spends it (§11.1).
 
   {
     key: 'ironwood_armor', name: 'Ironwood Armor', slot: 'armor', rarity: 'epic', tradeable: true,

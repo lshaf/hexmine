@@ -40,9 +40,9 @@ class InventoryController extends GameController
     /**
      * §8.5 -- drink one.
      *
-     * The buff it starts runs on the server clock and expires on its own, which
-     * is the sink (§11.1). Drinking a second of the same kind refreshes the
-     * clock rather than stacking.
+     * It arms the action the draught names and waits there; taking that action
+     * spends it, which is the sink (§11.1). Drinking a second of the same kind
+     * replaces the charge rather than stacking.
      */
     public function drink(Request $request): JsonResponse
     {
@@ -54,9 +54,8 @@ class InventoryController extends GameController
 
         $buff = $this->game->useConsumable($character, $validated['item']);
         $name = Catalog::item($validated['item'])['name'];
-        $minutes = max(1, (int) round(($buff['expiresAt'] - $this->game->now()) / 60000));
-        $unit = $minutes === 1 ? 'minute' : 'minutes';
+        $when = Catalog::SCOPE_PHRASE[$buff['scope']] ?? 'on your next action';
 
-        return $this->respond($character, $buff, "Drank {$name}. It holds for {$minutes} {$unit}.");
+        return $this->respond($character, $buff, "Drank {$name}. It holds until you work {$when}.");
     }
 }

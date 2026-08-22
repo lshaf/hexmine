@@ -85,6 +85,10 @@ final class Catalog
             // material. Generated, not typed: see scripts/gen_variants.py.
             + Variants::RAW
             + Variants::REFINED
+            // §4 -- the alchemist's second stock: what LIVES on a kind of
+            // ground, as against what grows on it. Hunted, never gathered.
+            // Generated, not typed: see scripts/gen_critters.py.
+            + Critters::STOCK
             // §4.0 -- junk. Sells for a copper and reaches no tier, exactly as
             // the bare-hands scrap does; it is simply never what a hex gives up.
             + Alchemy::JUNK;
@@ -112,6 +116,24 @@ final class Catalog
         'plains' => 'pelt',
         'badlands' => 'stone',
         'grassland' => 'fiber',
+    ];
+
+    /**
+     * §8.5 -- the action a charge is waiting on, said as a place in a sentence.
+     *
+     * "Drank a Forest Draught. It holds until you work a forest hex." A draught
+     * is bought for one thing you do, so the message that confirms it has to
+     * name that thing rather than a number of minutes it no longer has.
+     */
+    public const SCOPE_PHRASE = [
+        'woodcutting' => 'a forest hex',
+        'mining' => 'a mountain hex',
+        'hunting' => 'a herd',
+        'quarrying' => 'a badlands hex',
+        'harvesting' => 'a grassland hex',
+        'travel' => 'the road',
+        'processing' => 'a bench',
+        'global' => 'anything at all',
     ];
 
     /**

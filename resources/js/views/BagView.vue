@@ -23,7 +23,15 @@
  */
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useGame } from '@/stores/game'
-import { ITEM_BY_KEY, MATERIALS, RARITY_LABEL, SCOPE_LABEL, SLOT_LABEL, STAT_LABEL } from '@/game/catalog'
+import {
+  ITEM_BY_KEY,
+  MATERIALS,
+  RARITY_LABEL,
+  SCOPE_ACTION,
+  SCOPE_LABEL,
+  SLOT_LABEL,
+  STAT_LABEL,
+} from '@/game/catalog'
 import { formatPercent } from '@/game/formulas'
 import { itemIcon, materialIcon } from '@/icons/procedural'
 import SvgIcon from '@/components/SvgIcon.vue'
@@ -249,19 +257,42 @@ async function drink(key: string): Promise<void> {
 }
 
 /**
- * A buff already running on this potion's stat AND its action, so drinking
- * again reads as a refresh.
+ * A charge already armed on this potion's stat AND its action, so drinking
+ * again reads as replacing it rather than adding to it.
  *
  * §8.5 -- matching on the stat alone was right when a buff applied everywhere.
- * Now it would call a Forest Draught a "Refresh" while a Deepseam Draught is
- * running, because both are yield: two different things you are better at, not
- * one thing twice.
+ * Now it would call a Forest Draught armed while a Deepseam Draught is, because
+ * both are yield: two different things you are better at, not one thing twice.
  */
-const runningOn = (def: ItemDef) =>
+const armedOn = (def: ItemDef) =>
   game.buffs.find((b) => b.stat === def.stat && b.scope === (def.scope ?? 'global')) ?? null
 
-const minutesLeft = (expiresAt: number) =>
-  Math.max(0, Math.ceil((expiresAt - game.now) / 60000))
+/**
+ * §8.5 -- what is already waiting is the better draught, so this one would be
+ * paid for and never felt. Said here rather than after the fact: the server
+ * refuses it either way, and a button that opens a flask for nothing is worse
+ * than one that explains why it will not.
+ */
+const outclassed = (def: ItemDef) => {
+  const armed = armedOn(def)
+  return armed !== null && armed.value >= def.value
+}
+
+/** The same sentence the server would refuse with, said before the tap. */
+const standingNote = (def: ItemDef) => {
+  const armed = armedOn(def)
+  if (!armed) return ''
+
+  const held = ITEM_BY_KEY[armed.key]?.name ?? 'A draught'
+
+  if (!outclassed(def)) {
+    return `${held} is already waiting on the same work, and this one is stronger.`
+  }
+
+  return armed.key === def.key
+    ? `A ${def.name} is already waiting on the same work. A second would not make it any stronger.`
+    : `${held} is already waiting on the same work, and it is the stronger of the two.`
+}
 
 /**
  * §11.1 -- throwing things away.
@@ -421,13 +452,25 @@ async function scrap(item: OwnedItem): Promise<void> {
               <p class="tiny fact">
                 {{ formatPercent(def.value) }} {{ STAT_LABEL[def.stat] }}
                 <strong>{{ SCOPE_LABEL[def.scope ?? 'global'] }}</strong>
-                <template v-if="runningOn(def)">
-                  · {{ minutesLeft(runningOn(def)!.expiresAt) }} min left
-                </template>
+                · spent by one {{ SCOPE_ACTION[def.scope ?? 'global'] }}
               </p>
+              <!-- Two charges on one action are the same effect twice, so the
+                   stronger is the one that counts. Which way round that falls
+                   decides the button, so it is said in words first. -->
+              <p
+                v-if="armedOn(def)"
+                class="tiny standing"
+                :class="{ better: !outclassed(def) }"
+              >{{ standingNote(def) }}</p>
               <div class="acts">
-                <button class="btn btn-sm" type="button" :disabled="game.busy" @click="drink(picked.key)">
-                  {{ runningOn(def) ? 'Refresh' : 'Drink' }}
+                <button
+                  class="btn btn-sm"
+                  type="button"
+                  :disabled="game.busy || outclassed(def)"
+                  :title="outclassed(def) ? 'Keep it — what you have waiting is better' : ''"
+                  @click="drink(picked.key)"
+                >
+                  {{ armedOn(def) ? 'Replace the charge' : 'Drink' }}
                 </button>
               </div>
             </template>
@@ -712,6 +755,18 @@ async function scrap(item: OwnedItem): Promise<void> {
   margin: 9px 0 11px;
   line-height: 1.45;
   color: var(--vellum-dim);
+}
+
+/* Copper for the refusal, gold for the upgrade -- the same reading the dock
+   gives work in progress and an opportunity. */
+.standing {
+  margin: -4px 0 11px;
+  line-height: 1.45;
+  color: var(--copper);
+}
+
+.standing.better {
+  color: var(--gold);
 }
 
 .acts {

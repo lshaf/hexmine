@@ -9,6 +9,11 @@ export const ACTION_PATHS: Record<string, string> = {
      herd is the one thing on the map you bring it for. Stave, string, nocked
      arrow: drawn from the subject's own tool like every other glyph here. */
   hunt: 'M7 3.5a13 13 0 0 1 0 17 M7 3.5 18.5 12 7 20.5 M10.5 12h8.5 M16.5 9.6 19 12l-2.5 2.4',
+  /* §4.0 -- bare hands, so the glyph is a hand: an open palm reaching down,
+     with what it came up with above it. The one action on the dock drawn from
+     the player rather than from a tool, because not having one is the whole
+     point of it. */
+  gather: 'M5.5 21v-5.5a2 2 0 0 1 4 0V10a1.6 1.6 0 0 1 3.2 0v3.5 M12.7 12.5a1.6 1.6 0 0 1 3.2 0v2 M15.9 13.6a1.6 1.6 0 0 1 3.1 0v3.9a4 4 0 0 1-1.7 3.5 M8.5 6.5 12 3l3.5 3.5',
   travel: 'M8 3v10l-3 8h11l-1-5 5-2-4-4V3Z M8 8h5',
   trade: 'M12 4v16 M5 8l7-2 7 2 M3 15a3 3 0 0 0 6 0L6 8Z M15 15a3 3 0 0 0 6 0l-3-7Z',
   craft: 'M3 21 12 12 M9 6l5-3 7 7-3 5-4-4 2-2-3-3Z',
@@ -50,4 +55,29 @@ export const ACTION_PATHS: Record<string, string> = {
      the entry below it. Built from the map's own shape rather than a book,
      because what this catalogues is hexes and what comes off them. */
   almanac: 'M7 4 11 6.3v4.6L7 13.2 3 10.9V6.3Z M14.5 7h6.5 M14.5 11h6.5 M3 17.5h18 M3 21h12',
+}
+
+/**
+ * §8.5 -- the action a drunk charge is waiting on, drawn as the implement that
+ * takes it.
+ *
+ * The same argument as ACTION_PATHS above, one level finer: a charge is bought
+ * for one line, so four of the five gathering lines need their own tool rather
+ * than sharing the generic pick. Mining keeps `mine` and hunting keeps `hunt`,
+ * because those two glyphs already ARE the pickaxe and the bow.
+ */
+export const SCOPE_PATHS: Record<string, string> = {
+  /* An axe: haft up to the right, and a bit hung off its head. */
+  woodcutting: 'M4 20.5 13.5 11 M11.5 4.2c3.9.6 6.7 3.4 7.3 7.3-3.9-.6-6.7-3.4-7.3-7.3Z M13.5 11l2.6-2.6',
+  mining: ACTION_PATHS.mine!,
+  hunting: ACTION_PATHS.hunt!,
+  /* A sledge: banded head on a straight haft, §8.3's Banded Sledge. */
+  quarrying: 'M6.5 6.5h11v5h-11Z M9.5 6.5v5 M14.5 6.5v5 M12 11.5V21',
+  /* A sickle: the curve is the whole tell, so the haft is short and the blade
+     sweeps most of the grid. */
+  harvesting: 'M5.5 20.5 9 17 M9 17a9 9 0 0 1 9.5-9 9 9 0 0 1-6.6 7.2',
+  travel: ACTION_PATHS.travel!,
+  processing: ACTION_PATHS.process!,
+  /* Everywhere: the hex itself, because that is the whole of the ground. */
+  global: 'M8.5 4h7L19.5 12 15.5 20h-7L4.5 12Z',
 }

@@ -15,6 +15,7 @@ import {
   MATERIALS,
   RARITIES,
   RARITY_LABEL,
+  SCOPE_ACTION,
   STAT_LABEL,
   STATION_RANK,
   categoryForSlot,
@@ -116,7 +117,7 @@ function blockedReason(item: ItemDef): string | null {
  */
 function lifespan(item: ItemDef): string {
   if (item.consumable) {
-    return `${Math.round(EQUIPMENT.buffMs / 60000)} minutes, then gone`
+    return `one ${SCOPE_ACTION[item.scope ?? 'global']}`
   }
   return `${item.maxDurability} durability`
 }

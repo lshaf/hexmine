@@ -846,19 +846,36 @@ disagree.
 - **Stackable, never equipped.** They live in their own table, not with
   equipment: a potion has no durability and no slot, so a row per object would
   be wrong.
-- Using one spends it and starts a **timed buff** on one stat, **for one
-  action**. A potion is not a flat stat increase; it is bought for a specific
-  thing you do. The actions are the five §7.2 gathering lines plus `travel` and
-  `processing`.
-- **Buffs expire, and that expiry is the sink** (§11.1). Nothing here may ever be
-  permanent — a permanent effect only accumulates, which the north star forbids.
-- **One buff per stat, per action.** A second of the same kind refreshes the
-  clock rather than stacking, or a player could bank an afternoon of potions
-  into one window — that part is unchanged, and still enforced by a unique index
-  rather than by code. What scoping adds is that a woodcutting draught and a
-  mining draught are *different things you are better at*, so both may run. The
-  ceiling on any one action is exactly what it was, because the clamp applies to
-  that action's aggregate alone.
+- Using one spends it and **arms one action** with a **charge** on one stat. A
+  potion is not a flat stat increase; it is bought for a specific thing you do.
+  The actions are the five §7.2 gathering lines plus `travel` and `processing`.
+- **A charge waits, and taking the action spends it** — the first woodcutting
+  trip after the draught, whenever that is. It does not run on a clock.
+
+  *(It used to. A 30-minute window meant a woodcutting draught drunk in the
+  mountains was simply thrown away, which made scoping a trap rather than a
+  choice: the potion you had bought for one line could only be drunk while
+  already standing on it. Waiting is what turns the scope back into a decision.)*
+- **Being spent is the sink** (§11.1). Nothing here may ever be permanent — a
+  permanent effect only accumulates, which the north star forbids. A charge is
+  not permanent: it survives until it pays out exactly once.
+- **As many different effects at once as you like; the same effect never twice.**
+  A woodcutting draught and a mining draught are *different things you are better
+  at*, so both may be held, and so may a road tonic on top. Two draughts on the
+  same stat and the same action are one thing twice.
+- **When they are the same thing twice, the stronger wins.** Charges on a stat
+  contribute their **highest** value, never their sum — so no combination of
+  potions is a way of buying the ceiling in instalments, and a `global` charge
+  cannot quietly double up with a line-scoped one on the same trip.
+- **A weaker draught is refused before the flask is opened.** Pouring a common
+  draught on top of a legendary philtre would be paid for and never felt, and an
+  idle game must not take something away for nothing. The refusal reads as *you
+  already have better*, and the flask stays in the bag.
+- One charge per (stat, action) is still enforced by a unique index rather than
+  by code, and that index is also the cap on hoarding: a cellar of sixty
+  draughts is still two stats across seven actions once drunk. The ceiling on
+  any one action is exactly what it was, because the clamp applies to that
+  action's aggregate alone.
 - **Sixty of them, twelve a rung**, across all six rarities: yield and trip time
   on each of the five lines, plus the road and the bench. Scoping is what makes
   that many potions safe — sixty flat stat boosts would be a power ladder you
@@ -874,8 +891,18 @@ disagree.
 - Buffs feed the same aggregate as gear and are **clamped by the same ceiling**.
   A potion that could push a stat past `STAT_CEILING` would be a power ladder
   you can drink.
-- Expiry is an absolute server-clock deadline, compared and never ticked — an
-  hour offline and an hour idle must produce the same result (§16).
+- There is no deadline to compare and nothing to tick, so an hour offline and an
+  hour idle produce the same result for free (§16). A charge is spent where the
+  work is committed — the job row already carries the shortened clock and the
+  larger haul — and never by a read. **Costing a hex you are only looking at
+  must never burn what you are carrying.**
+- **On screen** the charges sit in the top-left instrument cluster, one hexagon
+  each: the glyph is the *action* it is waiting on, the colour is the *stat* it
+  moves — the same two channels §13.1 splits rarity and material across. It is
+  the one thing on that plate that is not a number, and tapping it says what
+  each charge is and what will spend it. Nothing there may drain or pulse like a
+  countdown; the toast (§13.1) already owns the draining hexagon, and a charge
+  has no clock to draw.
 
 ---
 

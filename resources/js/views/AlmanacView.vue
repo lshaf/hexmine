@@ -26,6 +26,7 @@ import {
   MATERIALS,
   RARITY_LABEL,
   RARITY_RANK,
+  SCOPE_ACTION,
   SKILL_BY_KEY,
   SLOT_LABEL,
   STAT_LABEL,
@@ -54,10 +55,12 @@ import {
   type VariantDef,
 } from '@/game/variants'
 import { itemIcon, materialIcon } from '@/icons/procedural'
-import { variantSpecimen } from '@/map/props'
+import { variantSpecimen, waterSpecimen } from '@/map/props'
+import { waterLabel } from '@/game/water'
 import SvgIcon from '@/components/SvgIcon.vue'
 import type {
   Biome,
+  WaterKind,
   EquipSlot,
   ItemDef,
   Material,
@@ -134,6 +137,13 @@ const BANDS: Band[] = [
     name: "The alchemist's stock",
     note: 'Two per biome, and the consumable bench runs on these alone — no potion wants anything a smith would bid for. Biome-locked like every other raw, and worth more than scrap, which §4 makes a rule rather than a tuning value.',
     holds: (mat) => rawRole(mat.key) === 'reagent',
+  },
+  {
+    key: 'critter',
+    tier: 1,
+    name: "The alchemist's other stock",
+    note: 'Five small animals, one per biome, and the only ingredient a hunt brings back rather than a gather. The herbs say what grows on a kind of ground; these say what lives on it — and because a critter needs a bow and a live herd, the top three rungs of the potion shelf wait on an animal turning up rather than on an afternoon with a sickle.',
+    holds: (mat) => rawRole(mat.key) === 'critter',
   },
   {
     key: 'component',
@@ -274,8 +284,48 @@ const tileGroups = computed<TileGroup[]>(() =>
   })).filter((g: TileGroup) => g.entries.length),
 )
 
-const tileCount = computed(() =>
-  tileGroups.value.reduce<number>((n, g) => n + g.entries.length, 0),
+/**
+ * §5.3 -- the two kinds of water, per biome.
+ *
+ * Kept out of the grade ladder above rather than tacked on as a fifth rung:
+ * water is not a better or worse version of the ground, it is the one hex
+ * neither verb answers to, and listing it beside Heartoak would imply it sat
+ * somewhere on the same scale.
+ */
+interface WaterEntry {
+  key: string
+  biome: Biome
+  kind: WaterKind
+  name: string
+  hay: string
+}
+
+const WATER_BLURB: Record<WaterKind, string> = {
+  river: 'Four waterways cross the map end to end, and each takes the character of whatever it runs through.',
+  lake: 'Standing water, scattered everywhere the ground allows. Never on a settlement or a dungeon mouth — those hold the hex.',
+}
+
+const waterEntries = computed<WaterEntry[]>(() =>
+  (Object.keys(BIOME_VARIANTS) as Biome[])
+    .flatMap((biome) =>
+      (['river', 'lake'] as WaterKind[]).map((kind) => {
+        const name = waterLabel(biome, kind)
+        return {
+          key: `${biome}.${kind}`,
+          biome,
+          kind,
+          name,
+          hay: [name, BIOME_LABEL[biome], WATER_BLURB[kind], 'water lake river'].join(' '),
+        }
+      }),
+    )
+    .filter((e) => matches(e.hay)),
+)
+
+const tileCount = computed(
+  () =>
+    tileGroups.value.reduce<number>((n, g) => n + g.entries.length, 0) +
+    waterEntries.value.length,
 )
 
 // ------------------------------------------------------------------ equipment
@@ -357,9 +407,7 @@ const groups = computed<Group[]>(() => {
   built.push({
     key: 'consumable',
     title: 'Consumables',
-    sub: `Drunk, never worn. One buff per stat, ${Math.round(
-      EQUIPMENT.buffMs / 60000,
-    )} minutes each, and the expiry is the sink.`,
+    sub: 'Drunk, never worn. One charge per stat per action, spent by taking that action — and being spent is the sink.',
     entries: ITEMS.filter((i) => i.consumable)
       .map(describe)
       .filter((e) => matches(e.hay))
@@ -384,7 +432,7 @@ const itemCount = computed(() => groups.value.reduce((n, g) => n + g.entries.len
 /** What the thing is, in one line: where it goes, what it serves, how long. */
 function nature(item: ItemDef): string {
   if (item.consumable) {
-    return `Drunk · ${Math.round(EQUIPMENT.buffMs / 60000)} minutes, then gone`
+    return `Drunk · one ${SCOPE_ACTION[item.scope ?? 'global']}, then gone`
   }
   const line = item.slot ? skillForSlot(item.slot) : null
   const scope = line ? SKILL_BY_KEY[line].name.toLowerCase() : 'every line'
@@ -636,6 +684,36 @@ function nature(item: ItemDef): string {
                 <div class="rail out">
                   <dt class="label">Found</dt>
                   <dd>{{ tile.reach }}</dd>
+                </div>
+              </dl>
+            </article>
+          </div>
+        </section>
+      </template>
+
+      <template v-if="half === 'tiles' && waterEntries.length">
+        <section>
+          <div class="sect">
+            <h3>Water</h3>
+            <span class="tally">{{ waterEntries.length }}</span>
+          </div>
+
+          <div class="entries">
+            <article v-for="w in waterEntries" :key="w.key" class="entry">
+              <div class="head">
+                <span class="specimen" v-html="waterSpecimen(w.biome, w.kind, 76)" />
+                <div class="grow">
+                  <span class="label eyebrow">{{ BIOME_LABEL[w.biome] }}</span>
+                  <strong class="name">{{ w.name }}</strong>
+                </div>
+              </div>
+
+              <p class="tiny muted desc">{{ WATER_BLURB[w.kind] }}</p>
+
+              <dl class="rails">
+                <div class="rail out">
+                  <dt class="label">Gives up</dt>
+                  <dd>Nothing. Water is worked by neither verb.</dd>
                 </div>
               </dl>
             </article>

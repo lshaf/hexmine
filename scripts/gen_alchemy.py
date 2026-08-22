@@ -108,7 +108,7 @@ SCOPE_BIOME = dict(
 # points at them breaks.
 PINNED = {
     ('common', 'yield', 'woodcutting'): ('forest_draught', 'Forest Draught',
-        'Bitter, resinous, and it keeps your arms swinging for half an hour.'),
+        'Bitter, resinous, and it keeps your arms swinging through the next stand of trees.'),
     ('common', 'travelSpeed', 'travel'): ('road_tonic', 'Road Tonic',
         'Drunk at the gate, not on the road. Your legs stop asking questions.'),
     ('uncommon', 'tripReduction', 'quarrying'): ('quarry_salts', 'Quarry Salts',
@@ -177,10 +177,16 @@ def consumables():
 def inputs_for(rarity, scope, mats):
     """Reagents and nothing else. Recipes get shorter and sharper as they climb.
 
-    The bench runs on its own stock (§4): the ten reagents feed potions, and
-    nothing a smith or an armorer would want is on the list. Two crafters never
-    bid against each other for the same pile, so an alchemist's demand cannot
-    price a gathering line out of its own equipment ladder.
+    The bench runs on its own stock (§4): ten herbs and five critters feed
+    potions, and nothing a smith or an armorer would want is on the list. Two
+    crafters never bid against each other for the same pile, so an alchemist's
+    demand cannot price a gathering line out of its own equipment ladder.
+
+    The top three rungs want the biome's critter, and that is a gate rather than
+    a flavour note. A herb is gathered -- no tool, any hex, whenever you like. A
+    critter is hunted, which needs a bow AND a live herd, and §5.5 puts herds on
+    a four-hour clock. So the cheap end of the shelf is something you can always
+    top up and the dear end waits on an animal turning up.
 
     Rank is carried by depth instead of by breadth. A common draught is a
     muddle of four cheap things pulled off two kinds of ground; a legendary
@@ -193,21 +199,28 @@ def inputs_for(rarity, scope, mats):
     b = SCOPE_BIOME[scope]
     r = [k for k, _, bio, _, _ in REAGENTS if bio == b]
     s = [k for k, _, bio, _, _ in REAGENTS if bio == SECOND[b]]
+    critter = CRITTER[b]
 
     if rarity == 'common':
         return {r[0]: 3, r[1]: 2, s[0]: 2, s[1]: 2}
     if rarity == 'uncommon':
         return {r[0]: 3, r[1]: 3, s[0]: 2}
     if rarity == 'rare':
-        return {r[0]: 4, r[1]: 3, s[1]: 3}
+        return {r[0]: 4, r[1]: 3, critter: 2}
     if rarity == 'epic':
-        return {r[0]: 6, r[1]: 4}
+        return {r[0]: 6, critter: 3}
 
-    return {r[0]: 8, r[1]: 6}
+    return {r[0]: 8, critter: 5}
 
 
 # The neighbouring biome a common recipe reaches into, so the cheapest tier is
 # the one that makes you travel and the dear ones are local.
+# Biome -> the animal that lives on it, §4. Mirrors gen_critters.py.
+CRITTER = {
+    'forest': 'glimmermoth', 'mountain': 'rockmite', 'plains': 'dustleveret',
+    'badlands': 'ashnewt', 'grassland': 'fenlark',
+}
+
 SECOND = {
     'forest': 'grassland', 'mountain': 'badlands', 'plains': 'forest',
     'badlands': 'mountain', 'grassland': 'plains',

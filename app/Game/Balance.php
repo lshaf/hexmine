@@ -125,6 +125,48 @@ final class Balance
     /** Chance an inner-ring tile carries its rare variant, §5.2 / §4. */
     public const RARE_SPAWN_CHANCE = 0.18;
 
+    // ---------------------------------------------------------------- water §5.3
+
+    /**
+     * Lakes and waterways. Neither can be worked, and both are derived like
+     * everything else on the map -- a pure function of (col, row, seed), so no
+     * table stores a single drop of it.
+     *
+     * Water is deliberately thin, around 3% of the map. It is there to break up
+     * the biome blobs and give a walk something to go round, not to gate
+     * anything: a hex you cannot work is a hex the §11 sinks never see, and too
+     * many of them would quietly shrink the economy.
+     */
+    public const RIVERS = 4;
+
+    /** Hexes between a waterway's control points. Longer is straighter. */
+    public const RIVER_SEGMENT = 24;
+
+    /** How far a waterway may wander off its line, as a fraction of the radius. */
+    public const RIVER_AMPLITUDE = 0.09;
+
+    /**
+     * Half the channel, in hexes.
+     *
+     * Under 1 on purpose: the band is measured between one column's centre and
+     * the next, so a steep reach widens on its own and a slack one stays a
+     * single hex across. A fixed width would either break into stepping stones
+     * on the bends or run four hexes wide on the straights.
+     */
+    public const RIVER_HALF_WIDTH = 0.6;
+
+    /** One candidate lake per cell of this many hexes, as with settlements. */
+    public const LAKE_CELL = 34;
+
+    public const LAKE_CHANCE = 0.42;
+
+    public const LAKE_MIN_RADIUS = 3;
+
+    public const LAKE_MAX_RADIUS = 5;
+
+    /** Per-hex jitter on the shoreline, so a lake is not a drawn circle. */
+    public const LAKE_EDGE_WOBBLE = 0.7;
+
     // ------------------------------------------------------------- hunting §5.5
 
     public const HERD_LIFETIME_MS = 4 * self::HOUR;
@@ -144,13 +186,6 @@ final class Balance
     public const HUNT_PELT_MIN = 2;
 
     public const HUNT_PELT_MAX = 5;
-
-    /**
-     * §5.5 -- the only bridge between the mining and raid tracks, and the only
-     * faucet for a Tier 4 material outside a dungeon. Bow required: see
-     * GameService::collectJob().
-     */
-    public const HUNT_ESSENCE_CHANCE = 0.35;
 
     // ---------------------------------------------------------- processing §6
 
@@ -376,14 +411,13 @@ final class Balance
     // --------------------------------------------------------- consumables §8.5
 
     /**
-     * Buffs expire, and that is the sink (§11.1). A consumable with a permanent
-     * effect would only accumulate, which the design's north star forbids
-     * outright -- if a potion is ever made permanent, it stops being a sink and
-     * becomes another power ladder.
+     * How many of one potion a character may hold. Stops hoarding a stat.
+     *
+     * There is no buff duration to tune any more: a draught arms the action it
+     * names and is spent by taking it (§8.5). Being *spent* is the sink -- a
+     * consumable whose effect were permanent would only accumulate, which the
+     * design's north star forbids outright.
      */
-    public const BUFF_MS = 30 * self::MINUTE;
-
-    /** How many of one potion a character may hold. Stops hoarding a stat. */
     public const CONSUMABLE_STACK_CAP = 20;
 
     public static function stationReaches(string $stationTier, string $rarity): bool
