@@ -35,7 +35,7 @@ export const MAP = {
   /**
    * §5.6 -- documentation only, and pointedly so. Sight is published per
    * character in the state payload (`character.sight`) because it changes with
-   * the Explorer chain and drops to zero on the road; reading these numbers
+   * the Explorer tree and drops to zero on the road; reading these numbers
    * instead of that field is how the fog and the server end up disagreeing.
    */
   sightRadius: 1,
@@ -127,7 +127,7 @@ export const JOBS = {
   costReductionCap: 0.15,
   batchCap: 2,
   /**
-   * §7.5 -- extra hexes of sight from the Explorer chain, on top of the base
+   * §7.5 -- extra hexes of sight from the Explorer tree, on top of the base
    * one. A query budget rather than a balance one: cost goes as the square of
    * the radius -- one hex is seven tiles, three is thirty-seven.
    */
@@ -149,7 +149,7 @@ export const SKILLS = {
  *
  * Documentation only, like `sightRadius` above: what a character may carry is
  * published per character in the state payload (`character.bag`) because the
- * Explorer chain widens it. Reading these numbers instead of that field is how
+ * Explorer tree widens it. Reading these numbers instead of that field is how
  * the meters and the server end up disagreeing about whether you may leave.
  */
 export const BAG = {
@@ -158,7 +158,7 @@ export const BAG = {
   /**
    * §7.5 -- what the road adds, and the most it can ever add: 120 -> 200 units
    * and 30 -> 50 rows, ten and four at a time across the Explorer's fifteen
-   * rungs. Counts rather than percentages, so they have nothing to do with the
+   * skills. Counts rather than percentages, so they have nothing to do with the
    * §8.1 stat ceiling -- which is the whole reason a tree that costs no skill
    * points is allowed to hand them out.
    */

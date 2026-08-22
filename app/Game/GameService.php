@@ -649,7 +649,7 @@ class GameService
      * §5.6 -- how far this character can see, right now.
      *
      * Two hexes standing still, nothing at all on the road, and up to four for
-     * an Explorer deep enough into the chain (§7.5). Deliberately untouched by
+     * an Explorer deep enough into the tree (§7.5). Deliberately untouched by
      * level or gear: the only thing that widens the eye is having walked, which
      * is the one behaviour worth paying for here and the only one whose reward
      * cannot be bought.
@@ -884,7 +884,7 @@ class GameService
      * on them.
      *
      * Scoped to sight (§5.6), which is one hex at the start and three at the
-     * end of the Explorer chain, and takes no arguments. The
+     * end of the Explorer tree, and takes no arguments. The
      * camera can be dragged anywhere and costs nothing, because terrain is
      * derived (§5); but live state follows the character, not the camera, so a
      * client cannot walk a viewport parameter across the map to harvest where

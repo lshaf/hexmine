@@ -44,7 +44,7 @@ final class JobTreeTest extends TestCase
             }
         }
 
-        $this->assertSame(11 * Jobs::NODES_PER_JOB + Jobs::NODES_PER_CHAIN, count(Jobs::NODES));
+        $this->assertSame(11 * Jobs::NODES_PER_JOB + Jobs::NODES_PER_WAYFARING, count(Jobs::NODES));
     }
 
     /**
@@ -62,8 +62,8 @@ final class JobTreeTest extends TestCase
         $automatic = array_filter(array_keys(Jobs::JOBS), fn (string $j) => Jobs::isAutomatic($j));
 
         $this->assertSame(['explorer'], array_values($automatic));
-        $this->assertCount(Jobs::NODES_PER_CHAIN, Jobs::nodesFor('explorer'));
-        $this->assertSame(15, Jobs::NODES_PER_CHAIN);
+        $this->assertCount(Jobs::NODES_PER_WAYFARING, Jobs::nodesFor('explorer'));
+        $this->assertSame(15, Jobs::NODES_PER_WAYFARING);
     }
 
     /**
@@ -76,6 +76,39 @@ final class JobTreeTest extends TestCase
      * cap, none of them touching the §8.1 ceiling. A percentage here would be a
      * power ladder climbed by leaving the app open on a long walk.
      */
+    /**
+     * §7.5 -- one skill per level, which is the whole of what makes this tree
+     * exceptional.
+     *
+     * Every other tree opens a depth whole, because the gate there only says you
+     * may start spending points and the points are the real price. Nothing is
+     * bought here, so a row arriving whole would be three rewards for one level.
+     * Each skill is charged for separately: one every second level, 2 through
+     * 30, ending exactly on the job ceiling.
+     */
+    public function test_the_granted_tree_gates_one_skill_at_a_time(): void
+    {
+        $levels = array_map(
+            fn (array $n) => $n['jobLevel'],
+            array_values(Jobs::nodesFor('explorer')),
+        );
+
+        $this->assertSame(range(2, Balance::JOB_MAX_LEVEL, 2), $levels);
+        $this->assertCount(Jobs::NODES_PER_WAYFARING, $levels, 'a level was shared by two skills');
+
+        // And each row is labelled by the first of its three, so the panel can
+        // say where a depth begins without claiming its whole row arrives there.
+        foreach (Jobs::WAYFARING_TIER_JOB_LEVEL as $tier => $opens) {
+            $inRow = array_values(array_filter(
+                Jobs::nodesFor('explorer'),
+                fn (array $n) => $n['tier'] === $tier,
+            ));
+
+            $this->assertCount(3, $inRow, "row {$tier} is not three wide");
+            $this->assertSame($opens, $inRow[0]['jobLevel'], "row {$tier} is mislabelled");
+        }
+    }
+
     public function test_the_granted_tree_pays_only_in_eye_and_back(): void
     {
         foreach (Jobs::nodesFor('explorer') as $key => $node) {
@@ -138,10 +171,11 @@ final class JobTreeTest extends TestCase
     public function test_tier_one_is_open_and_capstones_need_two_parents(): void
     {
         foreach (Jobs::NODES as $key => $node) {
-            // §7.5 -- a chain has one node per tier, so there is no second
-            // parent for a capstone to name. The two-parent rule exists to force
-            // thirty points through choices; five granted nodes have none to
-            // make, and inventing a fork would be a fork with one path.
+            // §7.5 -- the wayfaring tree is wired down its columns, so every
+            // node past the first row has exactly one parent. The two-parent
+            // rule exists to force thirty points through choices; a granted tree
+            // has none to make, and inventing a fork would be a fork nobody
+            // walks down.
             $expected = match (true) {
                 $node['tier'] === 1 => 0,
                 Jobs::isAutomatic($node['job']) => 1,
@@ -151,9 +185,20 @@ final class JobTreeTest extends TestCase
 
             $this->assertCount($expected, $node['requires'], "{$key} has the wrong number of parents");
 
-            // §7.5 -- the chain gates one tier differently (its tier 1 waits for
-            // level 3, because no point is paid for a granted node), so the
-            // table is asked for per shape rather than assumed.
+            // §7.4.2 -- a bought depth opens whole, so every node in it shares
+            // the tier's gate. §7.5's granted tree is the exception and has its
+            // own test below: its skills are gated one at a time, so all a row
+            // can promise is that nothing in it arrives before the row does.
+            if (Jobs::isAutomatic($node['job'])) {
+                $this->assertGreaterThanOrEqual(
+                    Jobs::tierJobLevels($node['job'])[$node['tier']],
+                    $node['jobLevel'],
+                    "{$key} arrives before the row it is drawn in",
+                );
+
+                continue;
+            }
+
             $this->assertSame(
                 Jobs::tierJobLevels($node['job'])[$node['tier']],
                 $node['jobLevel'],

@@ -193,9 +193,9 @@ final class Balance
     public const SKILL_BATCH_CAP = 2;
 
     /**
-     * §7.6 -- what the Explorer chain (§7.5) may add to each limit: 120 -> 200
-     * units and 30 -> 50 rows, arrived at ten and four at a time across a
-     * fifteen-rung climb from job level 2 to 30.
+     * §7.6 -- what the Explorer tree (§7.5) may add to each limit: 120 -> 200
+     * units and 30 -> 50 rows, arrived at ten and four at a time across five
+     * rows of three, from job level 2 to 30.
      *
      * Bounded for the same reason every other skill cap is: the bag is the
      * pressure that turns hauls into decisions, and a tree that could switch it
@@ -210,7 +210,7 @@ final class Balance
     public const SKILL_BAG_ROWS_CAP = 20;
 
     /**
-     * §7.5 -- how many hexes of sight the Explorer chain can add, on top of the
+     * §7.5 -- how many hexes of sight the Explorer tree can add, on top of the
      * base one.
      *
      * The last of them, and it guards the same kind of thing the rest do: not a
@@ -395,7 +395,7 @@ final class Balance
      * settlement glyphs are drawn everywhere (§13.2) -- it is merely
      * *unscouted*: no depletion, no miners, no haul figures. That is what makes
      * walking somewhere worth doing, and starting at one is what leaves the
-     * Explorer chain (§7.5) something to actually give.
+     * Explorer tree (§7.5) something to actually give.
      */
     public const SIGHT_RADIUS = 1;
 

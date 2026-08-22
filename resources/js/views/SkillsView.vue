@@ -2,12 +2,12 @@
 /**
  * The trades, §7.4.
  *
- * Eleven trees of thirty nodes, one chain of fifteen rungs, and the panel's one
- * job is to answer "what can I take right now" without the player counting
- * anything.
+ * Eleven trees of thirty nodes, one of fifteen, and the panel's one job is to
+ * answer "what can I take right now" without the player counting anything.
  *
- * The chain is Explorer (§7.5), and it is the one sheet with no price on it:
- * its rungs arrive as the job levels and cost no point. The panel says so
+ * The short one is Explorer (§7.5). Same five depths as everything else -- three
+ * to a row rather than 6/8/8/6/2 -- and it is the one sheet with no price on it:
+ * its skills arrive as the job levels and cost no point. The panel says so
  * rather than drawing a Learn button that would only ever be refused.
  *
  * ── Why strata, and why no wires ─────────────────────────────────────────────
@@ -112,9 +112,9 @@ const accent = computed(() =>
 
 /** Roman numerals, because a stratum is named not counted. */
 /**
- * Depth in the gutter. A bought tree has five bands; the Explorer's chain has
- * fifteen rungs (§7.5), so this counts rather than looks up -- a five-entry
- * table would have quietly rendered the last ten rungs with a blank gutter.
+ * Depth in the gutter. Five bands everywhere today, but computed rather than
+ * looked up: a fixed table is the kind of thing that renders a blank gutter the
+ * first time a tree is reshaped, which has already happened once here.
  */
 const NUMERALS: Array<[number, string]> = [
   [10, 'X'],
@@ -138,7 +138,14 @@ function roman(n: number): string {
 
 interface Band {
   tier: number
+  /** The level the depth opens at -- its first node's. */
   jobLevel: number
+  /**
+   * §7.5 -- what the gutter prints. A bought depth opens whole, so one number
+   * says everything; the wayfaring tree gates its three skills one level at a
+   * time, and a single "lv 2" over a row that runs to 6 would be a lie.
+   */
+  levels: string
   nodes: Array<{ key: string; def: NodeDef }>
   owned: number
   reached: boolean
@@ -151,8 +158,9 @@ const bands = computed<Band[]>(() => {
   const mine = Object.entries(t.nodes).filter(([, n]) => n.job === job.value)
   const out: Band[] = []
 
-  // Read the tiers off the nodes rather than assuming five: the chain has
-  // fifteen, and a hardcoded range would silently drop everything past rung 5.
+  // Read the tiers off the nodes rather than assuming a range. Every tree has
+  // five today; a hardcoded list would silently drop anything past the fifth
+  // depth the next time one is reshaped.
   const tiers = [...new Set(mine.map(([, n]) => n.tier))].sort((a, b) => a - b)
 
   for (const tier of tiers) {
@@ -161,12 +169,16 @@ const bands = computed<Band[]>(() => {
       .map(([key, def]) => ({ key, def }))
     if (!nodes.length) continue
 
+    const opens = nodes[0]!.def.jobLevel
+    const last = nodes[nodes.length - 1]!.def.jobLevel
+
     out.push({
       tier,
-      jobLevel: nodes[0]!.def.jobLevel,
+      jobLevel: opens,
+      levels: last > opens ? `lv ${opens}–${last}` : `lv ${opens}`,
       nodes,
       owned: nodes.filter((n) => game.ownedNodes.has(n.key)).length,
-      reached: jobRow.value.level >= nodes[0]!.def.jobLevel,
+      reached: jobRow.value.level >= opens,
     })
   }
   return out
@@ -353,8 +365,9 @@ async function learn(): Promise<void> {
           <p v-else-if="automatic" class="tiny granted">
             Levels on hexes walked, and walking earns no character XP — this is
             the only thing a long road pays out. Nothing here is bought, and
-            nothing here is a stat: each rung arrives the moment the level does,
-            and pays in sight or in room to carry things.
+            nothing here is a stat. Every other tree opens a whole depth at
+            once; this one hands over one skill per level, and pays in sight or
+            in room to carry things.
           </p>
         </header>
 
@@ -362,7 +375,7 @@ async function learn(): Promise<void> {
         <div v-for="band in bands" :key="band.tier" class="band" :class="{ sealed: !band.reached }">
           <div class="gutter">
             <span class="depth">{{ roman(band.tier) }}</span>
-            <span class="label lv">lv {{ band.jobLevel }}</span>
+            <span class="label lv">{{ band.levels }}</span>
             <span class="tiny cut">{{ band.owned }}/{{ band.nodes.length }}</span>
           </div>
 
@@ -570,7 +583,7 @@ async function learn(): Promise<void> {
  */
 .band {
   display: grid;
-  grid-template-columns: 58px 1fr;
+  grid-template-columns: 64px 1fr;
   gap: 10px;
   padding: 11px 0;
   border-top: 1px solid var(--hud-line-soft);
@@ -596,8 +609,12 @@ async function learn(): Promise<void> {
   color: var(--vellum);
 }
 
+/* §7.5 -- the wayfaring gutter prints a span ("lv 8–12"), which is two
+   characters wider than the single number every bought tree needs. Kept on one
+   line: a level range broken across two rows reads as two levels. */
 .lv {
   color: #6d7770;
+  white-space: nowrap;
 }
 
 .cut {

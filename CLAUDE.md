@@ -188,7 +188,7 @@ map worth walking.
 
 | | Rule |
 |---|---|
-| **Sight** | **1 hex.** Base `Balance::SIGHT_RADIUS`, up to 3 through the Explorer chain (§7.5). |
+| **Sight** | **1 hex.** Base `Balance::SIGHT_RADIUS`, up to 3 through the Explorer tree (§7.5). |
 | **Sight while travelling** | **0.** You are between hexes, watching your feet. |
 | **Travel range** | **None.** Any hex on the map is walkable from any other. |
 
@@ -485,43 +485,53 @@ test for this.
 
 ### 7.5 Explorer — the road job
 
-**A twelfth job, of a fourth kind (`wayfaring`), and it breaks five of §7.4's
+**A twelfth job, of a fourth kind (`wayfaring`), and it breaks four of §7.4's
 rules on purpose.** It exists because §5.6 took the reach limit off the map: if
 any hex is walkable, a long walk has to pay out *something*, or the map is just
 a waiting room.
 
 | | Explorer | Every other job |
 |---|---|---|
-| Tree | **15 rungs, one per tier, a single chain** | 30 nodes, 6/8/8/6/2, branching |
+| Tree | **15 nodes, 3/3/3/3/3** | 30 nodes, 6/8/8/6/2 |
 | Cost | **Nothing — granted at its job level** | 1 skill point each |
 | Levels from | **Hexes crossed** | Bench work, or raiding |
-| Capstone | **one parent** (a chain has no fork) | two parents |
-| Gates | **every second job level, 2 → 30** | 1 / 5 / 12 / 20 / 28 |
+| Pays in | **Capability only — never a stat** | Stats, unlocks, craft effects |
+| Gating | **One skill per level**, every 2nd level, 2 → 30 | A whole depth at once, at 1 / 5 / 12 / 20 / 28 |
 
-The ladder, in order. Nothing on it is a stat:
+**The shape is the same five depths as everything else**, and that is
+deliberate: a twelfth job that is also a twelfth kind of diagram is one thing
+too many to learn. Three to a row rather than 6/8/8/6/2, because fifteen free
+nodes is what a free tree may be worth.
 
-| Rung | Job level | Node | Effect |
-|---|---|---|---|
-| 1 | **2** | Deep Pockets | +10 bag units |
-| 2 | 4 | Second Strap | **+4 bag rows** |
-| 3 | 6 | Rolled Blanket | +10 bag units |
-| 4 | 8 | High Ground | **+1 sight** |
-| 5 | 10 | Side Pouch | **+4 bag rows** |
-| 6 | 12 | Even Load | +10 bag units |
-| 7 | 14 | Sorted Kit | **+4 bag rows** |
-| 8 | 16 | Bindle | +10 bag units |
-| 9 | 18 | Outer Pockets | **+4 bag rows** |
-| 10 | 20 | Tump Line | +10 bag units |
-| 11 | 22 | Packer's Knot | +10 bag units |
-| 12 | 24 | Tinker's Roll | **+4 bag rows** |
-| 13 | 26 | Long Haul | +10 bag units |
-| 14 | 28 | Drover's Back | +10 bag units |
-| 15 | **30** | Horizon Line | **+1 sight** |
+**What is exceptional sits under the layout: the row does not arrive whole.** A
+bought depth opens all at once because its gate only says you may *start
+spending points* there — the point is the real price, paid per node. Nothing is
+bought here, so a row opening whole would be three rewards for one level. Each
+skill carries its own `jobLevel` instead, one every second level, and a row
+fills in across three of them.
 
-Totals: **120 → 200 units, 30 → 50 rows, 1 → 3 hexes of sight.** Eight rungs of
-ten, five of four, two of one.
+| Depth | Levels | Left column — room | Middle column — straps | Right column — the road |
+|---|---|---|---|---|
+| I | **2 · 4 · 6** | Deep Pockets +10u | Second Strap **+4 rows** | Rolled Blanket +10u |
+| II | 8 · 10 · 12 | Even Load +10u | Side Pouch **+4 rows** | High Ground **+1 sight** |
+| III | 14 · 16 · 18 | Bindle +10u | Sorted Kit **+4 rows** | Tump Line +10u |
+| IV | 20 · 22 · 24 | Packer's Knot +10u | Outer Pockets **+4 rows** | Long Haul +10u |
+| V | 26 · 28 · **30** | Drover's Back +10u | Tinker's Roll **+4 rows** | Horizon Line **+1 sight** |
 
-**Every rung is the eye or the back, and not one of them is a stat.** This is
+`Jobs::WAYFARING_TIER_JOB_LEVEL` holds the level each *row* opens at — 2, 8, 14,
+20, 26 — which is what the panel prints in the gutter as a span (`lv 8–12`).
+What a given skill needs is on the skill: read `NODES[$key]['jobLevel']`.
+
+Totals: **120 → 200 units, 30 → 50 rows, 1 → 3 hexes of sight.** Eight nodes of
+ten units, five of four rows, two of one hex.
+
+**It is wired down its columns, not across.** A bought tree forks so that thirty
+points have to be spent through choices; there is nothing to choose here,
+because nothing is bought. Each node hangs off the one directly above it, which
+makes the three columns readable as three strands — room, straps, and the mixed
+one that carries both hexes of sight.
+
+**Every node is the eye or the back, and not one of them is a stat.** This is
 the rule that makes a granted tree safe to exist, and it is stricter than the
 §8.1 clamp it replaced. Every other tree is paid for with a skill point, and the
 point is what keeps the hundred-point cap (§7.4.1) meaningful; this one is free,
@@ -530,22 +540,20 @@ cap, none of them touching the stat ceiling. A percentage here would be a power
 ladder you climb by leaving the app open on a long walk. There is a test
 asserting a maxed Explorer moves no stat whatsoever.
 
-*(The chain used to end on +25% travelSpeed against a +15% ceiling and lean on
+*(The tree used to end on +25% travelSpeed against a +15% ceiling and lean on
 the clamp to stay honest. Writing nothing is the better version of that
 argument.)*
 
-**Rung 1 waits for level 2, where every bought tree opens at 1.** A bought tree
-can open immediately because the skill point is the price — the job level only
-says you may spend it. A granted tree has no price at all, so opening at 1 would
-hand a character who has walked nowhere something for existing. Two Explorer
-levels is seventeen XP, four hexes: a short walk, but a walk, and a walk is the
-only thing this job is ever allowed to charge.
+**The first skill waits for level 2, where every bought tree opens at 1.** A
+bought tree can open immediately because the skill point is the price — the job
+level only says you may spend it. A granted tree has no price at all, so opening
+at 1 would hand a character who has walked nowhere something for existing. Two
+Explorer levels is seventeen XP, four hexes: a short walk, but a walk, and a
+walk is the only thing this job is ever allowed to charge.
 
-**One rung every second level, not every level, and the last lands exactly on
-`JOB_MAX_LEVEL`.** Every level would make a rung ordinary; the gap is what makes
-one an event. `Jobs::CHAIN_TIER_JOB_LEVEL` holds the ladder, and it borrows
-nothing from §7.4.2's five tiers — those pace a tree bought with points, and
-this one is paced by walking.
+**The steps are even in levels and steep in effort**, which is what the job XP
+curve does for free: level 12 is about 800 hexes out, level 20 about 2,600, and
+level 30 about 6,400. The last skill lands exactly on `JOB_MAX_LEVEL`.
 
 **Walking earns Explorer XP and no character XP.** Both halves are load-bearing.
 Without the first, a map with no reach limit is a long wait; without the second,
@@ -560,16 +568,16 @@ yet" to be answered, and the two would eventually disagree.
 
 **Sight is the rarest thing the road pays in**, and it is capped for the reason
 in §7.4.3: it is a query radius, and cost goes as the square of it. It goes
-1 → 3 and no further, ever, and both rungs sit late — one at level 8 and the
-other at 30, the last thing the ladder gives. Starting at one hex is what makes
-the first of them felt: the chain trebles what a prospector can see rather than
-adding a fringe to a view that was already wide.
+1 → 3 and no further, ever. Both nodes sit at the foot of the right-hand column,
+at levels 12 and 30 — the second is the last thing the tree gives. Starting at
+one hex is what makes the first of them felt: it trebles what a prospector can
+see rather than adding a fringe to a view that was already wide.
 
-**The back grows the whole way up**, because that is what a long career of
-walking should feel like. Ten units is most of a haul; four straps is four more
-kinds you never have to choose between. A maxed Explorer carries two hundred
-units across fifty straps — which is a different *game* from 120 across 30, and
-the only way to get there is to have walked several thousand hexes.
+**The back grows every other level**, because that is what a long career of
+walking should feel like. Ten units is most of a haul; four straps is four more kinds
+you never have to choose between. A maxed Explorer carries two hundred units
+across fifty straps — a different *game* from 120 across 30, and the only way to
+get there is to have walked several thousand hexes.
 
 ### 7.6 The bag — two limits, and they refuse in two different ways
 
@@ -582,7 +590,7 @@ Everything a character owns and is not wearing is in one bag, and the bag has
 | **Rows** | **30.** How many *distinct* things that is: a stack is one row whether it holds 1 or 100, and two axes are two rows because gear does not stack. Roomy against a catalogue of 29 materials and 5 draughts, on purpose — see below. | `Balance::BAG_ROWS` |
 
 Both are **flat, and level does not move them** (§7.1). The only thing that
-widens either is the Explorer chain (§7.5), to **200 and 50** — fifteen rungs of
+widens either is the Explorer tree (§7.5), to **200 and 50** — fifteen nodes of
 ten units or four rows, earned by walking and by nothing else.
 
 **Units are the limit that bites; rows are the ceiling on carrying one of

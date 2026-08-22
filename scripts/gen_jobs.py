@@ -486,23 +486,23 @@ HARVESTING_NAMES = [
 # the pack, the middle is straps all the way down, and the right is the mixed
 # one that carries both hexes of sight.
 EXPLORER = [
- # row 1 -- lv 2. What a walker learns in the first fortnight.
+ # row 1 -- lv 2, 4, 6. What a walker learns in the first fortnight.
  ('deep_pockets','Deep Pockets',bag_units(10),'You stop leaving things behind because there was nowhere to put them.'),
  ('second_strap','Second Strap',bag_rows(4),'A second strap, and four more things you never have to choose between.'),
  ('rolled_blanket','Rolled Blanket',bag_units(10),'Rolled, not folded. It takes half the room and sheds the rain.'),
- # row 2 -- lv 9. The load starts sitting right, and the country opens up.
+ # row 2 -- lv 8, 10, 12. The load starts sitting right, and the country opens up.
  ('even_load','Even Load',bag_units(10),'Weight over the hips, not the shoulders. The miles get shorter.'),
  ('side_pouch','Side Pouch',bag_rows(4),'Small things stop living at the bottom of the pack.'),
  ('high_ground','High Ground',sight(1),'Take the ridge and the country opens a hex further out.'),
- # row 3 -- lv 16.
+ # row 3 -- lv 14, 16, 18.
  ('bindle','Bindle',bag_units(10),'An old trick: the pack that hangs outside the pack.'),
  ('sorted_kit','Sorted Kit',bag_rows(4),'Everything has a place, so everything fits in it.'),
  ('tump_line','Tump Line',bag_units(10),'A strap across the brow. Your neck argues; the load moves.'),
- # row 4 -- lv 23.
+ # row 4 -- lv 20, 22, 24.
  ('packers_knot','Packer\'s Knot',bag_units(10),'Cinch it once and it stays cinched for thirty miles.'),
  ('outer_pockets','Outer Pockets',bag_rows(4),'What you need on the road no longer lives under what you do not.'),
  ('long_haul','Long Haul',bag_units(10),'The day you stop counting the hours is the day you carry more of them.'),
- # row 5 -- lv 30. Six thousand hexes in.
+ # row 5 -- lv 26, 28, 30. Six thousand hexes in.
  ('drovers_back','Drover\'s Back',bag_units(10),'Built by the road, and it shows in what you can pick up.'),
  ('tinkers_roll','Tinker\'s Roll',bag_rows(4),'A roll of pockets, and a pocket for everything worth keeping.'),
  ('horizon_line','Horizon Line',sight(1),'You read the far edge of the ground the way others read the near.'),
@@ -555,45 +555,60 @@ TIERS = [(1, 6, 1), (2, 8, 5), (3, 8, 12), (4, 6, 20), (5, 2, 28)]
 # as a full tree and "level 12" means one thing across the whole panel.
 JOB_LEVELS = {tier: job_level for tier, _, job_level in TIERS}
 
-# ...and the wayfaring tree keeps their *shape* while setting its own depths.
+# ...and the wayfaring tree keeps their *shape* while gating node by node.
 #
 # Five rows of three, exactly like every bought tree, because a twelfth job that
-# is also a twelfth layout is one thing too many to learn. What differs is where
-# the rows sit: 2, 9, 16, 23, 30, evenly spaced from the first walk to
-# JOB_MAX_LEVEL.
+# is also a twelfth layout is one thing too many to learn. What is exceptional is
+# underneath the layout: a bought tree's depth opens whole, three or eight nodes
+# at once, because the gate only says you may start spending points there. A
+# granted tree has no points to spend, so a row arriving whole would be three
+# rewards for one level. Here each skill has a level of its own -- one every
+# second level, 2 through 30 -- and a row fills in across three of them.
 #
-# Row one waits for level 2 rather than 1 because a granted node has no skill
-# point paying for it -- seventeen XP, four hexes. Short, but a walk, and a walk
-# is the only thing this job is ever allowed to charge. Even spacing in *levels*
-# is steep spacing in effort: the job XP curve means row 2 is about 290 hexes
-# and row 5 about 6,400.
-CHAIN_JOB_LEVELS = {1: 2, 2: 9, 3: 16, 4: 23, 5: 30}
-CHAIN_TIER_WIDTH = 3
+# Skill one waits for level 2 rather than 1 because a granted node has no skill
+# point paying for it: seventeen XP, four hexes. Short, but a walk, and a walk is
+# the only thing this job is ever allowed to charge. Even spacing in *levels* is
+# steep spacing in effort -- the job XP curve puts level 12 about 800 hexes out
+# and level 30 about 6,400.
+WAYFARING_TIER_WIDTH = 3
+WAYFARING_STEP = 2
+
+# The level each *row* opens at, which is its first skill's. The panel labels a
+# band with it; the two skills after it in the row arrive a level-step apart.
+WAYFARING_JOB_LEVELS = {
+    row: (row - 1) * WAYFARING_TIER_WIDTH * WAYFARING_STEP + WAYFARING_STEP
+    for row in range(1, 6)
+}
 
 
-def chain(nodes):
-    """Five rows of three, wired down the columns.
+def wayfare(nodes):
+    """Five rows of three, one level per skill, wired down the columns.
 
     The wayfaring shape, §7.5. It borrows the *layout* of a bought tree -- five
-    depths, gated one after another -- because a twelfth job that is also a
-    twelfth kind of diagram is one thing too many to learn. What it does not
-    borrow is the branching: a bought tree forks so that thirty points have to be
-    spent through choices, and there is nothing to choose here, because nothing
-    is bought.
+    depths -- because a twelfth job that is also a twelfth kind of diagram is one
+    thing too many to learn. Two things it does not borrow:
 
-    So each node hangs off the one directly above it in its own column. That
-    makes the columns readable as three strands -- room, straps, and the mixed
-    one -- rather than a lattice nobody has to navigate.
+    One, the gating. A bought depth opens whole: the level says you may start
+    spending points there, and the points are the real cost. Nothing is bought
+    here, so a row opening whole would hand over three rewards for one level.
+    Each skill has its own level instead -- every second one, 2 through 30 -- and
+    a row fills in across three of them.
+
+    Two, the branching. A bought tree forks so that thirty points have to be
+    spent through choices, and there is nothing to choose here. Each node hangs
+    off the one directly above it in its own column, which makes the columns
+    readable as three strands -- room, straps, and the mixed one -- rather than a
+    lattice nobody has to navigate.
     """
     assert len(nodes) == 15, len(nodes)
-    width = CHAIN_TIER_WIDTH
+    width = WAYFARING_TIER_WIDTH
 
     out = []
     for idx, (key, name, effect, desc) in enumerate(nodes):
-        tier, column = divmod(idx, width)
-        tier += 1
+        tier = idx // width + 1
+        job_level = (idx + 1) * WAYFARING_STEP
         req = [] if tier == 1 else [nodes[idx - width][0]]
-        out.append((key, name, tier, CHAIN_JOB_LEVELS[tier], effect, req, desc))
+        out.append((key, name, tier, job_level, effect, req, desc))
     return out
 
 
@@ -676,9 +691,10 @@ namespace App\\Game;
  *
  * Generated shape: tiers of 6/8/8/6/2 at job levels 1/5/12/20/28, every node
  * above tier 1 naming a parent, and both capstones naming two. Explorer is the
- * one exception: 3/3/3/3/3 at job levels 2/9/16/23/30, wired down its columns
- * rather than across. Its first row waits for level 2 because a granted node has
- * no point to pay for it -- the walk is the price (§7.5).
+ * one exception: 3/3/3/3/3, wired down its columns rather than across, and gated
+ * one skill at a time -- every second job level from 2 to 30 -- rather than a
+ * row at a time. A granted node has no point to pay for it, so the walk is the
+ * price and each skill is charged for separately (§7.5).
  */
 final class Jobs
 {
@@ -734,8 +750,11 @@ for key, name, kind, source, palette, desc in JOBS:
 lines.append('''    ];
 
     /**
-     * §7.4.2 -- job level required to reach into each tier. Shared by every
-     * shape, so "level 12" means the same depth in a chain as in a full tree.
+     * §7.4.2 -- job level required to reach into each tier of a *bought* tree.
+     *
+     * The wayfaring tree keeps the same five depths and sets its own levels for
+     * them (WAYFARING_TIER_JOB_LEVEL below), because it is paced by walking
+     * rather than by skill points.
      */
     public const TIER_JOB_LEVEL = [1 => 1, 2 => 5, 3 => 12, 4 => 20, 5 => 28];
 
@@ -745,27 +764,31 @@ lines.append('''    ];
     public const NODES_PER_JOB = 30;
 
     /** §7.5 -- the wayfaring shape: five rows of three, fifteen in all. */
-    public const CHAIN_TIER_SIZE = [1 => 3, 2 => 3, 3 => 3, 4 => 3, 5 => 3];
+    public const WAYFARING_TIER_SIZE = [1 => 3, 2 => 3, 3 => 3, 4 => 3, 5 => 3];
 
     /**
-     * §7.5 -- the wayfaring tree's own depths: 2, 9, 16, 23, 30.
+     * §7.5 -- the level each wayfaring *row* opens at: 2, 8, 14, 20, 26.
      *
-     * Five rows, exactly as §7.4.2 shapes every bought tree, but sitting at its
-     * own levels. Those five gates pace a tree bought with skill points, where
-     * the gate only says you may spend one; a granted tree has no price at all,
-     * so its pacing has to come from the walking itself.
+     * This is where the wayfaring tree stops being like the others, and the
+     * difference is the point of it. A bought depth opens whole -- its gate only
+     * says you may start spending points there, and the point is the real price.
+     * Nothing is bought here, so a row arriving whole would be three rewards for
+     * one level. **Each skill carries its own `jobLevel` instead**, one every
+     * second level from 2 to 30, and a row fills in across three of them.
+     *
+     * So this table is the row's *first* skill, not a gate every node in the row
+     * shares: read `NODES[$key]['jobLevel']` for what a given skill actually
+     * needs. The panel uses this to label the band and to say when the depth
+     * begins.
      *
      * Row one waits for level 2 rather than 1 because a character who has walked
      * nowhere must not be handed anything. Seventeen XP, four hexes: a short
-     * walk, but a walk, and a walk is the only price this job may charge. Row
-     * five lands exactly on JOB_MAX_LEVEL.
-     *
-     * Even in levels is steep in effort -- the job curve puts row 2 about 290
-     * hexes out and row 5 about 6,400.
+     * walk, but a walk, and a walk is the only price this job may charge. The
+     * last skill lands exactly on JOB_MAX_LEVEL.
      */
-    public const CHAIN_TIER_JOB_LEVEL = [1 => 2, 2 => 9, 3 => 16, 4 => 23, 5 => 30];
+    public const WAYFARING_TIER_JOB_LEVEL = [1 => 2, 2 => 8, 3 => 14, 4 => 20, 5 => 26];
 
-    public const NODES_PER_CHAIN = 15;
+    public const NODES_PER_WAYFARING = 15;
 
     /**
      * Every node, keyed by its own key. `requires` names parent nodes in the
@@ -779,7 +802,7 @@ total = 0
 for job, nodes in TREES.items():
     assert len(nodes) in (15, 30), (job, len(nodes))
     lines.append('        // ---- %s' % job)
-    for key, name, tier, job_level, effect, req, desc in (chain if len(nodes) == 15 else wire)(nodes):
+    for key, name, tier, job_level, effect, req, desc in (wayfare if len(nodes) == 15 else wire)(nodes):
         total += 1
         # Parents are namespaced here, where the job is known. Doing it after
         # the fact by string replacement used to reach across trees: two jobs
@@ -816,19 +839,19 @@ lines.append('''    ];
     /** How many nodes this job's tree holds, whichever shape it is. */
     public static function nodeCount(string $job): int
     {
-        return self::isAutomatic($job) ? self::NODES_PER_CHAIN : self::NODES_PER_JOB;
+        return self::isAutomatic($job) ? self::NODES_PER_WAYFARING : self::NODES_PER_JOB;
     }
 
     /** @return array<int,int> tier => node count, for this job's shape. */
     public static function tierSizes(string $job): array
     {
-        return self::isAutomatic($job) ? self::CHAIN_TIER_SIZE : self::TIER_SIZE;
+        return self::isAutomatic($job) ? self::WAYFARING_TIER_SIZE : self::TIER_SIZE;
     }
 
     /** @return array<int,int> tier => job level required, for this job's shape. */
     public static function tierJobLevels(string $job): array
     {
-        return self::isAutomatic($job) ? self::CHAIN_TIER_JOB_LEVEL : self::TIER_JOB_LEVEL;
+        return self::isAutomatic($job) ? self::WAYFARING_TIER_JOB_LEVEL : self::TIER_JOB_LEVEL;
     }
 
     /**

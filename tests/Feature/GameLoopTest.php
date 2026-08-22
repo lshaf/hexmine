@@ -546,7 +546,7 @@ final class GameLoopTest extends TestCase
         [$col, $row] = $this->standOnAHerd();
 
         // Half a map away in both axes, so this is well outside any sight the
-        // Explorer chain can reach -- the scan above starts at 0,0, so simply
+        // Explorer tree can reach -- the scan above starts at 0,0, so simply
         // standing there could leave the herd inside the disc.
         $this->character->update([
             'col' => ($col + intdiv(Balance::MAP_COLS, 2)) % Balance::MAP_COLS,
@@ -1863,18 +1863,17 @@ final class GameLoopTest extends TestCase
         // for it, so the walk is the price.
         $this->assertNotContains('explorer.deep_pockets', $this->game->ownedNodes($this->character));
 
-        // A row arrives whole, exactly as a bought tree's depth opens whole.
+        // §7.5 -- one skill per level, not a row at a time. Level 2 pays for
+        // the first of row one and nothing else in it.
         $this->explorerAt(2);
         $owned = $this->game->ownedNodes($this->character->fresh());
-        foreach (['deep_pockets', 'second_strap', 'rolled_blanket'] as $key) {
-            $this->assertContains("explorer.{$key}", $owned);
-        }
-        $this->assertNotContains('explorer.even_load', $owned, 'row two arrived early');
+        $this->assertContains('explorer.deep_pockets', $owned);
+        $this->assertNotContains('explorer.second_strap', $owned, 'the whole row arrived for one level');
         $this->assertSame(0, $this->game->skillPoints($this->character)['spent']);
 
-        $this->explorerAt(9);
+        $this->explorerAt(4);
 
-        $this->assertContains('explorer.even_load', $this->game->ownedNodes($this->character));
+        $this->assertContains('explorer.second_strap', $this->game->ownedNodes($this->character));
         $this->assertSame(
             0,
             $this->game->skillPoints($this->character)['spent'],
@@ -1893,13 +1892,13 @@ final class GameLoopTest extends TestCase
     }
 
     /** §7.5 -- two hexes of eye on top of the base one, earned one at a time. */
-    public function test_the_explorer_chain_widens_sight_and_then_stops(): void
+    public function test_the_explorer_tree_widens_sight_and_then_stops(): void
     {
         $this->assertSame(Balance::SIGHT_RADIUS, $this->game->sightRadius($this->character));
 
-        // High Ground, row two. The eye is the rarest thing the road pays in,
-        // so it arrives later than a strap does.
-        $this->explorerAt(9);
+        // High Ground, the end of row two. The eye is the rarest thing the road
+        // pays in, so it arrives later than a strap does.
+        $this->explorerAt(12);
         $this->assertSame(Balance::SIGHT_RADIUS + 1, $this->game->sightRadius($this->character->fresh()));
 
         $this->explorerAt(Balance::JOB_MAX_LEVEL);
@@ -2193,29 +2192,28 @@ final class GameLoopTest extends TestCase
      * §7.5 + §7.6 -- the road is the only thing that widens the bag, and it
      * stops where the caps do.
      *
-     * Five rows of three, ten units or four straps a node, at job levels 2, 9,
-     * 16, 23 and 30. The climb is what is being tested here as much as the
-     * ceiling: an early row has to be felt, or a tree nobody spends points on is
-     * a tree nobody notices.
+     * Fifteen skills, ten units or four straps each, one every second job level
+     * from 2 to 30. The climb is what is being tested here as much as the
+     * ceiling: an early skill has to be felt, or a tree nobody spends points on
+     * is a tree nobody notices.
      */
-    public function test_the_explorer_chain_widens_the_bag_and_then_stops(): void
+    public function test_the_explorer_tree_widens_the_bag_and_then_stops(): void
     {
         $bag = $this->game->bag($this->character);
         $this->assertSame(Balance::BAG_UNITS, $bag['unitCap']);
         $this->assertSame(Balance::BAG_ROWS, $bag['rowCap']);
 
-        // Row one, at Explorer 2: four hexes of walking, and a whole row of
-        // three arrives at once -- twenty units of room and four straps.
+        // The first skill, at Explorer 2: four hexes of walking, ten units of
+        // pack. One skill per level, so the straps are still a level away.
         $this->explorerAt(2);
         $bag = $this->game->bag($this->character->fresh());
-        $this->assertSame(Balance::BAG_UNITS + 20, $bag['unitCap']);
-        $this->assertSame(Balance::BAG_ROWS + 4, $bag['rowCap']);
+        $this->assertSame(Balance::BAG_UNITS + 10, $bag['unitCap']);
+        $this->assertSame(Balance::BAG_ROWS, $bag['rowCap'], 'the straps arrived with the room');
 
-        // Row two is about 290 hexes further on, and pays one of each again.
-        $this->explorerAt(9);
+        $this->explorerAt(4);
         $bag = $this->game->bag($this->character->fresh());
-        $this->assertSame(Balance::BAG_UNITS + 30, $bag['unitCap']);
-        $this->assertSame(Balance::BAG_ROWS + 8, $bag['rowCap']);
+        $this->assertSame(Balance::BAG_UNITS + 10, $bag['unitCap']);
+        $this->assertSame(Balance::BAG_ROWS + 4, $bag['rowCap']);
 
         $this->explorerAt(Balance::JOB_MAX_LEVEL);
         $bag = $this->game->bag($this->character->fresh());
