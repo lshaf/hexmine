@@ -1,11 +1,12 @@
 <script setup lang="ts">
 /**
- * Transient feedback, top of screen.
+ * Transient feedback, clear of the controls.
  *
  * An idle game gives most of its news on a delay, so when something does happen
  * immediately it has to be visible without standing in front of the controls --
- * which is why this lives at the top and the dock owns the bottom. It is
- * pointer-transparent throughout; nothing here is ever clickable.
+ * which is why it takes the top edge on a wide screen and the empty band just
+ * above the bottom stack on a phone, where the top edge is already spoken for.
+ * It is pointer-transparent throughout; nothing here is ever clickable.
  *
  * The marker is a draining hexagon, the same perimeter-as-progress idea the
  * gauges use (§13.1). It carries two things at once: colour says how the news
@@ -181,20 +182,38 @@ const visible = computed(() =>
 }
 
 /*
- * Phones have no free centre at the top -- the gauge cluster owns the left. Tuck
- * under the two screen buttons on the right instead, where nothing else sits.
+ * Phones have no free top edge at all: the gauge cluster owns the left, the
+ * screen strip owns the right, and tucking under the strip landed toasts on top
+ * of the two cells below it. The clear band is above the bottom stack -- next to
+ * where the acting happens, and the one place nothing else sits. --stack-h is
+ * that stack measured (App.vue), so the toasts ride it as the dock grows and
+ * shrinks with location. Newest sits nearest the dock.
  */
 @media (max-width: 560px) {
   .toasts {
-    top: 74px;
-    left: auto;
+    top: auto;
+    bottom: calc(var(--stack-h, 150px) + 12px + env(safe-area-inset-bottom, 0px));
+    left: 8px;
     right: 8px;
     transform: none;
-    align-items: flex-end;
+    flex-direction: column-reverse;
+    align-items: stretch;
+    gap: 6px;
   }
 
   .toast {
-    max-width: min(270px, calc(100vw - 244px));
+    width: 100%;
+    max-width: none;
+  }
+}
+
+@media (max-width: 560px) and (prefers-reduced-motion: no-preference) {
+  .drop-enter-from {
+    transform: translateY(10px) scale(0.98);
+  }
+
+  .drop-leave-to {
+    transform: translateY(6px);
   }
 }
 </style>

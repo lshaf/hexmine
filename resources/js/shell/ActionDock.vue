@@ -15,7 +15,7 @@
 import { computed } from 'vue'
 import { useGame } from '@/stores/game'
 import { RECIPES, RING_LABEL, SKILL_BY_KEY } from '@/game/catalog'
-import { BIOME_LABEL } from '@/theme/palette'
+import { VARIANT_LABEL } from '@/game/variants'
 import { formatDuration } from '@/game/formulas'
 import { worldParams } from '@/game/worldgen'
 import HexAction from './HexAction.vue'
@@ -139,7 +139,7 @@ function hunted(): void {
       <div class="where">
         <span class="label">{{ here ? 'You are at' : 'Open country' }}</span>
         <h2 class="place">
-          {{ here ? here.name : standing ? BIOME_LABEL[standing.biome] : 'Unsurveyed' }}
+          {{ here ? here.name : standing ? VARIANT_LABEL[standing.variant] : 'Unsurveyed' }}
         </h2>
         <span v-if="doing" class="label doing" :class="{ ready }">{{ doing }}</span>
         <!-- §5.5 -- perishable, so it says when it goes rather than that it is
@@ -300,25 +300,35 @@ function hunted(): void {
   }
 
   .inner {
-    gap: 10px;
-    padding: 9px 11px 11px;
+    gap: 8px;
+    padding: 8px 10px 9px;
   }
 
   .where {
     min-width: 0;
     max-width: none;
+    gap: 2px;
   }
 
   .place {
-    font-size: 15px;
+    font-size: 13.5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .meta {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .actions {
-    gap: 3px;
+    gap: 2px;
   }
 
   .rule {
-    margin: 2px 2px 12px;
+    margin: 2px 1px 11px;
   }
 }
 </style>

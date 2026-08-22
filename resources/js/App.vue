@@ -6,10 +6,9 @@
  * to corners, so nothing steals area from the thing the game is actually about.
  *
  *   top-left      instrument cluster (AP / level) + village work
- *   top-right     the location-independent screens, nested into a
- *                 honeycomb strip, and the tutorial
+ *   top-right     recentre and the location-independent screens, nested into
+ *                 one honeycomb strip, and the tutorial
  *   bottom-centre what you are pointing at, and what you can do here
- *   bottom-right  recentre
  *
  * The camera pans freely and costs nothing, so it needs a way back -- but sight
  * does not pan with it. Beyond the character's travel range the map shows the
@@ -18,7 +17,7 @@
  * §13.2 -- sizing is real CSS, not utility classes with arbitrary values, which
  * silently collapsed the viewport to zero height when tried.
  */
-import { onMounted, computed } from 'vue'
+import { onMounted, onBeforeUnmount, computed, ref, watch } from 'vue'
 import { useGame } from '@/stores/game'
 import { useBreakpoint } from '@/composables/useBreakpoint'
 import HexMap from '@/map/HexMap.vue'
@@ -37,7 +36,6 @@ import ShopView from '@/views/ShopView.vue'
 import HeroView from '@/views/HeroView.vue'
 import AtlasView from '@/views/AtlasView.vue'
 import SkillsView from '@/views/SkillsView.vue'
-import { ACTION_PATHS } from '@/icons/actions'
 
 const game = useGame()
 const { isWide } = useBreakpoint()
@@ -56,6 +54,33 @@ const panel = computed(() => (game.panel ? PANELS[game.panel] : null))
 
 /** The station opens for whichever settlement the player is standing on. */
 const station = computed(() => game.station)
+
+/**
+ * The bottom stack is the one plate whose height changes with where you are --
+ * a settlement dock under an open tile card is twice an empty one -- and on a
+ * phone the toasts have to sit clear of it (§13.2). Measured rather than
+ * guessed, and published as --stack-h for anything that needs to ride it.
+ */
+const bottomStack = ref<HTMLElement | null>(null)
+const stackHeight = ref(0)
+let stackWatcher: ResizeObserver | undefined
+
+watch(bottomStack, (el) => {
+  stackWatcher?.disconnect()
+  stackWatcher = undefined
+
+  if (!el) {
+    stackHeight.value = 0
+    return
+  }
+
+  stackWatcher = new ResizeObserver(([entry]) => {
+    stackHeight.value = Math.round(entry!.contentRect.height)
+  })
+  stackWatcher.observe(el)
+})
+
+onBeforeUnmount(() => stackWatcher?.disconnect())
 
 /**
  * The map tells the store how much room it has, and where the camera has
@@ -80,7 +105,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="app">
+  <div class="app" :style="stackHeight ? { '--stack-h': `${stackHeight}px` } : undefined">
     <template v-if="game.booted && game.character">
       <HexMap
         :tiles="game.tiles"
@@ -107,6 +132,16 @@ onMounted(() => {
       <!-- ------------------------------------------------------ top right -->
       <div class="corner top-right">
         <div class="screens">
+          <!-- The map's own control, at the head of the strip: the camera pans
+               anywhere and costs nothing, so the way back belongs with the
+               things you can reach from any hex rather than in a corner of
+               its own. -->
+          <HexAction
+            icon="recenter"
+            label="Recentre"
+            hint="Centre the map on your prospector"
+            @activate="game.centreOnCharacter()"
+          />
           <HexAction icon="atlas" label="Atlas" @activate="game.openPanel('atlas')" />
           <HexAction icon="skills" label="Jobs" @activate="game.openPanel('skills')" />
           <!-- §7.6 -- the bag says when it is full, because nothing else does
@@ -124,46 +159,13 @@ onMounted(() => {
       </div>
 
       <!-- -------------------------------------------------- bottom centre -->
-      <div class="corner bottom-centre">
-        <!-- The bottom stack grows and shrinks with context, so on phones the
-             recentre control rides inside it rather than fighting it for a
-             fixed corner. -->
-        <button
-          v-if="!isWide"
-          class="recentre inline"
-          type="button"
-          title="Centre on your prospector"
-          @click="game.centreOnCharacter()"
-        >
-          <span class="hex"><span class="face"><svg viewBox="0 0 24 24" width="17" height="17"
-            fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"
-            aria-hidden="true"><path :d="ACTION_PATHS.recenter" /></svg></span></span>
-        </button>
-
+      <div ref="bottomStack" class="corner bottom-centre">
         <!-- No room beside the gauges on a phone, so the prompt sits where the
              acting happens instead. -->
         <TutorialCard v-if="!isWide" />
         <TileCard />
         <ActionDock />
       </div>
-
-      <!-- --------------------------------------------------- bottom right -->
-      <button
-        v-if="isWide"
-        class="recentre corner-fixed"
-        type="button"
-        title="Centre on your prospector"
-        @click="game.centreOnCharacter()"
-      >
-        <span class="hex">
-          <span class="face">
-            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
-                 stroke-width="1.7" stroke-linecap="round" aria-hidden="true">
-              <path :d="ACTION_PATHS.recenter" />
-            </svg>
-          </span>
-        </span>
-      </button>
 
       <!-- ---------------------------------------------------------- panels -->
       <Transition name="fade">
@@ -289,39 +291,6 @@ onMounted(() => {
   align-items: center;
 }
 
-.recentre {
-  color: var(--vellum-dim);
-}
-
-.recentre.corner-fixed {
-  position: absolute;
-  right: 12px;
-  bottom: 12px;
-  z-index: var(--z-hud);
-}
-
-.recentre.inline {
-  align-self: flex-end;
-}
-
-.recentre .hex {
-  display: block;
-  width: 46px;
-  height: 40px;
-}
-
-.recentre .face {
-  display: grid;
-  place-items: center;
-  background: var(--hud);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-}
-
-.recentre:hover {
-  color: var(--vellum);
-}
-
 /* ---------------------------------------------------------------- boot */
 
 .boot {
@@ -353,23 +322,27 @@ onMounted(() => {
  * rather than stacking a column down the middle of the screen.
  */
 @media (max-width: 560px) {
+  .corner {
+    gap: 7px;
+  }
+
   .top-left,
   .top-right {
-    top: 8px;
+    top: calc(6px + env(safe-area-inset-top, 0px));
   }
 
   .top-left {
-    left: 8px;
+    left: calc(6px + env(safe-area-inset-left, 0px));
   }
 
   .top-right {
-    right: 8px;
+    right: calc(6px + env(safe-area-inset-right, 0px));
   }
 
   .bottom-centre {
-    bottom: 8px;
-    left: 8px;
-    right: 8px;
+    bottom: calc(6px + env(safe-area-inset-bottom, 0px));
+    left: calc(6px + env(safe-area-inset-left, 0px));
+    right: calc(6px + env(safe-area-inset-right, 0px));
     transform: none;
   }
 
@@ -379,8 +352,8 @@ onMounted(() => {
    * closes up with them rather than coming apart.
    */
   .screens {
-    --cell-w: 40px;
-    --cell-h: 35px;
+    --cell-w: 37px;
+    --cell-h: 32px;
   }
 
   .screens :deep(.cell .hex) {

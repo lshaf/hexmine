@@ -147,7 +147,17 @@ const heading = computed(() => {
 
 @media (max-width: 560px) {
   .stack {
-    width: 200px;
+    width: 186px;
+    gap: 5px;
+  }
+
+  .inner {
+    gap: 7px;
+    padding: 6px 8px 6px 9px;
+  }
+
+  .qty {
+    font-size: 11px;
   }
 }
 </style>

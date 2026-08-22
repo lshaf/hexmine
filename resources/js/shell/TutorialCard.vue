@@ -216,6 +216,26 @@ const jumpTo = computed<PanelKey | null>(() => {
 @media (max-width: 560px) {
   .tut {
     width: 100%;
+    padding: 7px 10px 10px 12px;
+  }
+
+  .tut.folded {
+    padding: 6px 9px 6px 12px;
+  }
+
+  .title {
+    font-size: 13.5px;
+    margin-top: 3px;
+  }
+
+  .body {
+    margin-top: 4px;
+    font-size: 11.5px;
+    line-height: 1.45;
+  }
+
+  .jump {
+    margin-top: 7px;
   }
 }
 </style>

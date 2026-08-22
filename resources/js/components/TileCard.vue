@@ -16,7 +16,7 @@ import { computed, ref, watch } from 'vue'
 import { useGame } from '@/stores/game'
 import { MATERIALS, RING_LABEL, SKILL_BY_KEY, skillForMaterial } from '@/game/catalog'
 import { formatDuration, formatSpan } from '@/game/formulas'
-import { BIOME_LABEL } from '@/theme/palette'
+import { VARIANT_LABEL } from '@/game/variants'
 import { hexDistance } from '@/map/hexGeometry'
 import { materialIcon } from '@/icons/procedural'
 import HexAction from '@/shell/HexAction.vue'
@@ -146,13 +146,13 @@ const title = computed(() => {
 
   if (unseen.value) {
     return t.settlement
-      ? (TIER_LABEL[t.settlement.tier] ?? BIOME_LABEL[t.biome])
+      ? (TIER_LABEL[t.settlement.tier] ?? VARIANT_LABEL[t.variant])
       : t.dungeon
         ? 'A way down'
-        : BIOME_LABEL[t.biome]
+        : VARIANT_LABEL[t.variant]
   }
 
-  return t.settlement?.name ?? t.dungeon?.name ?? BIOME_LABEL[t.biome]
+  return t.settlement?.name ?? t.dungeon?.name ?? VARIANT_LABEL[t.variant]
 })
 
 // A new hex is a fresh question; do not carry the previous one's expansion.
@@ -224,35 +224,6 @@ watch(tile, () => {
           @activate="tile && game.travelTo(tile.col, tile.row)"
         />
         </div>
-
-        <!-- §5.6 -- not a refusal and not an error: there is simply nothing to
-             report from here. Says what walking there would buy you. -->
-        <p v-if="unseen" class="tiny bare">
-          Unscouted. Sight reaches {{ game.sight }}
-          {{ game.sight === 1 ? 'hex' : 'hexes' }}<template v-if="game.travel">
-            — and nothing at all while you are on the road</template>. Walk there
-          to see the seam, who is on it, and what it pays.
-        </p>
-
-        <!-- §7.6 -- the way out, not just the refusal. Every one of these can
-             be done from the hex you are standing on. -->
-        <p v-else-if="overloaded" class="tiny blocked">
-          Your bag is over its limit, so you cannot set off. Sell, process or
-          throw something away first.
-        </p>
-
-        <!-- Workable hex, wrong place to be standing. Says the next move
-             rather than repeating what the greyed button already implies. -->
-        <p v-else-if="trip && !trip.canMine" class="tiny blocked">
-          {{ trip.reason }}
-        </p>
-
-        <!-- §4.0 -- not a refusal: the hex is workable, it just will not give up
-             its material to bare hands. Sits apart from `blocked` for that
-             reason, and names the tool that would fix it. -->
-        <p v-if="trip && trip.scrap" class="tiny bare">
-          {{ trip.note }}
-        </p>
 
         <div v-if="open && trip && mat" class="detail">
           <!-- The line comes from the server, not from the material: a scrap
@@ -384,24 +355,6 @@ watch(tile, () => {
   transform: rotate(180deg);
 }
 
-.blocked {
-  margin: 0;
-  padding: 8px 14px 10px;
-  border-top: 1px solid var(--hud-line-soft);
-  color: var(--copper);
-  line-height: 1.35;
-}
-
-/* A warning, not a refusal -- muted rather than copper, so it never reads as
-   the hex saying no. */
-.bare {
-  margin: 0;
-  padding: 8px 14px 10px;
-  border-top: 1px solid var(--hud-line-soft);
-  color: var(--vellum-dim);
-  line-height: 1.35;
-}
-
 .detail {
   padding: 0 14px 12px;
 }
@@ -442,12 +395,33 @@ watch(tile, () => {
     max-width: none;
   }
 
+  .head {
+    gap: 8px;
+    padding: 8px 10px 9px 11px;
+  }
+
+  .summary {
+    gap: 8px;
+  }
+
+  .name {
+    font-size: 13px;
+  }
+
   .stats {
-    gap: 10px;
+    gap: 9px;
+  }
+
+  .stat .readout {
+    font-size: 12px;
   }
 
   .reason {
     max-width: 130px;
+  }
+
+  .detail {
+    padding: 0 11px 10px;
   }
 }
 </style>

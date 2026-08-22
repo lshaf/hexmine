@@ -32,9 +32,8 @@ import type { ItemDef, MaterialKey, OwnedItem } from '@/game/types'
 const game = useGame()
 
 /**
- * Generated at cell scale and then stretched to fill it -- see `.face svg`
- * below. The number is what the SVG is authored at; the hexagon is what it
- * ends up as.
+ * The size the SVG is authored at. What it ends up as is decided by `--art`
+ * below, so this only has to be big enough that nothing is rasterised small.
  */
 const ICON = 56
 
@@ -170,29 +169,35 @@ onBeforeUnmount(() => observer?.disconnect())
 const dropped = (index: number) => (index % columns.value) % 2 === 1
 
 /**
- * Sit every icon on its own drawn bounds, so the rim around it is the same
- * width on every strap.
+ * Scale every icon by its own drawn bounds, so a strap is the same weight
+ * whatever is on it -- and never by deforming one.
  *
  * The icons are authored in a 40x40 box and none of them fills it: a raw lump
  * lives in x 7..32, a stack of bars in y 7..29, a rarity frame in almost the
  * whole thing. Rendering the *box* therefore lands a different margin in every
- * cell -- measured on a real bag, 10.7px on one and 13.2px on the next -- and
- * the ones drawn slightly high sit slightly high in the hexagon too.
+ * cell -- measured on a real bag, 10.7px on one and 13.2px on the next.
  *
- * getBBox() reports the ink in user units, which is exactly the box the art
- * should be scaled by. Re-pointing the viewBox at it makes every icon fill its
- * cell identically, whatever it was authored inside. It reads the ink rather
- * than the current viewBox, so running it twice on the same element is a no-op.
+ * getBBox() reports the ink in user units. The viewBox is re-pointed at the
+ * **square around it**, centred, with its side the longer of the two: every
+ * icon's longest axis then lands at exactly the same length, which is the
+ * consistency the stretch was after, and its proportions survive. A shortbow is
+ * three parts wide to four tall and used to be drawn wider than it is high.
+ *
+ * A square viewBox in a square box means the default xMidYMid meet fits exactly
+ * -- there is no letterbox to leave. It reads the ink rather than the current
+ * viewBox, so running it twice on the same element is a no-op.
  */
 function fitToInk(root: HTMLElement): void {
   for (const svg of root.querySelectorAll('svg')) {
     const ink = svg.getBBox()
     if (!ink.width || !ink.height) continue
 
-    svg.setAttribute('viewBox', `${ink.x} ${ink.y} ${ink.width} ${ink.height}`)
-    // The rim is the same on all four sides, so the ink has to take the shape
-    // of the box it is given rather than letterbox itself inside it.
-    svg.setAttribute('preserveAspectRatio', 'none')
+    const side = Math.max(ink.width, ink.height)
+
+    svg.setAttribute(
+      'viewBox',
+      `${ink.x + ink.width / 2 - side / 2} ${ink.y + ink.height / 2 - side / 2} ${side} ${side}`,
+    )
   }
 }
 
@@ -501,6 +506,8 @@ async function scrap(item: OwnedItem): Promise<void> {
 .slots {
   --slot-w: 56px;
   --slot-h: 48px;
+  /* The inscribed square -- see the note on the icon box below. */
+  --art: calc(var(--slot-h) * 0.72);
   --cols: 6;
   display: grid;
   /* §13.2's tiling: colStep = W * 0.75, rowStep = H. The count comes from the
@@ -548,17 +555,6 @@ async function scrap(item: OwnedItem): Promise<void> {
   transition: background 0.14s ease;
 }
 
-/*
- * The art is the cell, not a stamp in the middle of it. Stretched to the
- * container and clipped by the same hexagon, so a full strap reads as a full
- * strap at a glance -- which is the whole reason the comb is drawn rather than
- * counted. The count then sits on top of it; overlapping the art is fine,
- * because the pill behind it carries its own contrast.
- *
- * Lifted two pixels off centre. A flat-top hexagon is widest across its middle
- * and the count hangs at its foot, so art centred by arithmetic sits low to the
- * eye. This is an optical correction, not a layout one.
- */
 .slots :deep(.svg-icon) {
   display: grid;
   place-items: center;
@@ -567,24 +563,23 @@ async function scrap(item: OwnedItem): Promise<void> {
 }
 
 /*
- * One rim, the same on every side and every strap. The art is fitted to its own
- * ink by fitToInk() above, so this box is what the drawing actually becomes:
- * inset by --rim from a 54x46 face, which is 44x36 of art.
+ * One square, the same on every strap, and the art is fitted to its own ink by
+ * fitToInk() above -- so the box below is what the drawing actually becomes.
  *
- * There is no optical lift any more. A lift is exactly the thing that makes the
- * top and bottom gaps differ, and an even rim is worth more than the half pixel
- * of centring it bought.
+ * The side is the largest square that sits inside a flat-top hexagon without
+ * its corners crossing the slanted edges: 2WH / (2H + W), which is 35.4px at
+ * 56x48 and is what the 0.72 is rounded down from. Past that the comb starts
+ * shaving the corners off whatever it is carrying.
  */
 .slots :deep(.svg-icon svg) {
-  --rim: 5px;
   display: block;
-  width: calc(100% - var(--rim) * 2);
-  height: calc(100% - var(--rim) * 2);
+  width: var(--art);
+  height: var(--art);
 }
 
-/* The art covers the face, so a background swap would never be seen on a full
-   strap. Lift the whole cell instead -- the shape is what the eye is tracking --
-   and keep the face swap for the empty ones, where there is nothing else. */
+/* Two readings of the same hover: the face lights behind the art, and the art
+   itself lifts. The shape is what the eye is tracking, so the cell as a whole
+   has to answer. */
 .slot:hover:not(.empty) {
   filter: brightness(1.22);
 }
@@ -666,13 +661,14 @@ async function scrap(item: OwnedItem): Promise<void> {
 }
 
 .pop-head .hex.big {
+  --art: calc(40px * 0.72);
   width: 46px;
   height: 40px;
   flex: 0 0 auto;
 }
 
-/* Same rule as the comb, and the same rim: a portrait hexagon that reads
-   differently from the strap it was tapped on would be two systems. */
+/* Same rule as the comb: a portrait hexagon that reads differently from the
+   strap it was tapped on would be two systems. */
 .pop-head :deep(.svg-icon) {
   display: grid;
   place-items: center;
@@ -680,12 +676,10 @@ async function scrap(item: OwnedItem): Promise<void> {
   height: 100%;
 }
 
-/* The same rim as a strap, so tapping one does not resize what is on it. */
 .pop-head :deep(.svg-icon svg) {
-  --rim: 5px;
   display: block;
-  width: calc(100% - var(--rim) * 2);
-  height: calc(100% - var(--rim) * 2);
+  width: var(--art);
+  height: var(--art);
 }
 
 .pop-head strong {

@@ -504,10 +504,6 @@ async function learn(): Promise<void> {
   margin-bottom: 0;
 }
 
-.band-of-jobs:last-of-type {
-  margin-bottom: 14px;
-}
-
 .trade {
   display: flex;
   align-items: center;
@@ -545,6 +541,16 @@ async function learn(): Promise<void> {
 }
 
 /* ------------------------------------------------------------------- sheet */
+
+/*
+ * The gap between the job chips and the sheet belongs to the sheet, not to the
+ * last chip band. It used to hang off `.band-of-jobs:last-of-type`, which stops
+ * matching the moment a skill is tapped: the detail panel below is a div too,
+ * so it becomes the last of its type and the sheet slides up against the chips.
+ */
+.sheet {
+  margin-top: 14px;
+}
 
 .head h3 {
   font-size: 16px;

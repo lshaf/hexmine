@@ -157,14 +157,27 @@ defineEmits<{ (e: 'activate'): void }>()
 }
 
 @media (max-width: 560px) {
+  .cell {
+    gap: 4px;
+  }
+
   .hex {
-    width: 46px;
-    height: 40px;
+    width: 41px;
+    height: 36px;
   }
 
   .small .hex {
-    width: 40px;
-    height: 35px;
+    width: 36px;
+    height: 31px;
+  }
+
+  .name {
+    font-size: 7.5px;
+    letter-spacing: 0.1em;
+  }
+
+  .small .name {
+    font-size: 7px;
   }
 }
 </style>

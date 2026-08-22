@@ -305,10 +305,57 @@ const pct = (s: Scale) => `${Math.min(100, Math.max(0, (s.at / s.of) * 100))}%`
   }
 }
 
+/*
+ * Phones get a genuinely smaller plate rather than a scaled one: scaling shrank
+ * the ink but kept the 238px box, so the strip on the other side of the top edge
+ * still had to fit around the full width.
+ */
 @media (max-width: 560px) {
   .panel {
-    transform: scale(0.9);
-    transform-origin: top left;
+    width: 186px;
+    padding: 7px 9px 8px;
+  }
+
+  .who {
+    gap: 7px;
+  }
+
+  .seal :deep(svg) {
+    width: 25px;
+    height: 25px;
+  }
+
+  .name {
+    font-size: 12px;
+  }
+
+  .addr {
+    font-size: 9px;
+  }
+
+  .gold {
+    font-size: 13px;
+  }
+
+  .scales {
+    margin-top: 7px;
+  }
+
+  .row {
+    gap: 7px;
+  }
+
+  .key {
+    flex: 0 0 30px;
+  }
+
+  .scale {
+    height: 5px;
+  }
+
+  .read {
+    min-width: 38px;
+    font-size: 10.5px;
   }
 }
 </style>
