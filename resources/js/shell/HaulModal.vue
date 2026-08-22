@@ -7,6 +7,10 @@
  * own table, and a line of toast text would either truncate that or stack five
  * notifications up the screen.
  *
+ * So the collect endpoint answers with **no message at all**, and this plate is
+ * the entire report. The toast that used to ride alongside it was a leftover
+ * from the one-stack days: the same news twice, and the worse of the two.
+ *
  * This is the one moment in an idle game where something actually happened, and
  * it is the payoff for an hour of waiting -- so it gets a beat of its own
  * rather than sliding past in the corner.

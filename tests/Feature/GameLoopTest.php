@@ -4075,6 +4075,40 @@ final class GameLoopTest extends TestCase
         $this->assertTrue($this->questRow('on_the_belt')['complete'], 'the equip missed the ledger');
     }
 
+    /**
+     * §4 -- collecting answers with a receipt, and the envelope says nothing.
+     *
+     * The haul modal carries every stack, both XP ladders, tool wear and
+     * anything that would not fit. A toast beside it is the same news twice,
+     * and it was a leftover from when a haul was one stack and a line of text
+     * could hold it.
+     */
+    public function test_collecting_carries_no_message_for_a_toast(): void
+    {
+        $open = $this->openNeighbour($this->character->col, $this->character->row);
+        $this->character->update($open);
+
+        // Bare-handed, so the trip needs no tool on the belt. §4.0 pays scrap
+        // rather than refusing, and a receipt for scrap is still a receipt.
+        $job = $this->game->startMining(
+            $this->character->fresh(),
+            $open['col'],
+            $open['row'],
+            \App\Game\Drops::GATHERING,
+        );
+        $job->update(['ends_at' => $this->game->now() - 1]);
+
+        $request = \Illuminate\Http\Request::create("/api/jobs/{$job->id}/collect", 'POST');
+        $request->attributes->set('character', $this->character->fresh());
+
+        $payload = (new \App\Http\Controllers\Api\MiningController($this->game))
+            ->collect($request, $job->id)
+            ->getData(true);
+
+        $this->assertNull($payload['message'], 'a collect toasted as well as opening the receipt');
+        $this->assertNotEmpty((array) $payload['data']['gained'], 'the receipt came back empty');
+    }
+
     /** Fire a counted goal directly, standing in for the work behind it. */
     private function fireQuest(string $kind, int $amount, ?string $subject = null): void
     {
