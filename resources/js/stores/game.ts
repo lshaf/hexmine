@@ -15,6 +15,7 @@ import { computed, ref, shallowRef, watch } from 'vue'
 import { api } from '@/api/client'
 import { ApiError } from '@/api/types'
 import type {
+  CollectResult,
   MapMutations,
   PlayerState,
   SkillTree,
@@ -24,7 +25,7 @@ import type {
 import type {
   Job,
   MaterialKey,
-  MiningJob,
+  FieldJob,
   ProcessingJob,
   Settlement,
   Tile,
@@ -54,6 +55,15 @@ export const useGame = defineStore('game', () => {
 
   const panel = ref<PanelKey | null>(null)
   const selected = ref<{ col: number; row: number } | null>(null)
+
+  /**
+   * §4 -- the last haul, held until the player dismisses its receipt.
+   *
+   * Kept in the store rather than in the component that claimed it, because
+   * the claim button lives in the trip stack and the receipt belongs over the
+   * whole map. Null when there is nothing to show.
+   */
+  const haul = ref<CollectResult | null>(null)
   const busy = ref(false)
   const booted = ref(false)
 
@@ -273,12 +283,14 @@ export const useGame = defineStore('game', () => {
   const jobs = computed<Job[]>(() => state.value?.jobs ?? [])
 
   /**
-    * One mining trip and one processing job at a time, so both of these are a
-    * single job or nothing. Mining pins the character to its hex; processing is
-    * the NPC's work, which the player only helps along by being there (§6.2).
+    * One trip out and one processing job at a time, so both of these are a
+    * single job or nothing. A trip pins the character to its hex, whether it is
+    * a seam or a herd (§5.5); processing is the NPC's work, which the player
+    * only helps along by being there (§6.2).
     */
-  const miningJob = computed<MiningJob | null>(
-    () => jobs.value.find((j): j is MiningJob => j.kind === 'mining') ?? null,
+  const fieldJob = computed<FieldJob | null>(
+    () =>
+      jobs.value.find((j): j is FieldJob => j.kind === 'mining' || j.kind === 'hunting') ?? null,
   )
 
   const processingJob = computed<ProcessingJob | null>(
@@ -484,17 +496,39 @@ export const useGame = defineStore('game', () => {
     if (job) await select(col, row)
   }
 
+  /**
+   * §4.0 -- the same hex, by hand.
+   *
+   * Never gated client-side. The button is always live and the server is what
+   * says no, because every reason it could say no is a fact only the server
+   * holds -- and a cell greyed out for a reason the player cannot read is
+   * worse than a cell that answers.
+   */
+  async function startGathering(col: number, row: number): Promise<void> {
+    const job = await act(() => api.startGathering(col, row))
+    if (job) await select(col, row)
+  }
+
+  /**
+   * §4 -- the haul, and the one moment in an idle game where something happened.
+   *
+   * A trip now comes back as several stacks off the hex's own table, which a
+   * toast cannot carry: it would either truncate the haul or stack five
+   * notifications up the screen. The result is held for the modal instead, and
+   * everything the player is owed -- what dropped, both XP ladders, tool wear,
+   * what would not fit -- is read off the server's own response.
+   */
   async function collect(jobId: string): Promise<void> {
     const result = await act(() => api.collectJob(jobId))
-    if (result?.lostToOverflow) {
-      // §2 and §7.6 -- either the per-wallet cap on that material, or no strap
-      // free for a kind the bag was not already carrying. Both are "it did not
-      // fit", and naming which would need the server to say which.
-      note(`${result.lostToOverflow} units lost — they would not fit.`, 'bad')
-    }
-    if (result?.levelsGained) note(`Level up. You are now level ${character.value?.level}.`, 'good')
+    if (result) haul.value = result
+
     await refreshMutations()
     if (selected.value) await select(selected.value.col, selected.value.row)
+  }
+
+  /** Dismiss the haul receipt. Nothing depends on it having been read. */
+  function clearHaul(): void {
+    haul.value = null
   }
 
   async function abandon(jobId: string): Promise<void> {
@@ -583,7 +617,7 @@ export const useGame = defineStore('game', () => {
     character, timeScale, bag, bagFull, inventory, equipment, skills, bonuses, toolYield, jobs, readyJobs,
     consumables, buffs,
     tree, skillPoints, jobLevels, ownedNodes,
-    activeJobs, miningJob, processingJob, underfoot, selectedTile,
+    activeJobs, fieldJob, processingJob, underfoot, selectedTile,
     currentSettlement, shopStock, sight, travelPerHexMs, travelEta,
     travel, travelProgress, travelHexesWalked, travelRemainingMs,
     currentStep, tutorialDone, tutorialProgress, TUTORIAL_OUTRO,
@@ -592,7 +626,8 @@ export const useGame = defineStore('game', () => {
     // actions
     boot, setView, setViewport, centreOnCharacter, refreshMutations, refreshState,
     select, clearSelection,
-    startMining, startHunt, collect, abandon, travelTo, cancelTravel, startProcessing, buy,
+    haul, clearHaul,
+    startMining, startGathering, startHunt, collect, abandon, travelTo, cancelTravel, startProcessing, buy,
     sell, craft, equip, unequip, repair, discard, discardMaterial, drink, openPanel, closePanel,
     loadTree, buyNode,
     openStation, closeStation,

@@ -30,6 +30,7 @@ import type {
   SkillKey,
   Tile,
   VariantKey,
+  WaterKind,
 } from './types'
 
 export interface WorldConfig {
@@ -227,6 +228,142 @@ export function coarseBiomeAt(col: number, row: number): Biome {
 
 /** How many hexes across one region of uniform coarse biome is. */
 export const coarseRegionHexes = (): number => cfg().biomeCell * cfg().biomeRegionCells
+
+// --------------------------------------------------------------------- water
+
+/**
+ * §5.3 -- lakes and waterways, and neither is stored.
+ *
+ * The mirror of WorldGen::waterAt(). Both shapes are integer hashes and plain
+ * arithmetic on purpose: no sine, no cosine. A boundary test landing within an
+ * ulp of the edge would flip a hex between water and land depending on whose
+ * libm answered, and the two generators have to agree on every tile.
+ */
+export function waterAt(col: number, row: number): WaterKind | undefined {
+  if (lakeAt(col, row)) return 'lake'
+
+  return riverAt(col, row) ? 'river' : undefined
+}
+
+const RIVERS = 4
+const RIVER_SEGMENT = 24
+const RIVER_AMPLITUDE = 0.09
+const RIVER_HALF_WIDTH = 0.6
+
+/**
+ * Four waterways: two east-west, two north-south, on lines given as fractions
+ * of the radius so the same four cross a test map and a ship-scale one. None
+ * passes through the middle -- the barren ring is for dungeon mouths, and a
+ * river there would read as a way in.
+ */
+const RIVER_LINES: Array<[0 | 1, number]> = [
+  [0, -0.55],
+  [0, 0.46],
+  [1, -0.44],
+  [1, 0.57],
+]
+
+const riverAmplitude = () => Math.max(4, Math.round(cfg().radius * RIVER_AMPLITUDE))
+
+/**
+ * Where a waterway's channel sits at one step along its length: value noise,
+ * one hashed offset every RIVER_SEGMENT hexes, smoothstepped between.
+ */
+function riverCentre(index: number, t: number): number {
+  const c = cfg()
+  const cell = Math.floor(t / RIVER_SEGMENT)
+  const f = (t - cell * RIVER_SEGMENT) / RIVER_SEGMENT
+
+  const amplitude = riverAmplitude()
+  const a = randInt(hash2(cell, index, c.seed ^ 0x21ce), -amplitude, amplitude)
+  const b = randInt(hash2(cell + 1, index, c.seed ^ 0x21ce), -amplitude, amplitude)
+
+  const u = f * f * (3 - 2 * f)
+  const base = Math.round(RIVER_LINES[index]![1] * c.radius)
+
+  return base + a + (b - a) * u
+}
+
+/**
+ * A hex is in the channel if it lies between this step's centre and the next
+ * one's. Consecutive bands share an endpoint, so the water is continuous by
+ * construction rather than by guessing a width that covers every slope.
+ */
+function riverAt(col: number, row: number): boolean {
+  for (let index = 0; index < RIVERS; index++) {
+    const axis = RIVER_LINES[index]![0]
+    const along = axis === 0 ? col : row
+    const across = axis === 0 ? row : col
+
+    const here = riverCentre(index, along)
+    const next = riverCentre(index, along + 1)
+
+    if (
+      across >= Math.min(here, next) - RIVER_HALF_WIDTH &&
+      across <= Math.max(here, next) + RIVER_HALF_WIDTH
+    ) {
+      return true
+    }
+  }
+
+  return false
+}
+
+const LAKE_CELL = 34
+const LAKE_CHANCE = 0.42
+const LAKE_MIN_RADIUS = 3
+const LAKE_MAX_RADIUS = 5
+const LAKE_EDGE_WOBBLE = 0.7
+
+/**
+ * One candidate lake per cell -- the same lattice trick the settlements use,
+ * so a blob can be tested for without ever enumerating it.
+ */
+function lakeIn(cellCol: number, cellRow: number): [number, number, number] | undefined {
+  const c = cfg()
+
+  if (rand01(hash2(cellCol, cellRow, c.seed ^ 0x1a4e)) > LAKE_CHANCE) return undefined
+
+  // Inset from the cell edge so a lake never reaches past the 3x3 scanned.
+  const inset = LAKE_MAX_RADIUS + 2
+
+  return [
+    cellCol * LAKE_CELL +
+      randInt(hash2(cellCol, cellRow, c.seed ^ 0x1a5e), inset, LAKE_CELL - inset - 1),
+    cellRow * LAKE_CELL +
+      randInt(hash2(cellRow, cellCol, c.seed ^ 0x1a6e), inset, LAKE_CELL - inset - 1),
+    randInt(
+      hash2(cellCol + cellRow, cellCol - cellRow, c.seed ^ 0x1a7e),
+      LAKE_MIN_RADIUS,
+      LAKE_MAX_RADIUS,
+    ),
+  ]
+}
+
+function lakeAt(col: number, row: number): boolean {
+  const c = cfg()
+  const cx = Math.floor(col / LAKE_CELL)
+  const cy = Math.floor(row / LAKE_CELL)
+
+  // §13.2 -- hexes are wider than tall, so the weighting the biome regions use
+  // keeps a lake round on screen instead of drawn out along the columns.
+  const wobble =
+    rand01(hash2(col, row, c.seed ^ 0x1a8e)) * LAKE_EDGE_WOBBLE - LAKE_EDGE_WOBBLE / 2
+
+  for (let i = -1; i <= 1; i++) {
+    for (let j = -1; j <= 1; j++) {
+      const site = lakeIn(cx + i, cy + j)
+      if (!site) continue
+
+      const dx = (site[0] - col) * ASPECT
+      const dy = site[1] - row
+
+      if (Math.sqrt(dx * dx + dy * dy) + wobble < site[2]) return true
+    }
+  }
+
+  return false
+}
 
 // --------------------------------------------------------------- settlements
 
@@ -495,9 +632,11 @@ export function dungeonAt(col: number, row: number): { key: string; name: string
  * §5.5 -- herd markers are temporary and time-bucketed, so they are derivable
  * rather than stored and every client agrees on where they are.
  */
-function herdUntil(col: number, row: number, biome: Biome, now: number): number | undefined {
+// §5.5 -- animals live on every kind of ground, so a herd may wander onto any
+// hex. It used to be plains and grassland only, which made hunting an errand
+// you made a special trip for rather than a reason to carry a bow.
+function herdUntil(col: number, row: number, _biome: Biome, now: number): number | undefined {
   const c = cfg()
-  if (biome !== 'plains' && biome !== 'grassland') return undefined
 
   const bucket = Math.floor(now / c.herdLifetimeMs)
   const h = hash2(col * 31 + bucket, row * 17 + bucket, c.seed ^ 0xbeef)
@@ -558,9 +697,14 @@ export function generateTile(
   //
   // A depleted tile keeps its material: it is drained, not dead (§5.1), and
   // callers gate on regrowsAt. The UI needs it to draw the right remnants.
+  // §5.3 -- water yields to the things that are placed rather than grown. A
+  // settlement on a river is a ford and a dungeon mouth is a fixed site; the
+  // water is the cheaper of the two to bend.
+  const water = !settlement && !dungeon ? waterAt(col, row) : undefined
+
   let material: MaterialKey | undefined
   let variant: VariantKey = biome
-  if (ring !== 'center' && !settlement) {
+  if (ring !== 'center' && !settlement && !water) {
     const picked = variantOf(col, row, biome, ring)
     variant = picked.key
     material = picked.material as MaterialKey
@@ -579,7 +723,9 @@ export function generateTile(
     regrowsAt: mutation?.regrowsAt ?? 0,
     settlement,
     dungeon,
-    herdUntil: herdUntil(col, row, biome, now),
+    water,
+    // §5.5 -- a herd stands on ground. Nothing grazes a lake.
+    herdUntil: water ? undefined : herdUntil(col, row, biome, now),
     propSeed: hash2(col, row, c.seed ^ 0xf00d),
   }
 }

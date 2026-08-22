@@ -8,8 +8,9 @@
  * The set is drawn as a WOODCUT SPECIMEN PLATE, which is the vernacular the
  * page is already named after: heavy outline, one flat fill, one lighter facet,
  * and no gradient anywhere below tier 3. The lit treatment is reserved for the
- * rare and raid tiers, so "this one glows" carries rarity across sixty matte
- * neighbours without a frame or a label doing it.
+ * rare and raid tiers, so "this one glows" separates the top of the ladder from
+ * sixty matte neighbours; the exact rung is on the rarity belt drawn under the
+ * specimen (§13.1).
  *
  * A form is DERIVED, never stored — the same argument §8.4 makes about craft
  * category. A second field would only be somewhere for the catalog and the
@@ -42,6 +43,8 @@ export type Form =
   | 'log' | 'ore' | 'hide' | 'rubble' | 'column' | 'slab' | 'sheaf'
   // tier 1 — the herbalist's shelf, and the only green things in the game
   | 'mushroom' | 'sprig' | 'trefoil' | 'root' | 'rosette' | 'sap' | 'umbel'
+  // tier 1 — the alchemist's other stock, and the only things with eyes
+  | 'moth' | 'mite' | 'hare' | 'newt' | 'bird'
   // tier 1 — the smith's and the armorer's stock
   | 'knot' | 'resin' | 'salt' | 'scale' | 'horn' | 'cord' | 'grit' | 'seep'
   | 'reed' | 'wax'
@@ -73,6 +76,13 @@ const FORM_BY_KEY: Record<string, Form> = {
   lichen: 'rosette', stonewort: 'rosette',
   birch_sap: 'sap',
   yarrow: 'umbel',
+
+  // ---- tier 1, the alchemist's second stock
+  glimmermoth: 'moth',
+  rockmite: 'mite',
+  dustleveret: 'hare',
+  ashnewt: 'newt',
+  fenlark: 'bird',
 
   // ---- tier 1, the smith and the armorer
   heartknot: 'knot', pine_pitch: 'resin',
@@ -113,6 +123,17 @@ export function formFor(mat: Material): Form {
 export const HERB_FORMS = new Set<Form>([
   'mushroom', 'sprig', 'trefoil', 'root', 'rosette', 'sap', 'umbel',
 ])
+
+/**
+ * §4 — the alchemist's other stock, and the only things in the set with eyes.
+ *
+ * Critters take their own accent rather than the herbs' green, because the two
+ * halves of the shelf are reached by different roads: a herb is gathered by
+ * hand on any hex, a critter needs a bow and a live herd. An icon that could
+ * not tell you which is which would hide the only thing worth knowing about an
+ * ingredient before you go looking for it.
+ */
+export const CRITTER_FORMS = new Set<Form>(['moth', 'mite', 'hare', 'newt', 'bird'])
 
 
 /**
@@ -343,6 +364,50 @@ const SHAPES: Record<Form, (ink: Ink, seed: number, grade: number) => string> = 
     `<ellipse cx="12" cy="15" rx="4.5" ry="2.6" fill="${fill}" stroke="${dark}" stroke-width="1"/>` +
     `<ellipse cx="28" cy="15" rx="4.5" ry="2.6" fill="${fill}" stroke="${dark}" stroke-width="1"/>` +
     `<ellipse cx="20" cy="12" rx="5.2" ry="3" fill="${light}" stroke="${dark}" stroke-width="1"/>`,
+
+
+  // ------------------------------------- tier 1, the alchemist's second stock
+  // Every one of these is drawn side-on and whole, because a specimen plate
+  // shows the animal rather than the part you use. They are also the only
+  // shapes in the set with an eye, which is most of what makes them read as
+  // alive next to sixty inert lumps.
+  moth: ({ fill, dark, light }) =>
+    cut('M19 12 Q9 6 6 14 Q5 22 17 21 Z', light, dark) +
+    cut('M21 12 Q31 6 34 14 Q35 22 23 21 Z', fill, dark) +
+    cut('M19 21 Q9 24 8 30 Q14 33 19 27 Z', fill, dark, 1) +
+    cut('M21 21 Q31 24 32 30 Q26 33 21 27 Z', light, dark, 1) +
+    cut('M18.5 10 H21.5 L21 28 H19 Z', dark, dark, 0.8) +
+    line('M19 10 L15 5 M21 10 L25 5', dark, 1.1),
+
+  mite: ({ fill, dark, light }) =>
+    `<ellipse cx="20" cy="21" rx="10" ry="8" fill="${fill}" stroke="${dark}" stroke-width="1.15"/>` +
+    `<ellipse cx="20" cy="16" rx="6" ry="4.5" fill="${light}" stroke="${dark}" stroke-width="1"/>` +
+    line('M11 17 L5 13 M11 24 L5 27 M29 17 L35 13 M29 24 L35 27', dark, 1.4) +
+    line('M17 12 L14 7 M23 12 L26 7', dark, 1.2) +
+    `<circle cx="18" cy="16" r="1" fill="${dark}"/>`,
+
+  hare: ({ fill, dark, light }) =>
+    cut('M11 15 Q9 6 13 5 Q17 6 15 16 Z', light, dark, 1) +
+    cut('M18 15 Q19 6 23 6 Q26 8 22 16 Z', fill, dark, 1) +
+    cut('M16 14 Q26 14 27 22 Q28 31 18 31 Q9 31 9 23 Q9 15 16 14 Z', fill, dark) +
+    `<circle cx="13" cy="21" r="1.2" fill="${dark}"/>` +
+    line('M9 26 Q5 27 4 24', dark, 1.2) +
+    cut('M27 24 Q32 23 32 28 Q28 29 26 27 Z', light, dark, 1),
+
+  newt: ({ fill, dark, light }) =>
+    cut('M8 20 Q14 13 22 15 Q30 17 31 22 Q30 27 22 27 Q14 28 8 20 Z', fill, dark) +
+    cut('M8 20 Q14 13 22 15 Q22 19 20 21 Q13 22 8 20 Z', light, dark, 0.85) +
+    line('M31 22 Q36 20 35 15', dark, 2.2) +
+    line('M13 26 L11 31 M19 27 L18 32 M14 15 L12 10 M20 15 L20 10', dark, 1.3) +
+    `<circle cx="12" cy="19" r="1.1" fill="${dark}"/>`,
+
+  bird: ({ fill, dark, light }) =>
+    cut('M14 12 Q23 10 27 17 Q31 25 24 30 Q15 33 11 26 Q8 18 14 12 Z', fill, dark) +
+    cut('M16 17 Q24 17 26 24 Q20 27 15 23 Z', light, dark, 0.9) +
+    cut('M13 11 Q11 5 16 4 Q20 5 19 11 Z', fill, dark, 1) +
+    line('M11 8 L5 9', dark, 2) +
+    line('M22 30 L24 34 M17 31 L17 35', dark, 1.3) +
+    `<circle cx="15" cy="9" r="1" fill="${dark}"/>`,
 
   // ------------------------------------ tier 1, the smith and the armorer
   knot: ({ fill, dark, light }) =>

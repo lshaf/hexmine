@@ -8,10 +8,10 @@
  * painter's-algorithm sort (§13.2): a mountain has to occlude the hexes behind it.
  */
 import { hash2, rand01, randInt } from '@/game/hash'
-import { shade, variantColor } from '@/theme/palette'
+import { desaturate, shade, variantColor, waterColor } from '@/theme/palette'
 import { HEX_SIDE_PATH, HEX_TOP_PATH, ROW_STEP } from './hexGeometry'
 import { VARIANT_PROPS } from '@/game/variants'
-import type { SettlementTier, Tile, VariantKey } from '@/game/types'
+import type { Biome, SettlementTier, Tile, VariantKey, WaterKind } from '@/game/types'
 
 /** Escape nothing -- all values are numbers we generate. Kept tiny on purpose. */
 const poly = (points: string, fill: string, stroke?: string) =>
@@ -367,6 +367,155 @@ function dungeonProp(): string {
   )
 }
 
+
+// ----------------------------------------------------------------- water §5.3
+
+/**
+ * Ripples: the one mark every stretch of water carries, whatever it crosses.
+ *
+ * Drawn as short strokes rather than filled shapes because water is the only
+ * surface on the map that is flat -- everything else here stands up off its
+ * hex and casts a side. A ripple that stood up would read as a ridge.
+ */
+function ripples(seed: number, count: number, color: string, width = 1.2): string {
+  let out = ''
+  for (let i = 0; i < count; i++) {
+    const x = randInt(hash2(i * 13, seed, seed ^ 0x9a), -21, 6)
+    const y = randInt(hash2(i * 29, seed, seed ^ 0x9b), -9, 9)
+    const w = randInt(hash2(i * 47, seed, seed ^ 0x9c), 9, 16)
+    out +=
+      `<path d="M${x},${y} q${w / 2},-2.2 ${w},0" fill="none" ` +
+      `stroke="${color}" stroke-width="${width}" stroke-linecap="round"/>`
+  }
+  return out
+}
+
+/** A boulder or a bar breaking the surface. */
+function midstream(x: number, y: number, scale: number, color: string): string {
+  const w = 5 * scale
+  const h = 3.4 * scale
+  return (
+    poly(`${x - w},${y} ${x - w * 0.4},${y - h} ${x + w * 0.5},${y - h * 0.8} ${x + w},${y}`, color) +
+    poly(`${x - w},${y} ${x - w * 0.4},${y - h} ${x},${y}`, shade(color, 0.16))
+  )
+}
+
+/** Reeds standing out of the shallows, in whatever the bank is made of. */
+function reeds(x: number, y: number, color: string, blades = 3): string {
+  let out = ''
+  for (let i = 0; i < blades; i++) {
+    // Near vertical with the bend at the top: a blade, not a tick. Leaning the
+    // whole length turned a stand of reeds into a row of little crosses.
+    const lean = i % 2 === 0 ? 1.5 : -1.2
+    out +=
+      `<path d="M${x + i * 2.6},${y} q${lean * 0.3},-6 ${lean},-10" fill="none" ` +
+      `stroke="${color}" stroke-width="1.2" stroke-linecap="round"/>`
+  }
+  return out
+}
+
+/** A flat pad on the surface -- forest water, and nothing else. */
+function lilyPad(x: number, y: number, color: string): string {
+  return (
+    `<ellipse cx="${x}" cy="${y}" rx="3.4" ry="1.9" fill="${color}"/>` +
+    `<path d="M${x},${y} L${x + 3.2},${y - 0.7}" stroke="${shade(color, -0.35)}" stroke-width="0.9"/>`
+  )
+}
+
+/**
+ * §5.3 / §13.1 -- what a stretch of water looks like on this kind of ground.
+ *
+ * Four waterways cross the whole map, so a single stream treatment would be
+ * the one thing on the board that ignored the biome it ran through and cut a
+ * uniform blue line across five kinds of country. Each biome gets its own
+ * surface instead: the water is the same rule everywhere and a different
+ * *place* everywhere, which is the same argument §5.3 makes for the four
+ * grades of ground.
+ *
+ * The pair per biome is deliberate -- a waterway is moving and a lake is
+ * still, and the marks say which without a label.
+ */
+function waterProp(tile: Tile): string {
+  const biome = tile.biome
+  const seed = tile.propSeed
+  const bank = shade(variantColor(biome as VariantKey), -0.12)
+  const foam = '#dbe7ec'
+  const river = tile.water === 'river'
+
+  switch (biome) {
+    // A brook under cover: still, dark, and half-roofed. The log across it is
+    // the tell that this is forest water rather than open water.
+    case 'forest': {
+      const green = shade(bank, 0.08)
+      let out = ripples(seed, river ? 3 : 2, shade(foam, -0.28), 1)
+      out += reeds(-21, 6, green, 3) + reeds(14, 7, green, 3)
+      if (river) {
+        out +=
+          `<path d="M-22,3 L21,-5" stroke="${shade(green, -0.5)}" ` +
+          `stroke-width="3" stroke-linecap="round"/>`
+      } else {
+        out +=
+          lilyPad(-11, 4, green) +
+          lilyPad(7, 7, green) +
+          lilyPad(-2, -4, shade(green, 0.1)) +
+          lilyPad(13, -1, green)
+      }
+      return out
+    }
+
+    // Rapids over scree, or a tarn that never warms up. Both are rock and cold
+    // light -- the most foam of the five, and the only white on the water.
+    case 'mountain': {
+      const rock = shade(bank, -0.24)
+      let out = midstream(-16, 5, 1.1, rock) + midstream(9, 8, 0.95, rock)
+      out += midstream(-2, -3, 0.85, shade(rock, 0.12)) + midstream(18, 1, 0.8, rock)
+      // Foam last and heaviest: it is the only white on the water, and what
+      // separates a run of rapids from a hex with rocks in it.
+      out += ripples(seed, river ? 5 : 2, foam, river ? 2 : 1.2)
+      return out
+    }
+
+    // A slow meander with a sandbar in it, or a stock pool. Widest and
+    // laziest of the five, which is what plains water is.
+    case 'plains': {
+      const sand = shade(bank, 0.22)
+      let out = river
+        ? `<ellipse cx="3" cy="6" rx="14" ry="3.4" fill="${sand}"/>` + midstream(-17, 3, 0.8, sand)
+        : reeds(-21, 7, shade(bank, -0.05), 3) +
+          reeds(16, 6, shade(bank, -0.05), 3) +
+          `<ellipse cx="-2" cy="8" rx="8" ry="2.2" fill="${sand}"/>`
+      out += ripples(seed, 3, shade(foam, -0.2), 1.2)
+      return out
+    }
+
+    // A wash running over silt between cracked shelves, or an alkali pan with
+    // a pale crust round it. The only water here that looks like it might not
+    // last the season.
+    case 'badlands': {
+      const crust = shade(desaturate(bank, 0.45), 0.34)
+      let out =
+        `<path d="M-24,-4 q9,4 17,0 q8,-4 15,2" fill="none" stroke="${crust}" ` +
+        'stroke-width="2.2" stroke-linecap="round"/>'
+      out += river
+        ? midstream(-7, 7, 0.9, crust) + midstream(12, 4, 0.7, crust)
+        : `<path d="M-21,9 q19,5 40,-2" fill="none" stroke="${crust}" ` +
+          'stroke-width="2.6" stroke-linecap="round"/>'
+      out += ripples(seed, 2, shade(foam, -0.34), 1.1)
+      return out
+    }
+
+    // Rushes to the waterline. Grassland water is the hardest of the five to
+    // see, which is exactly right: the crop comes right up to it.
+    default: {
+      const rush = shade(bank, -0.16)
+      let out = ripples(seed, river ? 3 : 2, shade(foam, -0.26), 1.2)
+      out += reeds(-22, 7, rush, 4) + reeds(-6, 9, rush, 3) + reeds(15, 6, rush, 4)
+      out += reeds(4, -3, shade(rush, 0.12), river ? 2 : 3)
+      return out
+    }
+  }
+}
+
 // ------------------------------------------------------------------- public
 
 /**
@@ -376,6 +525,7 @@ function dungeonProp(): string {
 export function tileProps(tile: Tile, depleted: boolean): string {
   if (tile.dungeon) return dungeonProp()
   if (tile.settlement) return settlementProp(tile.settlement.tier, tile.propSeed)
+  if (tile.water) return waterProp(tile)
 
   const base = variantColor(tile.variant)
   const seed = tile.propSeed
@@ -605,6 +755,47 @@ export function variantSpecimen(variant: VariantKey, size = 66): string {
 }
 
 /** Rendered separately so a herd can sit on top of whatever terrain is there. */
+/**
+ * §5.3 -- one stretch of water, off the map, for the almanac.
+ *
+ * Same argument as variantSpecimen(): the neighbour upslope goes back in,
+ * because a surface drawn against nothing has no edge to read against. Water
+ * needs it more than the land does -- its marks are strokes rather than
+ * silhouettes, and a stroke on an empty field is a scratch.
+ */
+export function waterSpecimen(biome: Biome, kind: WaterKind, size = 66): string {
+  const tile = {
+    col: 0,
+    row: 0,
+    biome,
+    variant: biome as VariantKey,
+    water: kind,
+    propSeed: SPECIMEN_SEED,
+    settlement: undefined,
+    dungeon: undefined,
+    herdUntil: undefined,
+  } as unknown as Tile
+
+  const top = waterColor(biome, kind)
+  const backTop = shade(variantColor(biome as VariantKey), -0.3)
+
+  const w = 62
+  const boxH = 82
+  const h = Math.round((size * boxH) / w)
+
+  return (
+    `<svg viewBox="-31 -54 ${w} ${boxH}" width="${size}" height="${h}" aria-hidden="true">` +
+    `<g transform="translate(0,${-ROW_STEP})">` +
+    `<path d="${HEX_SIDE_PATH}" fill="${shade(backTop, -0.4)}"/>` +
+    `<path d="${HEX_TOP_PATH}" fill="${backTop}"/>` +
+    '</g>' +
+    `<path d="${HEX_SIDE_PATH}" fill="${shade(top, -0.4)}"/>` +
+    `<path d="${HEX_TOP_PATH}" fill="${top}" stroke="${shade(top, -0.2)}" stroke-width="0.5"/>` +
+    tileProps(tile, false) +
+    '</svg>'
+  )
+}
+
 export function herdProp(tile: Tile): string {
   return tile.herdUntil ? herd(0, 6) : ''
 }

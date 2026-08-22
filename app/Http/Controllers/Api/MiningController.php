@@ -29,6 +29,30 @@ class MiningController extends GameController
         );
     }
 
+    /** §4.0 -- work the same hex by hand. No tool, and none required. */
+    public function gather(Request $request): JsonResponse
+    {
+        $character = $this->character($request);
+
+        $validated = $request->validate([
+            'col' => ['required', 'integer', 'min:'.(-Balance::mapRadius()), 'max:'.Balance::mapRadius()],
+            'row' => ['required', 'integer', 'min:'.(-Balance::mapRadius()), 'max:'.Balance::mapRadius()],
+        ]);
+
+        $job = $this->game->startMining(
+            $character,
+            (int) $validated['col'],
+            (int) $validated['row'],
+            \App\Game\Drops::GATHERING,
+        );
+
+        return $this->respond(
+            $character,
+            $this->game->jobPayload($job),
+            "Gathering by hand at {$validated['col']},{$validated['row']}.",
+        );
+    }
+
     /** §5.5 -- work a herd marker. AP and time, no raid charge. */
     public function hunt(Request $request): JsonResponse
     {

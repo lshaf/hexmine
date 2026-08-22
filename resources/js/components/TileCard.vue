@@ -16,11 +16,13 @@ import { computed, ref, watch } from 'vue'
 import { useGame } from '@/stores/game'
 import { MATERIALS, RING_LABEL, SKILL_BY_KEY, skillForMaterial } from '@/game/catalog'
 import { formatDuration, formatSpan } from '@/game/formulas'
+import { waterLabel } from '@/game/water'
 import { VARIANT_LABEL } from '@/game/variants'
 import { hexDistance } from '@/map/hexGeometry'
 import { materialIcon } from '@/icons/procedural'
 import HexAction from '@/shell/HexAction.vue'
 import SvgIcon from './SvgIcon.vue'
+import type { MaterialKey } from '@/game/types'
 
 const game = useGame()
 
@@ -68,6 +70,54 @@ const mat = computed(() =>
 )
 
 /**
+ * §4 -- the kinds this hex can pay out, in order of likelihood.
+ *
+ * Capped at what fits on a card rather than listing every tail entry: a list
+ * long enough to scroll stops being a glance and starts being homework.
+ */
+const DROPS_SHOWN = 7
+
+const shown = (keys: readonly MaterialKey[] | undefined) =>
+  (keys ?? []).slice(0, DROPS_SHOWN).map((k) => MATERIALS[k])
+
+/**
+ * One list per verb, because this hex may answer to two of them.
+ *
+ * §5.5 -- a herd is not a mode of mining, it is a different thing to do on the
+ * same ground, and it pays out of a different table: pelt, horn, sinew and the
+ * biome's critter. Reading a hex therefore means reading every offer on it, and
+ * folding them into one list would say the seam drops pelt.
+ *
+ * The hunting list is here only when there is a herd to point a bow at, and the
+ * server empties it when there is no bow -- so its presence IS the answer to
+ * "can I hunt here", and nothing has to say so twice.
+ */
+const drops = computed(() => shown(preview.value?.drops))
+const gatherDrops = computed(() => shown(preview.value?.gather?.drops))
+const huntDrops = computed(() => shown(preview.value?.hunt?.drops))
+
+/**
+ * One entry per verb the dock offers here, in the order the dock offers them.
+ *
+ * Each is named by its own line rather than by a phrase, because the names are
+ * already the thing that tells them apart -- a hex in the badlands offers a
+ * Quarrying reward and a Gather reward, and nothing has to say more than that.
+ */
+const tables = computed(() => {
+  const line = preview.value?.skill
+
+  return [
+    {
+      key: 'mine',
+      label: line ? `${SKILL_BY_KEY[line].name} reward` : 'Reward',
+      rows: drops.value,
+    },
+    { key: 'gather', label: 'Gather reward', rows: gatherDrops.value },
+    { key: 'hunt', label: 'Hunting reward', rows: huntDrops.value },
+  ].filter((t) => t.rows.length)
+})
+
+/**
  * The server costs a trip for any workable hex in sight, standing on it or not,
  * so the card can be read as a scouting report: what this seam is worth, and
  * what it would take. Whether you may act on it is a separate line.
@@ -75,6 +125,7 @@ const mat = computed(() =>
 const trip = computed(() =>
   !unseen.value && preview.value && preview.value.seconds > 0 ? preview.value : null,
 )
+
 
 /** Honest game time explains the rule; wall time is what you actually wait. */
 const gameTime = (seconds: number) => seconds * 1000
@@ -89,25 +140,24 @@ const onSelected = computed(() => {
 })
 
 /** A trip pins you to the hex you are working until you claim or drop it. */
-const working = computed(() => game.miningJob)
+const working = computed(() => game.fieldJob)
 
 /** §7.6 -- too much in the bag and the road is shut until it is not. */
 const overloaded = computed(() => Boolean(game.character?.bag.over))
 
 /**
  * §5.6 -- distance is not a gate any more. Every hex on the map can be walked
- * to, scouted or not. What stops you is being there already, being busy with
- * something else, or carrying more than you can carry (§7.6) -- and that last
- * one is the only refusal on this card the player can undo from where they are
- * standing.
+ * to, scouted or not. What stops you is being there already, or being busy with
+ * something else.
+ *
+ * §7.6's overloaded bag is deliberately NOT here. It is the one refusal the
+ * player can undo from where they are standing, so it must be *said* rather
+ * than greyed out: the button stays live, the server refuses the walk, and its
+ * own message -- which names the limit and how much to shed -- arrives as a
+ * toast. A dead button explains nothing and reads as a bug.
  */
 const canTravel = computed(
-  () =>
-    Boolean(tile.value) &&
-    !onSelected.value &&
-    !working.value &&
-    !game.travel &&
-    !overloaded.value,
+  () => Boolean(tile.value) && !onSelected.value && !working.value && !game.travel,
 )
 
 /** What the walk actually costs, which is the decision now that reach is not. */
@@ -143,6 +193,12 @@ const travelHint = computed(() => {
 const title = computed(() => {
   const t = tile.value
   if (!t) return ''
+
+  // §5.3 -- water is named whether it is scouted or not. What the server keeps
+  // back out there is live state, and a lake is terrain: the client derives it
+  // from the seed like every other hex, so pretending not to know would be a
+  // fog the map does not actually have.
+  if (t.water) return waterLabel(t.biome, t.water)
 
   if (unseen.value) {
     return t.settlement
@@ -206,7 +262,7 @@ watch(tile, () => {
             {{ depleted ? `Regrows in ${formatDuration(tile.regrowsAt - game.now)}` : preview?.reason }}
           </span>
 
-          <span v-if="trip" class="chevron" :class="{ open }" aria-hidden="true">
+          <span v-if="trip || tables.length" class="chevron" :class="{ open }" aria-hidden="true">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
               <path d="m6 15 6-6 6 6" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
@@ -225,14 +281,39 @@ watch(tile, () => {
         />
         </div>
 
-        <div v-if="open && trip && mat" class="detail">
+        <div v-if="open && (tables.length || (trip && mat))" class="detail">
           <!-- The line comes from the server, not from the material: a scrap
                haul still belongs to the hex's own line, §4.0. -->
-          <p class="tiny muted lede">
+          <p v-if="trip && mat" class="tiny muted lede">
             {{ mat.name }} · trains {{ SKILL_BY_KEY[trip.skill ?? skillForMaterial(mat.key)].name }}
           </p>
 
-          <div class="inset breakdown tiny">
+          <!-- §4 -- what this ground can give up, most likely first and with no
+               odds attached. Naming the odds would turn a hex into a spreadsheet;
+               naming the kinds is what lets you decide whether to spend an hour
+               here, which is the only decision the card exists to support.
+               
+               One list per verb, because the three verbs pay out of three
+               tables: a dig takes the seam, bare hands take what is lying
+               about, and a hunt takes the animal. Folding them together would
+               say the seam drops essence. A list is here only when its verb is
+               -- the hunting table arrives empty without a herd or without a
+               bow, so its presence IS the answer to "can I hunt here". -->
+          <div
+            v-for="t in tables"
+            :key="t.key"
+            class="inset drops"
+            :class="t.key"
+          >
+            <span class="label muted">{{ t.label }}</span>
+            <div class="pips">
+              <span v-for="d in t.rows" :key="d.key" class="pip" :title="d.name">
+                <SvgIcon :svg="materialIcon(d, 18)" />{{ d.name }}
+              </span>
+            </div>
+          </div>
+
+          <div v-if="trip" class="inset breakdown tiny">
             <div class="row-between">
               <span class="muted">Base tile time</span>
               <span class="readout">{{ formatSpan(gameTime(trip.baseSeconds)) }}</span>
@@ -423,5 +504,43 @@ watch(tile, () => {
   .detail {
     padding: 0 11px 10px;
   }
+}
+
+/* §4 -- the drop list. Pips rather than rows: this is a set of possibilities,
+   not a table of values, and a column of numbers would imply odds that are
+   deliberately not given. */
+.drops {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.drops .pips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+
+.drops .pip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--vellum-dim);
+}
+
+.drops + .drops {
+  margin-top: 8px;
+}
+
+/* Gold, the same reading the dock and the map already give a herd: an
+   opportunity standing here rather than ground that will keep. */
+.drops.hunt .label {
+  color: var(--gold);
+}
+
+/* §4.0 -- the floor under the ladder, and it says so by being the quiet one. */
+.drops.gather .label {
+  color: #7b8580;
 }
 </style>

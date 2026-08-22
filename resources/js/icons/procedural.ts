@@ -10,10 +10,26 @@
  *   slot     -> base silhouette
  *   tier     -> fill treatment (flat grey / solid / gradient + glow)
  *   material -> accent colour
- *   rarity   -> hex frame, ornamentation grows per tier
+ *   rarity   -> hex frame on gear, a belt under a material; ornamentation
+ *               grows per tier on both
  */
-import { HERB_ACCENT, MATERIAL_PALETTE, RARITY_TREATMENT, shade } from '@/theme/palette'
-import { HERB_FORMS, formFor, formShape, gradeRank, keySeed, type Ink } from './forms'
+import {
+  CRITTER_ACCENT,
+  HERB_ACCENT,
+  MATERIAL_PALETTE,
+  RARITY_TREATMENT,
+  shade,
+} from '@/theme/palette'
+import {
+  CRITTER_FORMS,
+  HERB_FORMS,
+  formFor,
+  formShape,
+  gradeRank,
+  keySeed,
+  type Ink,
+} from './forms'
+import { materialRarity } from '@/game/catalog'
 import type { EquipSlot, Material, Rarity } from '@/game/types'
 
 const VIEW = 40
@@ -207,10 +223,51 @@ export function itemIcon({ slot, rarity, palette, size = 40 }: IconOptions): str
  * Materials get their own small set: a shape per tier, tinted by the material's
  * palette. Same principle -- generated, never drawn.
  */
-export function materialIcon(mat: Material, size = 32): string {
+/**
+ * The one colour a material answers to, §13.1.
+ *
+ * Exported because the icon is not the only thing that has to say "this is
+ * wood": anything drawing a material as a bare colour -- a share of a bar, a
+ * pip, a legend -- has to arrive at the same answer, and a second copy of the
+ * herb/critter rule would eventually disagree with this one.
+ */
+export function materialAccent(mat: Material): string {
   // §4 -- the herbalist's shelf is green, whatever ground it grew on.
   const form = formFor(mat)
-  const accent = HERB_FORMS.has(form) ? HERB_ACCENT : MATERIAL_PALETTE[mat.palette]
+
+  return HERB_FORMS.has(form)
+    ? HERB_ACCENT
+    : CRITTER_FORMS.has(form)
+      ? CRITTER_ACCENT
+      : MATERIAL_PALETTE[mat.palette]
+}
+
+/**
+ * §13.1 -- the rarity belt: what the hex frame is to a piece of equipment.
+ *
+ * A specimen fills its plate, so there is no margin left to run a frame round
+ * it. The rung goes on a strap across the foot instead, and it is read the same
+ * two ways gear is: colour for the rung, an ornament line from rare upward. The
+ * material accent stays on the specimen, so "what it is" and "how good it is"
+ * never compete for one colour.
+ *
+ * The strap is the same width at every rung on purpose. The bag refits each
+ * icon to its own drawn bounds, so a belt that grew with the rung would quietly
+ * shrink the specimen above it exactly as the material got better.
+ */
+function rarityBelt(rarity: Rarity): string {
+  const { color, ornate } = RARITY_TREATMENT[rarity]
+  const strap = `<rect x="7" y="33.6" width="26" height="4.8" rx="2.4" fill="${color}"/>`
+
+  return ornate
+    ? strap +
+        `<rect x="9.8" y="35.4" width="20.4" height="1.2" rx="0.6" fill="${shade(color, 0.42)}"/>`
+    : strap
+}
+
+export function materialIcon(mat: Material, size = 32): string {
+  const form = formFor(mat)
+  const accent = materialAccent(mat)
 
   const ink: Ink = {
     fill: accent,
@@ -218,8 +275,13 @@ export function materialIcon(mat: Material, size = 32): string {
     light: shade(accent, 0.26),
   }
 
+  // The specimens are drawn to the floor of the box, so they give the belt its
+  // room rather than overlapping it. Centred: 20 * 0.88 + 2.4 lands back on 20.
+  const specimen = formShape(form, ink, keySeed(mat.key), gradeRank(mat.key))
+
   return `<svg viewBox="0 0 40 40" width="${size}" height="${size}" role="img" aria-hidden="true">
-    ${formShape(form, ink, keySeed(mat.key), gradeRank(mat.key))}
+    <g transform="translate(2.4 0) scale(0.88)">${specimen}</g>
+    ${rarityBelt(materialRarity(mat))}
   </svg>`
 }
 

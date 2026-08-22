@@ -89,7 +89,7 @@ final class Jobs
         'explorer' => ['name' => 'Explorer', 'kind' => self::WAYFARING, 'source' => 'travel', 'palette' => 'fiber', 'description' => 'Levels by walking, and by nothing else. Its skills are not bought -- they arrive as you go.'],
         'woodcutting' => ['name' => 'Woodcutting', 'kind' => self::GATHERING, 'source' => 'woodcutting', 'palette' => 'wood', 'description' => 'Forest work. Its level is the skill you already carry, and it still takes time off the trip.'],
         'mining' => ['name' => 'Mining', 'kind' => self::GATHERING, 'source' => 'mining', 'palette' => 'iron', 'description' => 'Mountain seams, and the patience a shaft asks for.'],
-        'hunting' => ['name' => 'Hunting', 'kind' => self::GATHERING, 'source' => 'hunting', 'palette' => 'pelt', 'description' => 'Plains and tundra. The only line that also brings back essence.'],
+        'hunting' => ['name' => 'Hunting', 'kind' => self::GATHERING, 'source' => 'hunting', 'palette' => 'pelt', 'description' => 'Any ground a herd wanders onto. Pelt, horn, sinew, and the animal itself.'],
         'quarrying' => ['name' => 'Quarrying', 'kind' => self::GATHERING, 'source' => 'quarrying', 'palette' => 'stone', 'description' => 'Badlands stone, cut square at the face.'],
         'harvesting' => ['name' => 'Harvesting', 'kind' => self::GATHERING, 'source' => 'harvesting', 'palette' => 'fiber', 'description' => 'Grassland fiber, and the field that comes back twice a year.'],
         'smith' => ['name' => 'Smith', 'kind' => self::CRAFT, 'source' => 'weapon', 'palette' => 'iron', 'description' => 'Forges the tools every line depends on, and the raid weapon nobody has needed yet.'],

@@ -25,7 +25,7 @@ import {
   tileToScreen,
 } from './hexGeometry'
 import { herdProp, tileProps } from './props'
-import { GOLD, VELLUM, depletedColor, shade, variantColor } from '@/theme/palette'
+import { GOLD, VELLUM, depletedColor, shade, variantColor, waterColor } from '@/theme/palette'
 import type { Job, Tile, TravelState } from '@/game/types'
 
 const props = defineProps<{
@@ -216,7 +216,7 @@ const RARE_KEYS = new Set<string>([
 const jobsByTile = computed(() => {
   const map = new Map<string, 'active' | 'ready'>()
   for (const job of props.jobs) {
-    if (job.kind !== 'mining') continue
+    if (job.kind === 'processing') continue
     const key = `${job.col},${job.row}`
     map.set(key, job.endsAt <= props.now ? 'ready' : 'active')
   }
@@ -227,7 +227,15 @@ const renderTiles = computed<RenderTile[]>(() =>
   paintersSort(props.tiles).map((tile) => {
     const { x, y } = tileToScreen(tile.col, tile.row)
     const depleted = tile.regrowsAt > props.now
-    const base = depleted ? depletedColor(tile.variant) : variantColor(tile.variant)
+    // §5.3 -- water takes its own fill, tinted by the ground it crosses so a
+    // waterway belongs to the badlands or the forest rather than cutting one
+    // uniform blue line across five kinds of country. Never depleted: there is
+    // nothing on it to work out.
+    const base = tile.water
+      ? waterColor(tile.biome, tile.water)
+      : depleted
+        ? depletedColor(tile.variant)
+        : variantColor(tile.variant)
     const distance = hexDistance(props.characterCol, props.characterRow, tile.col, tile.row)
     const inSight = distance <= props.sight
 

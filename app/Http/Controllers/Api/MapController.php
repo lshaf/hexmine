@@ -39,10 +39,13 @@ class MapController extends GameController
     {
         $character = $this->character($request);
 
-        // §5.5 -- both verbs on one hex, so the client costs them in one call
-        // rather than spending a second request inside the same sight disc.
+        // §4.0 / §5.5 -- all three verbs on one hex, so the client costs them in
+        // one call rather than spending three requests inside the same sight
+        // disc. Mining is the top level because it is the one the card is about;
+        // the other two hang off it.
         return response()->json([
             ...$this->game->previewTile($character, $col, $row),
+            'gather' => $this->game->previewGather($character, $col, $row),
             'hunt' => $this->game->previewHunt($character, $col, $row),
         ]);
     }

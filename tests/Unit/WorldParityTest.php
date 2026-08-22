@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit;
 
+use App\Game\Balance;
 use App\Game\Hash;
 use App\Game\WorldGen;
 use Tests\TestCase;
@@ -64,7 +65,7 @@ final class WorldParityTest extends TestCase
         $this->assertNotEmpty($lines);
 
         foreach ($lines as $line) {
-            [$coord, $biome, $variant, $ring, $material, $baseSeconds, $baseYield, $settlement, $dungeon, $propSeed]
+            [$coord, $biome, $variant, $ring, $material, $baseSeconds, $baseYield, $settlement, $dungeon, $water, $propSeed]
                 = explode('|', $line);
 
             [$col, $row] = array_map('intval', explode(',', $coord));
@@ -81,6 +82,7 @@ final class WorldParityTest extends TestCase
                 $tile['baseYield'],
                 $s ? $s['name'].':'.$s['tier'].':'.implode(',', $s['lines']) : '-',
                 $tile['dungeon'] ? $tile['dungeon']['key'] : '-',
+                $tile['water'] ?? '-',
                 $tile['propSeed'],
             ]);
 
@@ -88,8 +90,84 @@ final class WorldParityTest extends TestCase
 
             // Silence unused-variable noise while keeping the destructure
             // readable as documentation of the fixture format.
-            unset($biome, $variant, $ring, $material, $baseSeconds, $baseYield, $settlement, $dungeon, $propSeed);
+            unset($biome, $variant, $ring, $material, $baseSeconds, $baseYield, $settlement, $dungeon, $water, $propSeed);
         }
+    }
+
+    /**
+     * §5.3 -- the shoreline, hex by hex, against the TypeScript generator.
+     *
+     * The scattered sample above catches a handful of water tiles out of 244.
+     * What can actually diverge here is a boundary test landing a hair either
+     * side of an edge, and that only shows up where there are edges -- so this
+     * walks a dense box, which has thousands of them.
+     */
+    public function test_the_water_chart_matches_the_typescript_generator(): void
+    {
+        $fixture = __DIR__.'/../Fixtures/water.txt';
+        $this->assertFileExists($fixture, 'Regenerate with: php artisan game:worldgen-fixture');
+
+        $lines = file($fixture, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        [$from] = explode(' .. ', array_shift($lines));
+        [$colMin, $rowMin] = array_map('intval', explode(',', $from));
+
+        $this->assertNotEmpty($lines);
+
+        $lake = 0;
+        $river = 0;
+
+        foreach ($lines as $r => $expected) {
+            $actual = '';
+            for ($c = 0; $c < strlen($expected); $c++) {
+                $kind = WorldGen::waterAt($colMin + $c, $rowMin + $r);
+                $actual .= match ($kind) {
+                    'lake' => 'O',
+                    'river' => '~',
+                    default => '.',
+                };
+            }
+
+            $this->assertSame($expected, $actual, 'water row '.($rowMin + $r).' moved');
+
+            $lake += substr_count($actual, 'O');
+            $river += substr_count($actual, '~');
+        }
+
+        // A chart with no water in it would pass every assertion above and
+        // guard nothing at all.
+        $this->assertGreaterThan(0, $lake, 'the charted box holds no lake');
+        $this->assertGreaterThan(0, $river, 'the charted box holds no waterway');
+    }
+
+    /** §5.3 -- water is never workable, and never has anything to work. */
+    public function test_water_carries_no_material_and_no_herd(): void
+    {
+        $radius = Balance::mapRadius();
+        $now = 0;
+        $seen = 0;
+
+        for ($col = -$radius; $col <= $radius && $seen < 60; $col += 3) {
+            for ($row = -$radius; $row <= $radius && $seen < 60; $row += 3) {
+                if (WorldGen::waterAt($col, $row) === null) {
+                    continue;
+                }
+
+                $tile = WorldGen::generateTile($col, $row, $now);
+
+                // A settlement or a dungeon mouth wins the hex outright, so
+                // those are the tiles where waterAt() and the tile disagree.
+                if ($tile['settlement'] !== null || $tile['dungeon'] !== null) {
+                    continue;
+                }
+
+                $seen++;
+                $this->assertNotNull($tile['water'], "water at {$col},{$row} vanished from the tile");
+                $this->assertNull($tile['material'], "water at {$col},{$row} carries a material");
+                $this->assertNull($tile['herdUntil'], "a herd is grazing the water at {$col},{$row}");
+            }
+        }
+
+        $this->assertGreaterThan(0, $seen, 'the sample found no water at all');
     }
 
     /** §9.1 -- exactly five dungeons, one per biome, all in the capital ring. */

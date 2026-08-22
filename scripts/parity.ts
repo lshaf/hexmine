@@ -24,6 +24,7 @@ import {
   generateTile,
   settlementAt,
   settlementMarksIn,
+  waterAt,
 } from '../resources/js/game/worldgen.ts'
 import type { WorldConfig } from '../resources/js/game/worldgen.ts'
 
@@ -57,6 +58,7 @@ for (const line of lines) {
     baseYield,
     settlement,
     dungeon,
+    water,
     propSeed,
   ] = line.split('|')
   const [col, row] = coord!.split(',').map(Number)
@@ -73,6 +75,7 @@ for (const line of lines) {
     String(tile.baseYield),
     s ? `${s.name}:${s.tier}:${s.lines.join(',')}` : '-',
     tile.dungeon ? tile.dungeon.key : '-',
+    tile.water ?? '-',
     String(tile.propSeed),
   ].join('|')
 
@@ -85,6 +88,7 @@ for (const line of lines) {
     baseYield,
     settlement,
     dungeon,
+    water,
     propSeed,
   ].join('|')
 
@@ -92,6 +96,40 @@ for (const line of lines) {
 }
 
 console.log(`tiles: ${lines.length} checked`)
+
+// -------------------------------------------------------------------- water
+
+/*
+ * §5.3 -- the shoreline, hex by hex.
+ *
+ * What can differ between the two generators here is not the hashes, which
+ * HashParityTest already pins, but a boundary test landing a hair either side
+ * of an edge. That only shows up where there are edges, so this walks a dense
+ * box rather than trusting the scattered sample above to contain any.
+ */
+const waterLines = readFileSync(resolve(fixtures, 'water.txt'), 'utf8').trim().split('\n')
+const [origin, ...chart] = waterLines
+const [from] = origin!.split(' .. ')
+const [colMin, rowMin] = from!.split(',').map(Number)
+
+let waterCells = 0
+let waterFailures = 0
+
+chart.forEach((expected, r) => {
+  let actual = ''
+  for (let c = 0; c < expected.length; c++) {
+    const kind = waterAt(colMin! + c, rowMin! + r)
+    actual += kind === 'lake' ? 'O' : kind === 'river' ? '~' : '.'
+  }
+  waterCells += expected.length
+
+  if (actual !== expected) {
+    waterFailures++
+    if (waterFailures <= 4) fail(`water row ${rowMin! + r}`, expected, actual)
+  }
+})
+
+console.log(`water: ${waterCells} hexes charted, ${chart.length} rows`)
 
 // ---------------------------------------------------- lattice enumeration
 

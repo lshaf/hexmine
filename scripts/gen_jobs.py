@@ -535,7 +535,7 @@ JOBS = [
 
     ('woodcutting', 'Woodcutting', 'gathering', 'woodcutting', 'wood', 'Forest work. Its level is the skill you already carry, and it still takes time off the trip.'),
     ('mining', 'Mining', 'gathering', 'mining', 'iron', 'Mountain seams, and the patience a shaft asks for.'),
-    ('hunting', 'Hunting', 'gathering', 'hunting', 'pelt', 'Plains and tundra. The only line that also brings back essence.'),
+    ('hunting', 'Hunting', 'gathering', 'hunting', 'pelt', 'Any ground a herd wanders onto. Pelt, horn, sinew, and the animal itself.'),
     ('quarrying', 'Quarrying', 'gathering', 'quarrying', 'stone', 'Badlands stone, cut square at the face.'),
     ('harvesting', 'Harvesting', 'gathering', 'harvesting', 'fiber', 'Grassland fiber, and the field that comes back twice a year.'),
 

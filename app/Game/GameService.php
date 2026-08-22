@@ -81,6 +81,12 @@ class GameService
                     if (WorldGen::settlementAt($col, $row) !== null) {
                         continue;
                     }
+                    // §5.3 -- nobody starts in a lake. Water refuses both
+                    // verbs, so a spawn on it would open the game on a hex
+                    // with nothing to do and no explanation of why.
+                    if (WorldGen::waterAt($col, $row) !== null) {
+                        continue;
+                    }
 
                     $fallback = ['col' => $col, 'row' => $row];
                     if ($this->findNearbySettlement($col, $row, $range, 'woodcutting') !== null) {
@@ -490,24 +496,32 @@ class GameService
     {
         $items = $this->itemRows($character);
 
-        // §8.5 -- a live buff is another contributor to the same aggregate, and
-        // is clamped by the same ceiling. A potion that could push a stat past
-        // STAT_CEILING would be a power ladder you can drink, which §8.1 rule 1
-        // exists to prevent.
+        // §8.5 -- an armed charge is another contributor to the same aggregate,
+        // and is clamped by the same ceiling. A potion that could push a stat
+        // past STAT_CEILING would be a power ladder you can drink, which §8.1
+        // rule 1 exists to prevent.
         //
-        // §8.5 -- a scoped buff joins the sum only when its own action is the
-        // one being costed. `global` always counts; a line scope counts on that
+        // §8.5 -- a scoped charge counts only when its own action is the one
+        // being costed. `global` always counts; a line scope counts on that
         // line's work; `travel` and `processing` are asked for by name. This is
         // the same filter §7.4.3 already applies to line-locked tree nodes, and
         // it is what lets sixty potions exist without sixty of them stacking.
+        //
+        // §8.5 -- and potions take the HIGHEST rather than the sum. A player may
+        // hold as many different effects as they like, but two charges on the
+        // same stat are the same effect twice: the better draught wins and the
+        // other is simply not felt. Summing would let a `global` charge and a
+        // line-scoped one quietly double up on one trip, which is the stack the
+        // rung ladder exists to prevent -- twelve potions a rung would otherwise
+        // be a way of buying the ceiling in instalments.
         $buffs = [];
-        foreach ($this->liveBuffs($character) as $buff) {
+        foreach ($this->armedBuffs($character) as $buff) {
             $scope = $buff->scope ?? 'global';
             if ($scope !== 'global' && $scope !== $line) {
                 continue;
             }
 
-            $buffs[$buff->stat] = ($buffs[$buff->stat] ?? 0) + $buff->value;
+            $buffs[$buff->stat] = max($buffs[$buff->stat] ?? 0.0, (float) $buff->value);
         }
 
         // §7.4.3 -- bought tree nodes are a third contributor to the very same
@@ -547,28 +561,49 @@ class GameService
     }
 
     /**
-     * Buffs that have not run out, §8.5.
+     * Charges waiting on an action, §8.5.
      *
-     * Expired rows are deleted on read rather than swept by a job: this is the
-     * same lazy-settlement idea as AP regen (§16), and it means a buff cannot
-     * linger just because nobody looked.
+     * Every row here is armed: there is no clock to compare against and nothing
+     * to sweep, because a draught is ended by being used rather than by running
+     * out. The unique index on (character, stat, scope) caps how many can be
+     * held at once.
      *
      * @return array<int,\App\Models\CharacterBuff>
      */
-    public function liveBuffs(Character $character): array
+    public function armedBuffs(Character $character): array
     {
-        $now = $this->now();
-        $character->buffs()->where('expires_at', '<=', $now)->delete();
-        $character->unsetRelation('buffs');
-
-        return $character->buffs()->where('expires_at', '>', $now)->get()->all();
+        return $character->buffs()->get()->all();
     }
 
     /**
-     * Drink one. §11.1 -- the buff expiring is the sink, which is why nothing
-     * here is permanent and why a second flask refreshes rather than stacks.
+     * Spend whatever was armed for this action, §8.5.
      *
-     * @return array{stat:string,value:float,expiresAt:int}
+     * Called once the work has been costed and committed -- the job row already
+     * carries the shortened clock and the larger haul, so the charge has done
+     * its job and being spent is the sink (§11.1). `global` goes with it: a
+     * draught that applies everywhere applied here.
+     *
+     * Read-only paths never call this. Costing a hex you are only looking at
+     * must not burn what you are carrying, which is why this is a step of its
+     * own rather than something bonuses() does on the way past.
+     */
+    public function spendBuffs(Character $character, string $action): void
+    {
+        $spent = $character->buffs()
+            ->whereIn('scope', ['global', $action])
+            ->delete();
+
+        if ($spent > 0) {
+            $character->unsetRelation('buffs');
+        }
+    }
+
+    /**
+     * Drink one. §8.5 -- this arms the action the draught names; it does not
+     * start a clock. A second flask of the same kind replaces the charge rather
+     * than stacking, which is what stops an afternoon of potions being banked.
+     *
+     * @return array{stat:string,scope:string,value:float}
      */
     public function useConsumable(Character $character, string $key): array
     {
@@ -583,22 +618,40 @@ class GameService
                 throw new GameException("You have no {$def['name']}.", 'insufficient');
             }
 
+            // §8.5 -- one charge per stat PER ACTION. A woodcutting draught and
+            // a mining draught are different things and both may be held; two
+            // draughts on the same stat and the same action are the same thing
+            // twice, and the better one wins.
+            $scope = $def['scope'] ?? 'global';
+
+            $armed = $character->buffs()
+                ->where('stat', $def['stat'])
+                ->where('scope', $scope)
+                ->first();
+
+            // Refused before the flask is opened, never after. A weaker draught
+            // poured on top of a stronger one would be paid for and never felt,
+            // and an idle game must not take something away for nothing -- so
+            // this reads as "you already have better", not as a downgrade.
+            if ($armed !== null && (float) $armed->value >= (float) $def['value']) {
+                throw new GameException(
+                    $armed->item_key === $key
+                        ? "A {$def['name']} is already waiting on the same work. A second would not make it any stronger."
+                        : sprintf(
+                            '%s is already waiting on the same work, and it is the stronger of the two. Keep the %s for later.',
+                            Catalog::item($armed->item_key)['name'] ?? 'A stronger draught',
+                            $def['name'],
+                        ),
+                    'weaker_charge',
+                );
+            }
+
             $row->quantity -= 1;
             $row->quantity > 0 ? $row->save() : $row->delete();
 
-            $now = $this->now();
-            $expiresAt = $now + Balance::scaled(Balance::BUFF_MS);
-
-            // §8.5 -- one buff per stat PER ACTION. Drinking a second of the
-            // same kind restarts the clock instead of stacking, which is what
-            // stops an afternoon of potions being banked into one window; but a
-            // woodcutting draught and a mining draught are different things and
-            // both may run. A potion with no scope is global, as all five were.
-            $scope = $def['scope'] ?? 'global';
-
             CharacterBuff::updateOrCreate(
                 ['character_id' => $character->id, 'stat' => $def['stat'], 'scope' => $scope],
-                ['item_key' => $key, 'value' => $def['value'], 'expires_at' => $expiresAt],
+                ['item_key' => $key, 'value' => $def['value']],
             );
             $character->unsetRelation('buffs');
 
@@ -606,7 +659,6 @@ class GameService
                 'stat' => $def['stat'],
                 'scope' => $scope,
                 'value' => $def['value'],
-                'expiresAt' => $expiresAt,
             ];
         });
     }
@@ -616,12 +668,65 @@ class GameService
      * Broken counts as absent: §8.2 makes a 0-durability item inactive, and it
      * would be a strange rule that let a snapped axe still fell trees.
      */
+    /**
+     * The rarity of the tool doing this line's work, or null bare-handed.
+     *
+     * §5.3 -- the tool sets which grade of material you can reliably take, so
+     * this is the one thing the drop table needs to know about the belt. Best
+     * equipped wins, because nothing stops a player owning two.
+     */
+    public function lineToolRarity(Character $character, string $line): ?string
+    {
+        $slot = Catalog::slotForSkill($line);
+        $best = null;
+
+        foreach ($character->items as $item) {
+            if (! $item->equipped || $item->durability <= 0) {
+                continue;
+            }
+
+            $def = Catalog::item($item->item_key);
+            if (($def['slot'] ?? null) !== $slot) {
+                continue;
+            }
+
+            if ($best === null || Balance::rarityRank($def['rarity']) > Balance::rarityRank($best)) {
+                $best = $def['rarity'];
+            }
+        }
+
+        return $best;
+    }
+
     public function hasLineTool(Character $character, string $line): bool
     {
         $slot = Catalog::slotForSkill($line);
 
         foreach ($character->items as $item) {
             if (! $item->equipped || $item->durability <= 0) {
+                continue;
+            }
+            if ((Catalog::item($item->item_key)['slot'] ?? null) === $slot) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * A tool for this line is equipped, and it is at zero durability (§8.2).
+     *
+     * Worth telling apart from having none at all: broken gear is not destroyed
+     * gear, so the answer is a repair rather than a purchase, and a refusal
+     * that says "no axe" to someone wearing one reads as a bug.
+     */
+    public function brokenLineTool(Character $character, string $line): bool
+    {
+        $slot = Catalog::slotForSkill($line);
+
+        foreach ($character->items as $item) {
+            if (! $item->equipped || $item->durability > 0) {
                 continue;
             }
             if ((Catalog::item($item->item_key)['slot'] ?? null) === $slot) {
@@ -948,8 +1053,12 @@ class GameService
      * The hex underfoot is distance 0, so it survives a sight of zero and the
      * dock keeps working on the road.
      */
-    public function previewTile(Character $character, int $col, int $row): array
-    {
+    public function previewTile(
+        Character $character,
+        int $col,
+        int $row,
+        string $activity = Drops::MINING,
+    ): array {
         $now = $this->now();
 
         $distance = HexGeometry::distance((int) $character->col, (int) $character->row, $col, $row);
@@ -967,6 +1076,9 @@ class GameService
                 'clamped' => false,
                 'yield' => 0,
                 'material' => null,
+                'bare' => false,
+                'drops' => [],
+                'activity' => $activity,
                 'skill' => null,
                 'scrap' => false,
                 'note' => null,
@@ -986,6 +1098,9 @@ class GameService
             'clamped' => false,
             'yield' => 0,
             'material' => $tile['material'],
+            'bare' => false,
+            'drops' => [],
+            'activity' => $activity,
             'skill' => null,
             'scrap' => false,
             'note' => null,
@@ -994,6 +1109,12 @@ class GameService
 
         if ($tile['material'] === null) {
             $base['reason'] = match (true) {
+                // §5.3 -- water is the one ground both verbs refuse. Named
+                // rather than lumped in with "nothing here": a lake is plainly
+                // something, and a refusal that pretends otherwise reads as a
+                // bug in the map.
+                $tile['water'] === 'lake' => 'Open water. There is nothing here to work, by hand or otherwise.',
+                $tile['water'] === 'river' => 'A waterway. There is nothing here to work, by hand or otherwise.',
                 $tile['ring'] === 'center' => 'The capital ring is barren. Nothing grows or seams here.',
                 $tile['settlement'] !== null => 'Settlements sit on worked ground. Nothing left to take.',
                 default => 'Nothing mineable here.',
@@ -1016,23 +1137,54 @@ class GameService
 
         $skillKey = Catalog::skillForMaterial($tile['material']);
         $skillLevel = (int) ($character->skills()->where('skill_key', $skillKey)->value('level') ?? 1);
-        // §8 -- the only tool that counts here is the one for this tile's line.
-        $bonuses = $this->bonuses($character, $skillKey);
+        $gathering = $activity === Drops::GATHERING;
 
-        // §4.0 -- no tool for this line means bare hands, and bare hands bring
-        // back scrap. The hex is not blocked: you may always work it, you just
-        // will not get the material out of it. This is the whole reason the
-        // first tool is worth buying, so it must never read as a refusal.
+        // §8 -- the only tool that counts here is the one for this tile's line,
+        // and a gather uses none: bare hands are bare hands whatever is on the
+        // belt, so the line-locked tool and its nodes sit this trip out.
+        $bonuses = $this->bonuses($character, $gathering ? null : $skillKey);
+
+        // §4.0 -- the hex is never blocked for want of a tool. It is the VERB
+        // that is refused, not the ground: mining wants the line's tool and
+        // says so, and gathering is the answer standing next to it. Rolling the
+        // two into one button hid that choice behind a haul the player never
+        // asked for.
         $bare = ! $this->hasLineTool($character, $skillKey);
-        $material = $bare ? Catalog::BIOME_SCRAP[$tile['biome']] : $tile['material'];
         $note = null;
 
-        if ($bare) {
-            // The slot keys are the nouns -- axe, pickaxe, bow, hammer, sickle.
-            $tool = Catalog::slotForSkill($skillKey);
+        // §5.3 -- the tool sets the grade, the ground sets the ceiling. A
+        // common axe on a Hardwood Stand takes wood nearly every time and
+        // hardwood occasionally: the better timber is standing there, you are
+        // simply not equipped to take it down.
+        $variants = Variants::BIOME_VARIANTS[$tile['biome']];
+        $tileGrade = 0;
+        foreach ($variants as $index => $variant) {
+            if ($variant['key'] === $tile['variant']) {
+                $tileGrade = $index;
+                break;
+            }
+        }
+
+        $reach = min(Drops::toolGrade($this->lineToolRarity($character, $skillKey)), $tileGrade);
+        $material = $gathering
+            ? Catalog::BIOME_SCRAP[$tile['biome']]
+            : $variants[$reach]['material'];
+
+        // The slot keys are the nouns -- axe, pickaxe, bow, hammer, sickle.
+        $tool = Catalog::slotForSkill($skillKey);
+
+        if ($gathering) {
             $scrap = Catalog::material($material)['name'];
             $real = Catalog::material($tile['material'])['name'];
-            $note = "No {$tool} — bare hands take {$scrap} here, not {$real}.";
+            $note = "Bare hands. Mostly {$scrap} and whatever grows here, and {$real} only by luck.";
+        } elseif ($bare) {
+            $note = $this->brokenLineTool($character, $skillKey)
+                ? "Your {$tool} is broken. Repair it, or gather this hex by hand."
+                : "No {$tool}. Gather this hex by hand, or come back with one.";
+        } elseif ($reach < $tileGrade) {
+            $have = Catalog::material($variants[$reach]['material'])['name'];
+            $best = Catalog::material($variants[$tileGrade]['material'])['name'];
+            $note = "This ground carries {$best}. Your tool reliably takes {$have} — the better grade is a long shot.";
         }
 
         $trip = Formulas::tripTime($tile['baseSeconds'], $skillLevel, $bonuses['tripReduction']);
@@ -1052,6 +1204,13 @@ class GameService
                 : 'You are already working a hex. Finish that one first.';
         } elseif ($distance !== 0) {
             $reason = 'You are standing elsewhere. Travel to this hex to work it.';
+        } elseif (! $gathering && $bare) {
+            // §8.0 rule 1 -- the tool is what makes this mining rather than
+            // rummaging, so without it the verb has nothing behind it. The hex
+            // stays open: gathering is the same trip on the same ground, and
+            // §4.0 is satisfied by the button beside this one, not by quietly
+            // handing back scrap from the one that was pressed.
+            $reason = $note;
         }
 
         return [
@@ -1069,13 +1228,36 @@ class GameService
                 WorldGen::ringYield($tile['ring']),
             ),
             'material' => $material,
-            // The line stays the tile's own even on a scrap haul: swinging at a
-            // tree by hand is still woodcutting practice, §4.0, just poor.
+            'bare' => $bare,
+            // §4 -- what this ground can give up, most likely first. The ODDS
+            // are deliberately absent: naming them would turn a hex into a
+            // spreadsheet and the decision into arithmetic. What a prospector
+            // is owed is what is here, which is a fact about the place; how
+            // often is what the trip is for.
+            'drops' => Drops::kinds($activity, $tile, $gathering ? 0 : $reach),
+            'activity' => $activity,
+            // The line stays the tile's own even on a gathered haul: swinging
+            // at a tree by hand is still woodcutting practice, §4.0, just poor.
             'skill' => $skillKey,
-            'scrap' => $bare,
+            'scrap' => $gathering,
             'note' => $note,
             'unseen' => false,
         ];
+    }
+
+    /**
+     * §4.0 -- the same hex, worked by hand.
+     *
+     * A separate costing rather than a fallback inside previewTile(), because
+     * the two verbs are now two cells on the dock and each has to be able to
+     * say what IT would give. Always available: there is no tool to lack, which
+     * is the whole of what makes it the floor under the ladder.
+     *
+     * @return array<string,mixed>
+     */
+    public function previewGather(Character $character, int $col, int $row): array
+    {
+        return $this->previewTile($character, $col, $row, Drops::GATHERING);
     }
 
     // ----------------------------------------------------------- hunting §5.5
@@ -1102,7 +1284,6 @@ class GameService
             'yield' => 0,
             'material' => null,
             'scrap' => false,
-            'essenceChance' => 0.0,
             'note' => null,
             'unseen' => false,
         ];
@@ -1127,10 +1308,32 @@ class GameService
 
         $base['herdUntil'] = $herdUntil;
 
-        // §8.0 rule 1 -- the bow is the hunting line's tool and nothing else
-        // stands in for it. Bare hands still get something, per §4.0.
-        $bare = ! $this->hasLineTool($character, 'hunting');
-        $material = $bare ? Catalog::BIOME_SCRAP['plains'] : 'pelt';
+        // §8.0 rule 1 -- the bow is the hunting line's tool, and here it is not
+        // optional. Mining has a bare-handed floor because a hex is never
+        // blocked (§4.0); a hunt is not a hex, it is an animal, and you do not
+        // take one down by hand. This is the one refusal §4.0 does not cover,
+        // and it is what makes the bow the only tool with a gate behind it.
+        if (! $this->hasLineTool($character, 'hunting')) {
+            $base['reason'] = 'No bow. A herd is not something you take by hand.';
+            $base['note'] = 'Hunting needs a bow equipped — every other line will work bare-handed.';
+
+            return $base;
+        }
+
+        // §5.3 -- better ground carries better animals, capped by the bow, the
+        // same way a seam is capped by the pick.
+        $variants = Variants::BIOME_VARIANTS[$tile['biome']];
+        $tileGrade = 0;
+        foreach ($variants as $index => $variant) {
+            if ($variant['key'] === $tile['variant']) {
+                $tileGrade = $index;
+                break;
+            }
+        }
+
+        $bare = false;
+        $reach = min(Drops::toolGrade($this->lineToolRarity($character, 'hunting')), $tileGrade);
+        $material = Variants::BIOME_VARIANTS['plains'][$reach]['material'];
         $bonuses = $this->bonuses($character, 'hunting');
         $skillLevel = (int) ($character->skills()->where('skill_key', 'hunting')->value('level') ?? 1);
 
@@ -1149,15 +1352,7 @@ class GameService
             WorldGen::ringYield($tile['ring']),
         );
 
-        // §4.0 again, and this is the sharp end of it. Essence is the most
-        // valuable thing a non-raider can hold, so a bare-handed haul must not
-        // reach it -- otherwise the bow is optional on the one line where it
-        // pays for a Tier 4 material, and the §8.0 ladder inverts.
-        $base['essenceChance'] = $bare ? 0.0 : Balance::HUNT_ESSENCE_CHANCE;
-
-        if ($bare) {
-            $base['note'] = 'No bow — bare hands take Torn Hide here, not Pelt, and the herd leaves you nothing else.';
-        }
+        $base['drops'] = Drops::kinds(Drops::HUNTING, $tile, $reach);
 
         $working = $this->miningTrip($character);
 
@@ -1208,6 +1403,10 @@ class GameService
                 'ends_at' => $now + Balance::scaled(Balance::HUNT_BASE_SECONDS * 1000),
             ]);
 
+            // §8.5 -- the haul above already carries the charge, so this is
+            // where it is spent.
+            $this->spendBuffs($character, 'hunting');
+
             $character->save();
 
             return $job;
@@ -1216,10 +1415,22 @@ class GameService
 
     // ------------------------------------------------------------------ mining
 
-    public function startMining(Character $character, int $col, int $row): GameJob
-    {
-        return DB::transaction(function () use ($character, $col, $row) {
-            $preview = $this->previewTile($character, $col, $row);
+    /**
+     * Work the hex underfoot, §5.1.
+     *
+     * One method for both verbs, because everything that makes a trip a trip is
+     * the same either way: a tile slot, a bag row, a clock and a charge. What
+     * the verb decides is the table the haul comes off (§4) and whether a tool
+     * is required, and both of those are already settled by the preview.
+     */
+    public function startMining(
+        Character $character,
+        int $col,
+        int $row,
+        string $activity = Drops::MINING,
+    ): GameJob {
+        return DB::transaction(function () use ($character, $col, $row, $activity) {
+            $preview = $this->previewTile($character, $col, $row, $activity);
             if (! $preview['canMine']) {
                 throw new GameException($preview['reason'] ?? 'Cannot mine here.', 'blocked');
             }
@@ -1257,6 +1468,10 @@ class GameService
                 'ends_at' => $now + Balance::scaled($preview['seconds'] * 1000),
             ]);
 
+            // §8.5 -- the clock and the haul above are already costed with
+            // whatever was armed for this line, so the charge is spent here.
+            $this->spendBuffs($character, $preview['skill']);
+
             // Nobody moves here: the character was already standing on this hex
             // before the trip could start, and stays on it while the timer runs.
             // Position changes only through explicit travel.
@@ -1285,9 +1500,11 @@ class GameService
             $durabilityLost = 0;
 
             if ($job->kind === 'mining') {
-                $granted = $this->addMaterial($character, $job->material_key, $job->quantity);
-                $lostToOverflow = $job->quantity - $granted;
-                $gained[$job->material_key] = $granted;
+                // §4 -- the haul is the same SIZE the tile card promised and a
+                // different shape: one draw per unit off the activity's table,
+                // so the thing you came for still dominates and the rest of
+                // what is lying about on that ground turns up alongside it.
+                [$gained, $lostToOverflow] = $this->grantHaul($character, $job);
 
                 // §4.0 -- bare-handed work still teaches the line, badly. Full
                 // rate here would make the §8.0 tool ladder optional.
@@ -1312,34 +1529,12 @@ class GameService
 
                 $this->fireTutorial($character, 'collect');
             } elseif ($job->kind === 'hunting') {
-                $granted = $this->addMaterial($character, $job->material_key, $job->quantity);
-                $lostToOverflow = $job->quantity - $granted;
-                $gained[$job->material_key] = $granted;
+                [$gained, $lostToOverflow] = $this->grantHaul($character, $job);
 
                 $bare = Catalog::isScrap($job->material_key);
-
                 $xpAmount = $bare
                     ? max(1, (int) round($job->quantity * 4 * Balance::SCRAP_XP_RATE))
                     : $job->quantity * 4;
-
-                // §5.5 -- the bridge to the raid track, and the only Tier 4
-                // faucet outside a dungeon. Rolled server-side from a seed like
-                // every other outcome, and closed to bare hands: see
-                // previewHunt() for why that is not a tuning value.
-                if (! $bare) {
-                    $roll = Hash::rand01(
-                        Hash::hash2($job->col + $job->id, $job->row + $now, Balance::mapSeed() ^ 0x3550)
-                    );
-
-                    if ($roll < Balance::HUNT_ESSENCE_CHANCE) {
-                        $essence = $this->addMaterial($character, 'essence', 1);
-                        $lostToOverflow += 1 - $essence;
-
-                        if ($essence > 0) {
-                            $gained['essence'] = $essence;
-                        }
-                    }
-                }
 
                 // A bow is drawn, so a bow wears. The other four slots idle,
                 // §8.0 rule 2 -- drainDurability already scopes to the line.
@@ -1373,6 +1568,45 @@ class GameService
                 'durabilityLost' => $durabilityLost,
             ];
         });
+    }
+
+    /**
+     * Turn a finished trip into a haul, §4.
+     *
+     * The job already records the material its trip resolved to, and that key
+     * is the grade the tool could reach -- so the table is rebuilt from the job
+     * rather than from whatever is on the belt now, and swapping to a better
+     * tool while the timer runs buys nothing.
+     *
+     * Overflow is counted across the whole haul: the bag can refuse one kind
+     * and take another, and the player is owed a single honest number for what
+     * would not fit rather than one per stack.
+     *
+     * @return array{0:array<string,int>,1:int}
+     */
+    private function grantHaul(Character $character, GameJob $job): array
+    {
+        $tile = $this->buildTile((int) $job->col, (int) $job->row, $this->now());
+        $activity = Drops::activityFor($job->kind, (string) $job->material_key);
+        $table = Drops::tableFor($activity, $tile, (string) $job->material_key);
+
+        // Seeded from the job, so a haul is settled the moment it is claimed
+        // and cannot be re-rolled by claiming again (§16).
+        $rolled = Drops::roll($table, (int) $job->quantity, (int) $job->id);
+
+        $gained = [];
+        $lost = 0;
+
+        foreach ($rolled as $key => $qty) {
+            $granted = $this->addMaterial($character, (string) $key, $qty);
+            $lost += $qty - $granted;
+
+            if ($granted > 0) {
+                $gained[(string) $key] = $granted;
+            }
+        }
+
+        return [$gained, $lost];
     }
 
     public function abandonJob(Character $character, int $jobId): void
@@ -1498,6 +1732,8 @@ class GameService
                 'ends_at' => $now + Balance::scaled($seconds * 1000),
             ]);
 
+            $this->spendBuffs($character, 'processing');
+
             $this->fireTutorial($character, 'process_start');
             $character->save();
 
@@ -1610,6 +1846,10 @@ class GameService
         $character->travel_started_at = $now;
         $character->travel_ends_at = $now + $distance * $this->travelMsPerHex($character);
         $character->save();
+
+        // §8.5 -- the arrival time above is already costed with whatever was
+        // armed for the road, so the charge is spent on setting off.
+        $this->spendBuffs($character, 'travel');
 
         return $this->travelState($character);
     }
@@ -2442,7 +2682,7 @@ class GameService
             'skill' => $job->skill_key,
         ];
 
-        if ($job->kind === 'mining') {
+        if ($job->kind === 'mining' || $job->kind === 'hunting') {
             return $payload + [
                 'col' => $job->col,
                 'row' => $job->row,
@@ -2539,6 +2779,7 @@ class GameService
             // and the dock is only ever about here.
             'underfoot' => [
                 ...$this->previewTile($character, $character->col, $character->row),
+                'gather' => $this->previewGather($character, $character->col, $character->row),
                 'hunt' => $this->previewHunt($character, $character->col, $character->row),
             ],
             'shopStock' => $this->shopStock($character),
@@ -2560,12 +2801,11 @@ class GameService
             'buffs' => array_map(fn (CharacterBuff $b) => [
                 'key' => $b->item_key,
                 'stat' => $b->stat,
-                // §8.5 -- which action it applies to. The bag has to say so, or
-                // two buffs on the same stat read as a contradiction.
+                // §8.5 -- which action it applies to. The HUD has to say so, or
+                // two charges on the same stat read as a contradiction.
                 'scope' => $b->scope ?? 'global',
                 'value' => $b->value,
-                'expiresAt' => $b->expires_at,
-            ], $this->liveBuffs($character)),
+            ], $this->armedBuffs($character)),
         ];
     }
 }

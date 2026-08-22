@@ -193,7 +193,15 @@ export interface SkillTree {
 }
 
 /** Server-computed preview of what a trip on this tile would cost and give. */
-export interface TilePreview {
+/**
+ * What one verb on one hex would cost and give, §7.3.
+ *
+ * Mining and gathering are the same shape because they are the same trip on
+ * the same ground -- a tile slot, a bag row, a clock and a haul. What differs
+ * is the table the haul comes off and whether a tool is required, and both of
+ * those are already answered by the fields below.
+ */
+export interface WorkPreview {
   canMine: boolean
   reason?: string
   seconds: number
@@ -204,18 +212,42 @@ export interface TilePreview {
   yield: number
   /** The line this hex belongs to, even when the haul comes back as scrap. */
   skill: SkillKey | null
-  /** §4.0 -- true when there is no tool for the line and `material` is scrap. */
+  /** §4.0 -- true when this costing is the bare-handed verb and pays scrap. */
   scrap: boolean
-  /** Why the haul is scrap, naming the tool that would fix it. */
+  /** §8.0 -- no working tool for this hex's line, so mining has nothing behind it. */
+  bare: boolean
+  /** What the haul will really be, naming the tool that would change it. */
   note: string | null
   material: MaterialKey | null
+  /**
+   * §4 -- everything this ground can give up, most likely first.
+   *
+   * The ODDS are deliberately absent. Naming them would turn a hex into a
+   * spreadsheet and the decision into arithmetic; what a prospector is owed is
+   * what is here, which is a fact about the place, and how often is what the
+   * trip is for.
+   */
+  drops: MaterialKey[]
+  /** Which of the three verbs this costing is for. */
+  activity: 'gathering' | 'mining' | 'hunting'
   /**
    * §5.6 -- true when the hex is outside sight, and everything above it is
    * therefore blank rather than zero. The server will not cost an unscouted
    * hex, so the card reports the walk instead of the seam.
    */
   unseen: boolean
-  /** §5.5 -- the other verb on this hex, costed in the same request. */
+}
+
+/** The hex as the dock reads it: the tool's verb, with the other two hung off it. */
+export interface TilePreview extends WorkPreview {
+  /**
+   * §4.0 -- the same hex worked by hand, costed in the same request.
+   *
+   * Always present and almost always available: there is no tool to lack, which
+   * is the whole of what makes it the floor under the §8.0 ladder.
+   */
+  gather: WorkPreview
+  /** §5.5 -- the third verb on this hex, costed in the same request. */
   hunt: HuntPreview
 }
 
@@ -234,13 +266,10 @@ export interface HuntPreview {
   herdUntil: number | null
   yield: number
   material: MaterialKey | null
-  /** §4.0 -- true when there is no bow and the haul comes back as Torn Hide. */
+  /** Always false: a hunt is refused outright without a bow, never downgraded. */
   scrap: boolean
-  /**
-   * §5.5 -- odds of essence on top. Zero without a bow, and that is a rule
-   * rather than a tuning value: bare hands must not reach a Tier 4 material.
-   */
-  essenceChance: number
+  /** §4 -- what a herd on this ground can give up, most likely first. */
+  drops?: MaterialKey[]
   note: string | null
   unseen: boolean
 }
@@ -300,6 +329,8 @@ export interface GameApi {
   previewTile(col: number, row: number): Promise<TilePreview>
 
   startMining(col: number, row: number): Promise<ActionResult<Job>>
+  /** §4.0 -- the same hex, by hand. Its own call because it is its own verb. */
+  startGathering(col: number, row: number): Promise<ActionResult<Job>>
   /** §5.5 -- work a herd marker. Its own verb, not a mode of mining. */
   startHunt(col: number, row: number): Promise<ActionResult<Job>>
   collectJob(jobId: string): Promise<ActionResult<CollectResult>>

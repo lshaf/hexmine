@@ -28,6 +28,7 @@ import HexAction from '@/shell/HexAction.vue'
 import PanelOverlay from '@/shell/PanelOverlay.vue'
 import TutorialCard from '@/shell/TutorialCard.vue'
 import Toasts from '@/shell/Toasts.vue'
+import HaulModal from '@/shell/HaulModal.vue'
 import TileCard from '@/components/TileCard.vue'
 import StationPanel from '@/components/StationPanel.vue'
 import BagView from '@/views/BagView.vue'
@@ -193,6 +194,10 @@ onMounted(() => {
            land in front of it. Source order matches the stacking ladder so this
            survives someone editing the z-index out. -->
       <Toasts />
+
+      <!-- §4 -- the receipt for a finished trip. Over everything, because it
+           is the one moment in an idle game where something happened. -->
+      <HaulModal v-if="game.haul" :haul="game.haul" @close="game.clearHaul()" />
     </template>
 
     <div v-else class="boot">

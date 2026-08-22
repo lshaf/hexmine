@@ -22,7 +22,7 @@ const ordered = computed(() =>
   game.jobs.filter((j) => j.kind === 'processing').sort((a, b) => a.endsAt - b.endsAt),
 )
 
-const output = (job: Job) => (job.kind === 'mining' ? job.material : job.output)
+const output = (job: Job) => (job.kind === 'processing' ? job.output : job.material)
 
 const ready = (job: Job) => job.endsAt <= game.now
 

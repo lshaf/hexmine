@@ -16,6 +16,7 @@ import { computed } from 'vue'
 import { useGame } from '@/stores/game'
 import { RECIPES, RING_LABEL, SKILL_BY_KEY } from '@/game/catalog'
 import { VARIANT_LABEL } from '@/game/variants'
+import { waterLabel } from '@/game/water'
 import { formatDuration } from '@/game/formulas'
 import { worldParams } from '@/game/worldgen'
 import HexAction from './HexAction.vue'
@@ -33,14 +34,52 @@ const standing = computed(() => {
   return char ? game.tileAt(char.col, char.row) : undefined
 })
 
-/** One trip at a time, so this is a single job or nothing. */
-const trip = computed(() => game.miningJob)
+/**
+ * What this place is called. §5.3 water is named by biome, because a tarn and
+ * an alkali pan are not the same body of water and calling both "Lake" throws
+ * that away.
+ */
+const placeName = computed(() => {
+  if (here.value) return here.value.name
+
+  const tile = standing.value
+  if (!tile) return 'Unsurveyed'
+
+  return tile.water ? waterLabel(tile.biome, tile.water) : VARIANT_LABEL[tile.variant]
+})
+
+/**
+ * One trip at a time, so this is a single job or nothing -- and a hunt is a
+ * trip. Both pin you to the hex until you claim or drop, so both have to reach
+ * this slot; reading only the mining job left a finished hunt with no way to
+ * claim it and nothing on the dock saying why everything else was refused.
+ */
+const trip = computed(() => game.fieldJob)
 const ready = computed(() => Boolean(trip.value && trip.value.endsAt <= game.now))
 
-/** Ground worth a pick. Settlement tiles and the barren centre have no seam. */
+/** Ground worth working. Settlement tiles and the barren centre have neither. */
 const seam = computed(() => Boolean(underfoot.value?.material))
 
+/**
+ * §4.0 -- the same hex worked by hand, costed by the server beside the seam.
+ *
+ * Bare hands are not a worse version of mining, they are the other verb, so
+ * they get their own cell rather than quietly replacing the first one. Mining
+ * names the tool it wants and refuses without it; this is the answer standing
+ * next to that refusal, which is how the hex stays unblocked.
+ */
+const gather = computed(() => underfoot.value?.gather)
+
+/**
+ * Nothing here is greyed out for want of a tool, and that is the rule.
+ *
+ * A dead cell has to explain itself in a tooltip nobody opens on a phone, so
+ * the cells stay live and the server answers -- once, in a toast, in the same
+ * words the preview would have shown. The only thing that takes a verb off the
+ * dock is the hex genuinely not having it: no seam, or no herd.
+ */
 const mineHint = computed(() => underfoot.value?.reason ?? `${underfoot.value?.yield ?? 0} units`)
+const gatherHint = computed(() => gather.value?.reason ?? `${gather.value?.yield ?? 0} units by hand`)
 
 /**
  * §5.5 -- a herd standing on this hex right now. Temporary and time-bucketed,
@@ -83,18 +122,13 @@ const huntHint = computed(() => {
   const h = hunt.value
   if (!h) return ''
   if (h.reason) return h.reason
-  // Both halves of the offer, because the essence is the reason to care and
-  // the pelts are the reason to bother -- §5.5 is the bridge between them.
-  const essence = h.essenceChance > 0
-    ? `, ${Math.round(h.essenceChance * 100)}% essence`
-    : ' — no bow, so no essence'
-
-  return `${h.yield} units${essence}`
+  return `${h.yield} units`
 })
 
 const claimHint = computed(() => {
   if (!trip.value) return ''
-  return ready.value ? `${trip.value.quantity} units waiting` : 'Still working this hex'
+  if (ready.value) return `${trip.value.quantity} units waiting`
+  return trip.value.kind === 'hunting' ? 'Still working this herd' : 'Still working this hex'
 })
 
 /** Processing lines this settlement runs, §6. */
@@ -118,12 +152,21 @@ const processHint = computed(() => {
  */
 const doing = computed(() => {
   if (!trip.value) return null
-  return ready.value ? 'Reward ready' : `Working · ${formatDuration(trip.value.endsAt - game.now)}`
+  if (ready.value) return 'Reward ready'
+
+  const verb = trip.value.kind === 'hunting' ? 'Hunting' : 'Working'
+
+  return `${verb} · ${formatDuration(trip.value.endsAt - game.now)}`
 })
 
 function mine(): void {
   const char = game.character
   if (char) void game.startMining(char.col, char.row)
+}
+
+function gathered(): void {
+  const char = game.character
+  if (char) void game.startGathering(char.col, char.row)
 }
 
 function hunted(): void {
@@ -135,21 +178,25 @@ function hunted(): void {
 <template>
   <div class="dock plate">
     <div class="inner">
-      <!-- Where you are, and what you are doing about it. -->
+      <!-- Where you are, and what you are doing about it -- two lines, the same
+           two the tile card sitting above uses: what this place is, then what it
+           is called. The caption the first line used to carry ("You are at") was
+           the one thing here that said nothing. -->
       <div class="where">
-        <span class="label">{{ here ? 'You are at' : 'Open country' }}</span>
-        <h2 class="place">
-          {{ here ? here.name : standing ? VARIANT_LABEL[standing.variant] : 'Unsurveyed' }}
-        </h2>
-        <span v-if="doing" class="label doing" :class="{ ready }">{{ doing }}</span>
-        <!-- §5.5 -- perishable, so it says when it goes rather than that it is
-             here. "Herd" alone would read as scenery. -->
-        <span v-else-if="herdLeaves" class="label herd" :class="{ going: herdGoing }">
-          Herd moves on in {{ herdLeaves }}
-        </span>
-        <span v-else class="tiny muted meta">
+        <span class="label meta">
           <template v-if="here">{{ here.tier }} · {{ lineNames || 'no lines' }}</template>
-          <template v-else-if="standing">{{ RING_LABEL[standing.ring] }}</template>
+          <template v-else-if="standing">Open country · {{ RING_LABEL[standing.ring] }}</template>
+          <template v-else>Unsurveyed</template>
+        </span>
+
+        <span class="named">
+          <h2 class="place">{{ placeName }}</h2>
+          <span v-if="doing" class="label doing" :class="{ ready }">{{ doing }}</span>
+          <!-- §5.5 -- perishable, so it says when it goes rather than that it is
+               here. "Herd" alone would read as scenery. -->
+          <span v-else-if="herdLeaves" class="label herd" :class="{ going: herdGoing }">
+            Herd moves on in {{ herdLeaves }}
+          </span>
         </span>
       </div>
 
@@ -157,6 +204,7 @@ function hunted(): void {
         <!-- Mine and Claim are the same slot at two moments of one trip. -->
         <template v-if="trip">
           <HexAction
+            small
             icon="claim"
             label="Claim"
             :primary="ready"
@@ -165,6 +213,7 @@ function hunted(): void {
             @activate="game.collect(trip.id)"
           />
           <HexAction
+            small
             icon="drop"
             label="Drop"
             danger
@@ -175,25 +224,42 @@ function hunted(): void {
         </template>
 
         <template v-else>
+          <!-- Both verbs, always, on any hex that has a seam at all. Which one
+               is lit says which one the belt is ready for; neither is closed,
+               because §4.0 is about the ground being open and a greyed cell
+               says the opposite. -->
           <HexAction
             v-if="seam"
+            small
             icon="mine"
             label="Mine"
             :primary="Boolean(underfoot?.canMine) && !herd"
-            :disabled="!underfoot?.canMine"
+            :disabled="game.busy"
             :hint="mineHint"
             @activate="mine"
           />
 
-          <!-- §5.5 -- present only while a herd is. Beside Mine rather than
-               instead of it: a hunt takes no tile slot, so both verbs are
-               genuinely available on the same hex at the same time. -->
+          <HexAction
+            v-if="seam"
+            small
+            icon="gather"
+            label="Gather"
+            :primary="Boolean(gather?.canMine) && underfoot?.bare && !herd"
+            :disabled="game.busy"
+            :hint="gatherHint"
+            @activate="gathered"
+          />
+
+          <!-- §5.5 -- present only while a herd is. Beside the other two rather
+               than instead of them: a hunt takes no tile slot, so all three
+               verbs are genuinely available on the same hex at the same time. -->
           <HexAction
             v-if="herd"
+            small
             icon="hunt"
             label="Hunt"
             :primary="Boolean(hunt?.canHunt)"
-            :disabled="!hunt?.canHunt"
+            :disabled="game.busy"
             :hint="huntHint"
             @activate="hunted"
           />
@@ -203,9 +269,10 @@ function hunted(): void {
              is that these people are not out here. -->
         <template v-if="here">
           <span v-if="trip || seam || herd" class="rule" aria-hidden="true" />
-          <HexAction icon="trade" label="Trade" @activate="game.openPanel('shop')" />
-          <HexAction icon="craft" label="Craft" @activate="game.openPanel('craft')" />
+          <HexAction small icon="trade" label="Trade" @activate="game.openPanel('shop')" />
+          <HexAction small icon="craft" label="Craft" @activate="game.openPanel('craft')" />
           <HexAction
+            small
             icon="process"
             label="Process"
             :disabled="!lines.length"
@@ -223,14 +290,20 @@ function hunted(): void {
  * Sized to its contents: the dock is narrow in the field and wide at a
  * settlement, so its silhouette changes with location before you read a word
  * of it.
+ *
+ * Its *height* is not its own, though. The tile card sits directly on top of it
+ * and the two read as one band, so the dock takes the card's cell size and the
+ * card's vertical padding -- which is what makes the two plates come out the
+ * same height without either of them being told a number.
  */
 .dock {
   width: fit-content;
   max-width: min(620px, calc(100vw - 24px));
 }
 
+/* The tile card's own padding, to the pixel -- see the note on .dock above. */
 .inner {
-  padding: 11px 16px 13px;
+  padding: 9px 12px 10px 14px;
   display: flex;
   align-items: center;
   gap: 18px;
@@ -240,17 +313,40 @@ function hunted(): void {
   display: flex;
   flex-direction: column;
   gap: 3px;
-  min-width: 108px;
-  max-width: 150px;
+  min-width: 0;
+  /* Wide enough for a capital running all five lines, and the dock is sized to
+     its contents, so the plate grows rather than the text wrapping to a third
+     line. */
+  max-width: 300px;
+}
+
+/* The name and what is happening to it share the second line: the status is
+   about this place, so it reads as part of naming it rather than as a third
+   thing stacked underneath. */
+.named {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  min-width: 0;
 }
 
 .place {
   font-size: 16px;
   color: var(--vellum);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.meta {
-  line-height: 1.3;
+.meta,
+.named > .label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.named > .label {
+  flex: 0 0 auto;
 }
 
 .doing {
@@ -301,26 +397,20 @@ function hunted(): void {
 
   .inner {
     gap: 8px;
-    padding: 8px 10px 9px;
+    padding: 8px 10px 9px 11px;
   }
 
   .where {
-    min-width: 0;
     max-width: none;
     gap: 2px;
   }
 
-  .place {
-    font-size: 13.5px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+  .named {
+    gap: 7px;
   }
 
-  .meta {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+  .place {
+    font-size: 13.5px;
   }
 
   .actions {

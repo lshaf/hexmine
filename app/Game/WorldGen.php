@@ -192,6 +192,176 @@ final class WorldGen
         return $best;
     }
 
+    // ----------------------------------------------------------------- water
+
+    /**
+     * §5.3 -- lakes and waterways, and neither is stored.
+     *
+     * Water is a pure function of (col, row, seed) like everything else on the
+     * map, which is what lets the client draw a coastline the server never
+     * ships. Both shapes are built out of integer hashes and straight
+     * arithmetic: no sine, no cosine, because a boundary test that lands within
+     * an ulp of the edge would flip a hex between water and land depending on
+     * whose libm answered, and PHP and JS have to agree on every tile.
+     */
+    public static function waterAt(int $col, int $row): ?string
+    {
+        if (self::lakeAt($col, $row)) {
+            return 'lake';
+        }
+
+        return self::riverAt($col, $row) ? 'river' : null;
+    }
+
+    /**
+     * Four waterways: two running east-west, two north-south.
+     *
+     * Their lines are fractions of the radius rather than hex counts, so the
+     * same four rivers cross a test map and a ship-scale one. None of the four
+     * passes through the middle -- the barren ring keeps the dungeon mouths,
+     * and a river mouth there would read as a way in.
+     *
+     * @var array<int,array{0:int,1:float}>
+     */
+    private const RIVER_LINES = [
+        [0, -0.55],
+        [0, 0.46],
+        [1, -0.44],
+        [1, 0.57],
+    ];
+
+    private static function riverAmplitude(): int
+    {
+        return max(4, (int) round(Balance::mapRadius() * Balance::RIVER_AMPLITUDE));
+    }
+
+    /**
+     * Where a waterway's channel sits at one step along its length.
+     *
+     * Value noise: one hashed offset every RIVER_SEGMENT hexes, smoothstepped
+     * between. Polynomial interpolation keeps the curve identical on both
+     * sides of the wire, which a trig-driven meander could not promise.
+     */
+    private static function riverCentre(int $index, int $t): float
+    {
+        $segment = Balance::RIVER_SEGMENT;
+        $cell = (int) floor($t / $segment);
+        $f = ($t - $cell * $segment) / $segment;
+
+        $amplitude = self::riverAmplitude();
+        $a = Hash::randInt(
+            Hash::hash2($cell, $index, Balance::mapSeed() ^ 0x21ce),
+            -$amplitude,
+            $amplitude,
+        );
+        $b = Hash::randInt(
+            Hash::hash2($cell + 1, $index, Balance::mapSeed() ^ 0x21ce),
+            -$amplitude,
+            $amplitude,
+        );
+
+        $u = $f * $f * (3.0 - 2.0 * $f);
+        $base = round(self::RIVER_LINES[$index][1] * Balance::mapRadius());
+
+        return $base + $a + ($b - $a) * $u;
+    }
+
+    /**
+     * A hex is in the channel if it lies between this step's centre and the
+     * next one's, which is what keeps a steep reach unbroken: consecutive
+     * bands share an endpoint, so the water is continuous by construction
+     * rather than by picking a width that happens to cover the slope.
+     */
+    private static function riverAt(int $col, int $row): bool
+    {
+        $half = Balance::RIVER_HALF_WIDTH;
+
+        foreach (self::RIVER_LINES as $index => [$axis, $_]) {
+            $along = $axis === 0 ? $col : $row;
+            $across = $axis === 0 ? $row : $col;
+
+            $here = self::riverCentre($index, $along);
+            $next = self::riverCentre($index, $along + 1);
+
+            if ($across >= min($here, $next) - $half && $across <= max($here, $next) + $half) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * One candidate lake per cell, found by scanning the 3x3 around this hex.
+     *
+     * The same lattice trick the settlements use, and for the same reason: a
+     * blob can be tested for without enumerating it, so a tile costs a fixed
+     * handful of hashes however many lakes the map holds.
+     *
+     * @return array{0:int,1:int,2:int}|null
+     */
+    private static function lakeIn(int $cellCol, int $cellRow): ?array
+    {
+        $cell = Balance::LAKE_CELL;
+
+        if (Hash::rand01(Hash::hash2($cellCol, $cellRow, Balance::mapSeed() ^ 0x1a4e)) > Balance::LAKE_CHANCE) {
+            return null;
+        }
+
+        // Inset from the cell edge so a lake never reaches past the 3x3 the
+        // scan above covers.
+        $inset = Balance::LAKE_MAX_RADIUS + 2;
+
+        return [
+            $cellCol * $cell + Hash::randInt(
+                Hash::hash2($cellCol, $cellRow, Balance::mapSeed() ^ 0x1a5e),
+                $inset,
+                $cell - $inset - 1,
+            ),
+            $cellRow * $cell + Hash::randInt(
+                Hash::hash2($cellRow, $cellCol, Balance::mapSeed() ^ 0x1a6e),
+                $inset,
+                $cell - $inset - 1,
+            ),
+            Hash::randInt(
+                Hash::hash2($cellCol + $cellRow, $cellCol - $cellRow, Balance::mapSeed() ^ 0x1a7e),
+                Balance::LAKE_MIN_RADIUS,
+                Balance::LAKE_MAX_RADIUS,
+            ),
+        ];
+    }
+
+    private static function lakeAt(int $col, int $row): bool
+    {
+        $cell = Balance::LAKE_CELL;
+        $cx = (int) floor($col / $cell);
+        $cy = (int) floor($row / $cell);
+
+        // §13.2 -- hexes are wider than they are tall, so the same weighting
+        // the biome regions use keeps a lake round on screen instead of drawn
+        // out along the columns.
+        $wobble = Hash::rand01(Hash::hash2($col, $row, Balance::mapSeed() ^ 0x1a8e))
+            * Balance::LAKE_EDGE_WOBBLE - Balance::LAKE_EDGE_WOBBLE / 2;
+
+        for ($i = -1; $i <= 1; $i++) {
+            for ($j = -1; $j <= 1; $j++) {
+                $site = self::lakeIn($cx + $i, $cy + $j);
+                if ($site === null) {
+                    continue;
+                }
+
+                $dx = ($site[0] - $col) * self::ASPECT;
+                $dy = $site[1] - $row;
+
+                if (sqrt($dx * $dx + $dy * $dy) + $wobble < $site[2]) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
     // ---------------------------------------------------------- settlements
 
     /**
@@ -485,10 +655,10 @@ final class WorldGen
      */
     private static function herdUntil(int $col, int $row, string $biome, int $now): ?int
     {
-        if ($biome !== 'plains' && $biome !== 'grassland') {
-            return null;
-        }
-
+        // §5.5 -- animals live on every kind of ground, not only the two that
+        // grow grass. Keeping herds off the forest and the badlands made
+        // hunting a plains errand; letting them wander anywhere is what makes
+        // a bow worth carrying on a walk you took for another reason.
         $lifetime = Balance::scaled(Balance::HERD_LIFETIME_MS);
         $bucket = intdiv($now, $lifetime);
         $h = Hash::hash2($col * 31 + $bucket, $row * 17 + $bucket, Balance::mapSeed() ^ 0xbeef);
@@ -552,9 +722,17 @@ final class WorldGen
         // A depleted tile keeps its material: it is drained, not dead (§5.1), and
         // callers gate on regrowsAt. The UI needs the material to keep rendering
         // the right remnants while it regrows.
+        // §5.3 -- water yields to the things that are placed rather than
+        // grown. A settlement on a river is a ford and a dungeon mouth is a
+        // fixed site; moving either to make room would mean the lattice had to
+        // know about the water, and the water is the cheaper thing to bend.
+        $water = $settlement === null && $dungeon === null
+            ? self::waterAt($col, $row)
+            : null;
+
         $variant = null;
         $material = null;
-        if ($ring !== 'center' && $settlement === null) {
+        if ($ring !== 'center' && $settlement === null && $water === null) {
             $variant = self::variantOf($col, $row, $biome, $ring);
             $material = $variant['material'];
         }
@@ -574,7 +752,9 @@ final class WorldGen
             'regrowsAt' => $regrowsAt,
             'settlement' => $settlement,
             'dungeon' => $dungeon ? ['key' => $dungeon['key'], 'name' => $dungeon['name']] : null,
-            'herdUntil' => self::herdUntil($col, $row, $biome, $now),
+            'water' => $water,
+            // §5.5 -- a herd stands on ground. Nothing grazes a lake.
+            'herdUntil' => $water === null ? self::herdUntil($col, $row, $biome, $now) : null,
             'propSeed' => Hash::hash2($col, $row, Balance::mapSeed() ^ 0xf00d),
         ];
     }

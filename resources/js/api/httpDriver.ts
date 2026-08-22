@@ -121,6 +121,10 @@ export class HttpDriver implements GameApi {
     return post<ActionResult<Job>>('/mining', { col, row })
   }
 
+  startGathering(col: number, row: number): Promise<ActionResult<Job>> {
+    return post<ActionResult<Job>>('/gathering', { col, row })
+  }
+
   startHunt(col: number, row: number): Promise<ActionResult<Job>> {
     return post<ActionResult<Job>>('/hunting', { col, row })
   }

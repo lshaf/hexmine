@@ -4,7 +4,7 @@
  * needs is precomputed to an opaque hex string here.
  */
 import { VARIANT_TINT } from '@/game/variants'
-import type { Biome, VariantKey } from '@/game/types'
+import type { Biome, VariantKey, WaterKind } from '@/game/types'
 
 export const INK = '#141b18'
 export const INK_PANEL = '#1d2622'
@@ -64,6 +64,33 @@ export function desaturate(hex: string, amount: number): string {
   )
 }
 
+/** Blend two colours. Always opaque -- §13.2 allows no alpha on the map. */
+export function mix(a: string, b: string, amount: number): string {
+  const [r1, g1, b1] = hexToRgb(a)
+  const [r2, g2, b2] = hexToRgb(b)
+  return rgbToHex(r1 + (r2 - r1) * amount, g1 + (g2 - g1) * amount, b1 + (b2 - b1) * amount)
+}
+
+/**
+ * §5.3 -- open water, tinted by the ground it crosses.
+ *
+ * One blue everywhere would cut the map into blue and not-blue and read as a
+ * layer laid over the terrain rather than part of it. A fifth of the biome's
+ * own colour mixed in is enough that a river stays recognisably a river while
+ * still belonging to the badlands or the forest it runs through -- and that is
+ * the same argument §13.3 makes for depleted ground keeping its biome colour.
+ *
+ * A waterway is lighter than a lake because it is shallower. That is the only
+ * thing separating the two fills; the shape does the rest.
+ */
+const WATER_BASE = '#3f6b86'
+
+export const waterColor = (biome: Biome, kind: WaterKind): string => {
+  const tinted = mix(WATER_BASE, BIOME_COLOR[biome], 0.22)
+
+  return kind === 'river' ? shade(tinted, 0.12) : shade(tinted, -0.07)
+}
+
 /**
  * §5.3 -- the fill for a hex, which is its variant's tint rather than its
  * biome's. Four grades of forest are four greens, or the contested ground would
@@ -98,6 +125,14 @@ export const MATERIAL_PALETTE = {
  * Deliberately off the biome scale so it never reads as a sixth terrain.
  */
 export const HERB_ACCENT = '#7d9464'
+
+/**
+ * §4 -- the alchemist's other stock. Warm where the herbs are cool, because
+ * the two halves of the shelf are reached by different roads: a herb is
+ * gathered by hand, a critter is hunted. Off the biome scale for the same
+ * reason the green is.
+ */
+export const CRITTER_ACCENT = '#c08a52'
 
 /**
  * §8.1 -- rarity treatment for equipment icons. Rarity is the one thing a player

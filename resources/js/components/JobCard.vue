@@ -19,15 +19,15 @@ const progress = computed(() =>
 )
 
 const output = computed(() =>
-  props.job.kind === 'mining' ? props.job.material : props.job.output,
+  props.job.kind === 'processing' ? props.job.output : props.job.material,
 )
 const def = computed(() => MATERIALS[output.value])
 const icon = computed(() => materialIcon(def.value, 26))
 
 const where = computed(() =>
-  props.job.kind === 'mining'
-    ? `Hex ${props.job.col}, ${props.job.row}`
-    : 'Processing line',
+  props.job.kind === 'processing'
+    ? 'Processing line'
+    : `Hex ${props.job.col}, ${props.job.row}`,
 )
 </script>
 

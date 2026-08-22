@@ -30,6 +30,7 @@ import { BIOME_LABEL } from '@/theme/palette'
 import { VARIANT_BY_MATERIAL, VARIANT_LABEL, VARIANT_RINGS } from './variants'
 import { REAGENTS } from './alchemy'
 import { COMPONENTS } from './components'
+import { CRITTERS } from './critters'
 import type { ItemDef, Material, MaterialKey, SettlementTier } from './types'
 
 /** The five roads. Nothing in the world arrives by a sixth. */
@@ -103,13 +104,15 @@ export interface SourceLine {
  * the only one with a tool and a variant behind it; the other three are the
  * bench stocks, and two of those have no faucet on the map yet.
  */
-export type RawRole = 'ground' | 'reagent' | 'component'
+export type RawRole = 'ground' | 'reagent' | 'critter' | 'component'
 
 const REAGENT_KEYS = new Set<string>(REAGENTS.map((m) => m.key))
 const COMPONENT_KEYS = new Set<string>(COMPONENTS.map((m) => m.key))
+const CRITTER_KEYS = new Set<string>(CRITTERS.map((m) => m.key))
 
 export function rawRole(key: MaterialKey): RawRole {
   if (REAGENT_KEYS.has(key)) return 'reagent'
+  if (CRITTER_KEYS.has(key)) return 'critter'
   if (COMPONENT_KEYS.has(key)) return 'component'
   return 'ground'
 }
@@ -179,18 +182,30 @@ export function materialSources(mat: Material): SourceLine[] {
     case 1: {
       const role = rawRole(mat.key)
 
-      // §4 -- the two bench stocks are in the catalog and recipes want them,
-      // but no hex drops one yet. Saying "mine it in a forest" would be a
-      // straight lie, and saying nothing would read as "comes from nowhere".
-      if (role !== 'ground') {
-        const bench = role === 'reagent' ? 'consumable' : (mat.bench ?? 'craft')
+      // §4 -- the alchemist's second stock, and the only ingredient that needs
+      // a bow. A herb is an errand; a critter waits on a herd, and §5.5 puts
+      // herds on a four-hour clock.
+      if (role === 'critter') {
         lines.push({
           kind: 'mine',
-          where: `${BIOME_LABEL[mat.biome!]} hex`,
-          pending: true,
+          where: `${BIOME_LABEL[mat.biome!]} herd · Hunting`,
           note:
-            `Stock for the ${bench} bench, biome-locked like every other raw. ` +
-            'No hex drops it yet — the recipes that want it are real, the faucet is not.',
+            'Needs a bow and a live herd — the one activity bare hands cannot do ' +
+            'at all. Hunted, never gathered.',
+        })
+        break
+      }
+
+      // §4 -- the herbs and the craft components come off the ground, but not
+      // off the same verb: a herb turns up whether or not you brought a tool,
+      // a component only if you did.
+      if (role !== 'ground') {
+        const bench = role === 'reagent' ? 'consumable' : (mat.bench ?? 'craft')
+        const verb = role === 'reagent' ? 'Gathering or mining' : 'Mining';
+        lines.push({
+          kind: 'mine',
+          where: `${BIOME_LABEL[mat.biome!]} hex · ${verb}`,
+          note: `Stock for the ${bench} bench, alongside whatever the hex itself gives up.`,
         })
         break
       }
@@ -213,12 +228,12 @@ export function materialSources(mat: Material): SourceLine[] {
       if (mat.key === 'pelt') {
         lines.push({
           kind: 'mine',
-          where: 'Hunting grounds, plains and grassland',
+          where: 'Herd markers, any biome',
           pending: true,
           note:
-            `Herd markers wander onto open hexes and move on after about ` +
-            `${Math.round(HUNTING.markerLifetimeMs / 3_600_000)} hours. They cost time and ` +
-            'AP, no raid charge, and pay a little essence on top.',
+            `Herds wander onto open hexes and move on after about ` +
+            `${Math.round(HUNTING.markerLifetimeMs / 3_600_000)} hours. A bow is required, ` +
+            'and they pay horn, sinew and bone alongside the pelt.',
         })
       }
       break
@@ -284,25 +299,6 @@ function raidSources(key: MaterialKey): SourceLine[] {
         where: `${dungeon.name}, the ${dungeon.biome} dungeon`,
         pending: true,
         note: 'Reliable from floor 4 down, occasional above.',
-      },
-    ]
-  }
-
-  if (key === 'essence') {
-    return [
-      {
-        kind: 'dungeon',
-        where: 'Any dungeon, any floor',
-        pending: true,
-        note: 'The common residue. Every monster tier drops it.',
-      },
-      {
-        kind: 'mine',
-        where: 'Hunting grounds, plains and grassland',
-        pending: true,
-        note:
-          `A small amount on top of the pelts, at a ${Math.round(HUNTING.essenceChance * 100)}% ` +
-          'chance. The only activity that bridges the mining and raid tracks.',
       },
     ]
   }
