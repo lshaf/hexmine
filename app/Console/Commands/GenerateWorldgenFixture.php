@@ -71,6 +71,11 @@ class GenerateWorldgenFixture extends Command
                 $s ? $s['name'].':'.$s['tier'].':'.implode(',', $s['lines']) : '-',
                 $tile['dungeon'] ? $tile['dungeon']['key'] : '-',
                 $tile['water'] ?? '-',
+                // §9.5.1 -- at now = 0 the bucket is fixed, so a pack is as
+                // pinnable as terrain. Both generators offset the bucket per
+                // hex; a drift in that offset moves packs under characters who
+                // are standing on one, so it belongs in the fixture.
+                $tile['pack'] ? $tile['pack']['key'].':'.$tile['pack']['bucket'] : '-',
                 $tile['propSeed'],
             ]);
         }

@@ -671,6 +671,58 @@ final class WorldGen
     }
 
     /**
+     * §9.5.1 -- is a pack standing here, and which one.
+     *
+     * The same trick the herd uses (§5.5): a time bucket hashed with the hex, so
+     * the whole thing is derivable and a pack nobody has met costs no storage.
+     *
+     * The difference is the OFFSET. A herd's bucket starts at the same instant
+     * on every hex, which means the whole world's herds blink at once; with two
+     * hours between rolls and a pin on the far end of one (§9.5.3), a synchronised
+     * world would empty and refill on a heartbeat everybody could set a watch by.
+     * A per-hex offset staggers them: every hex keeps its own two-hour rhythm and
+     * the map churns continuously.
+     *
+     * `until` is returned in the caller's time base rather than the bucket's, so
+     * nothing outside here has to know the offset exists.
+     */
+    private static function packAt(int $col, int $row, string $ring, int $now): ?array
+    {
+        $lifetime = Balance::scaled(Balance::PACK_LIFETIME_MS);
+        $offset = Hash::randInt(
+            Hash::hash2($col, $row, Balance::mapSeed() ^ 0x9ac1),
+            0,
+            max(0, $lifetime - 1),
+        );
+
+        $bucket = intdiv($now + $offset, $lifetime);
+        $h = Hash::hash2($col * 37 + $bucket, $row * 19 + $bucket, Balance::mapSeed() ^ 0x5eed);
+
+        if (Hash::rand01($h) > (Balance::PACK_CHANCE[$ring] ?? 0.0)) {
+            return null;
+        }
+
+        // §9.5.2 -- a ring fights its own two and the two from outside it, so
+        // which of the four turns up is another roll on the same bucket.
+        $pool = Monsters::BY_RING[$ring] ?? [];
+        if ($pool === []) {
+            return null;
+        }
+
+        $pick = Hash::randInt(
+            Hash::hash2($col * 41 + $bucket, $row * 23 + $bucket, Balance::mapSeed() ^ 0x77a3),
+            0,
+            count($pool) - 1,
+        );
+
+        return [
+            'key' => $pool[$pick],
+            'bucket' => $bucket,
+            'until' => ($bucket + 1) * $lifetime - $offset,
+        ];
+    }
+
+    /**
      * §5.3 -- which of the biome's four variants this hex turned out to be.
      *
      * A weighted walk in fixed grade order over the ring's column, which sums
@@ -704,7 +756,7 @@ final class WorldGen
      * Build a tile. $mutation carries the only server-owned state a tile has;
      * everything else is derived.
      *
-     * @param  array{slotsUsed?:int,regrowsAt?:int}  $mutation
+     * @param  array{slotsUsed?:int,regrowsAt?:int,packCleared?:bool}  $mutation
      */
     public static function generateTile(int $col, int $row, int $now, array $mutation = []): array
     {
@@ -755,6 +807,18 @@ final class WorldGen
             'water' => $water,
             // §5.5 -- a herd stands on ground. Nothing grazes a lake.
             'herdUntil' => $water === null ? self::herdUntil($col, $row, $biome, $now) : null,
+            // §9.5.1 -- nothing camps on open water, and nothing camps on a
+            // settlement or a dungeon mouth either: a pack parked on a capital
+            // would lock a whole region out of the only five-line bench it has,
+            // and blocking shared infrastructure is not a hazard, it is grief.
+            // §9.5.1 -- `packCleared` is the one bit the seed cannot know: it
+            // comes from the cache (Packs), and folding it in here means every
+            // reader downstream sees the same absence rather than each one
+            // remembering to ask.
+            'pack' => $water === null && $settlement === null && $dungeon === null
+                && empty($mutation['packCleared'])
+                ? self::packAt($col, $row, $ring, $now)
+                : null,
             'propSeed' => Hash::hash2($col, $row, Balance::mapSeed() ^ 0xf00d),
         ];
     }

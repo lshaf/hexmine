@@ -59,6 +59,7 @@ for (const line of lines) {
     settlement,
     dungeon,
     water,
+    pack,
     propSeed,
   ] = line.split('|')
   const [col, row] = coord!.split(',').map(Number)
@@ -76,6 +77,9 @@ for (const line of lines) {
     s ? `${s.name}:${s.tier}:${s.lines.join(',')}` : '-',
     tile.dungeon ? tile.dungeon.key : '-',
     tile.water ?? '-',
+    // §9.5.1 -- the pack, and with it the per-hex bucket offset both sides fold
+    // into the roll. A drift here moves packs under characters standing on one.
+    tile.pack ? `${tile.pack.key}:${tile.pack.bucket}` : '-',
     String(tile.propSeed),
   ].join('|')
 
@@ -89,6 +93,7 @@ for (const line of lines) {
     settlement,
     dungeon,
     water,
+    pack,
     propSeed,
   ].join('|')
 

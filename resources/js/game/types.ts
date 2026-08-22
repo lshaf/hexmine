@@ -407,6 +407,15 @@ export interface ItemOption {
  * the percentage stats of the same name: §8.1's ceiling is +15%, and a fight
  * cannot be decided by a swing that small.
  */
+/** §9.5.1 -- a pack on a hex: which monster, which bucket, and when it leaves. */
+export interface Pack {
+  key: string
+  /** The time bucket it belongs to. The clear flag is keyed by it (§9.5.1). */
+  bucket: number
+  /** Unix ms it wanders off, in the caller's time base. */
+  until: number
+}
+
 export interface Monster {
   key: string
   name: string
@@ -545,6 +554,13 @@ export interface Tile {
   water?: WaterKind
   /** Temporary herd marker, §5.5. */
   herdUntil?: number
+  /**
+   * §9.5.1 -- the pack standing here this bucket, if any. Derived like the
+   * herd, so an unmet pack costs no storage; whether somebody has already
+   * fought it is the one thing the seed cannot say, and that arrives with the
+   * live-state payload instead.
+   */
+  pack?: Pack
   /** Elevation prop seed so mountains/trees render deterministically. */
   propSeed: number
 }

@@ -20,10 +20,12 @@
  */
 import { hash2, rand01, randInt } from './hash'
 import { BIOME_VARIANTS, type VariantDef } from './variants'
+import { MONSTERS_BY_RING } from './monsters'
 import { hexDistance } from '@/map/hexGeometry'
 import type {
   Biome,
   MaterialKey,
+  Pack,
   Ring,
   Settlement,
   SettlementTier,
@@ -48,6 +50,9 @@ export interface WorldConfig {
   slotsPerTile: number
   herdLifetimeMs: number
   herdChance: number
+  /** §9.5.1 -- how long a pack stands, and the odds by ring. */
+  packLifetimeMs: number
+  packChance: Record<Ring, number>
   biomes: Biome[]
   biomeMaterial: Record<Biome, MaterialKey>
   biomeRare: Record<Biome, MaterialKey>
@@ -645,9 +650,52 @@ function herdUntil(col: number, row: number, _biome: Biome, now: number): number
   return (bucket + 1) * c.herdLifetimeMs
 }
 
+/**
+ * §9.5.1 -- is a pack standing here, and which one.
+ *
+ * The mirror of WorldGen::packAt(). Same trick the herd uses, plus a per-hex
+ * OFFSET into the bucket: without it every pack in the world would appear and
+ * vanish on the same two-hour heartbeat, which with a pin on the far end of one
+ * (§9.5.3) is a rhythm players would set a watch by. `until` comes back in the
+ * caller's time base, so nothing outside here knows the offset exists.
+ */
+function packAt(col: number, row: number, ring: Ring, now: number): Pack | undefined {
+  const c = cfg()
+
+  const lifetime = c.packLifetimeMs
+  const offset = randInt(hash2(col, row, c.seed ^ 0x9ac1), 0, Math.max(0, lifetime - 1))
+
+  const bucket = Math.floor((now + offset) / lifetime)
+  const h = hash2(col * 37 + bucket, row * 19 + bucket, c.seed ^ 0x5eed)
+  if (rand01(h) > (c.packChance[ring] ?? 0)) return undefined
+
+  // §9.5.2 -- a ring fights its own two and the two from outside it, so which
+  // of the four turns up is another roll on the same bucket.
+  const pool = MONSTERS_BY_RING[ring] ?? []
+  if (pool.length === 0) return undefined
+
+  const pick = randInt(
+    hash2(col * 41 + bucket, row * 23 + bucket, c.seed ^ 0x77a3),
+    0,
+    pool.length - 1,
+  )
+
+  return {
+    key: pool[pick]!,
+    bucket,
+    until: (bucket + 1) * lifetime - offset,
+  }
+}
+
 export interface TileMutation {
   slotsUsed?: number
   regrowsAt?: number
+  /**
+   * §9.5.1 -- somebody already fought the pack standing here this bucket. The
+   * one thing about a pack the seed cannot know, folded in here so every reader
+   * downstream sees the same absence.
+   */
+  packCleared?: boolean
 }
 
 /**
@@ -726,6 +774,13 @@ export function generateTile(
     water,
     // §5.5 -- a herd stands on ground. Nothing grazes a lake.
     herdUntil: water ? undefined : herdUntil(col, row, biome, now),
+    // §9.5.1 -- nothing camps on water, a settlement or a dungeon mouth. The
+    // second is the load-bearing one: a pack on a capital would lock a region
+    // out of the only five-line bench it has.
+    pack:
+      water || settlement || dungeon || mutation?.packCleared
+        ? undefined
+        : packAt(col, row, ring, now),
     propSeed: hash2(col, row, c.seed ^ 0xf00d),
   }
 }

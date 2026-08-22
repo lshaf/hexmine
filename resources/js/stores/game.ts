@@ -99,7 +99,7 @@ export const useGame = defineStore('game', () => {
    */
   const view = ref({ col: 0, row: 0, w: 900, h: 620 })
 
-  const mutations = ref<MapMutations>({ depleted: [], occupied: [] })
+  const mutations = ref<MapMutations>({ depleted: [], occupied: [], cleared: [] })
 
   /**
    * Generated tiles for the current view. shallowRef because this is a few
@@ -112,6 +112,8 @@ export const useGame = defineStore('game', () => {
     const { col, row, w, h } = view.value
     const depleted = new Map(mutations.value.depleted.map(([c, r, at]) => [key(c, r), at]))
     const occupied = new Map(mutations.value.occupied.map(([c, r, n]) => [key(c, r), n]))
+    // §9.5.1 -- the pack itself is derived; whether it is still standing is not.
+    const cleared = new Set((mutations.value.cleared ?? []).map(([c, r]) => key(c, r)))
 
     const built: Tile[] = []
     for (const coord of visibleTiles(col, row, w, h)) {
@@ -126,6 +128,7 @@ export const useGame = defineStore('game', () => {
         generateTile(coord.col, coord.row, now.value, {
           regrowsAt: depleted.get(k) ?? 0,
           slotsUsed: occupied.get(k) ?? 0,
+          packCleared: cleared.has(k),
         }),
       )
     }

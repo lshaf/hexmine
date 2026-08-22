@@ -15,6 +15,13 @@
     "slotsPerTile": 2,
     "herdLifetimeMs": 240000,
     "herdChance": 0.06,
+    "packLifetimeMs": 120000,
+    "packChance": {
+        "outer": 0.02,
+        "mid": 0.1,
+        "inner": 0.18,
+        "center": 0.22
+    },
     "biomes": [
         "forest",
         "mountain",

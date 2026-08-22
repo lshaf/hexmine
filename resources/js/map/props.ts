@@ -800,4 +800,36 @@ export function herdProp(tile: Tile): string {
   return tile.herdUntil ? herd(0, 6) : ''
 }
 
+/**
+ * §9.5.1 -- a pack on the hex.
+ *
+ * Read against the herd, which is the only other marker that comes and goes: a
+ * herd is a pale brown animal side-on, this is a dark crouching mass with two
+ * lit eyes. Eyes are the tell -- nothing else on the map has any, and at a
+ * 58x34 hex two bright points on a dark shape read as "something is looking at
+ * you" before the silhouette resolves into anything.
+ *
+ * Solid fills only (§13.2). Ember rather than a biome colour, because a pack
+ * belongs to no ground: it walked here.
+ */
+function pack(x: number, y: number): string {
+  const hide = '#4a2b30'
+  const eye = '#e0a24a'
+
+  return (
+    `<path d="M${x - 8} ${y + 3} Q${x - 7} ${y - 6} ${x} ${y - 7}` +
+    ` Q${x + 7} ${y - 6} ${x + 8} ${y + 3} Z" fill="${hide}"/>` +
+    `<path d="M${x - 6} ${y - 5} L${x - 4} ${y - 9} L${x - 2} ${y - 5} Z" fill="${hide}"/>` +
+    `<path d="M${x + 6} ${y - 5} L${x + 4} ${y - 9} L${x + 2} ${y - 5} Z" fill="${hide}"/>` +
+    `<circle cx="${x - 3}" cy="${y - 3}" r="1.3" fill="${eye}"/>` +
+    `<circle cx="${x + 3}" cy="${y - 3}" r="1.3" fill="${eye}"/>` +
+    rect(x - 7, y + 2, 3, 2.4, shade(hide, -0.3)) +
+    rect(x + 4, y + 2, 3, 2.4, shade(hide, -0.3))
+  )
+}
+
+export function packProp(tile: Tile): string {
+  return tile.pack ? pack(0, 4) : ''
+}
+
 export { dungeonProp }

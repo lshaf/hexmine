@@ -65,7 +65,7 @@ final class WorldParityTest extends TestCase
         $this->assertNotEmpty($lines);
 
         foreach ($lines as $line) {
-            [$coord, $biome, $variant, $ring, $material, $baseSeconds, $baseYield, $settlement, $dungeon, $water, $propSeed]
+            [$coord, $biome, $variant, $ring, $material, $baseSeconds, $baseYield, $settlement, $dungeon, $water, $pack, $propSeed]
                 = explode('|', $line);
 
             [$col, $row] = array_map('intval', explode(',', $coord));
@@ -83,6 +83,7 @@ final class WorldParityTest extends TestCase
                 $s ? $s['name'].':'.$s['tier'].':'.implode(',', $s['lines']) : '-',
                 $tile['dungeon'] ? $tile['dungeon']['key'] : '-',
                 $tile['water'] ?? '-',
+                $tile['pack'] ? $tile['pack']['key'].':'.$tile['pack']['bucket'] : '-',
                 $tile['propSeed'],
             ]);
 
@@ -90,7 +91,7 @@ final class WorldParityTest extends TestCase
 
             // Silence unused-variable noise while keeping the destructure
             // readable as documentation of the fixture format.
-            unset($biome, $variant, $ring, $material, $baseSeconds, $baseYield, $settlement, $dungeon, $water, $propSeed);
+            unset($biome, $variant, $ring, $material, $baseSeconds, $baseYield, $settlement, $dungeon, $water, $pack, $propSeed);
         }
     }
 

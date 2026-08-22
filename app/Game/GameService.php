@@ -970,6 +970,11 @@ class GameService
             'slotsPerTile' => Balance::SLOTS_PER_TILE,
             'herdLifetimeMs' => Balance::scaled(Balance::HERD_LIFETIME_MS),
             'herdChance' => Balance::HERD_CHANCE,
+            // §9.5.1 -- sent rather than compiled in, like every other
+            // generation constant: the algorithm is mirrored, the numbers are
+            // not, so tuning the rings cannot silently desync the two.
+            'packLifetimeMs' => Balance::scaled(Balance::PACK_LIFETIME_MS),
+            'packChance' => Balance::PACK_CHANCE,
             'biomes' => Catalog::BIOMES,
             'biomeMaterial' => Catalog::BIOME_MATERIAL,
             'biomeRare' => Catalog::BIOME_RARE,
@@ -1011,7 +1016,13 @@ class GameService
      * hundred that reach-as-sight scanned, and a character on the road sees zero
      * -- so the walk itself costs no queries at all, however long it is.
      *
-     * @return array{depleted:array<int,array{0:int,1:int,2:int}>,occupied:array<int,array{0:int,1:int,2:int}>}
+     * `cleared` is the third of those things and the only one that is a
+     * subtraction rather than an addition: §9.5.1 packs are derived from the
+     * seed, so the client already knows where they stand -- what it cannot know
+     * is which of them somebody has already fought. One MGET over the disc
+     * answers that for every hex at once.
+     *
+     * @return array{depleted:array<int,array{0:int,1:int,2:int}>,occupied:array<int,array{0:int,1:int,2:int}>,cleared:array<int,array{0:int,1:int}>}
      */
     public function mapMutations(Character $character): array
     {
@@ -1052,7 +1063,28 @@ class GameService
             ->values()
             ->all();
 
-        return ['depleted' => $depleted, 'occupied' => $occupied];
+        // §9.5.1 -- generating the disc is thirty-seven tiles at the very most
+        // (§5.6 caps sight at three), and it is the only way to know which of
+        // them the hash put a pack on this bucket.
+        $packs = [];
+        for ($col = $minCol; $col <= $maxCol; $col++) {
+            for ($row = $minRow; $row <= $maxRow; $row++) {
+                if (! $inSight($col, $row)) {
+                    continue;
+                }
+
+                $pack = WorldGen::generateTile($col, $row, $now)['pack'] ?? null;
+                if ($pack !== null) {
+                    $packs[] = ['col' => $col, 'row' => $row, 'bucket' => $pack['bucket']];
+                }
+            }
+        }
+
+        return [
+            'depleted' => $depleted,
+            'occupied' => $occupied,
+            'cleared' => Packs::clearedAmong($packs),
+        ];
     }
 
     /**

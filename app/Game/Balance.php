@@ -172,6 +172,32 @@ final class Balance
     public const HERD_LIFETIME_MS = 4 * self::HOUR;
     public const HERD_CHANCE = 0.06;
 
+    // ---------------------------------------------------------- map combat §9.5
+
+    /**
+     * §9.5.1 -- how long a pack stands on its hex, and therefore how long the
+     * pin it puts on a prospector can last.
+     *
+     * Scaled like every other clock, so a fast test clock shortens the wait as
+     * well as the trip. Battle XP is NOT scaled and never will be (§7.4.4).
+     */
+    public const PACK_LIFETIME_MS = 2 * self::HOUR;
+
+    /**
+     * §9.5.1 -- the chance a hex is holding a pack this bucket, by ring.
+     *
+     * The outer ring is nearly safe on purpose: a new character has to be able
+     * to walk to a village without a fight it cannot win. Inward the road stops
+     * being a formality, and the barren centre is the worst of it -- which is
+     * what makes the last step toward a dungeon mouth a decision.
+     */
+    public const PACK_CHANCE = [
+        'outer' => 0.02,
+        'mid' => 0.10,
+        'inner' => 0.18,
+        'center' => 0.22,
+    ];
+
     /**
      * Mirrors HUNTING in resources/js/game/balance.ts.
      *

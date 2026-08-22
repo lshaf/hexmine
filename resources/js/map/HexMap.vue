@@ -24,7 +24,7 @@ import {
   screenToTile,
   tileToScreen,
 } from './hexGeometry'
-import { herdProp, tileProps } from './props'
+import { herdProp, packProp, tileProps } from './props'
 import { GOLD, VELLUM, depletedColor, shade, variantColor, waterColor } from '@/theme/palette'
 import type { Job, Tile, TravelState } from '@/game/types'
 
@@ -177,6 +177,8 @@ interface RenderTile {
   edge: string
   props: string
   herd: string
+  /** §9.5.1 -- the pack standing here, drawn only inside sight. */
+  pack: string
   depleted: boolean
   inSight: boolean
   onBoundary: boolean
@@ -263,6 +265,10 @@ const renderTiles = computed<RenderTile[]>(() =>
       edge: shade(top, -0.2),
       props: inSight ? tileProps(tile, depleted) : '',
       herd: inSight ? herdProp(tile) : '',
+      // §9.5.1 -- a pack is live state, so it is drawn inside sight and nowhere
+      // else. Beyond the ring the map says what the ground is and who lives on
+      // it, never what is happening there (§13.2).
+      pack: inSight ? packProp(tile) : '',
       depleted,
       inSight,
       // No ring at all when sight is zero: on the road the boundary would be
@@ -370,6 +376,7 @@ const SLOT_PIP_Y = HEX_H / 2 - 4
         <!-- Terrain and settlement props stand above the tile, in sight only. -->
         <g v-if="t.props" v-html="t.props" />
         <g v-if="t.herd" v-html="t.herd" />
+        <g v-if="t.pack" v-html="t.pack" />
 
         <!-- Beyond sight: is anybody there. Nothing else is knowable. -->
         <path

@@ -285,6 +285,8 @@ export interface HuntPreview {
 export interface MapMutations {
   depleted: Array<[number, number, number]>
   occupied: Array<[number, number, number]>
+  /** §9.5.1 -- packs in sight that somebody has already fought, win or lose. */
+  cleared: Array<[number, number]>
 }
 
 /** Standard envelope: the result of the action plus the new authoritative state. */
