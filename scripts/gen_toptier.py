@@ -15,9 +15,10 @@ Neither rung is reachable, and that is the point of defining them:
              tradeable drop is exactly the grind-to-external-value faucet §2
              exists to close. Three rolled options plus one fixed perk.
 
-The `weapon` slot is deliberately absent from both. §8.0 rule 5 keeps it empty
-until raid combat is designed (§14.2); filling it here would be inventing the
-combat system by the back door.
+The `weapon` slot is absent from both, and no longer because it is empty: §9.5.4
+fills it with three families whose whole ladder -- village to guild hall --
+lives in the catalog beside the tools. What is missing here is a UNIQUE weapon,
+which waits on dungeon loot (§14.3) the way every other unique does.
 
 The perks are NAMED, not costed. Loot tables and combat resolution are §14.3
 and §14.2, both undesigned, so each one states an intent the almanac shows as

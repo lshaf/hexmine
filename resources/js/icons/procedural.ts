@@ -10,12 +10,14 @@
  *   slot     -> base silhouette
  *   tier     -> fill treatment (flat grey / solid / gradient + glow)
  *   material -> accent colour
- *   rarity   -> hex frame on gear, a belt under a material; ornamentation
- *               grows per tier on both
+ *   rarity   -> hex frame, ornamentation grows per tier -- on a material as
+ *               much as on a piece of gear
  */
 import {
   CRITTER_ACCENT,
   HERB_ACCENT,
+  ICHOR_ACCENT,
+  PLATE_ACCENT,
   MATERIAL_PALETTE,
   RARITY_TREATMENT,
   shade,
@@ -23,6 +25,8 @@ import {
 import {
   CRITTER_FORMS,
   HERB_FORMS,
+  ICHOR_FORMS,
+  PLATE_FORMS,
   formFor,
   formShape,
   gradeRank,
@@ -48,7 +52,15 @@ const nextId = () => `g${++gradientSeq}`
  * always drawn in `edge`, the working head in `fill`, so the material accent
  * always lands on the part that meets the ground.
  */
-type IconShape = EquipSlot | 'potion'
+/**
+ * §9.5.4 -- the three weapon families are one slot and three silhouettes.
+ *
+ * Everything else in the set is told apart by its slot, because a slot holds
+ * one kind of thing. The `weapon` slot holds three, and which one you carry is
+ * your class -- so the family has to own the shape, or a shieldbearer's shield
+ * is drawn as a sword.
+ */
+type IconShape = EquipSlot | 'potion' | 'shield' | 'focus'
 
 const SILHOUETTE: Record<IconShape, (fill: string, edge: string) => string> = {
   // Woodcutting. A bearded bit hung off one side of the haft: the beard hooking
@@ -119,6 +131,24 @@ const SILHOUETTE: Record<IconShape, (fill: string, edge: string) => string> = {
     <rect x="18.6" y="28.6" width="2.8" height="6" rx="1.2" fill="${edge}"/>
     <circle cx="20" cy="34" r="1.9" fill="${edge}"/>`,
 
+  // §9.5.4 Shieldbearer. A heater shield: the only thing in the set that is
+  // wider at the top than the bottom, which is what stops it reading as a
+  // blade at 26px.
+  shield: (fill, edge) => `
+    <path d="M9 7 H31 V17 Q31 28 20 34 Q9 28 9 17 Z"
+          fill="${fill}" stroke="${edge}" stroke-width="1.3" stroke-linejoin="round"/>
+    <path d="M20 7 V34" stroke="${edge}" stroke-width="1"/>
+    <path d="M9 15 H31" stroke="${edge}" stroke-width="1"/>`,
+
+  // §9.5.4 Runecaster. A rod under a cut stone -- no edge anywhere on it, which
+  // is the whole read: the other two families are things you swing.
+  focus: (fill, edge) => `
+    <rect x="18.6" y="17" width="2.8" height="17" rx="1.3" fill="${edge}"/>
+    <path d="M20 5 L27 11.5 L20 20 L13 11.5 Z"
+          fill="${fill}" stroke="${edge}" stroke-width="1.2" stroke-linejoin="round"/>
+    <path d="M13 11.5 H27 M20 5 V20" stroke="${edge}" stroke-width="0.8"/>
+    <circle cx="20" cy="24.5" r="2.2" fill="${fill}" stroke="${edge}" stroke-width="1"/>`,
+
   // §8.5 consumables. A round bulb -- the only closed curve in the set, and the
   // only shape with no handle, because a potion is the one thing you do not hold
   // to work with.
@@ -163,6 +193,8 @@ function hexFrame(stroke: string, ornate: boolean): string {
 export interface IconOptions {
   /** Absent for consumables (§8.5), which have no slot and draw as a flask. */
   slot?: EquipSlot
+  /** §9.5.4 -- one weapon slot, three families, and the family owns the shape. */
+  family?: 'shield' | 'sword' | 'focus'
   rarity: Rarity
   palette: keyof typeof MATERIAL_PALETTE
   size?: number
@@ -179,7 +211,7 @@ export interface IconOptions {
  * `common` is the exception -- it takes the rarity grey for its body too, so the
  * cheapest gear looks like what it is no matter what it is made of.
  */
-export function itemIcon({ slot, rarity, palette, size = 40 }: IconOptions): string {
+export function itemIcon({ slot, family, rarity, palette, size = 40 }: IconOptions): string {
   const treatment = RARITY_TREATMENT[rarity]
   const accent = MATERIAL_PALETTE[palette]
   const id = nextId()
@@ -209,7 +241,11 @@ export function itemIcon({ slot, rarity, palette, size = 40 }: IconOptions): str
 
   const edge = shade(rarity === 'common' ? treatment.fill : accent, -0.42)
   const frame = hexFrame(treatment.color, treatment.ornate)
-  const body = SILHOUETTE[slot ?? 'potion'](fill, edge)
+  // A sword is the `weapon` slot's own shape, so only the other two families
+  // displace it -- and a weapon with no family recorded still draws as one.
+  const shape: IconShape =
+    family && family !== 'sword' ? family : (slot ?? 'potion')
+  const body = SILHOUETTE[shape](fill, edge)
 
   return `<svg viewBox="0 0 ${VIEW} ${VIEW}" width="${size}" height="${size}" role="img" aria-hidden="true">
     ${defs}${frame}
@@ -235,34 +271,13 @@ export function materialAccent(mat: Material): string {
   // §4 -- the herbalist's shelf is green, whatever ground it grew on.
   const form = formFor(mat)
 
-  return HERB_FORMS.has(form)
-    ? HERB_ACCENT
-    : CRITTER_FORMS.has(form)
-      ? CRITTER_ACCENT
-      : MATERIAL_PALETTE[mat.palette]
-}
+  if (HERB_FORMS.has(form)) return HERB_ACCENT
+  if (CRITTER_FORMS.has(form)) return CRITTER_ACCENT
+  // §9.5.8 -- bone and blood, and which of the two is the whole message.
+  if (PLATE_FORMS.has(form)) return PLATE_ACCENT
+  if (ICHOR_FORMS.has(form)) return ICHOR_ACCENT
 
-/**
- * §13.1 -- the rarity belt: what the hex frame is to a piece of equipment.
- *
- * A specimen fills its plate, so there is no margin left to run a frame round
- * it. The rung goes on a strap across the foot instead, and it is read the same
- * two ways gear is: colour for the rung, an ornament line from rare upward. The
- * material accent stays on the specimen, so "what it is" and "how good it is"
- * never compete for one colour.
- *
- * The strap is the same width at every rung on purpose. The bag refits each
- * icon to its own drawn bounds, so a belt that grew with the rung would quietly
- * shrink the specimen above it exactly as the material got better.
- */
-function rarityBelt(rarity: Rarity): string {
-  const { color, ornate } = RARITY_TREATMENT[rarity]
-  const strap = `<rect x="7" y="33.6" width="26" height="4.8" rx="2.4" fill="${color}"/>`
-
-  return ornate
-    ? strap +
-        `<rect x="9.8" y="35.4" width="20.4" height="1.2" rx="0.6" fill="${shade(color, 0.42)}"/>`
-    : strap
+  return MATERIAL_PALETTE[mat.palette]
 }
 
 export function materialIcon(mat: Material, size = 32): string {
@@ -275,13 +290,15 @@ export function materialIcon(mat: Material, size = 32): string {
     light: shade(accent, 0.26),
   }
 
-  // The specimens are drawn to the floor of the box, so they give the belt its
-  // room rather than overlapping it. Centred: 20 * 0.88 + 2.4 lands back on 20.
+  const { color, ornate } = RARITY_TREATMENT[materialRarity(mat)]
+
+  // Drawn to the edges of the box, so the specimen is pulled in to sit inside
+  // the frame rather than through it. Centred: 20 * 0.86 + 2.8 lands back on 20.
   const specimen = formShape(form, ink, keySeed(mat.key), gradeRank(mat.key))
 
   return `<svg viewBox="0 0 40 40" width="${size}" height="${size}" role="img" aria-hidden="true">
-    <g transform="translate(2.4 0) scale(0.88)">${specimen}</g>
-    ${rarityBelt(materialRarity(mat))}
+    ${hexFrame(color, ornate)}
+    <g transform="translate(2.8 2.8) scale(0.86)">${specimen}</g>
   </svg>`
 }
 

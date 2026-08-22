@@ -9,8 +9,8 @@
  * page is already named after: heavy outline, one flat fill, one lighter facet,
  * and no gradient anywhere below tier 3. The lit treatment is reserved for the
  * rare and raid tiers, so "this one glows" separates the top of the ladder from
- * sixty matte neighbours; the exact rung is on the rarity belt drawn under the
- * specimen (§13.1).
+ * sixty matte neighbours; the exact rung is on the hex frame round the specimen,
+ * the same one a piece of equipment wears (§13.1).
  *
  * A form is DERIVED, never stored — the same argument §8.4 makes about craft
  * category. A second field would only be somewhere for the catalog and the
@@ -48,6 +48,8 @@ export type Form =
   // tier 1 — the smith's and the armorer's stock
   | 'knot' | 'resin' | 'salt' | 'scale' | 'horn' | 'cord' | 'grit' | 'seep'
   | 'reed' | 'wax'
+  // tier 1 — cut off a monster, and the only things that are a PART of something
+  | 'plate' | 'ichor'
   // tier 2 — worked
   | 'planks' | 'ingot' | 'leather' | 'cutstone' | 'bolt' | 'frame'
   // tier 3 / 4 — the lit ones
@@ -83,6 +85,12 @@ const FORM_BY_KEY: Record<string, Form> = {
   dustleveret: 'hare',
   ashnewt: 'newt',
   fenlark: 'bird',
+
+  // ---- tier 1, what comes off a monster
+  cracked_carapace: 'plate', bone_plate: 'plate', scaled_hide: 'plate',
+  warped_barb: 'plate', revenant_plate: 'plate',
+  thin_ichor: 'ichor', black_blood: 'ichor', bile_sac: 'ichor',
+  ember_gland: 'ichor', grave_heart: 'ichor',
 
   // ---- tier 1, the smith and the armorer
   heartknot: 'knot', pine_pitch: 'resin',
@@ -135,6 +143,17 @@ export const HERB_FORMS = new Set<Form>([
  */
 export const CRITTER_FORMS = new Set<Form>(['moth', 'mite', 'hare', 'newt', 'bird'])
 
+/**
+ * §9.5.8 — the two halves of a monster, and neither is on the biome scale.
+ *
+ * Plate is bone; ichor is blood. They are kept apart for the same reason the
+ * herbs and the critters are: the icon has to say which bench wants it before
+ * the card says anything at all, and these two go to different benches.
+ */
+export const PLATE_FORMS = new Set<Form>(['plate'])
+
+export const ICHOR_FORMS = new Set<Form>(['ichor'])
+
 
 /**
  * §5.3 — where a material sits in its own three-grade ladder.
@@ -150,6 +169,11 @@ const GRADE_RANK: Record<string, number> = {
   iron_ore: 0, hematite: 1, meteoric_iron: 2,
   pelt: 0, thick_pelt: 1, dire_pelt: 2,
   fiber: 0, flax: 1, hemp: 2,
+
+  // §9.5.8 — five grades onto the three a shape can draw. The pairs at the
+  // bottom are the ones a player sees least often.
+  cracked_carapace: 0, bone_plate: 0, scaled_hide: 1, warped_barb: 1, revenant_plate: 2,
+  thin_ichor: 0, black_blood: 0, bile_sac: 1, ember_gland: 1, grave_heart: 2,
 
   planks: 0, beams: 1, bentwood: 2,
   ingots: 0, steel_ingots: 1, skysteel: 2,
@@ -408,6 +432,31 @@ const SHAPES: Record<Form, (ink: Ink, seed: number, grade: number) => string> = 
     line('M11 8 L5 9', dark, 2) +
     line('M22 30 L24 34 M17 31 L17 35', dark, 1.3) +
     `<circle cx="15" cy="9" r="1" fill="${dark}"/>`,
+
+  // ------------------------------------- tier 1, what comes off a monster
+  // Both of these have to read as a PART of something rather than a whole
+  // thing — the critters own "alive", and a lump owns "out of the ground". So
+  // the plate keeps the torn edge where it came away, and the organ keeps its
+  // duct. The grade thickens what is already there rather than redrawing it.
+  plate: ({ fill, dark, light }, _seed, grade) => {
+    let out = cut('M10 9 Q20 5 30 9 Q33 20 28 31 Q20 34 12 31 Q7 20 10 9 Z', fill, dark)
+    out += line('M20 8 V32', dark, 0.9)
+    if (grade >= 1) out += line('M12 16 Q20 19 28 16 M12 24 Q20 27 28 24', dark, 0.9)
+    if (grade >= 2) {
+      out += `<circle cx="14" cy="12" r="1.5" fill="${light}"/>`
+      out += `<circle cx="26" cy="12" r="1.5" fill="${light}"/>`
+    }
+    return out + cut('M10 9 Q14 12 12 17 Q8 13 10 9 Z', light, dark, 0.8)
+  },
+
+  ichor: ({ fill, dark, light }, _seed, grade) => {
+    let out = line('M20 5 Q23 9 20 13', dark, 2.6)
+    out += cut('M20 12 Q31 15 30 24 Q29 33 20 33 Q11 33 10 24 Q9 15 20 12 Z', fill, dark)
+    out += cut('M15 18 Q20 16 24 19 Q21 23 15 22 Z', light, dark, 0.85)
+    if (grade >= 1) out += line('M13 27 Q20 24 27 27', dark, 0.9)
+    if (grade >= 2) out += line('M12 21 Q15 30 21 32', dark, 0.8)
+    return out
+  },
 
   // ------------------------------------ tier 1, the smith and the armorer
   knot: ({ fill, dark, light }) =>

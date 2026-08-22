@@ -16,14 +16,13 @@ import {
   RARITIES,
   RARITY_LABEL,
   SCOPE_ACTION,
-  STAT_LABEL,
   STATION_RANK,
   categoryForSlot,
   craftableItems,
   stationReaches,
 } from '@/game/catalog'
 import type { Category } from '@/game/catalog'
-import { formatPercent } from '@/game/formulas'
+import { itemStatLine } from '@/game/formulas'
 import { EQUIPMENT } from '@/game/balance'
 import { itemIcon, materialIcon } from '@/icons/procedural'
 import SvgIcon from '@/components/SvgIcon.vue'
@@ -188,7 +187,7 @@ function lifespan(item: ItemDef): string {
       <div v-for="item in byRarity[rarity]" :key="item.key" class="recipe panel">
         <div class="row" style="align-items: flex-start">
           <SvgIcon
-            :svg="itemIcon({ slot: item.slot, rarity: item.rarity, palette: item.palette, size: 34 })"
+            :svg="itemIcon({ slot: item.slot, family: item.family, rarity: item.rarity, palette: item.palette, size: 34 })"
             boxed
             :size="34"
           />
@@ -196,7 +195,7 @@ function lifespan(item: ItemDef): string {
             <div class="row-between">
               <strong class="tiny" :class="`rarity-${item.rarity}`">{{ item.name }}</strong>
               <span class="chip tiny" :class="item.tradeable ? 'chip-nft' : ''">
-                {{ formatPercent(item.value) }} {{ STAT_LABEL[item.stat] }}
+                {{ itemStatLine(item) }}
               </span>
             </div>
             <div class="tiny muted">{{ item.description }}</div>

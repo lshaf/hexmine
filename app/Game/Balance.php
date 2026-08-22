@@ -263,6 +263,21 @@ final class Balance
     public const JOB_XP_PER_RARITY_RANK = 10;
 
     /**
+     * §6 -- what one unit off a processing bench teaches its line's job.
+     *
+     * Per unit of output rather than per run, so a three-batch smelt is worth
+     * three times a single one and the number the player picks is the number
+     * that pays. Twelve puts a committed line at job 30 around the same
+     * six-month mark §7.4.4 sizes everything else to: a prospector who actually
+     * runs a line clears roughly fifteen units a day, and 32,000 XP is about
+     * 2,700 units.
+     *
+     * Never run through scaled(), like every other XP figure (§7.4.4): a fast
+     * dev clock is a testing tool, not a progression cheat.
+     */
+    public const JOB_XP_PER_PROCESS_UNIT = 12;
+
+    /**
      * §7.4.3 -- caps on the node effects that are NOT stats.
      *
      * Stat nodes need no cap of their own: they feed the same aggregate and the
@@ -400,6 +415,21 @@ final class Balance
     public const OPTION_MIN = 0.01;
 
     public const OPTION_MAX = 0.03;
+
+    /**
+     * §8.0.1 -- a line pointed at ONE gathering line is worth more than a flat
+     * one, because it is worth nothing on the other four.
+     *
+     * Without the gap a scoped roll would be strictly the worse outcome and the
+     * whole pool would read as a bad-luck table. With it, the choice between
+     * "+2% yield everywhere" and "+4% mining yield" is a real one for a
+     * prospector who knows which line they actually work. It is still clamped
+     * by STAT_CEILING like everything else -- narrower buys a steeper climb to
+     * the same ceiling, never a higher one (§8.1 rule 1).
+     */
+    public const OPTION_SCOPED_MIN = 0.02;
+
+    public const OPTION_SCOPED_MAX = 0.05;
 
     /**
      * The capital bazaar, §8.0.1. A capital stocks the same common and uncommon

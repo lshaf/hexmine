@@ -1,6 +1,6 @@
 """Emit app/Game/Alchemy.php and resources/js/game/alchemy.ts from one spec.
 
-Sixty consumables and fifteen materials, hand-mirrored across PHP and
+Seventy consumables and fifteen materials, hand-mirrored across PHP and
 TypeScript, is precisely the drift the catalog has no parity test for -- so
 neither side is written by hand. Same argument as gen_jobs.py: the shape is
 regular, only the names and the flavour are not.
@@ -98,10 +98,20 @@ SPEED_WORD = {
 }
 
 # Where a scope's ingredients come from, for scopes that are not a biome line.
+# `battle` is the odd one: its recipe runs on the ichor line (§9.5.8) rather
+# than on a biome's herbs, and the biome named here only decides its palette.
 SCOPE_BIOME = dict(
     {LINE[b]: b for b in BIOMES},
-    **{'travel': 'grassland', 'processing': 'plains'},
+    **{'travel': 'grassland', 'processing': 'plains', 'battle': 'plains'},
 )
+
+# §9.5.8 -- the ichor grade each rung is brewed from. A battle draught is the
+# one thing on the shelf that cannot be gathered: every rung waits on a fight,
+# and the top two wait on a fight in the barren centre.
+BATTLE_ICHOR = {
+    'common': 'thin_ichor', 'uncommon': 'black_blood', 'rare': 'bile_sac',
+    'epic': 'ember_gland', 'legendary': 'grave_heart',
+}
 
 # Keys already in the catalog and already referenced by tests, the demo seeder
 # and the almanac. Pinned to the slot they naturally fall in so nothing that
@@ -136,8 +146,8 @@ FLAVOUR_SPEED = {
 
 
 def consumables():
-    """Twelve per rank: yield and trip time on each of the five lines, plus the
-    road and the bench. Sixty in all, every one of them action-locked."""
+    """Fourteen per rank: yield and trip time on each of the five lines, plus the
+    road, the bench and the fight. Seventy in all, every one action-locked."""
     out = []
 
     for rarity, value, station, tradeable, mats in RANKS:
@@ -153,6 +163,11 @@ def consumables():
                         'The miles stop counting themselves at you.'))
         effects.append(('processingSpeed', 'processing', 'Guild',
                         'You are more use at the bench than you were an hour ago.'))
+        # §9.5 -- the two dormant stats, and the only scope that is not work.
+        effects.append(('power', 'battle', 'Warcry',
+                        'You hit first, and you hit like you meant it.'))
+        effects.append(('defence', 'battle', 'Ironhide',
+                        'Whatever lands, lands somewhere else.'))
 
         for stat, scope, word, flavour in effects:
             pin = PINNED.get((rarity, stat, scope))
@@ -196,6 +211,21 @@ def inputs_for(rarity, scope, mats):
     cap that §8.5 used to gate the two tradeable rungs is not behind them any
     more. Their inputs are uncapped.
     """
+    # §9.5.8 -- a battle draught is brewed off a monster, not off a hex. The
+    # herbs are still in it, but the ichor is what makes the rung: the top two
+    # cannot be brewed at all without a kill in the barren centre.
+    if scope == 'battle':
+        ichor = BATTLE_ICHOR[rarity]
+        if rarity == 'common':
+            return {ichor: 2, 'yarrow': 3, 'bitterroot': 2, 'clover': 2}
+        if rarity == 'uncommon':
+            return {ichor: 2, 'yarrow': 3, 'bitterroot': 2}
+        if rarity == 'rare':
+            return {ichor: 2, 'yarrow': 3, 'sagebrush': 2}
+        if rarity == 'epic':
+            return {ichor: 2, 'yarrow': 3}
+        return {ichor: 2, 'yarrow': 4}
+
     b = SCOPE_BIOME[scope]
     r = [k for k, _, bio, _, _ in REAGENTS if bio == b]
     s = [k for k, _, bio, _, _ in REAGENTS if bio == SECOND[b]]

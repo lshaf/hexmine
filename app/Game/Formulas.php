@@ -65,9 +65,20 @@ final class Formulas
                 $contributions[] = $def['value'];
             }
             foreach ($item['options'] ?? [] as $option) {
-                if (($option['stat'] ?? null) === $stat) {
-                    $contributions[] = (float) $option['value'];
+                if (($option['stat'] ?? null) !== $stat) {
+                    continue;
                 }
+
+                // §8.0.1 -- a scoped line pays in full on the line it names and
+                // nothing anywhere else. No line being worked is one of those
+                // elsewheres, which is what keeps "+4% mining yield" off the
+                // road and off the bench.
+                $scope = $option['scope'] ?? null;
+                if ($scope !== null && $scope !== $line) {
+                    continue;
+                }
+
+                $contributions[] = (float) $option['value'];
             }
 
             if ($contributions === []) {
@@ -106,7 +117,12 @@ final class Formulas
      * capital bazaar's bonus slot, which is the one way a common item ever
      * carries a line.
      *
-     * @return array<int,array{stat:string,value:float}>
+     * A worn line may come out pointed at one gathering line -- "+4% mining
+     * yield" -- and is worth more when it does, because it is worth nothing on
+     * the other four (Balance::OPTION_SCOPED_MIN). `scope` is absent on a flat
+     * line rather than null, so every row already stored keeps its shape.
+     *
+     * @return array<int,array{stat:string,value:float,scope?:string}>
      */
     public static function rollOptions(array $def, int $seed, int $extra = 0): array
     {
@@ -115,7 +131,7 @@ final class Formulas
             return [];
         }
 
-        $pool = Catalog::optionStatsFor($def['slot'] ?? '');
+        $pool = Catalog::optionRollsFor($def['slot'] ?? '');
         $out = [];
         $used = [];
 
@@ -127,25 +143,45 @@ final class Formulas
                 }
             }
 
-            // One line per stat: two "+2% yield" rows on one item reads as a bug.
-            $choices = array_values(array_diff($pool, $used));
+            // One line per (stat, scope): two "+2% mining yield" rows on one
+            // item reads as a bug, while mining yield beside hunting yield is
+            // two things the same piece of armor is genuinely good at.
+            $choices = array_values(array_filter(
+                $pool,
+                static fn (array $entry) => ! in_array(self::optionKey($entry), $used, true),
+            ));
             if ($choices === []) {
                 break;
             }
 
             $pick = $choices[Hash::randInt(Hash::hash2($seed, 910 + $i, Balance::mapSeed()), 0, count($choices) - 1)];
-            $used[] = $pick;
+            $used[] = self::optionKey($pick);
 
-            $steps = (int) round((Balance::OPTION_MAX - Balance::OPTION_MIN) * 100);
+            $scoped = $pick['scope'] !== null;
+            $min = $scoped ? Balance::OPTION_SCOPED_MIN : Balance::OPTION_MIN;
+            $max = $scoped ? Balance::OPTION_SCOPED_MAX : Balance::OPTION_MAX;
+
+            $steps = (int) round(($max - $min) * 100);
             $roll = Hash::randInt(Hash::hash2($seed, 920 + $i, Balance::mapSeed()), 0, $steps);
 
-            $out[] = [
-                'stat' => $pick,
-                'value' => round(Balance::OPTION_MIN + $roll / 100, 2),
+            $line = [
+                'stat' => $pick['stat'],
+                'value' => round($min + $roll / 100, 2),
             ];
+            if ($scoped) {
+                $line['scope'] = $pick['scope'];
+            }
+
+            $out[] = $line;
         }
 
         return $out;
+    }
+
+    /** @param array{stat:string,scope:?string} $entry */
+    private static function optionKey(array $entry): string
+    {
+        return $entry['stat'].'|'.($entry['scope'] ?? '');
     }
 
     /** Salvage returned when an item is discarded, §8.2. */

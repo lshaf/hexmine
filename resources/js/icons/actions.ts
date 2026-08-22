@@ -78,6 +78,9 @@ export const SCOPE_PATHS: Record<string, string> = {
   harvesting: 'M5.5 20.5 9 17 M9 17a9 9 0 0 1 9.5-9 9 9 0 0 1-6.6 7.2',
   travel: ACTION_PATHS.travel!,
   processing: ACTION_PATHS.process!,
+  /* §9.5 -- crossed blade and guard. The only glyph here that is not a tool,
+     because a fight is the only scope that is not work. */
+  battle: 'M5 19.5 15.5 9 M12.5 6 18 4.5 16.5 10 M4.5 6 15 16.5 M18 15l1.5 4.5-4.5-1.5',
   /* Everywhere: the hex itself, because that is the whole of the ground. */
   global: 'M8.5 4h7L19.5 12 15.5 20h-7L4.5 12Z',
 }

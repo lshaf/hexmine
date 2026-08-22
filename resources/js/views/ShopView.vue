@@ -8,8 +8,8 @@
  */
 import { computed, ref } from 'vue'
 import { useGame } from '@/stores/game'
-import { MATERIALS, STAT_LABEL, shopItems } from '@/game/catalog'
-import { formatPercent } from '@/game/formulas'
+import { MATERIALS, shopItems } from '@/game/catalog'
+import { itemStatLine } from '@/game/formulas'
 import { itemIcon, materialIcon } from '@/icons/procedural'
 import SvgIcon from '@/components/SvgIcon.vue'
 import type { Material, MaterialKey } from '@/game/types'
@@ -107,7 +107,7 @@ const owned = (key: string) => game.equipment.filter((e) => e.key === key).lengt
 
         <div v-for="item in catalog" :key="item.key" class="inset row-item">
           <SvgIcon
-            :svg="itemIcon({ slot: item.slot, rarity: item.rarity, palette: item.palette, size: 30 })"
+            :svg="itemIcon({ slot: item.slot, family: item.family, rarity: item.rarity, palette: item.palette, size: 30 })"
             boxed
             :size="30"
           />
@@ -118,7 +118,7 @@ const owned = (key: string) => game.equipment.filter((e) => e.key === key).lengt
             </div>
             <div class="tiny muted">{{ item.description }}</div>
             <div class="row tiny" style="gap: 6px; margin-top: 4px">
-              <span class="chip tiny">{{ formatPercent(item.value) }} {{ STAT_LABEL[item.stat] }}</span>
+              <span class="chip tiny">{{ itemStatLine(item) }}</span>
               <span class="chip tiny">{{ item.maxDurability }} dur</span>
               <span v-if="owned(item.key)" class="tiny muted">owned ×{{ owned(item.key) }}</span>
             </div>
@@ -139,7 +139,7 @@ const owned = (key: string) => game.equipment.filter((e) => e.key === key).lengt
           </p>
           <div v-for="item in elsewhere" :key="item.key" class="list-item locked">
             <SvgIcon
-              :svg="itemIcon({ slot: item.slot, rarity: item.rarity, palette: item.palette, size: 26 })"
+              :svg="itemIcon({ slot: item.slot, family: item.family, rarity: item.rarity, palette: item.palette, size: 26 })"
               boxed
               :size="26"
             />
@@ -149,7 +149,7 @@ const owned = (key: string) => game.equipment.filter((e) => e.key === key).lengt
                 <span class="chip tiny">needs a {{ item.station }}</span>
               </div>
               <div class="tiny muted">
-                {{ formatPercent(item.value) }} {{ STAT_LABEL[item.stat] }} · {{ item.goldPrice }}g
+                {{ itemStatLine(item) }} · {{ item.goldPrice }}g
               </div>
             </div>
           </div>

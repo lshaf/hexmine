@@ -7,10 +7,11 @@
  * can *predict* and display them; it must never be the authority.
  */
 import { EQUIPMENT, MINING, PROCESSING, SKILLS } from './balance'
-import { ITEM_BY_KEY, skillForSlot } from './catalog'
+import { ITEM_BY_KEY, LINE_STAT_LABEL, SKILL_BY_KEY, STAT_LABEL, skillForSlot } from './catalog'
 import type {
   Rarity,
   ItemDef,
+  ItemOption,
   OwnedItem,
   SettlementTier,
   SkillKey,
@@ -54,7 +55,11 @@ export function aggregateStat(
 
     if (def.stat === stat) contributions.push({ def, value: def.value })
     for (const option of owned.options ?? []) {
-      if (option.stat === stat) contributions.push({ def, value: option.value })
+      if (option.stat !== stat) continue
+      // §8.0.1 -- a scoped line pays in full on the line it names and nothing
+      // anywhere else, and no line being worked is one of those elsewheres.
+      if (option.scope && option.scope !== line) continue
+      contributions.push({ def, value: option.value })
     }
   }
 
@@ -212,3 +217,46 @@ export function formatSpan(ms: number): string {
 
 export const formatPercent = (value: number): string =>
   `${value >= 0 ? '+' : ''}${Math.round(value * 1000) / 10}%`
+
+/**
+ * The stats stored as a reduction. There is one, and the screen has to turn it
+ * over: a trip cut by three minutes in ten is `-3% trip time`, and printing the
+ * stored `+3%` next to the word "time" says the opposite of what it does.
+ */
+const REDUCTION_STATS = new Set<StatKey>(['tripReduction'])
+
+/** A stat's percentage with the sign it is read by, never the sign it is stored with. */
+export const formatStat = (stat: StatKey, value: number): string =>
+  formatPercent(REDUCTION_STATS.has(stat) ? -value : value)
+
+/**
+ * One bonus, said in full: `+6% mining yield`, `-3% woodcutting time`.
+ *
+ * Every screen that prints a bonus goes through here, so the sign and the
+ * wording are decided once. `line` names the gathering line the bonus is good
+ * on -- a tool's is read off its slot (§8 rule 1), a rolled line carries its
+ * own (§8.0.1) -- and naming it is most of what makes the number legible: "+6%
+ * yield" leaves a player asking *yield of what*.
+ */
+export function statLine(
+  stat: StatKey,
+  value: number,
+  line: SkillKey | null = null,
+): string {
+  const scoped = line ? LINE_STAT_LABEL[stat] : undefined
+  const words = scoped ? `${SKILL_BY_KEY[line!].name.toLowerCase()} ${scoped}` : STAT_LABEL[stat]
+
+  return `${formatStat(stat, value)} ${words}`
+}
+
+/** What an item is for, §8. A gathering tool names its line; worn gear has none. */
+export const itemStatLine = (def: ItemDef): string =>
+  statLine(def.stat, def.value, def.slot ? skillForSlot(def.slot) : null)
+
+/** §8.0.1 -- a rolled line, which may name a line of its own or take its item's. */
+export const optionStatLine = (option: ItemOption, def: ItemDef): string =>
+  statLine(
+    option.stat,
+    option.value,
+    option.scope ?? (def.slot ? skillForSlot(def.slot) : null),
+  )

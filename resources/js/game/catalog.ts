@@ -8,6 +8,8 @@ import { CONSUMABLES, JUNK, REAGENTS } from './alchemy'
 import { COMPONENTS } from './components'
 import { TOP_TIER } from './toptier'
 import { CRITTERS } from './critters'
+import { SPOILS } from './spoils'
+import { BATTLE_GEAR } from './battlegear'
 import {
   BIOME_VARIANTS,
   VARIANT_PROCESSING,
@@ -36,6 +38,7 @@ import type {
   Ring,
   ScrapKey,
   SettlementTier,
+  SpoilKey,
   Skill,
   SkillKey,
   StatKey,
@@ -48,11 +51,23 @@ export const MATERIALS: Record<MaterialKey, Material> = {
   // Reagents and craft components are Tier 1 raw, junk is Tier 0; none of them
   // is typed here so the catalogs cannot drift.
   ...Object.fromEntries(
-    [...REAGENTS, ...COMPONENTS, ...CRITTERS, ...JUNK, ...VARIANT_RAW, ...VARIANT_REFINED].map(
-      (m) => [m.key, m],
-    ),
+    [
+      ...REAGENTS,
+      ...COMPONENTS,
+      ...CRITTERS,
+      ...SPOILS,
+      ...JUNK,
+      ...VARIANT_RAW,
+      ...VARIANT_REFINED,
+    ].map((m) => [m.key, m]),
   ) as Record<
-    ReagentKey | ComponentKey | CritterKey | JunkKey | GradeRawKey | GradeRefinedKey,
+    | ReagentKey
+    | ComponentKey
+    | CritterKey
+    | SpoilKey
+    | JunkKey
+    | GradeRawKey
+    | GradeRefinedKey,
     Material
   >,
 
@@ -336,6 +351,7 @@ export const SCOPE_LABEL: Record<BuffScope | 'global', string> = {
   harvesting: 'when harvesting',
   travel: 'on the road',
   processing: 'at the bench',
+  battle: 'in a fight',
   global: 'everywhere',
 }
 
@@ -352,18 +368,31 @@ export const SCOPE_ACTION: Record<BuffScope | 'global', string> = {
   harvesting: 'harvesting trip',
   travel: 'journey',
   processing: 'bench run',
+  battle: 'fight',
   global: 'action',
 }
 
 export const STAT_LABEL: Record<StatKey, string> = {
   yield: 'yield',
-  // 'off' matters: every use of this is a reduction shown with a + sign, and
-  // "+3% mine time" reads as more digging rather than less.
-  tripReduction: 'off mine time',
-  travelSpeed: 'travel',
-  processingSpeed: 'processing',
+  // The stat is stored as a reduction and said with a minus, so the words are
+  // the plain thing it moves: "-3% trip time" rather than "+3% off mine time".
+  // Every screen goes through statLine(), which owns that sign.
+  tripReduction: 'trip time',
+  travelSpeed: 'travel speed',
+  processingSpeed: 'processing speed',
   power: 'power',
   defence: 'defence',
+}
+
+/**
+ * The same stats said against one gathering line, §8.
+ *
+ * Shorter than the unscoped label rather than longer: a line name already says
+ * that this is a trip, so "mining time" beats "mining trip time".
+ */
+export const LINE_STAT_LABEL: Partial<Record<StatKey, string>> = {
+  yield: 'yield',
+  tripReduction: 'time',
 }
 
 /**
@@ -473,8 +502,14 @@ for (const recipe of RECIPES) {
   RARITY_BY_MATERIAL[recipe.output] = RARITY_BY_MATERIAL[recipe.input] ?? 'common'
 }
 
-export const materialRarity = (mat: Material): Rarity =>
-  mat.tier === 4 ? 'legendary' : (RARITY_BY_MATERIAL[mat.key] ?? 'common')
+/** §9.5.8 -- a spoil's grade is its rung: the tier of the thing that carried it. */
+const SPOIL_RARITY: Rarity[] = ['common', 'uncommon', 'rare', 'epic', 'legendary']
+
+export const materialRarity = (mat: Material): Rarity => {
+  if (mat.spoil) return SPOIL_RARITY[(mat.grade ?? 1) - 1] ?? 'common'
+
+  return mat.tier === 4 ? 'legendary' : (RARITY_BY_MATERIAL[mat.key] ?? 'common')
+}
 
 /** Slot names for the screen. The raw keys are lowercase and never reach it. */
 export const SLOT_LABEL: Record<EquipSlot, string> = {
@@ -498,9 +533,14 @@ export const SLOT_LABEL: Record<EquipSlot, string> = {
  * never from one line having better tools available than the rest.
  */
 export const ITEMS: ItemDef[] = [
-  // §8.5 -- sixty action-scoped potions, generated alongside the PHP copy.
+  // §8.5 -- seventy action-scoped potions, generated alongside the PHP copy.
   ...CONSUMABLES,
 
+
+
+  // §9.5.4 -- the six combat groups, three grades at every rung. Generated
+  // alongside the PHP copy; see scripts/gen_battlegear.py.
+  ...BATTLE_GEAR,
   // §8.0 -- the two rungs above epic, generated so the ladder reads whole.
   // Legendary needs a guild hall and there are none; unique has no bench at
   // all and drops soulbound. See scripts/gen_toptier.py.

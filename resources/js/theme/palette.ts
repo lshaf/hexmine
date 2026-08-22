@@ -135,6 +135,17 @@ export const HERB_ACCENT = '#7d9464'
 export const CRITTER_ACCENT = '#c08a52'
 
 /**
+ * §9.5.8 -- the two halves of a monster. Bone and blood, and both off the biome
+ * scale for the same reason the herbs and the critters are: a spoil comes off a
+ * thing that walked onto the hex, not out of it, so it must never read as a
+ * sixth terrain. Kept apart from each other because they feed different
+ * benches, which is the one thing the icon has to say at 15px.
+ */
+export const PLATE_ACCENT = '#8f8071'
+
+export const ICHOR_ACCENT = '#8d4a58'
+
+/**
  * §8.1 -- rarity treatment for equipment icons. Rarity is the one thing a player
  * reads at a glance across the shop, the bag and the hero sheet, so it gets a
  * colour of its own rather than a shade of the material accent.

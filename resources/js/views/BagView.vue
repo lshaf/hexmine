@@ -30,9 +30,8 @@ import {
   SCOPE_ACTION,
   SCOPE_LABEL,
   SLOT_LABEL,
-  STAT_LABEL,
 } from '@/game/catalog'
-import { formatPercent } from '@/game/formulas'
+import { itemStatLine, statLine } from '@/game/formulas'
 import { itemIcon, materialIcon } from '@/icons/procedural'
 import SvgIcon from '@/components/SvgIcon.vue'
 import type { ItemDef, MaterialKey, OwnedItem } from '@/game/types'
@@ -100,7 +99,7 @@ const slots = computed<Slot[]>(() => {
       name: def.name,
       // §13.1 -- the slot is what picks the silhouette. Without it every piece
       // of gear draws as the flask consumables fall back to.
-      icon: itemIcon({ slot: def.slot, rarity: def.rarity, palette: def.palette, size: ICON }),
+      icon: itemIcon({ slot: def.slot, family: def.family, rarity: def.rarity, palette: def.palette, size: ICON }),
       item,
     })
   }
@@ -450,7 +449,7 @@ async function scrap(item: OwnedItem): Promise<void> {
             <!-- Potion: drinking it is both the use and the way to free a strap. -->
             <template v-else-if="picked.kind === 'potion' && def">
               <p class="tiny fact">
-                {{ formatPercent(def.value) }} {{ STAT_LABEL[def.stat] }}
+                {{ statLine(def.stat, def.value) }}
                 <strong>{{ SCOPE_LABEL[def.scope ?? 'global'] }}</strong>
                 · spent by one {{ SCOPE_ACTION[def.scope ?? 'global'] }}
               </p>
@@ -479,7 +478,7 @@ async function scrap(item: OwnedItem): Promise<void> {
             <template v-else-if="picked.kind === 'gear' && def">
               <p class="tiny fact">
                 {{ picked.item.durability }}/{{ def.maxDurability }} durability ·
-                {{ formatPercent(def.value) }} {{ STAT_LABEL[def.stat] }}
+                {{ itemStatLine(def) }}
               </p>
               <div class="acts">
                 <button

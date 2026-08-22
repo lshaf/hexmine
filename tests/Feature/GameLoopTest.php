@@ -412,7 +412,7 @@ final class GameLoopTest extends TestCase
         $this->assertSame(1, Player::where('wallet', $wallet)->count());
     }
 
-    /** §8.5 -- every potion names the action it buffs. Sixty, twelve a rung. */
+    /** §8.5 -- every potion names the action it buffs. Seventy, fourteen a rung. */
     public function test_every_consumable_is_locked_to_one_action(): void
     {
         $byRank = [];
@@ -425,7 +425,13 @@ final class GameLoopTest extends TestCase
             $this->assertArrayHasKey('scope', $def, "{$key} buffs everything at once");
             $this->assertContains(
                 $def['scope'],
-                ['woodcutting', 'mining', 'hunting', 'quarrying', 'harvesting', 'travel', 'processing'],
+                [
+                    'woodcutting', 'mining', 'hunting', 'quarrying', 'harvesting',
+                    'travel', 'processing',
+                    // §9.5 -- the one scope that is not work, and the only place
+                    // `power` and `defence` are worth drinking for.
+                    'battle',
+                ],
                 "{$key} names an action nothing does",
             );
 
@@ -1117,16 +1123,18 @@ final class GameLoopTest extends TestCase
     /**
      * The crafted recipes are hand-written on both sides, so they can drift.
      *
-     * Materials and consumables are generated from one spec and cannot; the 28
-     * crafted items are not, and a recipe that disagrees between the server and
-     * the client shows the player a cost they will not be charged.
+     * Materials and consumables are generated from one spec and cannot; the
+     * crafted items are hand-written on both sides, and a recipe that disagrees
+     * between the server and the client shows the player a cost they will not
+     * be charged.
      */
     public function test_crafted_recipes_agree_between_php_and_typescript(): void
     {
-        // §8.0's top two rungs are generated into their own file, so the client
-        // side of the catalog is two files rather than one.
+        // §8.0's top two rungs and §9.5.4's combat gear are generated into their
+        // own files, so the client side of the catalog is three rather than one.
         $ts = file_get_contents(base_path('resources/js/game/catalog.ts'))
-            .file_get_contents(base_path('resources/js/game/toptier.ts'));
+            .file_get_contents(base_path('resources/js/game/toptier.ts'))
+            .file_get_contents(base_path('resources/js/game/battlegear.ts'));
         $checked = 0;
 
         foreach (\App\Game\Catalog::items() as $key => $def) {
@@ -1148,7 +1156,10 @@ final class GameLoopTest extends TestCase
             $checked++;
         }
 
-        $this->assertSame(37, $checked, 'the crafted list changed size');
+        // 37 tools and work-leaning worn gear, plus §9.5.4's 90 combat pieces:
+        // six groups, five rungs, three material grades apiece, and every one
+        // of them craftable.
+        $this->assertSame(127, $checked, 'the crafted list changed size');
     }
 
     /**
@@ -1542,9 +1553,10 @@ final class GameLoopTest extends TestCase
 
     public function test_every_job_exists_from_the_start_at_level_one(): void
     {
-        // Three benches, three battle roles, and the road (§7.5). The five
-        // gathering lines have no row: their level is the CharacterSkill one.
-        $this->assertCount(7, $this->character->jobLevels()->get());
+        // Five processing lines, three benches, three battle roles, and the
+        // road (§7.5). The five gathering lines have no row: their level is the
+        // CharacterSkill one.
+        $this->assertCount(12, $this->character->jobLevels()->get());
 
         foreach ($this->character->jobLevels()->get() as $job) {
             $this->assertSame(1, $job->level, "{$job->job_key} did not start at level 1");
@@ -1956,9 +1968,17 @@ final class GameLoopTest extends TestCase
         $this->assertArrayNotHasKey('hardwood', $result['gained']);
 
         // And with a tool on the belt it is still on offer.
+        //
+        // Depletion is the one refusal that may stand here: §4.0 promises a hex
+        // is never blocked for want of a tool, and says nothing about ground
+        // that has just been worked out. The haul above sometimes empties the
+        // tile, so the assertion is about WHY it was refused, not whether.
         $this->equipToolForHere();
+        $preview = $this->game->previewGather($this->character->fresh(), $col, $row);
         $this->assertTrue(
-            $this->game->previewGather($this->character->fresh(), $col, $row)['canMine'],
+            $preview['canMine'] || str_contains((string) $preview['reason'], 'Depleted'),
+            'gathering was refused for something other than worked-out ground: '
+                .json_encode($preview),
         );
     }
 
@@ -2279,6 +2299,63 @@ final class GameLoopTest extends TestCase
         $this->assertLessThanOrEqual(Balance::STAT_CEILING, $total, 'options beat the global ceiling');
     }
 
+    /**
+     * §8.0.1 -- a worn line may name one gathering line, and pays there alone.
+     *
+     * Armor works all five lines at once, which is exactly why a line it names
+     * is narrower than a flat one. "No line is being worked" is one of the
+     * elsewheres it pays nothing on, so a mining roll never shortens a journey.
+     */
+    public function test_a_scoped_option_pays_on_its_line_and_nowhere_else(): void
+    {
+        $kit = [[
+            'key' => 'leather_armor',
+            'durability' => 10,
+            'equipped' => true,
+            'options' => [['stat' => 'yield', 'value' => 0.04, 'scope' => 'mining']],
+        ]];
+
+        $this->assertSame(0.04, \App\Game\Formulas::aggregateStat($kit, 'yield', 'mining'));
+        $this->assertSame(0.0, \App\Game\Formulas::aggregateStat($kit, 'yield', 'woodcutting'));
+        $this->assertSame(0.0, \App\Game\Formulas::aggregateStat($kit, 'yield'));
+    }
+
+    /**
+     * §8.0.1 -- a scoped roll is worth more than a flat one, because it is
+     * worth nothing on the other four lines. Without the gap the pool would
+     * read as a bad-luck table.
+     */
+    public function test_worn_gear_rolls_scoped_lines_and_pays_them_better(): void
+    {
+        $def = \App\Game\Catalog::item('ironwood_armor');
+        $scoped = 0;
+        $flat = 0;
+
+        for ($seed = 1; $seed <= 200; $seed++) {
+            foreach (\App\Game\Formulas::rollOptions($def, $seed) as $option) {
+                $scope = $option['scope'] ?? null;
+
+                if ($scope === null) {
+                    $flat++;
+                    $this->assertGreaterThanOrEqual(Balance::OPTION_MIN, $option['value']);
+                    $this->assertLessThanOrEqual(Balance::OPTION_MAX, $option['value']);
+
+                    continue;
+                }
+
+                $scoped++;
+                $this->assertContains($scope, \App\Game\Catalog::SKILLS);
+                $this->assertContains($option['stat'], \App\Game\Catalog::OPTION_SCOPED_STATS);
+                $this->assertGreaterThanOrEqual(Balance::OPTION_SCOPED_MIN, $option['value']);
+                $this->assertLessThanOrEqual(Balance::OPTION_SCOPED_MAX, $option['value']);
+            }
+        }
+
+        $this->assertGreaterThan(0, $scoped, 'worn gear never rolled a scoped line');
+        $this->assertGreaterThan(0, $flat, 'worn gear never rolled a flat line');
+        $this->assertGreaterThan(Balance::OPTION_MAX, Balance::OPTION_SCOPED_MAX);
+    }
+
     /** §8.0.1 -- a rolled line can reach a stat the item was never built for. */
     public function test_an_option_can_add_a_stat_the_item_does_not_have(): void
     {
@@ -2318,9 +2395,19 @@ final class GameLoopTest extends TestCase
                 $this->assertContains($option['stat'], \App\Game\Catalog::optionStatsFor($def['slot']));
             }
 
-            // One line per stat: two "+2% yield" rows on one item reads as a bug.
-            $stats = array_column($rolled, 'stat');
-            $this->assertSame($stats, array_unique($stats), "{$key} rolled a stat twice");
+            // One line per (stat, scope): two "+2% mining yield" rows on one
+            // item reads as a bug, and a tool has no scope to tell them apart.
+            $lines = array_map(
+                static fn (array $o) => $o['stat'].'|'.($o['scope'] ?? ''),
+                $rolled,
+            );
+            $this->assertSame($lines, array_unique($lines), "{$key} rolled a line twice");
+
+            // A tool is line-locked by its slot (§8 rule 1), so a scope on it
+            // would be a second copy of a fact that is already true.
+            foreach ($rolled as $option) {
+                $this->assertArrayNotHasKey('scope', $option, "{$key} scoped a tool line");
+            }
         }
 
         // The capital bazaar is the one way a common ever carries a line.
@@ -3586,5 +3673,135 @@ final class GameLoopTest extends TestCase
 
         $this->expectException(\App\Game\GameException::class);
         $this->game->startProcessing($this->character, $settlement['id'], 'planks', 1);
+    }
+
+    // -------------------------------------------------- processing jobs §6
+
+    /** Run a whole planks job at the village and collect it. */
+    private function runPlanks(int $batches = 1): array
+    {
+        $settlement = $this->standAtWoodcuttingVillage();
+        $this->give(['wood' => 60]);
+
+        $job = $this->game->startProcessing($this->character->fresh(), $settlement['id'], 'planks', $batches);
+        $job->update(['ends_at' => $this->game->now() - 1]);
+
+        return [$job, $this->game->collectJob($this->character->fresh(), $job->id)];
+    }
+
+    /**
+     * §6 -- a finished run teaches the line that ran it, and only that line.
+     *
+     * The same rule the benches already follow: a Smith's forging does not
+     * teach the Armorer, and sawing planks does not teach the Tanner. Without
+     * it, running any one line would level all five and the five trees would be
+     * one tree with five names.
+     */
+    public function test_a_finished_run_levels_its_own_processing_job_and_no_other(): void
+    {
+        [$job] = $this->runPlanks();
+
+        $this->assertGreaterThan(
+            0,
+            (int) $this->character->fresh()->jobLevels()->where('job_key', 'sawyer')->value('xp'),
+            'sawing planks taught the Sawyer nothing',
+        );
+        $this->assertSame(
+            $job->quantity * Balance::JOB_XP_PER_PROCESS_UNIT,
+            (int) $this->character->fresh()->jobLevels()->where('job_key', 'sawyer')->value('xp'),
+        );
+
+        foreach (['smelter', 'tanner', 'mason', 'weaver', 'smith'] as $other) {
+            $this->assertSame(
+                0,
+                (int) $this->character->fresh()->jobLevels()->where('job_key', $other)->value('xp'),
+                "{$other} learned from somebody else's saw pit",
+            );
+        }
+    }
+
+    /** §11.1 -- a run walked away from teaches nothing, like every other job. */
+    public function test_an_abandoned_run_teaches_the_line_nothing(): void
+    {
+        $settlement = $this->standAtWoodcuttingVillage();
+        $this->give(['wood' => 12]);
+
+        $job = $this->game->startProcessing($this->character->fresh(), $settlement['id'], 'planks', 1);
+        $this->game->abandonJob($this->character->fresh(), $job->id);
+
+        $this->assertSame(
+            0,
+            (int) $this->character->fresh()->jobLevels()->where('job_key', 'sawyer')->value('xp'),
+        );
+    }
+
+    /**
+     * §8 rule 1 -- a processing node is line-locked exactly as a tool is.
+     *
+     * A Sawyer is faster at a saw pit and at nothing else. Left unlocked, three
+     * processing trees would stack processingSpeed on every line at once, which
+     * is the same stack the tool ladder is careful never to allow.
+     */
+    public function test_a_sawyers_speed_reaches_his_own_line_and_no_other(): void
+    {
+        $this->grantNodes(array_keys(\App\Game\Jobs::nodesFor('sawyer')));
+        $character = $this->character->fresh();
+
+        $sawing = $this->game->bonuses($character, 'processing', 'woodcutting')['processingSpeed'];
+        $tanning = $this->game->bonuses($character, 'processing', 'hunting')['processingSpeed'];
+
+        $this->assertGreaterThan(0, $sawing, 'a full Sawyer tree does nothing at a saw pit');
+        $this->assertSame(0.0, $tanning, 'a Sawyer sped up a tannery');
+
+        // And a saw pit is not a forest: the axe on the belt stays out of it.
+        $this->assertSame(
+            0.0,
+            $this->game->bonuses($character, 'woodcutting')['processingSpeed'],
+            'a processing node paid out on a mining trip',
+        );
+    }
+
+    /**
+     * §7.4.3 -- what a processing tree may thin, and where it stops.
+     *
+     * `costReduction` and `batch` both drain the §11 materials sink, so a maxed
+     * Sawyer has to eat measurably less wood and hand back measurably more
+     * planks -- and no more than the caps allow, whatever else is bought.
+     */
+    public function test_a_full_processing_tree_thins_the_run_within_its_caps(): void
+    {
+        $settlement = $this->standAtWoodcuttingVillage();
+        $recipe = \App\Game\Catalog::recipe('planks');
+        $batches = 4;
+
+        $this->give(['wood' => 60]);
+        $plain = $this->game->startProcessing($this->character->fresh(), $settlement['id'], 'planks', $batches);
+        $plainSpent = 60 - $this->game->held($this->character->fresh(), 'wood');
+        $this->game->abandonJob($this->character->fresh(), $plain->id);
+
+        $this->grantNodes(array_keys(\App\Game\Jobs::nodesFor('sawyer')));
+
+        $this->give(['wood' => 60 - $this->game->held($this->character->fresh(), 'wood')]);
+        $skilled = $this->game->startProcessing($this->character->fresh(), $settlement['id'], 'planks', $batches);
+        $skilledSpent = 60 - $this->game->held($this->character->fresh(), 'wood');
+
+        $this->assertLessThan($plainSpent, $skilledSpent, 'a full tree ate as much wood as no tree');
+        $this->assertGreaterThanOrEqual(
+            $batches,
+            $skilledSpent,
+            'a run went below one input a batch, which is a hole in the §11 sink',
+        );
+        $this->assertGreaterThanOrEqual(
+            (int) round($recipe['inputQty'] * $batches * (1 - Balance::SKILL_COST_REDUCTION_CAP)),
+            $skilledSpent,
+            'the cost reduction went past its cap',
+        );
+
+        $this->assertSame(
+            $recipe['outputQty'] * $batches + Balance::SKILL_BATCH_CAP,
+            (int) $skilled->quantity,
+            'batch is not exactly the cap, per run rather than per batch',
+        );
+        $this->assertGreaterThan((int) $plain->quantity, (int) $skilled->quantity);
     }
 }

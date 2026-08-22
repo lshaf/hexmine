@@ -25,8 +25,8 @@ import { useGame } from '@/stores/game'
 import { copyText, shortWallet } from '@/game/identity'
 import { walletSeal } from '@/icons/sigil'
 import { SCOPE_PATHS } from '@/icons/actions'
-import { ITEM_BY_KEY, SCOPE_ACTION, SCOPE_LABEL, STAT_LABEL } from '@/game/catalog'
-import { formatPercent } from '@/game/formulas'
+import { ITEM_BY_KEY, SCOPE_ACTION, SCOPE_LABEL } from '@/game/catalog'
+import { statLine } from '@/game/formulas'
 import type { StatKey } from '@/game/types'
 
 const game = useGame()
@@ -101,7 +101,7 @@ const charges = computed(() =>
     name: ITEM_BY_KEY[b.key]?.name ?? 'Draught',
     path: SCOPE_PATHS[b.scope] ?? SCOPE_PATHS.global!,
     tone: STAT_TONE[b.stat],
-    effect: `${formatPercent(b.value)} ${STAT_LABEL[b.stat]} ${SCOPE_LABEL[b.scope]}`,
+    effect: `${statLine(b.stat, b.value)} ${SCOPE_LABEL[b.scope]}`,
     spent: `Spent by your next ${SCOPE_ACTION[b.scope]}`,
   })),
 )

@@ -31,8 +31,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useGame } from '@/stores/game'
 import { ACTION_PATHS } from '@/icons/actions'
 import { MATERIAL_PALETTE } from '@/theme/palette'
-import { STAT_LABEL } from '@/game/catalog'
-import { formatPercent } from '@/game/formulas'
+import { formatPercent, statLine } from '@/game/formulas'
 import type { NodeDef, NodeEffect } from '@/api/types'
 import type { StatKey } from '@/game/types'
 
@@ -53,10 +52,10 @@ const tree = computed(() => game.tree)
 
 /**
  * Grouped in the order a character meets them: you walk and gather from the
- * first minute, craft once there is something to craft with, and raid when
- * raiding exists. The server sends them in this order already; this only cuts
- * them into their three bands so the panel does not read as twelve equal
- * choices.
+ * first minute, refine what you gathered, craft once there is something to
+ * craft with, and raid when raiding exists. The server sends them in this order
+ * already; this only cuts them into their four bands so the panel does not read
+ * as seventeen equal choices.
  *
  * "Gathering" rather than "Mining" for the first band, because one of the jobs
  * inside it is called Mining and a heading that repeats a row underneath it is
@@ -64,6 +63,7 @@ const tree = computed(() => game.tree)
  */
 const KIND_LABEL: Record<string, string> = {
   gathering: 'Gathering',
+  processing: 'Processing',
   craft: 'Crafting',
   battle: 'Battle',
 }
@@ -255,7 +255,7 @@ const EFFECT_ICON: Record<NodeEffect['kind'], string> = {
 function effectText(effect: NodeEffect): string {
   switch (effect.kind) {
     case 'stat':
-      return `${formatPercent(effect.value)} ${STAT_LABEL[effect.stat as StatKey] ?? effect.stat}`
+      return statLine(effect.stat as StatKey, effect.value)
     case 'unlock':
       return 'Unlocks a raid ability'
     case 'craftOption':

@@ -174,9 +174,27 @@ export type CritterKey =
   | 'ashnewt'
   | 'fenlark'
 
+/**
+ * §9.5.8 Tier 1 -- what comes off a monster. Two families of five: a plate/hide
+ * line for the smith and the armorer, an ichor/organ line for the consumable
+ * bench. Biome-free, and dropped by nothing but a fight.
+ */
+export type SpoilKey =
+  | 'cracked_carapace'
+  | 'bone_plate'
+  | 'scaled_hide'
+  | 'warped_barb'
+  | 'revenant_plate'
+  | 'thin_ichor'
+  | 'black_blood'
+  | 'bile_sac'
+  | 'ember_gland'
+  | 'grave_heart'
+
 export type MaterialKey =
   | ScrapKey
   | JunkKey
+  | SpoilKey
   | RawKey
   | GradeRawKey
   | ReagentKey
@@ -195,6 +213,10 @@ export interface Material {
   bench?: 'weapon' | 'armor'
   /** §4 -- alchemy stock that is an animal rather than a plant. */
   critter?: boolean
+  /** §9.5.8 -- which half of a monster this is, and nothing else has it. */
+  spoil?: 'plate' | 'ichor'
+  /** §9.5.8 -- 1..5, the monster tier that gives it up. Grade 5 is the centre ring. */
+  grade?: number
   /** Biome lock for tier 1 and tier 3. Raid + refined materials are unlocked. */
   biome?: Biome
   /** Accent colour for the procedural icon system, §13.1. */
@@ -267,9 +289,11 @@ export type StatKey =
  *
  * The five gathering lines are the §7.2 skills, so a line-scoped buff lands on
  * exactly the trips that line already governs. `travel` and `processing` are
- * the two other things a character spends real time on.
+ * the two other things a character spends real time on, and `battle` (§9.5) is
+ * the one that is not work at all -- the only place `power` and `defence` are
+ * worth drinking for.
  */
-export type BuffScope = SkillKey | 'travel' | 'processing'
+export type BuffScope = SkillKey | 'travel' | 'processing' | 'battle'
 
 /**
  * §8.0 -- the bench a recipe needs, which is not the same as a settlement tier.
@@ -290,10 +314,11 @@ export interface ItemDef {
   consumable?: boolean
   rarity: Rarity
   /**
-   * §3.3 -- whether this is an NFT, the only externally tradeable value. Kept
-   * apart from rarity on purpose: `unique` is the strongest thing in the game
-   * and is soulbound, because §2 forbids a grind→NFT faucet and a dungeon drop
-   * would be exactly that.
+   * §3.3 -- whether this rung may be **minted** and withdrawn from the game.
+   * Not a property the item has while it is in a bag: everything in a bag is in
+   * play, and everything in play can be destroyed (§8.2). Kept apart from
+   * rarity on purpose -- `unique` is the strongest thing in the game and is
+   * soulbound, because §2 forbids a grind→NFT faucet.
    */
   tradeable: boolean
   stat: StatKey
@@ -315,6 +340,19 @@ export interface ItemDef {
   perk?: string
   /** Fractional bonus, e.g. 0.06 = +6%. */
   value: number
+  /**
+   * §9.5.4 -- which of the three battle jobs this weapon levels, and the shape
+   * of its attack/defence pair. Weapons only: one slot holds all three
+   * families, and the family you carry is your class.
+   */
+  family?: 'shield' | 'sword' | 'focus'
+  /**
+   * §9.5.4 -- FLAT combat numbers, and deliberately not the `power`/`defence`
+   * StatKeys, which stay percentages under §8.1's +15% ceiling. A fight cannot
+   * be decided by a swing that small, so it needs a base; these are it.
+   */
+  attack?: number
+  defence?: number
   palette: Material['palette']
   /** Gold cost if sold by the NPC shop; absent for crafted/NFT items. */
   goldPrice?: number
@@ -355,6 +393,37 @@ export interface ActiveBuff {
 export interface ItemOption {
   stat: StatKey
   value: number
+  /**
+   * §8.0.1 -- the one gathering line this roll pays on, and absent when it pays
+   * everywhere. Worn gear is where it matters: armor works all five lines at
+   * once, so a line it names is narrower than a flat roll and worth more for
+   * being so. A tool needs no scope -- its slot already locks it to one line.
+   */
+  scope?: SkillKey
+}
+
+/**
+ * §9.5.2 -- one of the eight. `attack` and `defence` are FLAT, and they are not
+ * the percentage stats of the same name: §8.1's ceiling is +15%, and a fight
+ * cannot be decided by a swing that small.
+ */
+export interface Monster {
+  key: string
+  name: string
+  /** 1..4, and the ring it is new on. A ring fights its own tier and the one outside. */
+  tier: number
+  /** What a player reads instead of a level: brute, carapace, swift. */
+  profile: 'brute' | 'carapace' | 'swift'
+  attack: number
+  defence: number
+  /** §9.5.6 -- a swift one blunts a weapon harder than its numbers suggest. */
+  wearBias: number
+  gold: [number, number]
+  plate: SpoilKey
+  ichor: SpoilKey
+  /** The grade above its own, rarely. Grade 5 exists only off the centre ring. */
+  rareSpoil?: SpoilKey
+  description: string
 }
 
 export interface OwnedItem {

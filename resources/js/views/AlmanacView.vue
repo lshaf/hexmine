@@ -29,7 +29,6 @@ import {
   SCOPE_ACTION,
   SKILL_BY_KEY,
   SLOT_LABEL,
-  STAT_LABEL,
   ITEMS,
   skillForSlot,
 } from '@/game/catalog'
@@ -44,7 +43,7 @@ import {
   materialUses,
 } from '@/game/sources'
 import type { SourceLine } from '@/game/sources'
-import { formatPercent } from '@/game/formulas'
+import { formatPercent, itemStatLine } from '@/game/formulas'
 import { EQUIPMENT, ECONOMY, PROCESSING, BAG } from '@/game/balance'
 import { ACTION_PATHS } from '@/icons/actions'
 import { BIOME_LABEL } from '@/theme/palette'
@@ -146,6 +145,13 @@ const BANDS: Band[] = [
     holds: (mat) => rawRole(mat.key) === 'critter',
   },
   {
+    key: 'spoil',
+    tier: 1,
+    name: 'Off a monster',
+    note: 'The only Tier 1 with no ground under it: two families of five, cut off a pack rather than out of a hex (§9.5). The plate line feeds the smith and the armorer, the ichor line feeds the consumable bench, and the grade you get is the tier of the thing that was carrying it — which is why the best of them are only found in the barren centre. Combat feeds combat; none of this reaches the mining economy.',
+    holds: (mat) => rawRole(mat.key) === 'spoil',
+  },
+  {
     key: 'component',
     tier: 1,
     name: 'The smith and the armorer',
@@ -217,7 +223,6 @@ const materialsByBand = computed(() => {
 
   return groups
 })
-
 
 // ---------------------------------------------------------------------- tiles
 
@@ -595,6 +600,7 @@ function nature(item: ItemDef): string {
                 <SvgIcon
                   :svg="itemIcon({
                     slot: entry.item.slot,
+                    family: entry.item.family,
                     rarity: entry.item.rarity,
                     palette: entry.item.palette,
                     size: 30,
@@ -611,7 +617,7 @@ function nature(item: ItemDef): string {
                   </strong>
                 </div>
                 <span class="chip tiny" :class="entry.item.tradeable ? 'chip-nft' : ''">
-                  {{ formatPercent(entry.item.value) }} {{ STAT_LABEL[entry.item.stat] }}
+                  {{ itemStatLine(entry.item) }}
                 </span>
               </div>
 

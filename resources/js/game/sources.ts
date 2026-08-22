@@ -31,6 +31,7 @@ import { VARIANT_BY_MATERIAL, VARIANT_LABEL, VARIANT_RINGS } from './variants'
 import { REAGENTS } from './alchemy'
 import { COMPONENTS } from './components'
 import { CRITTERS } from './critters'
+import { SPOILS } from './spoils'
 import type { ItemDef, Material, MaterialKey, SettlementTier } from './types'
 
 /** The five roads. Nothing in the world arrives by a sixth. */
@@ -99,21 +100,33 @@ export interface SourceLine {
 /**
  * §4 -- what kind of raw a Tier 1 material is.
  *
- * Four things share the tier and arrive by different roads, so the almanac
+ * Five things share the tier and arrive by different roads, so the almanac
  * cannot describe them in one sentence. `ground` is what a hex gives up and is
- * the only one with a tool and a variant behind it; the other three are the
- * bench stocks, and two of those have no faucet on the map yet.
+ * the only one with a tool and a variant behind it; the rest are bench stocks.
+ * `spoil` is the odd one: it comes off a monster rather than off any ground at
+ * all, which is why it has no biome (§9.5.8).
  */
-export type RawRole = 'ground' | 'reagent' | 'critter' | 'component'
+export type RawRole = 'ground' | 'reagent' | 'critter' | 'component' | 'spoil'
 
 const REAGENT_KEYS = new Set<string>(REAGENTS.map((m) => m.key))
 const COMPONENT_KEYS = new Set<string>(COMPONENTS.map((m) => m.key))
 const CRITTER_KEYS = new Set<string>(CRITTERS.map((m) => m.key))
+const SPOIL_KEYS = new Set<string>(SPOILS.map((m) => m.key))
+
+/** §9.5.2 -- the ring a grade's monster is new on. Grade 5 is the centre's rare drop. */
+const SPOIL_RING: Record<number, string> = {
+  1: 'outer ring and inward',
+  2: 'middle ring and inward',
+  3: 'contested ring and inward',
+  4: 'the barren centre',
+  5: 'the barren centre, rarely',
+}
 
 export function rawRole(key: MaterialKey): RawRole {
   if (REAGENT_KEYS.has(key)) return 'reagent'
   if (CRITTER_KEYS.has(key)) return 'critter'
   if (COMPONENT_KEYS.has(key)) return 'component'
+  if (SPOIL_KEYS.has(key)) return 'spoil'
   return 'ground'
 }
 
@@ -181,6 +194,21 @@ export function materialSources(mat: Material): SourceLine[] {
 
     case 1: {
       const role = rawRole(mat.key)
+
+      // §9.5.8 -- the only Tier 1 with no ground under it. A spoil comes off a
+      // thing that walked there, so the almanac names the ring it walked on
+      // rather than a biome.
+      if (role === 'spoil') {
+        const ring = SPOIL_RING[mat.grade ?? 1] ?? 'the road'
+        lines.push({
+          kind: 'mine',
+          where: `Monster pack · ${ring}`,
+          note:
+            `Cut off a tier ${mat.grade} monster and nothing else — no hex gives ` +
+            `this up. Wanted by the ${mat.spoil === 'ichor' ? 'consumable' : 'smith and armorer'} bench.`,
+        })
+        break
+      }
 
       // §4 -- the alchemist's second stock, and the only ingredient that needs
       // a bow. A herb is an errand; a critter waits on a herd, and §5.5 puts
