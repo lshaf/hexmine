@@ -191,6 +191,50 @@ final class Balance
      * being a formality, and the barren centre is the worst of it -- which is
      * what makes the last step toward a dungeon mouth a decision.
      */
+    /**
+     * §9.5.5 -- the band the roll swings through, and the clamp on either end.
+     *
+     * A straight comparison would decide every fight before it was tapped:
+     * scout the number and you either always win or never engage, and there is
+     * nothing left to choose. The band makes it a KNOWN RISK instead, and the
+     * clamp means never certain and never hopeless -- the same instinct as
+     * §7.3's floor on a trip.
+     */
+    public const BATTLE_BAND = 10;
+
+    public const BATTLE_ODDS_MIN = 0.05;
+
+    public const BATTLE_ODDS_MAX = 0.95;
+
+    /** §9.5.4 -- a battle job's level is worth this fraction of itself, in both halves. */
+    public const BATTLE_JOB_DIVISOR = 3;
+
+    /**
+     * §9.5.6 -- wear is the combat system.
+     *
+     * There is no health, so the cost of a fight lands on the gear and scales
+     * with how badly matched you were: a weapon wears on the gap to their
+     * defence, one random worn piece wears on the excess of their attack over
+     * its own. Matched, both cost `WEAR_BASE` and nothing more.
+     */
+    public const WEAR_BASE = 2;
+
+    public const WEAR_PER_GAP = 0.4;
+
+    public const WEAR_PER_EXCESS = 0.4;
+
+    /** A loss costs half again. Being driven off is harder on the kit than winning. */
+    public const WEAR_LOSS_MULTIPLIER = 1.5;
+
+    /**
+     * No single fight may take more than this share of an item's maximum.
+     *
+     * Not optional now that zero is fatal (§8.2): without it one hopeless fight
+     * snaps a legendary outright, and the pre-fight warning would be the only
+     * thing between a player and losing a week of work to a mistap.
+     */
+    public const WEAR_CAP_FRACTION = 0.15;
+
     public const PACK_CHANCE = [
         'outer' => 0.02,
         'mid' => 0.10,
@@ -556,7 +600,7 @@ final class Balance
 
     /**
      * §5.4 + §12 -- how far a fresh spawn may be from the village whose
-     * woodcutting line its tutorial needs.
+     * woodcutting line its opening arc needs.
      *
      * This is a *generation* constraint, not a rule the player ever meets. It
      * was level-1 reach back when reach existed; it stays a number of its own

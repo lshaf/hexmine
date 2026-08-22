@@ -12,14 +12,17 @@
  * appear only at a settlement (§6) -- there is no trader in the middle of a
  * forest, and greying one out would imply there could be.
  */
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useGame } from '@/stores/game'
+import { api } from '@/api/client'
+import { MONSTERS } from '@/game/monsters'
 import { RECIPES, RING_LABEL, SKILL_BY_KEY } from '@/game/catalog'
 import { VARIANT_LABEL } from '@/game/variants'
 import { waterLabel } from '@/game/water'
 import { formatDuration } from '@/game/formulas'
 import { worldParams } from '@/game/worldgen'
 import HexAction from './HexAction.vue'
+import type { BattlePreview } from '@/api/types'
 
 const game = useGame()
 
@@ -116,6 +119,50 @@ const herdGoing = computed(() => {
   if (!until) return false
 
   return until - game.now < worldParams().herdLifetimeMs * 0.25
+})
+
+/**
+ * §9.5.3 -- something is standing on this hex, and until it is not there is no
+ * work here and no road out.
+ *
+ * The dock says the two exits out loud, because a refusal that names neither
+ * reads as a bug: fight it, or wait for its clock. Nothing is greyed out to
+ * explain the pin -- the verbs are simply not what this hex is offering.
+ */
+const pinned = computed(() => Boolean(underfoot.value?.pinned))
+
+/** The pack itself is derived client-side, so the name costs no request. */
+const pack = computed(() => game.tileAt(game.character?.col ?? 0, game.character?.row ?? 0)?.pack)
+
+const packLeaves = computed(() => {
+  const until = pack.value?.until
+  if (!until) return null
+
+  return formatDuration(until - game.now)
+})
+
+/**
+ * §9.5.5 -- the odds, before anything is committed.
+ *
+ * Fetched rather than derived: the client knows which monster is standing
+ * there, but what a fight would cost depends on gear, a battle job and whatever
+ * was drunk, and the server owns all three (§16).
+ */
+const battle = ref<BattlePreview | null>(null)
+
+watch(
+  [pinned, () => pack.value?.key],
+  async ([isPinned]) => {
+    battle.value = isPinned ? await api.previewBattle() : null
+  },
+  { immediate: true },
+)
+
+const packHint = computed(() => {
+  const b = battle.value
+  if (!b?.canFight) return 'Nothing here will let you work'
+
+  return `${Math.round((b.odds ?? 0) * 100)}% · you ${b.attack}/${b.defence} · it ${b.monster?.attack}/${b.monster?.defence}`
 })
 
 const huntHint = computed(() => {
@@ -221,6 +268,19 @@ function hunted(): void {
             hint="Forfeits the reward, and frees you to move"
             @activate="game.abandon(trip.id)"
           />
+        </template>
+
+        <!-- §9.5.3 -- while a pack holds the hex there are no verbs, only the
+             two ways out of the pin. -->
+        <template v-else-if="pinned">
+          <div class="pinned">
+            <strong class="tiny">{{ pack ? MONSTERS[pack.key]?.name : 'Something' }} is standing here</strong>
+            <span class="tiny muted">{{ packHint }}</span>
+            <span v-for="warning in battle?.warnings ?? []" :key="warning" class="tiny warn">
+              {{ warning }}
+            </span>
+            <span v-if="packLeaves" class="tiny muted">Moves on in {{ packLeaves }}</span>
+          </div>
         </template>
 
         <template v-else>
@@ -420,5 +480,19 @@ function hunted(): void {
   .rule {
     margin: 2px 1px 11px;
   }
+}
+
+/* §9.5.3 -- the pin reads as a statement, not a disabled control. Nothing here
+   is a button, because the two ways out are a fight that has its own cell and a
+   clock that needs no help. */
+.pinned {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 2px;
+}
+
+.pinned .warn {
+  color: var(--ember);
 }
 </style>

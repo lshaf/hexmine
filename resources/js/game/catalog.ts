@@ -426,6 +426,16 @@ export const slotForSkill = (skill: SkillKey): GatherSlot =>
  * §8.1 -- the rarity ladder, weakest first. Anything that sorts or gates by
  * rarity compares `RARITY_RANK`, never the string.
  */
+/**
+ * §9.5.4 -- which battle job a weapon family levels. Mirrors
+ * Catalog::BATTLE_JOB_FOR_FAMILY.
+ */
+export const BATTLE_JOB_FOR_FAMILY: Record<string, string> = {
+  shield: 'shieldbearer',
+  sword: 'swordhand',
+  focus: 'runecaster',
+}
+
 export const RARITIES: Rarity[] = [
   'common',
   'uncommon',

@@ -184,6 +184,119 @@ final class Formulas
         return $entry['stat'].'|'.($entry['scope'] ?? '');
     }
 
+    // ------------------------------------------------------------ combat §9.5
+
+    /**
+     * §9.5.4 -- what a character brings to a fight.
+     *
+     * Flat numbers off the gear, because §8.1's ceiling is +15% and a fight
+     * cannot be decided by a swing that small. The percentages are still here:
+     * `power` and `defence` MULTIPLY the gear half, so everything that feeds the
+     * ordinary aggregate -- rolled options, tree nodes, a battle draught --
+     * lands somewhere real without a second ceiling being invented for it.
+     *
+     * The battle job is added flat afterwards, in both halves. It is the proof
+     * you have fought, and it is worth the same whether you are swinging or
+     * being swung at.
+     *
+     * @param  array<int,array{key:string,durability:int,equipped:bool}>  $items
+     * @return array{attack:int,defence:int}
+     */
+    public static function combatPair(
+        array $items,
+        int $jobLevel = 0,
+        float $power = 0.0,
+        float $defence = 0.0,
+    ): array {
+        $gearAttack = 0;
+        $gearDefence = 0;
+
+        foreach ($items as $item) {
+            if (! $item['equipped'] || $item['durability'] <= 0) {
+                continue;
+            }
+
+            $def = Catalog::item($item['key']);
+            if ($def === null) {
+                continue;
+            }
+
+            $gearAttack += (int) ($def['attack'] ?? 0);
+            $gearDefence += (int) ($def['defence'] ?? 0);
+        }
+
+        $might = intdiv($jobLevel, Balance::BATTLE_JOB_DIVISOR);
+
+        return [
+            'attack' => (int) round($gearAttack * (1 + $power)) + $might,
+            'defence' => (int) round($gearDefence * (1 + $defence)) + $might,
+        ];
+    }
+
+    /**
+     * §9.5.5 -- how the fight leans before the die is thrown.
+     *
+     * Strike is what you get through, hold is what you keep out, and the fight
+     * is the average of the two. That is what makes the profiles in §9.5.2
+     * matter: a brute loses to armor, a carapace loses to reach, and the same
+     * kit is not the answer to both.
+     */
+    public static function battleMargin(int $attack, int $defence, array $monster): float
+    {
+        $strike = $attack - (int) $monster['defence'];
+        $hold = $defence - (int) $monster['attack'];
+
+        return ($strike + $hold) / 2;
+    }
+
+    /** §9.5.5 -- the margin as a chance, and never certain in either direction. */
+    public static function battleOdds(int $attack, int $defence, array $monster): float
+    {
+        $margin = self::battleMargin($attack, $defence, $monster);
+
+        return max(
+            Balance::BATTLE_ODDS_MIN,
+            min(Balance::BATTLE_ODDS_MAX, 0.5 + $margin / (2 * Balance::BATTLE_BAND)),
+        );
+    }
+
+    /**
+     * §9.5.6 -- what the weapon pays, on the gap to their defence.
+     *
+     * Hitting a wall chips the blade, which is why bringing the wrong class is
+     * expensive EVEN WHEN YOU WIN. A swift monster blunts harder than its
+     * numbers suggest, and that is its whole `wearBias`.
+     */
+    public static function weaponWear(int $attack, array $monster, bool $won, int $maxDurability): int
+    {
+        $gap = max(0, (int) $monster['defence'] - $attack);
+
+        $wear = (Balance::WEAR_BASE + $gap * Balance::WEAR_PER_GAP)
+            * ($monster['wearBias'] ?? 1.0)
+            * ($won ? 1.0 : Balance::WEAR_LOSS_MULTIPLIER);
+
+        return self::cappedWear($wear, $maxDurability);
+    }
+
+    /** §9.5.6 -- what one worn piece pays, on the excess of their attack over its guard. */
+    public static function armorWear(int $pieceDefence, array $monster, bool $won, int $maxDurability): int
+    {
+        $excess = max(0, (int) $monster['attack'] - $pieceDefence);
+
+        $wear = (Balance::WEAR_BASE + $excess * Balance::WEAR_PER_EXCESS)
+            * ($won ? 1.0 : Balance::WEAR_LOSS_MULTIPLIER);
+
+        return self::cappedWear($wear, $maxDurability);
+    }
+
+    /** No fight takes more than §9.5.6's share of an item, now that zero is fatal. */
+    private static function cappedWear(float $wear, int $maxDurability): int
+    {
+        $cap = max(1, (int) floor($maxDurability * Balance::WEAR_CAP_FRACTION));
+
+        return min($cap, max(1, (int) ceil($wear)));
+    }
+
     /** Salvage returned when an item is discarded, §8.2. */
     public static function salvageYield(array $def): array
     {

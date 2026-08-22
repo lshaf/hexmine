@@ -280,6 +280,19 @@ final class Catalog
         return array_values(array_unique(array_column(self::optionRollsFor($slot), 'stat')));
     }
 
+    /**
+     * §9.5.4 -- which battle job a weapon family levels.
+     *
+     * One slot holds all three, and the family you carry is your class: §7.4 has
+     * always said a battle job levels by fighting with a shield, a sword or a
+     * focus, and this is the line that finally makes that true.
+     */
+    public const BATTLE_JOB_FOR_FAMILY = [
+        'shield' => 'shieldbearer',
+        'sword' => 'swordhand',
+        'focus' => 'runecaster',
+    ];
+
     /** §4.0 -- scrap is what a hex gives up to bare hands. It feeds no recipe. */
     public static function isScrap(string $materialKey): bool
     {
