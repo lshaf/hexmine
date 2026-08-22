@@ -30,10 +30,16 @@ Route::middleware(ResolveCharacter::class)->group(function () {
 
     Route::get('/world', [MapController::class, 'world']);
     Route::get('/map', [MapController::class, 'index']);
+    // §5 -- the world is a disc centred on the origin, so most of the map has
+    // negative coordinates. whereNumber() is `[0-9]+` and would 404 all of it.
     Route::get('/tiles/{col}/{row}/preview', [MapController::class, 'preview'])
-        ->whereNumber(['col', 'row']);
+        ->where(['col' => '-?\d+', 'row' => '-?\d+']);
 
     Route::post('/mining', [MiningController::class, 'store']);
+    // §4.0 -- the bare-handed verb, and its own endpoint rather than a flag on
+    // the one above: mining refuses without the line's tool, and gathering is
+    // the answer to that refusal rather than a quieter version of it.
+    Route::post('/gathering', [MiningController::class, 'gather']);
     // §5.5 -- hunting is its own verb, not a mode of mining: it takes no tile
     // slot, depletes nothing, and is the only Tier 4 faucet outside a dungeon.
     Route::post('/hunting', [MiningController::class, 'hunt']);
