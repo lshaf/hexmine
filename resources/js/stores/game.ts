@@ -18,6 +18,8 @@ import type {
   CollectResult,
   MapMutations,
   PlayerState,
+  QuestDef,
+  QuestReward,
   SkillTree,
   StationState,
   TilePreview,
@@ -31,12 +33,11 @@ import type {
   Tile,
   TravelState,
 } from '@/game/types'
-import { TUTORIAL, TUTORIAL_OUTRO, tutorialStep } from '@/game/tutorial'
 import { configureWorld, generateTile, inBounds, worldParams } from '@/game/worldgen'
 import { hexDistance, visibleTiles } from '@/map/hexGeometry'
 
 /** Which overlay is open over the map, if any. */
-export type PanelKey = 'bag' | 'craft' | 'shop' | 'hero' | 'atlas' | 'skills'
+export type PanelKey = 'bag' | 'craft' | 'shop' | 'hero' | 'atlas' | 'skills' | 'quests'
 
 export interface LogEntry {
   id: number
@@ -283,6 +284,45 @@ export const useGame = defineStore('game', () => {
   async function buyNode(nodeKey: string): Promise<void> {
     await act(() => api.buyNode(nodeKey))
   }
+
+  /**
+   * §12.1 -- quests.
+   *
+   * Same split as the trees: the catalog is static and fetched once, and where
+   * this character stands rides in the state with everything else that moves.
+   */
+  const questDefs = shallowRef<Record<string, QuestDef> | null>(null)
+  const quests = computed(() => state.value?.quests ?? [])
+
+  /**
+   * How many are payable right now. The one number the HUD needs, so the button
+   * can say there is gold waiting without the panel being open.
+   */
+  const questsReady = computed(() => quests.value.filter((q) => q.complete && !q.claimed).length)
+
+  async function loadQuests(): Promise<void> {
+    if (questDefs.value) return
+    questDefs.value = await api.getQuests()
+  }
+
+  /**
+   * §12.1 -- claim, and open the receipt over it.
+   *
+   * Deliberately NOT a toast. The server answers with no message, so `act`
+   * notes nothing, and the modal carries the whole of it: what was earned, what
+   * the purse is now, and what the claim just opened up. A toast saying
+   * "+40 gold" alongside would be the same news twice, said worse.
+   */
+  const questReward = ref<QuestReward | null>(null)
+
+  async function claimQuest(quest: string): Promise<void> {
+    const result = await act(() => api.claimQuest(quest))
+    if (result) questReward.value = result
+  }
+
+  function clearQuestReward(): void {
+    questReward.value = null
+  }
   const jobs = computed<Job[]>(() => state.value?.jobs ?? [])
 
   /**
@@ -377,16 +417,6 @@ export const useGame = defineStore('game', () => {
       await refreshState()
       await refreshMutations()
     },
-  )
-
-  const currentStep = computed(() =>
-    character.value ? tutorialStep(character.value.tutorialStep) : null,
-  )
-  const tutorialDone = computed(() => character.value?.tutorialStep === -1)
-  const tutorialProgress = computed(() =>
-    character.value && character.value.tutorialStep >= 0
-      ? `${character.value.tutorialStep + 1} / ${TUTORIAL.length}`
-      : '',
   )
 
   const held = (material: MaterialKey): number => inventory.value[material] ?? 0
@@ -620,10 +650,10 @@ export const useGame = defineStore('game', () => {
     character, timeScale, bag, bagFull, inventory, equipment, skills, bonuses, toolYield, jobs, readyJobs,
     consumables, buffs,
     tree, skillPoints, jobLevels, ownedNodes,
+    questDefs, quests, questsReady, questReward,
     activeJobs, fieldJob, processingJob, underfoot, selectedTile,
     currentSettlement, shopStock, sight, travelPerHexMs, travelEta,
     travel, travelProgress, travelHexesWalked, travelRemainingMs,
-    currentStep, tutorialDone, tutorialProgress, TUTORIAL_OUTRO,
     // helpers
     tileAt, held, note,
     // actions
@@ -633,6 +663,7 @@ export const useGame = defineStore('game', () => {
     startMining, startGathering, startHunt, collect, abandon, travelTo, cancelTravel, startProcessing, buy,
     sell, craft, equip, unequip, repair, discard, discardMaterial, drink, openPanel, closePanel,
     loadTree, buyNode,
+    loadQuests, claimQuest, clearQuestReward,
     openStation, closeStation,
   }
 })

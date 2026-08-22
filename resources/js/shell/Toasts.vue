@@ -130,7 +130,7 @@ const visible = computed(() =>
 }
 
 .good {
-  --tone: #8fbf7f;
+  --tone: var(--sap);
 }
 
 .bad {

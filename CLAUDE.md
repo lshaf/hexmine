@@ -914,7 +914,7 @@ Beastfang Boots   = 2 Beastfang + 1 Obsidian + 1 Relic         → +15% travel  
 
 Gathering tools, §8.0 — one ladder, repeated per line. Yield only, and only on
 that line. The crafted starter is single-line on purpose: it is what a player can
-build straight off the tutorial's first processing run (§12 step 7).
+build straight off the opening arc's first processing run (§12 step 6).
 
 | Line | Village +3% | City +5% | Starter +4% | Crafted +6% | NFT +12% |
 |---|---|---|---|---|---|
@@ -1423,22 +1423,112 @@ not on a calendar. Fixed schedules let players time their entry and defeat the p
 
 ---
 
-## 12. Onboarding / tutorial
+## 12. Onboarding — the ledger, not a tutorial
 
-The tutorial is the **actual game loop**, not scripted fake mechanics — nothing to unlearn.
+**There is no tutorial.** There was one: eleven scripted steps and a card in the
+corner. It was always the *actual game loop* rather than fake mechanics, so
+there was never anything to unlearn — which is exactly why it converted into
+quests without losing a lesson.
 
-1. Collect branches in a Forest hex → teaches hex mining, biome locking, and §4.0: bare hands get scrap
-2. Sell branches for gold → teaches NPC shop, gold faucet (1g a branch, deliberately poor)
-3. Buy a Stone Axe → teaches gold-tier equipment, and that the axe is the *forest* tool (§8.0)
-4. Mine wood with axe → the same hex now gives wood, not branches. This is the payoff
-5. Sell more wood → reinforces gold loop
-6. Process wood → planks → teaches processing + presence bonus
-7. Craft a Hewn Axe → teaches material crafting, gold→crafted tier ladder
-8. Mine with the new axe → loop closes with visible improvement
-9. Sell some, process some → teaches the **sell-vs-process decision** players make forever
+What it never had was a **reason to finish**. It paid nothing, and a prompt that
+pays nothing is a prompt to dismiss. The same nine lessons in the same order,
+each with gold on the end of it, is the same teaching with a stake in it — and
+it leaves **one** place a player looks to find out what to do next instead of
+two.
 
-End on a soft hook toward the contested ring ("the forest edge holds rarer wood, but it's
-contested") so depth is signposted without overwhelming onboarding.
+The opening arc, which is the old script:
+
+1. Bring back branches bare-handed → hex work, biome locking, and §4.0: bare hands get scrap
+2. Sell them → NPC shop, gold faucet, and a rate that is bad on purpose (1g a branch)
+3. Buy a Stone Axe → gold buys the bottom two rungs, and the axe is the *forest* tool (§8.0)
+4. Put it on → a tool pays out on its own line and nowhere else
+5. Work the same hex → it gives wood now, not branches. This is the payoff
+6. Take planks off a saw pit → processing, and the presence bonus (§6.2)
+7. Forge a Hewn Axe → material crafting, and the gold→crafted rung
+8. Back to the trees → the loop closes with visible improvement
+
+§5.4 guarantees a forest spawn with a woodcutting village in reach, which is
+what lets this arc name wood, a stone axe and a saw pit without ever
+soft-locking anybody.
+
+The arc used to end on a sentence about the contested ring. Now the ledger just
+keeps going — each quest after it points at one system the arc only brushed: the
+road, the trader, the benches, the seams, the ring.
+
+### 12.1 How the ledger works
+
+A chained ledger of one-time tasks that pays **gold** (§3.2) and tells a
+prospector what the map wants from them next. Three rules, and they are the
+whole of the design:
+
+**One-shot, per character, forever.** A quest is claimed once and never comes
+back. That cap is what makes it safe for §2 — an unbounded gold faucet is a
+bot's entire business plan, while a finite list of one-time payouts is worth
+exactly as much to a thousand wallets as to one, which is not enough to farm.
+Dailies, if they ever land, need their own cap and their own argument; they must
+not be bolted onto this.
+
+**Gold, and only gold.** §3.3 forbids a grind→NFT faucet outright and §3.2 makes
+gold the currency that may be inflated precisely because it bridges to nothing
+external. A quest that paid a rare material would be a hole in the threat model
+rather than a nicer reward.
+
+**Nothing here is a new verb.** Every goal counts something the player was going
+to do anyway — a haul, a walk, a run at a bench, a sale — riding the same eleven
+call sites the tutorial cursor used to sit on. That is most of why §12 converted
+without losing anything. A quest asking for an action that existed only to
+satisfy quests would be a second game played beside this one.
+
+| Goal kind | Counts | Narrowed by |
+|---|---|---|
+| `gather` | units that **landed in the bag** off a trip | a material, or any |
+| `process` | refined units off a bench | a line, or any |
+| `craft` | things made | a bench category, or any |
+| `travel` | hexes actually crossed | — |
+| `sell` | gold taken from traders | — |
+| `level` | character level | — |
+| `job` | a job level | the job |
+
+The first five are **counted**: a tally on the character's row for that quest,
+bumped as the work finishes. The last two are **measured** — read off the
+character every time they are asked about and never written down, because "am I
+level five" has a live answer and a stored copy would eventually disagree with
+the character it is about. That is also why there is no `completed_at` column:
+whether a goal is met is a comparison, and storing the answer beside the inputs
+is a second opinion about one fact.
+
+**Counted work counts whether or not the quest was offered yet.** A prospector
+who walked two hundred hexes before anybody wrote the quest down has still
+walked them, and being handed a task already half done is a better welcome than
+being told to start again.
+
+**A quest is offered once the one before it is *claimed*** — not merely met — so
+the chain advances on a decision the player made. A still-locked quest is not
+sent to the client at all: what is next should be legible, and what comes after
+that is not yet anybody's problem. That single `requires` field is the whole
+extension point; adding a quest is a row in `Quests::DEFS` and nothing else.
+
+**On screen** it is a ledger in the top-right screens block, and its cell goes
+**green** when something is payable. That is the same idea as the bag's ember
+(§7.6) pointed the other way, and the colour is the whole distinction: ember is
+what a *problem* looks like — a full bag, a broken tool — and a reward wearing it
+reads as an alarm going off over good news.
+
+Gold is taken too, and deliberately not reused for this: gold is the currency,
+it is already on every reward figure in the panel, and spending it on status as
+well would make "20g" and "done" the same colour saying two different things.
+
+Two tabs and no third: **pending** is everything still owed you, in progress or
+finished-and-waiting, sorted so the payable rows come first; **completed** is
+everything already paid. Finished reads green wherever it appears — the tally,
+the bar, the goal line — and nothing else on the screen does.
+
+**A claim answers with a receipt, never a toast.** It is the one thing on the
+ledger the player came back for, and there is more to say than a status line
+holds — what was earned, what the purse is now, and what the claim just opened
+up. It gets the same one-beat arrival as the haul modal (§4), and like that one
+it carries no button: the gold landed before the plate was drawn, so "Take it"
+would be a question with one answer.
 
 ---
 
@@ -1494,11 +1584,25 @@ The working approach, after several failed attempts:
 ink        #141b18   inkPanel  #1d2622   line    #3a463f
 vellum     #ece3cd   vellumDim #c9bd9e
 copper     #c1793f   ember     #b8453f   gold    #d8b34a   violet #7d5fa8
+sap        #8fbf7f
 forest     #5f8058   mountain  #6d8399   plains  #b08a5a
 badlands   #96604c   grassland #a8a05c
 ```
 Depleted tiles use a darker/desaturated variant of their **own biome color**, never grey —
 the land is drained, not dead, and it will regrow.
+
+**Ember and sap are a pair, and neither may do the other's job.** Ember marks a
+state to deal with — a full bag, a broken tool, a destructive button. Sap marks
+one worth crossing the screen for: a finished quest, a good toast. A payout in
+ember reads as an alarm; a warning in sap reads as a congratulation. `forest` is
+a biome fill and is not either of them.
+
+**The screens block is three across and two down** — a honeycomb, nested the way
+§13.2's map hexes are: three quarters of a width between columns, middle column
+dropped half a height. Six cells in a row would eat 350px of the top edge, and
+six in a nested column reached a third of the way down a phone. Three by two is
+the squarest the lattice allows, and it keeps every screen within a thumb's
+reach of the corner.
 
 ---
 
@@ -1546,5 +1650,5 @@ Ordered roughly by leverage:
 - Suggested stack given prior projects: PHP or Node backend, MySQL/SQLite, **SSE + POST** for
   any realtime needs (already evaluated as sufficient at this scale — WebSockets are overkill),
   React + Vite frontend, Capacitor if packaging for Android.
-- Start with the tutorial loop (§12) as the first vertical slice. It touches mining,
+- Start with the opening quest arc (§12) as the first vertical slice. It touches mining,
   processing, gold, NPC shop, and crafting — roughly 60% of the core systems in one flow.

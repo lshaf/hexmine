@@ -42,8 +42,6 @@ export interface CharacterDto {
   sight: number
   /** §8.3 -- wall-clock ms to cross one hex at this character's pace. */
   travelPerHexMs: number
-  /** §12 -- index into the tutorial script; -1 once finished. */
-  tutorialStep: number
 }
 
 /**
@@ -130,6 +128,52 @@ export interface PlayerState {
   jobLevels: JobLevel[]
   /** §7.4.2 -- node keys bought. Bought, never refunded. */
   nodes: string[]
+  /**
+   * §12.1 -- where every *visible* quest stands. A quest whose prerequisite is
+   * unclaimed is not in this list at all: what is next should be legible, and
+   * what comes after that is not yet the player's problem.
+   */
+  quests: QuestState[]
+}
+
+/** §12.1 -- one quest's standing. The catalog behind it comes from GET /quests. */
+export interface QuestState {
+  key: string
+  /** Held at the target rather than run past it. */
+  progress: number
+  /** Whether the goal is met. Server-decided: it is a rule, and §16 owns rules. */
+  complete: boolean
+  /** Claimed pays once and never comes back. */
+  claimed: boolean
+  claimedAt: number | null
+}
+
+/**
+ * §12.1 -- a quest, as written down. Static and identical for everyone, so it is
+ * fetched once when the panel first opens rather than riding every refresh.
+ */
+export interface QuestDef {
+  name: string
+  description: string
+  goal: {
+    kind: 'gather' | 'process' | 'craft' | 'travel' | 'sell' | 'level' | 'job'
+    /** Narrows the counter: a material, a line, a category, a job. Null is any. */
+    subject: string | null
+    target: number
+  }
+  /** §3.2 -- gold, and only ever gold. */
+  gold: number
+  /** The quest that must be *claimed* before this one is offered. */
+  requires: string | null
+}
+
+/** What a claim paid, and what it opened. Rendered as a receipt, never a toast. */
+export interface QuestReward {
+  quest: string
+  name: string
+  gold: number
+  goldAfter: number
+  unlocked: Array<{ key: string; name: string }>
 }
 
 export interface SkillPoints {
@@ -231,6 +275,13 @@ export interface WorkPreview {
   /** Which of the three verbs this costing is for. */
   activity: 'gathering' | 'mining' | 'hunting'
   /**
+   * §9.5.3 -- something is standing on the hex under your feet.
+   *
+   * Set on every costing in sight, not only this hex's: the pin is about the
+   * ground you are on, so while it holds there is no work anywhere.
+   */
+  pinned: boolean
+  /**
    * §5.6 -- true when the hex is outside sight, and everything above it is
    * therefore blank rather than zero. The server will not cost an unscouted
    * hex, so the card reports the walk instead of the seam.
@@ -289,6 +340,40 @@ export interface MapMutations {
   cleared: Array<[number, number]>
 }
 
+/**
+ * §9.5.5 -- what the fight standing on your hex would cost, before you take it.
+ *
+ * Priced server-side like every other outcome. The odds are the point: a forced
+ * encounter you can see the odds of is a decision, and one you cannot is a
+ * gamble.
+ */
+export interface BattlePreview {
+  canFight: boolean
+  reason: string | null
+  /** Unix ms the pack wanders off, which is the other way out of the pin. */
+  until?: number
+  monster?: {
+    key: string
+    name: string
+    tier: number
+    profile: 'brute' | 'carapace' | 'swift'
+    attack: number
+    defence: number
+    description: string
+  }
+  /** Your flat pair, gear plus battle job, §9.5.4. */
+  attack?: number
+  defence?: number
+  odds?: number
+  /** §9.5.4 -- the battle job the equipped weapon levels, and where it stands. */
+  job?: string | null
+  jobLevel?: number
+  /** §9.5.6 -- worst-case durability cost, weapon and worn piece. */
+  wear?: { weapon: number; armor: number }
+  /** §8.2 -- gear this fight could destroy outright, named before it happens. */
+  warnings?: string[]
+}
+
 /** Standard envelope: the result of the action plus the new authoritative state. */
 export interface ActionResult<T = unknown> {
   data: T
@@ -329,6 +414,8 @@ export interface GameApi {
   getWorld(): Promise<WorldConfig>
   getMap(): Promise<MapMutations>
   previewTile(col: number, row: number): Promise<TilePreview>
+  /** §9.5.5 -- no coordinates: the only fight on offer is the one under your feet. */
+  previewBattle(): Promise<BattlePreview>
 
   startMining(col: number, row: number): Promise<ActionResult<Job>>
   /** §4.0 -- the same hex, by hand. Its own call because it is its own verb. */
@@ -364,6 +451,11 @@ export interface GameApi {
   getSkillTree(): Promise<SkillTree>
   /** §7.4 -- spend one point. Every gate is checked server-side. */
   buyNode(nodeKey: string): Promise<ActionResult<{ node: string; points: SkillPoints }>>
+
+  /** §12.1 -- the static quest catalog. Fetched once, never per action. */
+  getQuests(): Promise<Record<string, QuestDef>>
+  /** §12.1 -- take the gold, once. Answers with no message: the receipt says it. */
+  claimQuest(quest: string): Promise<ActionResult<QuestReward>>
 }
 
 export class ApiError extends Error {

@@ -9,7 +9,6 @@ use App\Game\Catalog;
 use App\Game\Formulas;
 use App\Game\GameService;
 use App\Game\HexGeometry;
-use App\Game\Tutorial;
 use App\Game\WorldGen;
 use App\Models\Character;
 use App\Models\CharacterItem;
@@ -24,8 +23,7 @@ class SeedDemoCharacter extends Command
     protected $signature = 'game:demo
         {--session= : Bind to this session id instead of the most recently active one}
         {--wallet= : Bind to this wallet instead of the session-derived one}
-        {--fresh : Delete the existing character and mint a new one before seeding}
-        {--tutorial : Leave the tutorial running instead of marking it finished}';
+        {--fresh : Delete the existing character and mint a new one before seeding}';
 
     protected $description = 'Give a character a mid-game kit so every screen can be exercised';
 
@@ -145,7 +143,6 @@ class SeedDemoCharacter extends Command
             ['bag', "{$bag['units']}/{$bag['unitCap']} units, {$bag['rows']}/{$bag['rowCap']} rows"
                 .($bag['over'] ? '  — OVERLOADED, this character cannot travel' : '')],
             ['jobs', $summary['jobs']],
-            ['tutorial', $this->option('tutorial') ? 'running from step 1' : 'finished'],
         ]);
 
         $this->line('  Reload the app to see it. Timers run at <options=bold>'.Balance::timeScale().'x</> — set GAME_TIME_SCALE in .env to compress them.');
@@ -211,7 +208,6 @@ class SeedDemoCharacter extends Command
         $character->xp = (int) round(Balance::xpForLevel(self::LEVEL) * 0.42);
         $character->gold = self::GOLD;
         $character->presence_settlement_id = null;
-        $character->tutorial_step = $this->option('tutorial') ? 0 : Tutorial::DONE;
         $character->save();
 
         $character->jobs()->delete();

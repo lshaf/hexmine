@@ -11,6 +11,7 @@ use App\Models\CharacterItem;
 use App\Models\CharacterJob;
 use App\Models\CharacterMaterial;
 use App\Models\CharacterNode;
+use App\Models\CharacterQuest;
 use App\Models\CharacterSkill;
 use App\Models\GameJob;
 use App\Models\Player;
@@ -43,7 +44,7 @@ class GameService
      * §5.4 -- spawn is auto-assigned, never player-chosen, and biased toward
      * under-populated regions.
      *
-     * It also has to guarantee the §12 tutorial is completable from where it
+     * It also has to guarantee the §12 opening arc is completable from where it
      * drops you: a forest tile in the outer ring, with a village running the
      * woodcutting line a short walk away. Villages run only 1 of 5 lines (§6),
      * so unconstrained spawns leave most players with no nearby way to turn
@@ -133,7 +134,6 @@ class GameService
                 'gold' => Balance::STARTING_GOLD,
                 'col' => $spawn['col'],
                 'row' => $spawn['row'],
-                'tutorial_step' => 0,
             ]);
 
             foreach (Catalog::SKILLS as $skill) {
@@ -871,11 +871,197 @@ class GameService
         return $result['levelsGained'];
     }
 
-    // ---------------------------------------------------------------- tutorial
+    // ----------------------------------------------------------------- quests §12
 
-    private function fireTutorial(Character $character, string $event): void
+    /**
+     * §12 -- credit a counted goal.
+     *
+     * Called from wherever the work actually finishes. Two properties matter and
+     * both come from riding the call sites the game already had rather than
+     * inventing new ones: a quest can only ever be advanced by work the server
+     * itself witnessed, and adding a quest costs a row in Quests::DEFS rather
+     * than a new hook.
+     *
+     * These are the same eleven sites the tutorial cursor used to sit on, which
+     * is most of why §12 converted to quests without losing anything.
+     *
+     * A quest already claimed is skipped. Counting past a finished quest would
+     * be bookkeeping nobody reads, and it is the one place a `claimed_at` check
+     * is cheaper than the alternative.
+     *
+     * A quest still LOCKED is counted anyway, and deliberately. A prospector who
+     * walked two hundred hexes before anybody wrote the quest down has still
+     * walked them, and being handed a task already half done is a better welcome
+     * than being told to start again.
+     */
+    private function fireQuest(Character $character, string $kind, int $amount, ?string $subject = null): void
     {
-        $character->tutorial_step = Tutorial::advance($character->tutorial_step, $event);
+        if ($amount <= 0) {
+            return;
+        }
+
+        foreach (Quests::counting($kind, $subject) as $key) {
+            $row = $character->quests()->firstOrCreate(
+                ['quest_key' => $key],
+                ['progress' => 0],
+            );
+
+            if ($row->claimed_at !== null) {
+                continue;
+            }
+
+            // Held at the target rather than run past it: a counter that keeps
+            // climbing after the goal is met is a number the panel would have to
+            // apologise for.
+            $row->progress = min(
+                Quests::DEFS[$key]['goal']['target'],
+                (int) $row->progress + $amount,
+            );
+            $row->save();
+        }
+
+        $character->unsetRelation('quests');
+    }
+
+    /**
+     * §12 -- where a quest stands, whichever kind of goal it has.
+     *
+     * A counted goal reads its stored tally; a measured one is read off the
+     * character every single time. The second is the reason there is no
+     * `completed_at` column: "am I level five" is a question with a live answer,
+     * and storing it would let the stored copy and the character disagree.
+     */
+    private function questProgress(Character $character, string $key, ?CharacterQuest $row): int
+    {
+        $goal = Quests::DEFS[$key]['goal'];
+
+        return match ($goal['kind']) {
+            'level' => (int) $character->level,
+            'job' => $this->jobLevels($character)[$goal['subject']] ?? 0,
+            default => (int) ($row->progress ?? 0),
+        };
+    }
+
+    /**
+     * §12 -- a quest is offered once the one before it has been *claimed*.
+     *
+     * Claimed rather than merely met, so the chain advances on a decision the
+     * player made. A quest still locked is not sent to the client at all: what
+     * is next should be legible, and what comes after that is not yet anybody's
+     * problem.
+     */
+    private function questUnlocked(array $claimed, string $key): bool
+    {
+        $requires = Quests::DEFS[$key]['requires'] ?? null;
+
+        return $requires === null || in_array($requires, $claimed, true);
+    }
+
+    /**
+     * §12 -- every quest this character can see, with where it stands.
+     *
+     * Rides in the state payload rather than on the quests endpoint, because it
+     * changes with almost every action while the catalog behind it never does.
+     *
+     * @return array<int,array<string,mixed>>
+     */
+    public function questPayload(Character $character): array
+    {
+        $rows = $character->quests()->get()->keyBy('quest_key');
+        $claimed = $rows->filter(fn (CharacterQuest $q) => $q->claimed_at !== null)
+            ->pluck('quest_key')
+            ->all();
+
+        $out = [];
+
+        foreach (Quests::DEFS as $key => $def) {
+            if (! $this->questUnlocked($claimed, $key)) {
+                continue;
+            }
+
+            $row = $rows->get($key);
+            $progress = $this->questProgress($character, $key, $row);
+
+            $out[] = [
+                'key' => $key,
+                'progress' => min($progress, $def['goal']['target']),
+                // Derived here rather than client-side: whether a goal is met is
+                // a rule, and §16 puts rules on this side of the wire.
+                'complete' => $progress >= $def['goal']['target'],
+                'claimed' => $row?->claimed_at !== null,
+                'claimedAt' => $row?->claimed_at,
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * §12 -- take the gold, once and forever.
+     *
+     * Every gate is here rather than on the button: the client draws a list, the
+     * server decides what is payable (§16). The unique index on (character,
+     * quest) is the last line of defence against a doubled request, exactly as
+     * it is for a bought node.
+     *
+     * @return array<string,mixed>
+     */
+    public function claimQuest(Character $character, string $key): array
+    {
+        return DB::transaction(function () use ($character, $key) {
+            $def = Quests::def($key);
+            if ($def === null) {
+                throw new GameException('No such quest.', 'not_found');
+            }
+
+            $rows = $character->quests()->get()->keyBy('quest_key');
+            $claimed = $rows->filter(fn (CharacterQuest $q) => $q->claimed_at !== null)
+                ->pluck('quest_key')
+                ->all();
+
+            if (! $this->questUnlocked($claimed, $key)) {
+                $before = Quests::DEFS[$def['requires']]['name'];
+                throw new GameException("{$before} comes first.", 'locked');
+            }
+
+            $row = $character->quests()->firstOrCreate(
+                ['quest_key' => $key],
+                ['progress' => 0],
+            );
+
+            if ($row->claimed_at !== null) {
+                throw new GameException('Already claimed. A quest pays once.', 'already_claimed');
+            }
+
+            $progress = $this->questProgress($character, $key, $row);
+            if ($progress < $def['goal']['target']) {
+                throw new GameException('Not finished yet.', 'incomplete');
+            }
+
+            // §3.2 -- gold and only gold. A quest that paid a material would be
+            // a hole in §2 rather than a nicer reward.
+            $character->gold += $def['gold'];
+            $row->claimed_at = $this->now();
+            $row->save();
+            $character->save();
+            $character->unsetRelation('quests');
+
+            return [
+                'quest' => $key,
+                'name' => $def['name'],
+                'gold' => $def['gold'],
+                'goldAfter' => (int) $character->gold,
+                // What this claim just made visible, so the modal can say the
+                // road goes on rather than ending on a receipt.
+                'unlocked' => array_values(array_map(
+                    fn (string $next) => ['key' => $next, 'name' => Quests::DEFS[$next]['name']],
+                    array_filter(
+                        array_keys(Quests::DEFS),
+                        fn (string $next) => (Quests::DEFS[$next]['requires'] ?? null) === $key,
+                    ),
+                )),
+            ];
+        });
     }
 
     // ------------------------------------------------------------------- tiles
@@ -929,6 +1115,14 @@ class GameService
     {
         $regrowsAt = (int) (TileState::where('col', $col)->where('row', $row)->value('regrows_at') ?? 0);
         $tile = WorldGen::generateTile($col, $row, $now, ['regrowsAt' => $regrowsAt]);
+
+        // §9.5.1 -- the seed says a pack is standing here; the cache says
+        // whether anybody has already settled it. Win or lose it is gone, and
+        // folding that in here means no reader downstream has to remember to
+        // ask.
+        if ($tile['pack'] !== null && Packs::isCleared($col, $row, $tile['pack']['bucket'])) {
+            $tile['pack'] = null;
+        }
 
         // Only mineable tiles have slots to occupy: barren capital-ring hexes,
         // settlements and dungeon entrances would otherwise show phantom pips.
@@ -1087,6 +1281,148 @@ class GameService
         ];
     }
 
+    // ------------------------------------------------------------ combat §9.5
+
+    /**
+     * §9.5.3 -- is a pack standing on the hex this character is on.
+     *
+     * The pin is about the ground under your feet and nothing else: a pack two
+     * hexes away is a hazard on a road you have not taken yet, and refusing
+     * work because of it would be a fence rather than a fight.
+     *
+     * @return array{key:string,bucket:int,until:int,monster:array<string,mixed>}|null
+     */
+    public function packHere(Character $character): ?array
+    {
+        // On the road there is no hex under your feet yet. A traveller is
+        // stopped by a pack when they arrive (§9.5.6), not while they walk.
+        if ($this->isTravelling($character)) {
+            return null;
+        }
+
+        $tile = $this->buildTile((int) $character->col, (int) $character->row, $this->now());
+        $pack = $tile['pack'] ?? null;
+
+        if ($pack === null || $pack['until'] <= $this->now()) {
+            return null;
+        }
+
+        return $pack + ['monster' => Monsters::ROSTER[$pack['key']]];
+    }
+
+    /**
+     * §9.5.3 -- what the pin says when it refuses.
+     *
+     * It names the thing and its clock, because the two exits are fighting it
+     * and waiting it out, and a refusal that mentions neither reads as a bug.
+     */
+    private function pinnedReason(array $pin): string
+    {
+        return $pin['monster']['name'].' is standing here. Fight it, or wait for it to move on.';
+    }
+
+    /** §9.5.4 -- the battle job the equipped weapon levels, and its level. */
+    private function battleJobLevel(Character $character): array
+    {
+        foreach ($this->itemRows($character) as $item) {
+            if (! $item['equipped'] || $item['durability'] <= 0) {
+                continue;
+            }
+
+            $def = Catalog::item($item['key']);
+            $family = $def['family'] ?? null;
+            if ($family === null) {
+                continue;
+            }
+
+            $job = Catalog::BATTLE_JOB_FOR_FAMILY[$family] ?? null;
+            if ($job === null) {
+                continue;
+            }
+
+            return ['job' => $job, 'level' => (int) ($this->jobLevels($character)[$job] ?? 0)];
+        }
+
+        return ['job' => null, 'level' => 0];
+    }
+
+    /**
+     * §9.5.5 -- what this fight would cost and what it would probably do.
+     *
+     * The odds are shown BEFORE anything is committed, which is what makes a
+     * forced encounter a decision rather than a gamble. So is the warning: §8.2
+     * destroys an item at zero durability, and an idle game may take something
+     * expensive from a player but never by surprise.
+     */
+    public function previewBattle(Character $character): array
+    {
+        $pin = $this->packHere($character);
+
+        if ($pin === null) {
+            return ['canFight' => false, 'reason' => 'Nothing is standing here.'];
+        }
+
+        $monster = $pin['monster'];
+        $items = $this->itemRows($character);
+        $job = $this->battleJobLevel($character);
+
+        // §8.5 -- a battle draught is armed for exactly this and nothing else.
+        $bonuses = $this->bonuses($character, 'battle');
+        $pair = Formulas::combatPair($items, $job['level'], $bonuses['power'], $bonuses['defence']);
+
+        $warnings = [];
+        $wear = ['weapon' => 0, 'armor' => 0];
+
+        foreach ($items as $item) {
+            if (! $item['equipped'] || $item['durability'] <= 0) {
+                continue;
+            }
+
+            $def = Catalog::item($item['key']);
+            $slot = $def['slot'] ?? null;
+            $max = (int) ($def['maxDurability'] ?? 1);
+
+            // The worst case is what a warning has to be built on: the fight is
+            // not rolled yet, and "it might survive" is not a thing to tell
+            // somebody about to lose a legendary.
+            if ($slot === 'weapon') {
+                $wear['weapon'] = Formulas::weaponWear($pair['attack'], $monster, false, $max);
+                $cost = $wear['weapon'];
+            } elseif (in_array($slot, ['armor', 'boots', 'gloves'], true)) {
+                $cost = Formulas::armorWear((int) ($def['defence'] ?? 0), $monster, false, $max);
+                $wear['armor'] = max($wear['armor'], $cost);
+            } else {
+                continue;
+            }
+
+            if ($cost >= $item['durability']) {
+                $warnings[] = $def['name'].' will not survive this.';
+            }
+        }
+
+        return [
+            'canFight' => true,
+            'reason' => null,
+            'until' => $pin['until'],
+            'monster' => [
+                'key' => $pin['key'],
+                'name' => $monster['name'],
+                'tier' => $monster['tier'],
+                'profile' => $monster['profile'],
+                'attack' => $monster['attack'],
+                'defence' => $monster['defence'],
+                'description' => $monster['description'],
+            ],
+            'attack' => $pair['attack'],
+            'defence' => $pair['defence'],
+            'odds' => round(Formulas::battleOdds($pair['attack'], $pair['defence'], $monster), 3),
+            'job' => $job['job'],
+            'jobLevel' => $job['level'],
+            'wear' => $wear,
+            'warnings' => $warnings,
+        ];
+    }
+
     /**
      * Server-computed preview of what a trip here would cost and give.
      *
@@ -1132,6 +1468,11 @@ class GameService
             ];
         }
 
+        // §9.5.3 -- the pin. A pack on the hex under your feet stops mining,
+        // gathering and hunting ANYWHERE in sight, not merely on the hex it is
+        // standing on: you are not working while something is looking at you.
+        $pin = $this->packHere($character);
+
         $tile = $this->buildTile($col, $row, $now);
 
         $base = [
@@ -1151,7 +1492,16 @@ class GameService
             'scrap' => false,
             'note' => null,
             'unseen' => false,
+            // §9.5.3 -- something is standing on the hex you are on.
+            'pinned' => false,
         ];
+
+        if ($pin !== null) {
+            $base['reason'] = $this->pinnedReason($pin);
+            $base['pinned'] = true;
+
+            return $base;
+        }
 
         if ($tile['material'] === null) {
             $base['reason'] = match (true) {
@@ -1288,6 +1638,9 @@ class GameService
             'scrap' => $gathering,
             'note' => $note,
             'unseen' => false,
+            // §9.5.3 -- nothing is standing on you, or this return was never
+            // reached: the pin refuses above, before any of this is costed.
+            'pinned' => false,
         ];
     }
 
@@ -1521,7 +1874,6 @@ class GameService
             // Nobody moves here: the character was already standing on this hex
             // before the trip could start, and stays on it while the timer runs.
             // Position changes only through explicit travel.
-            $this->fireTutorial($character, 'mine_start');
             $character->save();
 
             return $job;
@@ -1573,7 +1925,6 @@ class GameService
                     );
                 }
 
-                $this->fireTutorial($character, 'collect');
             } elseif ($job->kind === 'hunting') {
                 [$gained, $lostToOverflow] = $this->grantHaul($character, $job);
 
@@ -1588,7 +1939,6 @@ class GameService
 
                 // No depletion and no TileState row: the herd was the resource,
                 // and it leaves on its own clock whatever anybody does here.
-                $this->fireTutorial($character, 'collect');
             } else {
                 $granted = $this->addMaterial($character, $job->output_key, $job->quantity);
                 $lostToOverflow = $job->quantity - $granted;
@@ -1608,7 +1958,22 @@ class GameService
                     );
                 }
 
-                $this->fireTutorial($character, 'process_collect');
+            }
+
+            // §12 -- one hook for all three verbs, because what a quest counts
+            // is what LANDED in the bag. A unit lost to a full bag was never
+            // carried home, and crediting it would pay for a haul the player
+            // does not have. Per material, so "ten of anything" and "thirty iron
+            // ore" are the same mechanism; a processing run is counted against
+            // its line instead, because that is what the bench was running.
+            $processing = $job->kind === 'processing';
+            foreach ($gained as $materialKey => $qty) {
+                $this->fireQuest(
+                    $character,
+                    $processing ? 'process' : 'gather',
+                    (int) $qty,
+                    $processing ? (string) $job->skill_key : (string) $materialKey,
+                );
             }
 
             $this->grantSkillXp($character, $job->skill_key, $xpAmount);
@@ -1815,7 +2180,6 @@ class GameService
 
             $this->spendBuffs($character, 'processing');
 
-            $this->fireTutorial($character, 'process_start');
             $character->save();
 
             return $job;
@@ -1896,6 +2260,15 @@ class GameService
             );
         }
 
+        // §9.5.3 -- and the road is shut while something holds the hex. Both
+        // ways out are here on this tile: fight it, or wait for its clock.
+        // Neither is a dead end, because a loss clears the pack as surely as a
+        // win does.
+        $pin = $this->packHere($character);
+        if ($pin !== null) {
+            throw new GameException($this->pinnedReason($pin), 'pinned');
+        }
+
         // Anywhere on the map, seen or not (§5.6). Distance is the whole cost:
         // the far side of the world is a walk of days, which is a decision the
         // clock enforces on its own. The only refusal left is the map's edge.
@@ -1965,7 +2338,6 @@ class GameService
         $settlement = WorldGen::settlementAt($character->col, $character->row);
         if ($settlement !== null) {
             $this->joinPresence($character, $settlement['id']);
-            $this->fireTutorial($character, 'travel');
         }
         $character->save();
 
@@ -2054,7 +2426,6 @@ class GameService
         $settlement = WorldGen::settlementAt($character->col, $character->row);
         if ($settlement !== null) {
             $this->joinPresence($character, $settlement['id']);
-            $this->fireTutorial($character, 'travel');
         }
 
         return true;
@@ -2163,7 +2534,10 @@ class GameService
             }
 
             $character->gold -= $def['goldPrice'];
-            $this->fireTutorial($character, 'buy');
+            // §12 -- fired under both names the quest could mean: the item and
+            // the slot it goes in. The matcher knows about neither.
+            $this->fireQuest($character, 'buy', 1, $itemKey);
+            $this->fireQuest($character, 'buy', 1, $def['slot'] ?? null);
             $character->save();
 
             return CharacterItem::create([
@@ -2199,7 +2573,9 @@ class GameService
 
             $gold = $def['npcPrice'] * $count;
             $character->gold += $gold;
-            $this->fireTutorial($character, 'sell');
+            // §12 -- counted in gold taken rather than stacks sold, so a
+            // quest about the trader is about the rate rather than the trips.
+            $this->fireQuest($character, 'sell', $gold);
             $character->save();
 
             return $gold;
@@ -2262,7 +2638,9 @@ class GameService
                 $this->takeMaterial($character, $key, $qty);
             }
 
-            $this->fireTutorial($character, 'craft');
+            // §12 -- the item and its bench, so a quest may name either.
+            $this->fireQuest($character, 'craft', 1, $itemKey);
+            $this->fireQuest($character, 'craft', 1, Catalog::category($def));
             $character->save();
 
             // §7.4 -- the bench that made it is the job that learns from it, and
@@ -2443,6 +2821,11 @@ class GameService
         }
 
         $this->grantJobXp($character, 'explorer', $hexes * Balance::EXPLORER_XP_PER_HEX);
+
+        // §12 -- the same hexes, counted once. Paid on ground actually
+        // crossed, so a journey abandoned halfway credits the half that
+        // happened -- the same arithmetic the Explorer is paid on.
+        $this->fireQuest($character, 'travel', $hexes);
     }
 
     /**
@@ -2702,7 +3085,10 @@ class GameService
         $item->equipped = true;
         $item->save();
 
-        $this->fireTutorial($character, 'equip');
+        // §12 -- the item and the slot, same as a purchase. "Put an axe on" and
+        // "put the Stone Axe on" are the same event asked about differently.
+        $this->fireQuest($character, 'equip', 1, $item->item_key);
+        $this->fireQuest($character, 'equip', 1, $def['slot'] ?? null);
         $character->save();
     }
 
@@ -2860,7 +3246,6 @@ class GameService
                 // §8.3 -- the character's pace, for costing a walk before it is
                 // taken. Already wall-clock: the dev clock is applied here.
                 'travelPerHexMs' => $this->travelMsPerHex($character),
-                'tutorialStep' => $character->tutorial_step,
             ],
             'skills' => $skills,
             // Cast to object so an empty inventory serialises as {} rather than
@@ -2903,6 +3288,10 @@ class GameService
             // work above, and a duplicate here silently clobbered it.
             'jobLevels' => $this->jobLevelPayload($character),
             'nodes' => $this->ownedNodes($character),
+            // §12 -- where every visible quest stands. In the state rather
+            // than on the quests endpoint because it moves with almost every
+            // action, while the catalog behind it never moves at all.
+            'quests' => $this->questPayload($character),
             'bonuses' => $this->bonuses($character),
             'toolYield' => $this->toolYieldByLine($character),
             // §8.5 -- what is on the shelf, and what is running right now.

@@ -12,7 +12,7 @@ class Character extends Model
 {
     protected $fillable = [
         'player_id', 'name', 'level', 'xp', 'gold',
-        'col', 'row', 'presence_settlement_id', 'tutorial_step',
+        'col', 'row', 'presence_settlement_id',
         'travel_to_col', 'travel_to_row', 'travel_started_at', 'travel_ends_at',
     ];
 
@@ -22,7 +22,6 @@ class Character extends Model
         'gold' => 'integer',
         'col' => 'integer',
         'row' => 'integer',
-        'tutorial_step' => 'integer',
         'travel_to_col' => 'integer',
         'travel_to_row' => 'integer',
         'travel_started_at' => 'integer',
@@ -78,6 +77,12 @@ class Character extends Model
     public function nodes(): HasMany
     {
         return $this->hasMany(CharacterNode::class);
+    }
+
+    /** §12.1 -- one row per quest this character has touched. */
+    public function quests(): HasMany
+    {
+        return $this->hasMany(CharacterQuest::class);
     }
 
     public function jobs(): HasMany

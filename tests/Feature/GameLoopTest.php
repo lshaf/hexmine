@@ -37,6 +37,33 @@ final class GameLoopTest extends TestCase
         $this->game = app(GameService::class);
         $player = Player::create(['wallet' => '0xtest', 'session_id' => 'test']);
         $this->character = $this->game->createCharacter($player);
+
+        $this->clearPackHere();
+    }
+
+    /**
+     * §9.5.3 -- settle whatever is standing on the character's hex.
+     *
+     * Packs are a hash of the hex and the clock, so on some runs one is camped
+     * on the spawn tile and pins the character: every trip, hunt and journey in
+     * this file would be refused, on a schedule nobody can see. Clearing it in
+     * setUp makes the rest of the suite deterministic, and the pin is tested on
+     * a hex chosen for holding one.
+     */
+    private function clearPackHere(): void
+    {
+        $pack = $this->game->packHere($this->character->fresh());
+        if ($pack === null) {
+            return;
+        }
+
+        \App\Game\Packs::clear(
+            (int) $this->character->col,
+            (int) $this->character->row,
+            $pack['bucket'],
+            $pack['until'],
+            0,
+        );
     }
 
     /**
@@ -184,7 +211,7 @@ final class GameLoopTest extends TestCase
         }
     }
 
-    /** §12 -- the spawn must make the tutorial completable. */
+    /** §12 -- the spawn must make the opening quest arc completable. */
     public function test_spawn_is_forest_with_a_reachable_woodcutting_village(): void
     {
         $tile = $this->game->buildTile($this->character->col, $this->character->row, $this->game->now());
@@ -1870,7 +1897,7 @@ final class GameLoopTest extends TestCase
 
     /**
      * §4.0 -- the tool is the difference between a haul and a pile of junk.
-     * This is what the tutorial's first three steps exist to teach, and what
+     * This is what the opening arc's first three quests exist to teach, and what
      * makes the first 12 gold worth spending.
      */
     public function test_bare_hands_bring_back_scrap_and_the_tool_brings_back_the_material(): void
@@ -3807,5 +3834,296 @@ final class GameLoopTest extends TestCase
             'batch is not exactly the cap, per run rather than per batch',
         );
         $this->assertGreaterThan((int) $plain->quantity, (int) $skilled->quantity);
+    }
+
+    // ----------------------------------------------------------- quests §12
+
+    /** §12 -- a quest only advances on work the server actually witnessed. */
+    public function test_a_haul_advances_a_gather_quest(): void
+    {
+        $this->assertSame(0, $this->questProgress('bare_hands'));
+
+        $open = $this->openNeighbour($this->character->col, $this->character->row);
+        $this->character->update($open);
+
+        $job = $this->game->startMining($this->character->fresh(), $open['col'], $open['row'], \App\Game\Drops::GATHERING);
+        $job->update(['ends_at' => $this->game->now() - 1]);
+        $result = $this->game->collectJob($this->character->fresh(), $job->id);
+
+        // Only what the quest actually names: a bare-handed forest trip brings
+        // back rubbish alongside the branches, and none of it counts here.
+        $branches = (int) ($result['gained']['branch'] ?? 0);
+        $this->assertGreaterThan(0, $branches, 'a bare-handed forest trip brought back no branches');
+        $this->assertSame(
+            min($branches, \App\Game\Quests::DEFS['bare_hands']['goal']['target']),
+            $this->questProgress('bare_hands'),
+            'the haul did not reach the ledger',
+        );
+    }
+
+    /**
+     * §12 -- a counter is held at the target rather than run past it.
+     *
+     * A tally that keeps climbing after the goal is met is a number the panel
+     * would have to apologise for.
+     */
+    public function test_a_finished_counter_stops_at_its_target(): void
+    {
+        $target = \App\Game\Quests::DEFS['short_road']['goal']['target'];
+
+        $this->fireQuest('travel', $target * 3);
+
+        // Read off the row rather than the ledger: short_road is still locked
+        // behind the opening arc, and §12 counts work whether or not the quest
+        // that wants it has been offered yet.
+        $this->assertSame(
+            $target,
+            (int) $this->character->fresh()->quests()->where('quest_key', 'short_road')->value('progress'),
+        );
+    }
+
+    /**
+     * §12 -- work counts whether or not the quest asking for it is offered.
+     *
+     * A prospector who sold a bagful before anybody wrote the quest down has
+     * still sold it, and being handed a task already done is a better welcome
+     * than being told to start again.
+     */
+    public function test_work_done_before_a_quest_is_offered_still_counts(): void
+    {
+        $this->fireQuest('sell', 500);
+        $this->fireQuest('gather', 50, 'branch');
+
+        $this->game->claimQuest($this->character->fresh(), 'bare_hands');
+
+        $this->assertTrue($this->questRow('first_coin')['complete'], 'the sale was forgotten');
+    }
+
+    /** §3.2 -- the reward is gold, it lands once, and the row is closed. */
+    public function test_claiming_pays_gold_exactly_once(): void
+    {
+        $this->fireQuest('gather', 50, 'branch');
+        $before = (int) $this->character->fresh()->gold;
+
+        $reward = $this->game->claimQuest($this->character->fresh(), 'bare_hands');
+
+        $this->assertSame(\App\Game\Quests::DEFS['bare_hands']['gold'], $reward['gold']);
+        $this->assertSame(
+            $before + $reward['gold'],
+            (int) $this->character->fresh()->gold,
+            'the gold did not reach the purse',
+        );
+
+        try {
+            $this->game->claimQuest($this->character->fresh(), 'bare_hands');
+            $this->fail('a quest paid twice');
+        } catch (\App\Game\GameException $e) {
+            $this->assertSame('already_claimed', $e->errorCode);
+        }
+
+        $this->assertSame(
+            $before + $reward['gold'],
+            (int) $this->character->fresh()->gold,
+            'the second claim moved the purse',
+        );
+    }
+
+    /** §12 -- an unfinished quest is not payable, however it is asked for. */
+    public function test_an_unfinished_quest_cannot_be_claimed(): void
+    {
+        $this->expectException(\App\Game\GameException::class);
+        $this->game->claimQuest($this->character->fresh(), 'bare_hands');
+    }
+
+    /**
+     * §12 -- the chain advances on claiming, not on finishing.
+     *
+     * A quest whose prerequisite is unclaimed is not offered and cannot be
+     * taken, so what is next stays legible.
+     */
+    public function test_a_locked_quest_is_neither_offered_nor_payable(): void
+    {
+        $keys = array_column($this->game->questPayload($this->character->fresh()), 'key');
+        $this->assertContains('bare_hands', $keys);
+        $this->assertNotContains('first_coin', $keys, 'a locked quest was offered');
+
+        try {
+            $this->game->claimQuest($this->character->fresh(), 'first_coin');
+            $this->fail('claimed past a locked prerequisite');
+        } catch (\App\Game\GameException $e) {
+            $this->assertSame('locked', $e->errorCode);
+        }
+
+        // Claiming the one before it is what opens the next.
+        $this->fireQuest('gather', 50, 'branch');
+        $reward = $this->game->claimQuest($this->character->fresh(), 'bare_hands');
+
+        $this->assertContains(
+            'first_coin',
+            array_column($reward['unlocked'], 'key'),
+            'the receipt did not name what it opened',
+        );
+        $this->assertContains(
+            'first_coin',
+            array_column($this->game->questPayload($this->character->fresh()), 'key'),
+        );
+    }
+
+    /**
+     * §12 -- a measured goal is read off the character, never stored.
+     *
+     * "Am I level five" has a live answer, and a stored copy would eventually
+     * disagree with the character it is about.
+     */
+    public function test_a_measured_goal_reads_the_character_rather_than_a_tally(): void
+    {
+        $this->claimThrough('traders_rate');
+
+        $this->character->level = 1;
+        $this->character->save();
+        $this->assertFalse($this->questRow('journeyman')['complete']);
+
+        $this->character->level = \App\Game\Quests::DEFS['journeyman']['goal']['target'];
+        $this->character->save();
+
+        $row = $this->questRow('journeyman');
+        $this->assertTrue($row['complete'], 'a level the character has did not count');
+        $this->assertSame(
+            0,
+            (int) ($this->character->quests()->where('quest_key', 'journeyman')->value('progress') ?? 0),
+            'a measured goal wrote a tally',
+        );
+    }
+
+    /** §12 -- claiming answers with a receipt, and the envelope says nothing. */
+    public function test_a_claim_carries_no_message_for_a_toast(): void
+    {
+        $this->fireQuest('gather', 50, 'branch');
+
+        $request = \Illuminate\Http\Request::create('/api/quests/bare_hands/claim', 'POST');
+        $request->attributes->set('character', $this->character->fresh());
+
+        $payload = (new \App\Http\Controllers\Api\QuestController($this->game))
+            ->claim($request, 'bare_hands')
+            ->getData(true);
+
+        // The receipt carries the whole of it, so the envelope says nothing --
+        // a toast reading "+10 gold" on top would be the same news twice.
+        $this->assertNull($payload['message'], 'a claim toasted as well as paying');
+        $this->assertSame('bare_hands', $payload['data']['quest']);
+        $this->assertSame(\App\Game\Quests::DEFS['bare_hands']['gold'], $payload['data']['gold']);
+    }
+
+    /**
+     * §12 -- the tutorial is gone, and the ledger is what replaced it.
+     *
+     * The old script's eleven steps were always the real game loop, so they are
+     * the opening arc here: one quest with no prerequisite, and a single line
+     * from it through buying, equipping, refining and crafting. A branch this
+     * early would be a choice offered to somebody who does not yet know what
+     * they are choosing between.
+     */
+    public function test_the_opening_arc_is_one_unbroken_line(): void
+    {
+        $this->assertFalse(
+            \Illuminate\Support\Facades\Schema::hasColumn('characters', 'tutorial_step'),
+            'the tutorial cursor outlived the tutorial',
+        );
+
+        $arc = ['bare_hands', 'first_coin', 'a_stone_axe', 'on_the_belt', 'the_real_thing',
+            'saw_it_down', 'hewn_axe', 'back_to_the_trees'];
+
+        $this->assertNull(\App\Game\Quests::DEFS['bare_hands']['requires'], 'nothing opens the ledger');
+
+        foreach ($arc as $i => $key) {
+            $this->assertArrayHasKey($key, \App\Game\Quests::DEFS, "{$key} is missing from the arc");
+
+            if ($i > 0) {
+                $this->assertSame(
+                    $arc[$i - 1],
+                    \App\Game\Quests::DEFS[$key]['requires'],
+                    "{$key} does not follow the step before it",
+                );
+            }
+        }
+
+        // And only one quest is on offer at the start: the first of them.
+        $this->assertSame(
+            ['bare_hands'],
+            array_column($this->game->questPayload($this->character->fresh()), 'key'),
+        );
+    }
+
+    /** §12 -- buying and equipping are counted, so the arc is walkable. */
+    public function test_buying_and_equipping_reach_the_ledger(): void
+    {
+        $this->claimThrough('first_coin');
+        $this->give(['branch' => 0]);
+        $this->character->gold = 500;
+        $this->character->save();
+
+        $this->standAtWoodcuttingVillage();
+        $item = $this->game->buyItem($this->character->fresh(), 'stone_axe');
+
+        $this->assertTrue($this->questRow('a_stone_axe')['complete'], 'the purchase missed the ledger');
+        $this->game->claimQuest($this->character->fresh(), 'a_stone_axe');
+
+        $this->game->equipItem($this->character->fresh(), $item->id);
+
+        // Named by its slot rather than its key, and it still counts: a fire
+        // goes up under both, so a quest may say whichever it means.
+        $this->assertTrue($this->questRow('on_the_belt')['complete'], 'the equip missed the ledger');
+    }
+
+    /** Fire a counted goal directly, standing in for the work behind it. */
+    private function fireQuest(string $kind, int $amount, ?string $subject = null): void
+    {
+        $fire = new \ReflectionMethod($this->game, 'fireQuest');
+        $fire->setAccessible(true);
+        $fire->invoke($this->game, $this->character->fresh(), $kind, $amount, $subject);
+    }
+
+    /**
+     * Walk the chain to a given quest, claiming everything on the way.
+     *
+     * DEFS is written in unlock order, so a single pass is enough: every
+     * prerequisite is already behind whatever needs it.
+     */
+    private function claimThrough(string $target): void
+    {
+        foreach (\App\Game\Quests::DEFS as $key => $def) {
+            $goal = $def['goal'];
+
+            if (in_array($goal['kind'], \App\Game\Quests::COUNTED, true)) {
+                $this->fireQuest($goal['kind'], $goal['target'], $goal['subject']);
+            } elseif ($goal['kind'] === 'level') {
+                $this->character->level = max((int) $this->character->level, $goal['target']);
+                $this->character->save();
+            }
+
+            $this->game->claimQuest($this->character->fresh(), $key);
+
+            if ($key === $target) {
+                return;
+            }
+        }
+
+        $this->fail("{$target} is not on the chain");
+    }
+
+    private function questRow(string $key): array
+    {
+        foreach ($this->game->questPayload($this->character->fresh()) as $row) {
+            if ($row['key'] === $key) {
+                return $row;
+            }
+        }
+
+        $this->fail("{$key} is not on the ledger");
+    }
+
+    private function questProgress(string $key): int
+    {
+        return $this->questRow($key)['progress'];
     }
 }

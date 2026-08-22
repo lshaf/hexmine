@@ -24,8 +24,18 @@ withDefaults(
      * bag is exactly the thing you want to open.
      */
     alert?: boolean
+    /**
+     * §12 -- the same idea pointed the other way: a state worth crossing the
+     * screen for, and a welcome one. Ember is what something WRONG looks like,
+     * so gold waiting on the ledger must not borrow it -- a reward drawn in the
+     * colour of a full bag reads as an alarm going off over good news.
+     */
+    good?: boolean
   }>(),
-  { disabled: false, primary: false, hint: '', danger: false, small: false, alert: false },
+  {
+    disabled: false, primary: false, hint: '', danger: false,
+    small: false, alert: false, good: false,
+  },
 )
 
 defineEmits<{ (e: 'activate'): void }>()
@@ -35,7 +45,7 @@ defineEmits<{ (e: 'activate'): void }>()
   <button
     type="button"
     class="cell"
-    :class="{ primary, danger, small, alert, off: disabled }"
+    :class="{ primary, danger, small, alert, good, off: disabled }"
     :disabled="disabled"
     :title="hint || label"
     :aria-label="hint ? `${label} — ${hint}` : label"
@@ -143,6 +153,25 @@ defineEmits<{ (e: 'activate'): void }>()
 
 .alert .name {
   color: var(--ember);
+}
+
+/* §12 -- the affirmative twin of .alert, and drawn exactly the same way so the
+   two read as one grammar: the cell has something to tell you, and the colour
+   says whether that is a problem or a payout. */
+.good .hex {
+  background: var(--sap);
+}
+
+.good .face {
+  color: var(--sap);
+}
+
+.good:hover:not(:disabled) .face {
+  background: #1e2a1c;
+}
+
+.good .name {
+  color: var(--sap);
 }
 
 /* Secondary cells: same shape, less weight. Used by the tile card, where

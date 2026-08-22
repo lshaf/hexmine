@@ -779,7 +779,7 @@ JOBS = [
     ('quarrying', 'Quarrying', 'gathering', 'quarrying', 'stone', 'Badlands stone, cut square at the face.'),
     ('harvesting', 'Harvesting', 'gathering', 'harvesting', 'fiber', 'Grassland fiber, and the field that comes back twice a year.'),
 
-    ('sawyer', 'Sawyer', 'processing', 'woodcutting', 'wood', 'Saws wood into planks. The first bench a prospector ever stands at, and the one the tutorial ends on.'),
+    ('sawyer', 'Sawyer', 'processing', 'woodcutting', 'wood', 'Saws wood into planks. The first bench a prospector ever stands at, and the one the opening arc ends on.'),
     ('smelter', 'Smelter', 'processing', 'mining', 'iron', 'Smelts ore into ingots, and bands ingots to planks for a frame -- the one run that spends two lines.'),
     ('tanner', 'Tanner', 'processing', 'hunting', 'pelt', 'Turns pelt into leather. Slow, and it cannot be hurried by wanting it.'),
     ('mason', 'Mason', 'processing', 'quarrying', 'stone', 'Dresses rough stone square. What the walls and the boots are made of.'),

@@ -113,7 +113,7 @@ final class Jobs
         'hunting' => ['name' => 'Hunting', 'kind' => self::GATHERING, 'source' => 'hunting', 'palette' => 'pelt', 'description' => 'Any ground a herd wanders onto. Pelt, horn, sinew, and the animal itself.'],
         'quarrying' => ['name' => 'Quarrying', 'kind' => self::GATHERING, 'source' => 'quarrying', 'palette' => 'stone', 'description' => 'Badlands stone, cut square at the face.'],
         'harvesting' => ['name' => 'Harvesting', 'kind' => self::GATHERING, 'source' => 'harvesting', 'palette' => 'fiber', 'description' => 'Grassland fiber, and the field that comes back twice a year.'],
-        'sawyer' => ['name' => 'Sawyer', 'kind' => self::PROCESSING, 'source' => 'woodcutting', 'palette' => 'wood', 'description' => 'Saws wood into planks. The first bench a prospector ever stands at, and the one the tutorial ends on.'],
+        'sawyer' => ['name' => 'Sawyer', 'kind' => self::PROCESSING, 'source' => 'woodcutting', 'palette' => 'wood', 'description' => 'Saws wood into planks. The first bench a prospector ever stands at, and the one the opening arc ends on.'],
         'smelter' => ['name' => 'Smelter', 'kind' => self::PROCESSING, 'source' => 'mining', 'palette' => 'iron', 'description' => 'Smelts ore into ingots, and bands ingots to planks for a frame -- the one run that spends two lines.'],
         'tanner' => ['name' => 'Tanner', 'kind' => self::PROCESSING, 'source' => 'hunting', 'palette' => 'pelt', 'description' => 'Turns pelt into leather. Slow, and it cannot be hurried by wanting it.'],
         'mason' => ['name' => 'Mason', 'kind' => self::PROCESSING, 'source' => 'quarrying', 'palette' => 'stone', 'description' => 'Dresses rough stone square. What the walls and the boots are made of.'],

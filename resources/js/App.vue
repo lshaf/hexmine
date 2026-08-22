@@ -7,7 +7,7 @@
  *
  *   top-left      instrument cluster (AP / level) + village work
  *   top-right     recentre and the location-independent screens, nested into
- *                 one honeycomb strip, and the tutorial
+ *                 one honeycomb strip
  *   bottom-centre what you are pointing at, and what you can do here
  *
  * The camera pans freely and costs nothing, so it needs a way back -- but sight
@@ -19,14 +19,12 @@
  */
 import { onMounted, onBeforeUnmount, computed, ref, watch } from 'vue'
 import { useGame } from '@/stores/game'
-import { useBreakpoint } from '@/composables/useBreakpoint'
 import HexMap from '@/map/HexMap.vue'
 import StatusCluster from '@/shell/StatusCluster.vue'
 import TripStack from '@/shell/TripStack.vue'
 import ActionDock from '@/shell/ActionDock.vue'
 import HexAction from '@/shell/HexAction.vue'
 import PanelOverlay from '@/shell/PanelOverlay.vue'
-import TutorialCard from '@/shell/TutorialCard.vue'
 import Toasts from '@/shell/Toasts.vue'
 import HaulModal from '@/shell/HaulModal.vue'
 import TileCard from '@/components/TileCard.vue'
@@ -37,9 +35,10 @@ import ShopView from '@/views/ShopView.vue'
 import HeroView from '@/views/HeroView.vue'
 import AtlasView from '@/views/AtlasView.vue'
 import SkillsView from '@/views/SkillsView.vue'
+import QuestView from '@/views/QuestView.vue'
+import QuestRewardModal from '@/shell/QuestRewardModal.vue'
 
 const game = useGame()
-const { isWide } = useBreakpoint()
 
 const PANELS = {
   bag: { title: 'Bag', component: BagView, wide: false },
@@ -49,6 +48,8 @@ const PANELS = {
   atlas: { title: 'Atlas', component: AtlasView, wide: true },
   // §7.4 -- six trees of thirty. Wide, because a seam of nodes needs room.
   skills: { title: 'Jobs', component: SkillsView, wide: false },
+  // §12.1 -- what is owed and what has been paid. Two tabs, no third.
+  quests: { title: 'Ledger', component: QuestView, wide: false },
 } as const
 
 const panel = computed(() => (game.panel ? PANELS[game.panel] : null))
@@ -145,6 +146,19 @@ onMounted(() => {
           />
           <HexAction icon="atlas" label="Atlas" @activate="game.openPanel('atlas')" />
           <HexAction icon="skills" label="Jobs" @activate="game.openPanel('skills')" />
+          <!-- §12 -- the cell says when there is gold waiting, for the same
+               reason the bag says when it is full: the state is worth crossing
+               the screen for. Green rather than the bag's ember, because ember
+               is what a PROBLEM looks like and a finished quest is a payout. -->
+          <HexAction
+            icon="quest"
+            label="Ledger"
+            :good="game.questsReady > 0"
+            :hint="game.questsReady > 0
+              ? `${game.questsReady} finished — the gold is waiting`
+              : 'What is owed, and what has been paid'"
+            @activate="game.openPanel('quests')"
+          />
           <!-- §7.6 -- the bag says when it is full, because nothing else does
                any more: no strap free means the next new kind is turned away. -->
           <HexAction
@@ -156,14 +170,10 @@ onMounted(() => {
           />
           <HexAction icon="hero" label="Hero" @activate="game.openPanel('hero')" />
         </div>
-        <TutorialCard v-if="isWide" />
       </div>
 
       <!-- -------------------------------------------------- bottom centre -->
       <div ref="bottomStack" class="corner bottom-centre">
-        <!-- No room beside the gauges on a phone, so the prompt sits where the
-             acting happens instead. -->
-        <TutorialCard v-if="!isWide" />
         <TileCard />
         <ActionDock />
       </div>
@@ -198,6 +208,15 @@ onMounted(() => {
       <!-- §4 -- the receipt for a finished trip. Over everything, because it
            is the one moment in an idle game where something happened. -->
       <HaulModal v-if="game.haul" :haul="game.haul" @close="game.clearHaul()" />
+
+      <!-- §12.1 -- a claim gets a receipt rather than a toast: there is more to
+           say than a status line holds, and it is the thing the player came
+           back for. -->
+      <QuestRewardModal
+        v-if="game.questReward"
+        :reward="game.questReward"
+        @close="game.clearQuestReward()"
+      />
     </template>
 
     <div v-else class="boot">
@@ -246,22 +265,32 @@ onMounted(() => {
 
 .screens {
   /*
-   * A honeycomb strip, not a row.
+   * A honeycomb block, three across and two down.
    *
-   * Four cells side by side ate 250px of the top edge and left the map with a
-   * band it could not use. Stacked and nested the way the map's own hexes nest
-   * -- three quarters of a width across, half a height down -- the same four
-   * cells occupy one and three quarter widths and give the horizon back.
+   * Six cells in a row would eat 350px of the top edge; six in a nested column
+   * gave the horizon back but reached a third of the way down the screen, which
+   * is worse on a phone than it was wide. Three by two is the squarest the
+   * lattice allows, and it puts every screen inside one thumb's reach of the
+   * corner.
    *
-   * The captions go with the row. They were never the thing being read at a
+   * It nests exactly the way the map's own hexes do (§13.2): three quarters of
+   * a width between columns, and the middle column dropped half a height so the
+   * points interlock. That is the same lattice, read across instead of down.
+   *
+   * The captions go with the block. They were never the thing being read at a
    * glance, and there is nowhere to put them between two nested cells; every
    * button keeps its title and aria-label, so nothing is lost but the ink.
    */
   --cell-w: 58px;
   --cell-h: 50px;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
+  display: grid;
+  /* The first two columns are a step apart; the last is a whole cell, so the
+     block ends on its own right edge rather than overhanging the corner. */
+  grid-template-columns: repeat(2, calc(var(--cell-w) * 0.75)) var(--cell-w);
+  grid-auto-rows: var(--cell-h);
+  justify-items: start;
+  /* Room for the dropped middle column, which would otherwise be clipped. */
+  padding-bottom: calc(var(--cell-h) / 2);
 }
 
 /* Nested cells overlap at the tips, so hit-testing has to follow the hexagon
@@ -271,12 +300,11 @@ onMounted(() => {
   clip-path: var(--hex-clip);
 }
 
-.screens :deep(.cell + .cell) {
-  margin-top: calc(var(--cell-h) / -2);
-}
-
-.screens :deep(.cell:nth-child(even)) {
-  transform: translateX(calc(var(--cell-w) * -0.75));
+/* The middle column of each row drops half a height. Two straight columns and
+   one dropped between them is what makes six hexes a honeycomb rather than a
+   grid of six hexagons. */
+.screens :deep(.cell:nth-child(3n + 2)) {
+  transform: translateY(calc(var(--cell-h) / 2));
 }
 
 .screens :deep(.cell .name) {

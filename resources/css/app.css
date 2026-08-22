@@ -22,6 +22,13 @@
   --vellum-dim: #c9bd9e;
   --copper: #c1793f;
   --ember: #b8453f;
+  /*
+   * The affirmative. Ember is the colour of something to deal with -- a full
+   * bag, a broken tool, a destructive button -- and it was standing in for good
+   * news as well, which read as an alarm going off over a reward. This is what
+   * "done, and in your favour" is drawn in.
+   */
+  --sap: #8fbf7f;
   --gold: #d8b34a;
   --violet: #7d5fa8;
 
@@ -436,4 +443,8 @@ button:focus-visible,
 
 .bar-ember > span {
   background: var(--ember);
+}
+
+.bar-sap > span {
+  background: var(--sap);
 }

@@ -36,9 +36,12 @@ import type {
   GameApi,
   MapMutations,
   PlayerState,
+  QuestDef,
+  QuestReward,
   SkillPoints,
   SkillTree,
   StationState,
+  BattlePreview,
   TilePreview,
   TravelStop,
 } from './types'
@@ -117,6 +120,10 @@ export class HttpDriver implements GameApi {
     return request<TilePreview>(`/tiles/${col}/${row}/preview`)
   }
 
+  previewBattle(): Promise<BattlePreview> {
+    return request<BattlePreview>('/battle/preview')
+  }
+
   startMining(col: number, row: number): Promise<ActionResult<Job>> {
     return post<ActionResult<Job>>('/mining', { col, row })
   }
@@ -172,6 +179,14 @@ export class HttpDriver implements GameApi {
     return post<ActionResult<{ node: string; points: SkillPoints }>>('/jobs-tree/nodes', {
       node: nodeKey,
     })
+  }
+
+  getQuests(): Promise<Record<string, QuestDef>> {
+    return request<{ quests: Record<string, QuestDef> }>('/quests').then((r) => r.quests)
+  }
+
+  claimQuest(quest: string): Promise<ActionResult<QuestReward>> {
+    return post<ActionResult<QuestReward>>(`/quests/${quest}/claim`, {})
   }
 
   craftItem(itemKey: string): Promise<ActionResult<OwnedItem>> {

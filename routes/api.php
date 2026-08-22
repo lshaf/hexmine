@@ -1,11 +1,13 @@
 <?php
 
+use App\Http\Controllers\Api\BattleController;
 use App\Http\Controllers\Api\CraftingController;
 use App\Http\Controllers\Api\EquipmentController;
 use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\MapController;
 use App\Http\Controllers\Api\MiningController;
 use App\Http\Controllers\Api\SettlementController;
+use App\Http\Controllers\Api\QuestController;
 use App\Http\Controllers\Api\ShopController;
 use App\Http\Controllers\Api\SkillTreeController;
 use App\Http\Controllers\Api\StateController;
@@ -43,6 +45,10 @@ Route::middleware(ResolveCharacter::class)->group(function () {
     // §5.5 -- hunting is its own verb, not a mode of mining: it takes no tile
     // slot, depletes nothing, and is the only Tier 4 faucet outside a dungeon.
     Route::post('/hunting', [MiningController::class, 'hunt']);
+
+    // §9.5.5 -- no coordinates: the only fight on offer is the one standing on
+    // the hex under your feet, and asking about anyone else's would be a scanner.
+    Route::get('/battle/preview', [BattleController::class, 'preview']);
     Route::post('/jobs/{job}/collect', [MiningController::class, 'collect'])->whereNumber('job');
     Route::delete('/jobs/{job}', [MiningController::class, 'destroy'])->whereNumber('job');
 
@@ -62,6 +68,12 @@ Route::middleware(ResolveCharacter::class)->group(function () {
     // §7.4 -- the tree is static and player-independent, so it is its own GET.
     Route::get('/jobs-tree', [SkillTreeController::class, 'index']);
     Route::post('/jobs-tree/nodes', [SkillTreeController::class, 'store']);
+
+    // §12.1 -- the catalog once, the claim per quest. Where a character stands
+    // rides in the state like everything else that moves.
+    Route::get('/quests', [QuestController::class, 'index']);
+    Route::post('/quests/{quest}/claim', [QuestController::class, 'claim'])
+        ->where('quest', '[a-z_]+');
 
     Route::post('/equipment/{item}/equip', [EquipmentController::class, 'equip'])->whereNumber('item');
     Route::post('/equipment/{item}/unequip', [EquipmentController::class, 'unequip'])->whereNumber('item');

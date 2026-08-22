@@ -37,7 +37,7 @@ import type { StatKey } from '@/game/types'
 
 const game = useGame()
 
-/** Woodcutting first: it is the line the tutorial puts in your hands. */
+/** Woodcutting first: it is the line the opening arc puts in your hands. */
 const job = ref<string>('woodcutting')
 const picked = ref<string | null>(null)
 
