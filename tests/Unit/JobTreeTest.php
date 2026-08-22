@@ -9,7 +9,7 @@ use App\Game\Jobs;
 use PHPUnit\Framework\TestCase;
 
 /**
- * The skill trees are 335 rows of static data, and the two things that can go
+ * The skill trees are 495 rows of static data, and the two things that can go
  * wrong with static data are shape and balance.
  *
  * Shape: a node pointing at a parent that does not exist, or at one in its own
@@ -27,8 +27,9 @@ final class JobTreeTest extends TestCase
 {
     public function test_every_job_has_a_tree_in_one_of_the_two_shapes(): void
     {
-        // Five gathering lines, three benches, three battle roles, one road.
-        $this->assertCount(12, Jobs::JOBS);
+        // Five gathering lines, five processing lines, three benches, three
+        // battle roles, one road.
+        $this->assertCount(17, Jobs::JOBS);
 
         foreach (array_keys(Jobs::JOBS) as $job) {
             $nodes = Jobs::nodesFor($job);
@@ -44,7 +45,7 @@ final class JobTreeTest extends TestCase
             }
         }
 
-        $this->assertSame(11 * Jobs::NODES_PER_JOB + Jobs::NODES_PER_WAYFARING, count(Jobs::NODES));
+        $this->assertSame(16 * Jobs::NODES_PER_JOB + Jobs::NODES_PER_WAYFARING, count(Jobs::NODES));
     }
 
     /**
@@ -380,6 +381,74 @@ final class JobTreeTest extends TestCase
             );
             $this->assertCount(8, $unlocks, "{$job} should carry 8 dormant ability hooks");
         }
+    }
+
+    /**
+     * §6 -- a processing tree deals in the run and never in the bench.
+     *
+     * The two effects a craft bench owns -- a rolled option and a starting
+     * durability -- belong to an object, and a processing run makes a material,
+     * which has neither. Left in, they would be a reason to take a processing
+     * tree that has nothing to do with processing.
+     */
+    public function test_processing_trees_carry_no_bench_effects(): void
+    {
+        foreach (Jobs::JOBS as $job => $def) {
+            if ($def['kind'] !== Jobs::PROCESSING) {
+                continue;
+            }
+
+            foreach (Jobs::nodesFor($job) as $key => $node) {
+                $this->assertNotContains(
+                    $node['effect']['kind'],
+                    ['craftOption', 'craftDurability'],
+                    "{$key} is a processing node doing a bench's work",
+                );
+
+                // One stat applies to a run, and it is the one the run costs
+                // its clock against. Anything else here would be a §11 sink
+                // thinned by a job that has no business touching it.
+                if ($node['effect']['kind'] === 'stat') {
+                    $this->assertSame(
+                        'processingSpeed',
+                        $node['effect']['stat'],
+                        "{$key} moves a stat a processing run does not have",
+                    );
+                }
+            }
+        }
+    }
+
+    /**
+     * §6 -- every processing line has a job, and every processing job has a
+     * line. A recipe whose line named no job would teach nothing, silently.
+     */
+    public function test_every_processing_job_names_a_gathering_line(): void
+    {
+        $lines = [];
+        foreach (Jobs::JOBS as $job => $def) {
+            if ($def['kind'] !== Jobs::PROCESSING) {
+                continue;
+            }
+
+            $source = $def['source'];
+            $this->assertSame(
+                Jobs::GATHERING,
+                Jobs::JOBS[$source]['kind'] ?? null,
+                "{$job} names {$source}, which is not a gathering line",
+            );
+            $this->assertNotContains($source, $lines, "two processing jobs claim {$source}");
+            $lines[] = $source;
+        }
+
+        $gathering = array_keys(array_filter(
+            Jobs::JOBS,
+            fn (array $d) => $d['kind'] === Jobs::GATHERING,
+        ));
+
+        sort($lines);
+        sort($gathering);
+        $this->assertSame($gathering, $lines, 'a gathering line has no processing job');
     }
 
     /** Keys are namespaced by job, so two trees can share a node name. */

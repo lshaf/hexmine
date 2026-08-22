@@ -246,6 +246,240 @@ RUNE_NAMES = [
 ]
 
 
+# ------------------------------------------------------------ processing trees
+#
+# §6 turns raw into refined at a settlement, and until now nobody got better at
+# it. Five jobs, one per line, because §6 is already a five-line structure: a
+# village runs one of the five, a city two, a capital all five.
+#
+# What separates them from the craft benches is the input. A Smith spends
+# refined stock on an object; a Smelter makes the stock. So a processing tree
+# deals in the three things a run has -- how long it takes, how much ore it
+# eats, and how many ingots come off it -- and in what the line can make at all.
+#
+# Their `stat` nodes are line-locked exactly as the gathering ones are (§8 rule
+# 1): a Sawyer's speed is speed at a saw pit and nowhere else. Without it, three
+# processing trees would stack processingSpeed on every line at once, which is
+# the same stack the tool ladder is careful never to allow.
+#
+# Only one stat applies to a processing run, which is why these trees are the
+# most capability-heavy in the game: eleven unlocks against twelve stat nodes.
+# That is the right shape for the work -- a processing line grows by learning
+# what it can make, not by shaving another percent off the clock.
+#
+# 12 processingSpeed (.12, inside the .1275 a single tree may spend), 5
+# costReduction (.15, exactly the cap), 2 batch (the cap), 11 unlock.
+PROCESS_PATTERN = [
+    'p', 'c', 'u', 'p', 'u', 'p',
+    'p', 'c', 'u', 'p', 'b', 'u', 'p', 'c',
+    'p', 'u', 'c', 'p', 'u', 'b', 'p', 'u',
+    'p', 'u', 'c', 'p', 'u', 'u',
+    'p', 'u',
+]
+
+
+def process(prefix, names):
+    """30 (key, name, desc) into a tree, effects assigned by PROCESS_PATTERN."""
+    out = []
+    for i, (key, name, desc) in enumerate(names):
+        kind = PROCESS_PATTERN[i]
+        if kind == 'p':
+            e = stat('processingSpeed', .01)
+        elif kind == 'c':
+            e = cost(.03)
+        elif kind == 'b':
+            e = batch(1)
+        else:
+            e = unlock(f'{prefix}.{key}')
+        out.append((key, name, e, desc))
+    return out
+
+
+SAWYER_NAMES = [
+ ('saw_set','Saw Set','Teeth set right cut on the pull and clear on the push.'),
+ ('bark_first','Bark First','Strip it standing and the blade never meets grit.'),
+ ('sawpit','The Sawpit','Unlocks a pit long enough to take a whole trunk.'),
+ ('steady_stroke','Steady Stroke','Full length, every stroke. Short strokes are how a day gets long.'),
+ ('drying_stack','Drying Stack','Unlocks a stack that seasons while you work the next log.'),
+ ('log_dogs','Log Dogs','Pinned down, a log stops arguing with the blade.'),
+
+ ('kerf_line','Kerf Line','Snap a chalk line and the cut follows it.'),
+ ('slab_first','Slab First','Take the round off one face and the rest squares itself.'),
+ ('frame_saw','Frame Saw','Unlocks a blade held in a frame, and the boards it makes.'),
+ ('pit_rhythm','Pit Rhythm','Top man and bottom man, and neither waiting on the other.'),
+ ('gang_blades','Gang Blades','Several blades in one frame. One pass, several boards.'),
+ ('green_and_dry','Green and Dry','Unlocks the knack for what to cut wet and what to leave standing.'),
+ ('roller_bed','Roller Bed','The log arrives at the blade without being lifted.'),
+ ('edging_pass','Edging Pass','Trim the wane and the board is stock, not firewood.'),
+
+ ('sharpening_round','Sharpening Round','Ten minutes on the teeth buys an hour at the pit.'),
+ ('seasoning_shed','Seasoning Shed','Unlocks a shed where boards dry out of the weather.'),
+ ('heart_and_sap','Heart and Sap','Cut around the sapwood and nothing good is wasted.'),
+ ('two_man_tempo','Two-Man Tempo','Two sawyers who never fight the blade or each other.'),
+ ('quarter_sawn','Quarter Sawn','Unlocks boards cut across the rings, which never cup.'),
+ ('stacked_cuts','Stacked Cuts','Log on log, one setting, twice the boards.'),
+ ('blade_tension','Blade Tension','A slack blade wanders; a tight one goes where it is sent.'),
+ ('offcut_shingles','Offcut Shingles','Unlocks a use for what falls off the edge.'),
+
+ ('true_planing','True Planing','Flat off the pit, so nothing needs doing twice.'),
+ ('kiln_drying','Kiln Drying','Unlocks a heated shed, and the weeks it takes off a stack.'),
+ ('full_trunk','Full Trunk','Nothing leaves the pit but sawdust.'),
+ ('pit_crew','Pit Crew','A yard with hands enough that the blade never stops.'),
+ ('laminated_stock','Laminated Stock','Unlocks board glued into something stronger than the tree was.'),
+ ('ironwood_setting','Ironwood Setting','Unlocks the teeth and the patience that wood asks for.'),
+
+ ('the_long_pit','The Long Pit','A pit that takes anything the forest can put down.'),
+ ('timber_reeve','Timber Reeve','Unlocks the right to work any pit on the ring at your own pace.'),
+]
+
+SMELTER_NAMES = [
+ ('ore_washing','Ore Washing','Wash the dirt off and the furnace works on metal, not mud.'),
+ ('hand_sorting','Hand Sorting','The waste rock never gets a share of the charcoal.'),
+ ('bloomery','The Bloomery','Unlocks a low stack that makes a bloom out of ore and time.'),
+ ('charge_order','Charge Order','Ore, fuel, ore, fuel. Never two of one.'),
+ ('roasting_bed','Roasting Bed','Unlocks a bed that drives the sulphur off before the smelt.'),
+ ('tuyere_angle','Tuyere Angle','The air goes where the heat is wanted.'),
+
+ ('bellows_pair','Bellows Pair','Two bags, alternating, and the blast never drops.'),
+ ('limestone_flux','Limestone Flux','The slag takes the rubbish and leaves the iron behind.'),
+ ('slag_tap','Slag Tap','Unlocks a tap hole, and a furnace that outlives one heat.'),
+ ('stack_height','Stack Height','A taller stack holds the heat where the ore falls through it.'),
+ ('double_crucible','Double Crucible','Two pots on one fire, and both come off together.'),
+ ('charcoal_burn','Charcoal Burn','Unlocks your own burn, and fuel nobody has to be paid for.'),
+ ('preheated_blast','Preheated Blast','Warm air costs nothing and saves a third of the fuel.'),
+ ('bloom_squeezing','Bloom Squeezing','Beat the slag out while it is soft and the iron stays.'),
+
+ ('hearth_lining','Hearth Lining','A lining that lasts is a furnace that never cools.'),
+ ('finery_forge','Finery Forge','Unlocks the second fire, which takes the carbon back out.'),
+ ('slag_reclaim','Slag Reclaim','There is iron in what was thrown away.'),
+ ('continuous_run','Continuous Run','Charged from the top while it pours from the bottom.'),
+ ('banded_frame','Banded Frame','Unlocks banding timber and iron into one thing.'),
+ ('ingot_moulds','Ingot Moulds','A row of moulds, and one pour fills them all.'),
+ ('blast_timing','Blast Timing','Hard while it is charged, gentle while it is working.'),
+ ('wrought_and_cast','Wrought and Cast','Unlocks knowing which of the two a job actually wants.'),
+
+ ('heat_economy','Heat Economy','One fire, all day, and nothing waiting on it.'),
+ ('crucible_melt','Crucible Melt','Unlocks melting it properly, so the grain comes out even.'),
+ ('full_burden','Full Burden','Every basket of ore weighed against every basket of fuel.'),
+ ('water_bellows','Water Bellows','The river works the blast and never gets tired.'),
+ ('alloying','Alloying','Unlocks putting something else in on purpose.'),
+ ('mythril_heat','Mythril Heat','Unlocks the temperature the humming ore asks for.'),
+
+ ('the_long_blast','The Long Blast','Lit in spring, out in autumn.'),
+ ('master_of_the_stack','Master of the Stack','Unlocks first charge at any furnace on the ring.'),
+]
+
+TANNER_NAMES = [
+ ('fleshing_beam','Fleshing Beam','Everything that rots comes off before anything else happens.'),
+ ('salt_cure','Salt Cure','A salted hide waits for you. A green one does not.'),
+ ('lime_pit','The Lime Pit','Unlocks a pit that takes the hair off without taking the hide.'),
+ ('bark_liquor','Bark Liquor','Weak at the start, strong at the end. Never the other way.'),
+ ('drying_loft','Drying Loft','Unlocks a loft with air enough to dry without cracking.'),
+ ('scudding','Scudding','Work the grain clean and the tan takes evenly.'),
+
+ ('pit_rotation','Pit Rotation','Move it through weak, middling and strong in turn.'),
+ ('spent_bark','Spent Bark','The second liquor is weaker, not useless.'),
+ ('bating','Bating','Unlocks the step that turns a stiff hide soft.'),
+ ('even_immersion','Even Immersion','Nothing folded, nothing touching, nothing missed.'),
+ ('layered_pit','Layered Pit','Hide, bark, hide, bark, and the pit holds a stack.'),
+ ('oak_and_hemlock','Oak and Hemlock','Unlocks knowing which bark suits which hide.'),
+ ('warm_liquor','Warm Liquor','A warm pit works in weeks where a cold one takes a season.'),
+ ('trim_first','Trim First','Cut the shanks off before they drink the liquor.'),
+
+ ('currying_table','Currying Table','Shaved to thickness, and the piece is finished in one pass.'),
+ ('oil_tannage','Oil Tannage','Unlocks a hide worked soft with fat rather than bark.'),
+ ('offcut_glue','Offcut Glue','Trimmings boil down into something a bench will buy.'),
+ ('staking','Staking','Worked over the blade until it gives. Then it is leather.'),
+ ('alum_tawing','Alum Tawing','Unlocks white leather, which no bark can make.'),
+ ('paired_pits','Paired Pits','One filling while the other empties.'),
+ ('steady_warmth','Steady Warmth','A tannery that never gets cold never starts over.'),
+ ('split_hides','Split Hides','Unlocks taking two skins out of one thickness.'),
+
+ ('finish_coat','Finish Coat','Dressed, and off the table without a second thought.'),
+ ('chamois_work','Chamois Work','Unlocks the soft grades nothing heavy is ever made of.'),
+ ('whole_beast','Whole Beast','Horn, hoof, sinew and hide. Nothing carried in is carried out.'),
+ ('drum_tanning','Drum Tanning','A turning drum does in a day what a pit does in a season.'),
+ ('hardened_leather','Hardened Leather','Unlocks boiled leather, which stops things.'),
+ ('beastfang_curing','Beastfang Curing','Unlocks curing a hide that is still trying to bite.'),
+
+ ('the_deep_pit','The Deep Pit','A pit that has not been empty in living memory.'),
+ ('master_tanner','Master Tanner','Unlocks first pit at any tannery on the ring.'),
+]
+
+MASON_NAMES = [
+ ('banker_bench','Banker Bench','Waist height, and the work stops fighting your back.'),
+ ('mark_and_measure','Mark and Measure','Twice with the square, once with the chisel.'),
+ ('dressing_shed','The Dressing Shed','Unlocks a shed where stone is cut out of the weather.'),
+ ('punch_work','Punch Work','Take the waste off fast before you take it off carefully.'),
+ ('template_board','Template Board','Unlocks a template, and stones that match without measuring.'),
+ ('chisel_angle','Chisel Angle','Too steep and it bruises. Too flat and it slides.'),
+
+ ('claw_and_boaster','Claw and Boaster','Three tools in order, none of them doing another\'s work.'),
+ ('bed_and_face','Bed and Face','Lay it the way it lay in the ground and it never spalls.'),
+ ('sand_saw','Sand Saw','Unlocks a saw and sand, and cuts a chisel would take a week over.'),
+ ('mallet_rhythm','Mallet Rhythm','Light, quick and endless beats heavy and tired.'),
+ ('ganged_blocks','Ganged Blocks','Set a row and dress them all to the same line.'),
+ ('limestone_and_grit','Limestone and Grit','Unlocks knowing what a stone will do before you strike it.'),
+ ('sharpening_forge','Sharpening Forge','A mason who cannot sharpen is a mason who is waiting.'),
+ ('offcut_rubble','Offcut Rubble','What falls off the banker is still walling stone.'),
+
+ ('true_arris','True Arris','A clean edge is the whole difference between block and ashlar.'),
+ ('ashlar_course','Ashlar Course','Unlocks stone cut close enough to lay without mortar.'),
+ ('dust_reclaim','Dust Reclaim','Even the grit sells, to the next mason\'s saw.'),
+ ('drafted_margin','Drafted Margin','Cut the border first and the middle takes care of itself.'),
+ ('moulded_work','Moulded Work','Unlocks profiles, and stone that is more than a box.'),
+ ('double_banker','Double Banker','Two benches, one setting-out, both finished together.'),
+ ('wet_cutting','Wet Cutting','Water carries the dust away and the blade lasts twice as long.'),
+ ('frost_stone','Frost Stone','Unlocks working the stone that only opens in winter.'),
+
+ ('final_rub','Final Rub','Off the banker finished, not off the banker nearly.'),
+ ('voussoir_cutting','Voussoir Cutting','Unlocks the wedge stones an arch stands on.'),
+ ('block_economy','Block Economy','Every face of the block is somebody\'s stone.'),
+ ('setting_out_floor','Setting-Out Floor','Draw it full size once and cut it fifty times.'),
+ ('carved_work','Carved Work','Unlocks stone somebody stops to look at.'),
+ ('obsidian_dressing','Obsidian Dressing','Unlocks working glass that takes a hand off if it is rushed.'),
+
+ ('the_great_banker','The Great Banker','A bench that takes a stone two men cannot lift.'),
+ ('master_mason','Master Mason','Unlocks first banker at any yard on the ring.'),
+]
+
+WEAVER_NAMES = [
+ ('retting_judgement','Retting Judgement','A day too long and it rots. A day too short and it fights you.'),
+ ('sorted_stricks','Sorted Stricks','Long with long, short with short, and nothing on the wrong cloth.'),
+ ('the_brake','The Brake','Unlocks a brake that cracks the woody core out of the stalk.'),
+ ('scutching_blade','Scutching Blade','Beat it downward and the boon falls away on its own.'),
+ ('hackling_combs','Hackling Combs','Unlocks combs coarse to fine, and thread that runs true.'),
+ ('distaff_dressing','Distaff Dressing','A well-dressed distaff spins itself.'),
+
+ ('treadle_wheel','Treadle Wheel','Both hands on the fibre, because the foot does the turning.'),
+ ('tow_and_line','Tow and Line','The short fibre is coarse cloth, not sweepings.'),
+ ('warping_board','Warping Board','Unlocks a warp measured out before a single pick is thrown.'),
+ ('even_tension','Even Tension','A loom argues with you exactly as much as the warp is uneven.'),
+ ('double_shuttle','Double Shuttle','Two shuttles, two cloths, one setting-up.'),
+ ('sizing_paste','Sizing Paste','Unlocks a dressed warp that does not fray as it is woven.'),
+ ('broad_loom','Broad Loom','Wider cloth for the same number of picks.'),
+ ('thrums','Thrums','The ends off the loom are cord to somebody.'),
+
+ ('shed_and_pick','Shed and Pick','The rhythm is the whole craft. The rest is setting up.'),
+ ('fulling_trough','Fulling Trough','Unlocks cloth beaten dense enough to keep the weather out.'),
+ ('noil_carding','Noil Carding','What the combs threw out is carded back into something.'),
+ ('flying_shuttle','Flying Shuttle','It crosses on its own, and your hands are free for the beat.'),
+ ('twill_setting','Twill Setting','Unlocks a weave that gives where a plain one tears.'),
+ ('two_beam_warp','Two-Beam Warp','Two warps on one loom, and both come off finished.'),
+ ('damp_weaving','Damp Weaving','A damp shed, and the thread stops snapping.'),
+ ('nettle_and_flax','Nettle and Flax','Unlocks the coarse fibres nobody else bothers to ret.'),
+
+ ('off_the_loom','Off the Loom','Cut it down and it is cloth, not a job half done.'),
+ ('napping_teasels','Napping Teasels','Unlocks raising a nap, which is cloth against blanket.'),
+ ('whole_stalk','Whole Stalk','Fibre, tow, boon and seed. The field gives up all four.'),
+ ('loom_discipline','Loom Discipline','Nothing on the loom is ever waiting on the weaver.'),
+ ('figured_weave','Figured Weave','Unlocks patterns worked into the cloth rather than onto it.'),
+ ('silkweave_handling','Silkweave Handling','Unlocks thread fine enough to lose sight of.'),
+
+ ('the_long_warp','The Long Warp','A warp set up once and woven for a season.'),
+ ('master_weaver','Master Weaver','Unlocks first loom at any shed on the ring.'),
+]
+
 # ------------------------------------------------------------- gathering trees
 #
 # §7.2 lines become jobs too, and their job level is the skill level they have
@@ -520,6 +754,12 @@ TREES = {
     'quarrying': gather('quarrying', QUARRYING_NAMES),
     'harvesting': gather('harvesting', HARVESTING_NAMES),
 
+    'sawyer': process('sawyer', SAWYER_NAMES),
+    'smelter': process('smelter', SMELTER_NAMES),
+    'tanner': process('tanner', TANNER_NAMES),
+    'mason': process('mason', MASON_NAMES),
+    'weaver': process('weaver', WEAVER_NAMES),
+
     'smith': SMITH,
     'armorer': ARMORER,
     'alchemist': ALCHEMIST,
@@ -538,6 +778,12 @@ JOBS = [
     ('hunting', 'Hunting', 'gathering', 'hunting', 'pelt', 'Any ground a herd wanders onto. Pelt, horn, sinew, and the animal itself.'),
     ('quarrying', 'Quarrying', 'gathering', 'quarrying', 'stone', 'Badlands stone, cut square at the face.'),
     ('harvesting', 'Harvesting', 'gathering', 'harvesting', 'fiber', 'Grassland fiber, and the field that comes back twice a year.'),
+
+    ('sawyer', 'Sawyer', 'processing', 'woodcutting', 'wood', 'Saws wood into planks. The first bench a prospector ever stands at, and the one the tutorial ends on.'),
+    ('smelter', 'Smelter', 'processing', 'mining', 'iron', 'Smelts ore into ingots, and bands ingots to planks for a frame -- the one run that spends two lines.'),
+    ('tanner', 'Tanner', 'processing', 'hunting', 'pelt', 'Turns pelt into leather. Slow, and it cannot be hurried by wanting it.'),
+    ('mason', 'Mason', 'processing', 'quarrying', 'stone', 'Dresses rough stone square. What the walls and the boots are made of.'),
+    ('weaver', 'Weaver', 'processing', 'harvesting', 'fiber', 'Rets, spins and weaves fiber into cloth. The longest chain from raw to refined.'),
 
     ('smith', 'Smith', 'craft', 'weapon', 'iron', 'Forges the tools every line depends on, and the raid weapon nobody has needed yet.'),
     ('armorer', 'Armorer', 'craft', 'armor', 'pelt', 'Cuts and fits what is worn, which is the only gear that counts on every line at once.'),
@@ -668,7 +914,7 @@ namespace App\\Game;
  * derives every tier and every parent link, so the only hand-written part is
  * what a node is called and what it does.
  *
- * Eleven jobs of thirty nodes, bought one at a time with the skill points a
+ * Sixteen jobs of thirty nodes, bought one at a time with the skill points a
  * character level grants. Two numbers and only one of them is power: a job level
  * gates nodes and does nothing else, while a point is the scarce thing you spend.
  *
@@ -711,6 +957,22 @@ final class Jobs
      */
     public const GATHERING = 'gathering';
 
+    /**
+     * §6 -- the five settlement lines, now jobs of their own.
+     *
+     * Processing is not crafting and the split is the input. A craft bench
+     * spends refined stock on an object; a processing line makes the stock. So
+     * these trees deal in the three things a run actually has -- how long it
+     * takes, how much raw it eats, how much refined comes off it -- and in what
+     * the line can make at all.
+     *
+     * Their level comes from finished runs, and their `stat` nodes are
+     * line-locked exactly as the gathering ones are (§8 rule 1): a Sawyer is
+     * faster at a saw pit and nowhere else. Three processing trees must not
+     * stack processingSpeed on every line at once.
+     */
+    public const PROCESSING = 'processing';
+
     public const CRAFT = 'craft';
 
     public const BATTLE = 'battle';
@@ -730,14 +992,19 @@ final class Jobs
      * jobs walks this rather than inventing its own order.
      *
      * Wayfaring comes first because it does: you walk before you have swung at
-     * anything.
+     * anything, and you refine what you gathered before you craft with it.
      */
-    public const KINDS = [self::WAYFARING, self::GATHERING, self::CRAFT, self::BATTLE];
+    public const KINDS = [self::WAYFARING, self::GATHERING, self::PROCESSING, self::CRAFT, self::BATTLE];
 
     /**
-     * §7.4 -- the twelve. `source` is the craft category a job draws XP from,
-     * the battle role it will draw XP from once raiding exists (§9), or -- for
-     * Explorer alone -- `travel`, meaning hexes crossed.
+     * §7.4 -- the seventeen. `source` is the craft category a job draws XP
+     * from, the §6 processing line it draws XP from, the battle role it will
+     * draw XP from once raiding exists (§9), or -- for Explorer alone --
+     * `travel`, meaning hexes crossed.
+     *
+     * A processing job's `source` is a gathering line key on purpose: it is the
+     * line the recipe belongs to, which is what makes Sawyer the job that
+     * learns from sawing planks and the one whose nodes count there.
      *
      * @var array<string,array<string,string>>
      */

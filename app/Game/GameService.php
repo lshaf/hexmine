@@ -485,14 +485,22 @@ class GameService
     }
 
     /**
-     * Aggregated equipment bonuses. `$line` is the skill line being worked --
-     * §8 gathering tools only count for their own line, so a trip must say which
-     * line it is, and a read with no line in mind (the hero sheet, travel range)
-     * gets only the gear that works everywhere.
+     * Aggregated equipment bonuses.
+     *
+     * `$action` is what is being costed, and it is one of the seven §8.5 names:
+     * a gathering line, `travel`, or `processing`. §8 gathering tools only count
+     * for their own line, so a trip must say which one it is, and a read with no
+     * action in mind (the hero sheet) gets only the gear that works everywhere.
+     *
+     * `$line` is the *material* line underneath that action, and it exists
+     * because §6 processing has both: sawing planks is the action `processing`
+     * on the line `woodcutting`. Gear and potions are scoped by the action, a
+     * line-locked tree node by the line. For a gathering trip the two are the
+     * same word and the second argument is left off.
      *
      * @return array<string,float>
      */
-    public function bonuses(Character $character, ?string $line = null): array
+    public function bonuses(Character $character, ?string $action = null, ?string $line = null): array
     {
         $items = $this->itemRows($character);
 
@@ -505,7 +513,7 @@ class GameService
         // being costed. `global` always counts; a line scope counts on that
         // line's work; `travel` and `processing` are asked for by name. This is
         // the same filter §7.4.3 already applies to line-locked tree nodes, and
-        // it is what lets sixty potions exist without sixty of them stacking.
+        // it is what lets seventy potions exist without seventy of them stacking.
         //
         // §8.5 -- and potions take the HIGHEST rather than the sum. A player may
         // hold as many different effects as they like, but two charges on the
@@ -517,7 +525,7 @@ class GameService
         $buffs = [];
         foreach ($this->armedBuffs($character) as $buff) {
             $scope = $buff->scope ?? 'global';
-            if ($scope !== 'global' && $scope !== $line) {
+            if ($scope !== 'global' && $scope !== $action) {
                 continue;
             }
 
@@ -532,17 +540,23 @@ class GameService
         $effects = $this->nodeEffects($character);
         $tree = $effects['stats'];
 
-        // A gathering line's nodes only count on that line's own work, so they
-        // join the sum only when a line is being asked about.
-        if ($line !== null) {
-            foreach ($effects['byLine'][$line] ?? [] as $stat => $value) {
+        // A line-locked node -- gathering or processing -- only counts on its
+        // own line's work, so these join the sum only when a line is being asked
+        // about. The bucket is the action and the line together, which is what
+        // keeps a Sawyer's speed off a woodcutting trip: both are `woodcutting`
+        // work and only one of them happens at a saw pit.
+        $nodeLine = $line === null ? $action : $action.':'.$line;
+        if ($nodeLine !== null) {
+            foreach ($effects['byLine'][$nodeLine] ?? [] as $stat => $value) {
                 $tree[$stat] = ($tree[$stat] ?? 0) + $value;
             }
         }
 
         $out = [];
         foreach (['yield', 'tripReduction', 'travelSpeed', 'processingSpeed', 'power', 'defence'] as $stat) {
-            $gear = Formulas::aggregateStat($items, $stat, $line);
+            // Gear is scoped by the action, not the line: an axe is a forest
+            // tool, and standing at a saw pit is not swinging it (§8 rule 1).
+            $gear = Formulas::aggregateStat($items, $stat, $action);
             $out[$stat] = min(
                 Balance::STAT_CEILING,
                 $gear + ($buffs[$stat] ?? 0) + ($tree[$stat] ?? 0),
@@ -1549,6 +1563,19 @@ class GameService
                 $gained[$job->output_key] = $granted;
                 $xpAmount = $job->quantity * 9;
 
+                // §6 -- a finished run teaches the line that ran it. Paid on
+                // collection like everything else, so a run walked away from
+                // teaches nothing (§11.1), and paid on what came off the bench
+                // rather than what went in, because a bigger batch is more work.
+                $processJob = $this->jobForLine((string) $job->skill_key);
+                if ($processJob !== null) {
+                    $this->grantJobXp(
+                        $character,
+                        $processJob,
+                        $job->quantity * Balance::JOB_XP_PER_PROCESS_UNIT,
+                    );
+                }
+
                 $this->fireTutorial($character, 'process_collect');
             }
 
@@ -1702,9 +1729,26 @@ class GameService
             }
 
             $count = max(1, $batches);
-            $this->takeMaterial($character, $recipe['input'], $recipe['inputQty'] * $count);
+
+            // §6 -- the line's own job is what a run is read against. A Sawyer's
+            // cheaper planks do not make a Tanner's leather cheaper, exactly as
+            // a Smith's discount stops at the Smith's bench (§7.4.3).
+            $line = $recipe['skill'];
+            $effects = $this->craftEffects($character, $this->jobForLine($line));
+
+            // Never below one of anything per batch: a free run is not a
+            // discount, it is a hole in the §11 materials sink.
+            $this->takeMaterial(
+                $character,
+                $recipe['input'],
+                max($count, (int) round($recipe['inputQty'] * $count * (1 - $effects['costReduction']))),
+            );
             if (isset($recipe['secondInput'])) {
-                $this->takeMaterial($character, $recipe['secondInput'], ($recipe['secondInputQty'] ?? 1) * $count);
+                $this->takeMaterial(
+                    $character,
+                    $recipe['secondInput'],
+                    max($count, (int) round(($recipe['secondInputQty'] ?? 1) * $count * (1 - $effects['costReduction']))),
+                );
             }
 
             $now = $this->now();
@@ -1713,8 +1757,10 @@ class GameService
                 $recipe['baseSeconds'] * $count,
                 $settlement['tier'],
                 $presence,
-                // §8.5 -- named, for the same reason travel is.
-                $this->bonuses($character, 'processing')['processingSpeed'],
+                // §8.5 -- named, for the same reason travel is. The line comes
+                // with it because a processing run has both: this is the action
+                // `processing` on the line the recipe belongs to.
+                $this->bonuses($character, 'processing', $line)['processingSpeed'],
             );
 
             $job = GameJob::create([
@@ -1726,8 +1772,11 @@ class GameService
                 'material_key' => $recipe['input'],
                 'output_key' => $recipe['output'],
                 'presence' => $presence,
-                'quantity' => $recipe['outputQty'] * $count,
-                'skill_key' => $recipe['skill'],
+                // §7.4.3 -- `batch` is extra output per RUN, not per batch.
+                // Multiplied through the count it would grow with the very
+                // number the player chooses, which is not a bounded effect.
+                'quantity' => $recipe['outputQty'] * $count + (int) $effects['batch'],
+                'skill_key' => $line,
                 'started_at' => $now,
                 'ends_at' => $now + Balance::scaled($seconds * 1000),
             ]);
@@ -2303,8 +2352,9 @@ class GameService
     }
 
     /**
-     * §7.4 -- a craft teaches the job whose bench made it, and a walk teaches
-     * the only job that learns from walking (§7.5).
+     * §7.4 -- a craft teaches the job whose bench made it, a finished §6 run
+     * teaches the line that ran it, and a walk teaches the only job that learns
+     * from walking (§7.5).
      *
      * Two kinds are deliberately unreachable from here. Gathering jobs read
      * their CharacterSkill level instead (§7.2), so writing a row for one would
@@ -2363,6 +2413,25 @@ class GameService
         $this->grantJobXp($character, 'explorer', $hexes * Balance::EXPLORER_XP_PER_HEX);
     }
 
+    /**
+     * §6 -- the job a processing run teaches, from the line it belongs to.
+     *
+     * The recipe already names its line and the job already names its source,
+     * so the two are matched rather than a third table being written down. A
+     * line with no processing job simply teaches nothing, which is what makes
+     * this safe to call before every run.
+     */
+    private function jobForLine(string $line): ?string
+    {
+        foreach (Jobs::JOBS as $key => $job) {
+            if ($job['kind'] === Jobs::PROCESSING && $job['source'] === $line) {
+                return $key;
+            }
+        }
+
+        return null;
+    }
+
     /** The job a crafted item teaches, from its category (§8.4). */
     private function jobForItem(array $def): ?string
     {
@@ -2411,8 +2480,19 @@ class GameService
                     // §8 rule 1 again: a gathering node pays out on its own line
                     // and no other, exactly as that line's tool does. Three
                     // gathering trees must not stack yield on every trip.
-                    if (Jobs::JOBS[$job]['kind'] === Jobs::GATHERING) {
-                        $line = Jobs::JOBS[$job]['source'];
+                    //
+                    // §6 -- a processing node is line-locked by the same rule
+                    // and for the same reason: a Sawyer is faster at a saw pit,
+                    // not at a tannery. It files under `processing:<line>`
+                    // rather than the bare line, because a saw pit and a forest
+                    // are two different pieces of work on the same word --
+                    // filing both under `woodcutting` would pay a Sawyer out on
+                    // a felling trip.
+                    $jobKind = Jobs::JOBS[$job]['kind'];
+                    if ($jobKind === Jobs::GATHERING || $jobKind === Jobs::PROCESSING) {
+                        $line = $jobKind === Jobs::PROCESSING
+                            ? Jobs::PROCESSING.':'.Jobs::JOBS[$job]['source']
+                            : Jobs::JOBS[$job]['source'];
                         $byLine[$line][$effect['stat']] =
                             ($byLine[$line][$effect['stat']] ?? 0) + $effect['value'];
                         break;
