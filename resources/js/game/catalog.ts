@@ -5,6 +5,14 @@
  */
 import { ECONOMY, EQUIPMENT } from './balance'
 import { CONSUMABLES, JUNK, REAGENTS } from './alchemy'
+import { COMPONENTS } from './components'
+import { TOP_TIER } from './toptier'
+import {
+  VARIANT_PROCESSING,
+  VARIANT_RAW,
+  VARIANT_REFINED,
+  VARIANT_SKILL,
+} from './variants'
 import type {
   Biome,
   EquipSlot,
@@ -17,6 +25,9 @@ import type {
   RareKey,
   RawKey,
   ReagentKey,
+  ComponentKey,
+  GradeRawKey,
+  GradeRefinedKey,
   Recipe,
   Rarity,
   Ring,
@@ -30,10 +41,12 @@ import type {
 // ------------------------------------------------------------- materials §4
 
 export const MATERIALS: Record<MaterialKey, Material> = {
-  // §4 -- generated, see scripts/gen_alchemy.py. Reagents are Tier 1 raw and
-  // junk is Tier 0; neither is typed here so the two catalogs cannot drift.
-  ...Object.fromEntries([...REAGENTS, ...JUNK].map((m) => [m.key, m])) as
-    Record<ReagentKey | JunkKey, Material>,
+  // §4 -- generated, see scripts/gen_alchemy.py and gen_components.py.
+  // Reagents and craft components are Tier 1 raw, junk is Tier 0; none of them
+  // is typed here so the catalogs cannot drift.
+  ...Object.fromEntries(
+    [...REAGENTS, ...COMPONENTS, ...JUNK, ...VARIANT_RAW, ...VARIANT_REFINED].map((m) => [m.key, m]),
+  ) as Record<ReagentKey | ComponentKey | JunkKey | GradeRawKey | GradeRefinedKey, Material>,
 
   // Tier 0 -- Scrap, §4.0. What bare hands bring back when you have no tool for
   // the line. Sells for a copper, feeds no recipe, and exists only to make the
@@ -246,6 +259,10 @@ export const BIOME_RARE: Record<Biome, RareKey> = {
 }
 
 export const skillForMaterial = (key: MaterialKey): SkillKey => {
+  // §5.3 -- a grade belongs to the same line its base raw does, or the fallback
+  // below would credit a hematite haul to woodcutting.
+  if (VARIANT_SKILL[key]) return VARIANT_SKILL[key]
+
   const found = SKILL_LIST.find(
     (s) => s.material === key || s.rareMaterial === key || s.scrapMaterial === key,
   )
@@ -280,6 +297,10 @@ export const RECIPES: Recipe[] = [
     secondInput: 'ingots', secondInputQty: 2, output: 'reinforced_frame',
     outputQty: 1, baseSeconds: 26 * 60, skill: 'mining',
   },
+
+  // §5.3 -- one line per grade, generated alongside the variants themselves so
+  // the bench list and the ground it comes off cannot disagree.
+  ...VARIANT_PROCESSING,
 ]
 
 export const RECIPE_BY_KEY: Record<string, Recipe> = Object.fromEntries(
@@ -430,6 +451,11 @@ export const ITEMS: ItemDef[] = [
   // §8.5 -- sixty action-scoped potions, generated alongside the PHP copy.
   ...CONSUMABLES,
 
+  // §8.0 -- the two rungs above epic, generated so the ladder reads whole.
+  // Legendary needs a guild hall and there are none; unique has no bench at
+  // all and drops soulbound. See scripts/gen_toptier.py.
+  ...TOP_TIER,
+
   // -- Basic: gold shop, +3-5%, §8.
   //    `station` is the smallest settlement that stocks the item -- villages
   //    carry the basics, better gear is a reason to walk to a city.
@@ -496,174 +522,176 @@ export const ITEMS: ItemDef[] = [
     description: 'Soft-soled and quiet. Not built for the badlands.',
   },
 
-  // -- Crafted starter: one tier 2 line, +4%, §12 step 7.
+  // -- Crafted starter: own raw + one refined, +4%, §12 step 7.
+  //    Two kinds here, and one more at every rung above: 2, 3, 4, 5.
   //    The first thing a player makes on a line: cheap, short-lived, and
   //    deliberately weaker than the city shop tool. It is what you can build
   //    before you can afford to buy.
   {
     key: 'hewn_axe', name: 'Hewn Axe', slot: 'axe', rarity: 'common', tradeable: false, stat: 'yield',
     value: 0.03, palette: 'wood', station: 'village', maxDurability: 60,
-    inputs: { planks: 4 },
+    inputs: { wood: 6, planks: 2, heartknot: 2 },
     description: 'Your first real tool. It will not last, but it will teach.',
   },
   {
     key: 'wood_pickaxe', name: 'Wood Pickaxe', slot: 'pickaxe', rarity: 'common', tradeable: false, stat: 'yield',
     value: 0.03, palette: 'wood', station: 'village', maxDurability: 60,
-    inputs: { planks: 4 },
+    inputs: { wood: 6, planks: 2, flux_salt: 2 },
     description: 'Wood against rock. It lasts exactly as long as you would expect.',
   },
   {
     key: 'shortbow', name: 'Shortbow', slot: 'bow', rarity: 'common', tradeable: false, stat: 'yield',
     value: 0.03, palette: 'wood', station: 'village', maxDurability: 60,
-    inputs: { planks: 3, cloth: 2 },
+    inputs: { wood: 6, cloth: 2, horn: 2 },
     description: 'Straight stave, woven string. Quiet, and quick to redraw.',
   },
   {
     key: 'stone_maul', name: 'Stone Maul', slot: 'hammer', rarity: 'common', tradeable: false, stat: 'yield',
     value: 0.03, palette: 'stone', station: 'village', maxDurability: 60,
-    inputs: { cut_stone: 3, planks: 2 },
+    inputs: { stone: 6, cut_stone: 2, whetgrit: 2 },
     description: 'Dressed head, seated cold. Stone breaks stone.',
   },
   {
     key: 'reed_sickle', name: 'Reed Sickle', slot: 'sickle', rarity: 'common', tradeable: false, stat: 'yield',
     value: 0.03, palette: 'fiber', station: 'village', maxDurability: 60,
-    inputs: { cloth: 3, planks: 2 },
+    inputs: { fiber: 6, cloth: 2, quench_reed: 2 },
     description: 'Bound at the grip so it stops turning in a wet hand.',
   },
 
-  // -- Crafted: tier 1-2 materials, +6-8%, §8.3
+  // -- Crafted: raw + own refined + a partner refined, +6-8%, §8.3
   {
     key: 'ironbound_axe', name: 'Ironbound Axe', slot: 'axe', rarity: 'uncommon', tradeable: false, stat: 'yield',
     value: 0.05, palette: 'iron', station: 'city', maxDurability: 120,
-    inputs: { ingots: 4, planks: 3 },
+    inputs: { hardwood: 6, beams: 3, ingots: 2, heartknot: 3 },
     description: 'Wedged head, banded eye. Fells clean and comes back out.',
   },
   {
     key: 'iron_pickaxe', name: 'Iron Pickaxe', slot: 'pickaxe', rarity: 'uncommon', tradeable: false, stat: 'yield',
     value: 0.05, palette: 'iron', station: 'city', maxDurability: 120,
-    inputs: { ingots: 5, planks: 3 },
+    inputs: { hematite: 6, steel_ingots: 3, planks: 2, flux_salt: 3 },
     description: 'Balanced head, seasoned haft. The workhorse tool.',
   },
   {
     key: 'sinew_longbow', name: 'Sinew Longbow', slot: 'bow', rarity: 'uncommon', tradeable: false, stat: 'yield',
     value: 0.05, palette: 'pelt', station: 'city', maxDurability: 120,
-    inputs: { leather: 4, cloth: 3 },
+    inputs: { thick_pelt: 6, boiled_leather: 3, cloth: 2, horn: 3 },
     description: 'Sinew-backed and heavy to draw. The herd never hears it.',
   },
   {
     key: 'banded_sledge', name: 'Banded Sledge', slot: 'hammer', rarity: 'uncommon', tradeable: false, stat: 'yield',
     value: 0.05, palette: 'iron', station: 'city', maxDurability: 120,
-    inputs: { ingots: 4, cut_stone: 4 },
+    inputs: { basalt: 6, dressed_basalt: 3, ingots: 2, whetgrit: 3 },
     description: 'Iron banding over a stone core. It takes the shock instead of you.',
   },
   {
     key: 'toothed_sickle', name: 'Toothed Sickle', slot: 'sickle', rarity: 'uncommon', tradeable: false, stat: 'yield',
     value: 0.05, palette: 'iron', station: 'city', maxDurability: 120,
-    inputs: { ingots: 4, cloth: 3 },
+    inputs: { flax: 6, linen: 3, ingots: 2, quench_reed: 3 },
     description: 'Serrated inside the curve. It saws where a plain edge slides.',
   },
   {
     key: 'leather_armor', name: 'Leather Armor', slot: 'armor', rarity: 'uncommon', tradeable: false,
     stat: 'tripReduction', value: 0.05, palette: 'pelt', station: 'city', maxDurability: 130,
-    inputs: { leather: 6, cloth: 2 },
+    inputs: { thick_pelt: 8, boiled_leather: 4, cloth: 2, sinew: 3 },
     description: 'Light enough to walk in all day.',
   },
   {
     key: 'reinforced_boots', name: 'Reinforced Boots', slot: 'boots', rarity: 'uncommon', tradeable: false,
     stat: 'travelSpeed', value: 0.05, palette: 'stone', station: 'city', maxDurability: 140,
-    inputs: { cut_stone: 4, leather: 3 },
+    inputs: { basalt: 8, dressed_basalt: 3, leather: 2, slate_scale: 3 },
     description: 'Stone-shod. Ugly, and you will stop caring by noon.',
   },
   {
     key: 'work_gloves', name: 'Work Gloves', slot: 'gloves', rarity: 'common', tradeable: false,
     stat: 'processingSpeed', value: 0.03, palette: 'fiber', station: 'village', maxDurability: 90,
-    inputs: { cloth: 3, planks: 2 },
+    inputs: { fiber: 6, cloth: 2, beeswax: 2 },
     description: 'Doubled at the palm. Speeds work on the settlement lines.',
   },
 
-  // -- Rare: tier 1-2 only, +8%, capital bench. Reinforced Frame gates the rung:
+  // -- Rare: the crafted three, deeper, plus the frame. +8%, capital bench.
+  //    Reinforced Frame gates the rung:
   //    it is the one tier-2 needing two processing lines, so rare gear already
   //    implies a settled player.
   {
     key: 'broadaxe', name: 'Broadaxe', slot: 'axe', rarity: 'rare', tradeable: false,
     stat: 'yield', value: 0.08, palette: 'iron', station: 'capital', maxDurability: 160,
-    inputs: { reinforced_frame: 2, planks: 4 },
+    inputs: { heartoak: 8, bentwood: 4, ingots: 3, heartknot: 4, reinforced_frame: 1 },
     description: 'Two hands, a long haul, and a tree down in three swings.',
   },
   {
     key: 'deep_pick', name: 'Deep Pick', slot: 'pickaxe', rarity: 'rare', tradeable: false,
     stat: 'yield', value: 0.08, palette: 'iron', station: 'capital', maxDurability: 160,
-    inputs: { reinforced_frame: 2, ingots: 4 },
+    inputs: { meteoric_iron: 8, skysteel: 4, planks: 3, flux_salt: 4, reinforced_frame: 1 },
     description: 'Long in the head, for seams that do not start at the surface.',
   },
   {
     key: 'warbow', name: 'Warbow', slot: 'bow', rarity: 'rare', tradeable: false,
     stat: 'yield', value: 0.08, palette: 'pelt', station: 'capital', maxDurability: 160,
-    inputs: { reinforced_frame: 1, leather: 5, cloth: 4 },
+    inputs: { dire_pelt: 8, lacquered_hide: 4, canvas: 3, horn: 4, reinforced_frame: 1 },
     description: 'A draw weight most people cannot hold. It does not need a second shot.',
   },
   {
     key: 'splitting_maul', name: 'Splitting Maul', slot: 'hammer', rarity: 'rare', tradeable: false,
     stat: 'yield', value: 0.08, palette: 'stone', station: 'capital', maxDurability: 160,
-    inputs: { reinforced_frame: 2, cut_stone: 5 },
+    inputs: { granite: 8, polished_granite: 4, ingots: 3, whetgrit: 4, reinforced_frame: 1 },
     description: 'Wedge-headed. It does not crush the rock, it opens it.',
   },
   {
     key: 'threshing_scythe', name: 'Threshing Scythe', slot: 'sickle', rarity: 'rare', tradeable: false,
     stat: 'yield', value: 0.08, palette: 'iron', station: 'capital', maxDurability: 160,
-    inputs: { reinforced_frame: 1, ingots: 3, cloth: 5 },
+    inputs: { hemp: 8, canvas: 4, skysteel: 3, quench_reed: 4, reinforced_frame: 1 },
     description: 'Long snath, long blade. A field goes down in rows, not handfuls.',
   },
   {
     key: 'banded_mail', name: 'Banded Mail', slot: 'armor', rarity: 'rare', tradeable: false,
     stat: 'tripReduction', value: 0.08, palette: 'iron', station: 'capital', maxDurability: 160,
-    inputs: { leather: 6, reinforced_frame: 2 },
+    inputs: { dire_pelt: 8, lacquered_hide: 4, steel_ingots: 3, sinew: 4, reinforced_frame: 1 },
     description: 'Iron bands over tanned hide. Heavy, and worth every pound of it.',
   },
   {
     key: 'marching_boots', name: 'Marching Boots', slot: 'boots', rarity: 'rare', tradeable: false,
     stat: 'travelSpeed', value: 0.08, palette: 'pelt', station: 'capital', maxDurability: 160,
-    inputs: { leather: 5, cut_stone: 4 },
+    inputs: { dire_pelt: 8, lacquered_hide: 4, polished_granite: 3, tar_seep: 4, reinforced_frame: 1 },
     description: 'Built for the road between rings, not the walk to the next hex.',
   },
   {
     key: 'tanners_gloves', name: "Tanner's Gloves", slot: 'gloves', rarity: 'rare', tradeable: false,
     stat: 'processingSpeed', value: 0.08, palette: 'pelt', station: 'capital', maxDurability: 160,
-    inputs: { leather: 4, cloth: 4 },
+    inputs: { hemp: 8, canvas: 4, lacquered_hide: 3, beeswax: 4, reinforced_frame: 1 },
     description: 'Cut for the settlement lines. The work goes faster and the hands last.',
   },
 
-  // -- NFT: tier 3 + tier 4 materials, +12-15% hard cap, §8.3
+  // -- NFT: five kinds across tiers 1-4, +12-15% hard cap, §8.3
   //    Each line's top tool wants its own rare material and its own dungeon
   //    shard, so kitting out a second line means crossing the map, §4.
   {
     key: 'ironwood_axe', name: 'Ironwood Axe', slot: 'axe', rarity: 'epic', tradeable: true, stat: 'yield',
     value: 0.11, palette: 'wood', station: 'capital', maxDurability: 200,
-    inputs: { ironwood: 3, reinforced_frame: 2, shard_verdant: 1 },
+    inputs: { ironwood: 3, heartoak: 8, bentwood: 4, heartknot: 4, reinforced_frame: 2, shard_verdant: 1 },
     description: 'Cut from the thing it is meant to cut. Marketplace-tradeable.',
   },
   {
     key: 'mythril_pickaxe', name: 'Mythril Pickaxe', slot: 'pickaxe', rarity: 'epic', tradeable: true, stat: 'yield',
     value: 0.11, palette: 'iron', station: 'capital', maxDurability: 200,
-    inputs: { mythril_ore: 3, reinforced_frame: 2, essence: 1 },
+    inputs: { mythril_ore: 3, meteoric_iron: 8, skysteel: 4, flux_salt: 4, reinforced_frame: 2, essence: 1 },
     description: 'Rings like a bell on ore. Marketplace-tradeable.',
   },
   {
     key: 'beastfang_bow', name: 'Beastfang Bow', slot: 'bow', rarity: 'epic', tradeable: true, stat: 'yield',
     value: 0.11, palette: 'pelt', station: 'capital', maxDurability: 200,
-    inputs: { beastfang_hide: 3, silkweave_fiber: 2, shard_sanguine: 1 },
+    inputs: { beastfang_hide: 3, dire_pelt: 8, lacquered_hide: 4, horn: 4, reinforced_frame: 2, shard_sanguine: 1 },
     description: 'Strung with something that used to run. Marketplace-tradeable.',
   },
   {
     key: 'obsidian_sledge', name: 'Obsidian Sledge', slot: 'hammer', rarity: 'epic', tradeable: true, stat: 'yield',
     value: 0.11, palette: 'stone', station: 'capital', maxDurability: 200,
-    inputs: { obsidian_shard: 3, reinforced_frame: 2, shard_cinder: 1 },
+    inputs: { obsidian_shard: 3, granite: 8, polished_granite: 4, whetgrit: 4, reinforced_frame: 2, shard_cinder: 1 },
     description: 'Glass that lands like iron. Marketplace-tradeable.',
   },
   {
     key: 'silkweave_sickle', name: 'Silkweave Sickle', slot: 'sickle', rarity: 'epic', tradeable: true, stat: 'yield',
     value: 0.11, palette: 'fiber', station: 'capital', maxDurability: 200,
-    inputs: { silkweave_fiber: 3, reinforced_frame: 2, shard_zephyr: 1 },
+    inputs: { silkweave_fiber: 3, hemp: 8, canvas: 4, quench_reed: 4, reinforced_frame: 2, shard_zephyr: 1 },
     description: 'The grass parts before it arrives. Marketplace-tradeable.',
   },
   // -- Consumables, §8.5. No slot and no durability: a potion is spent, it
@@ -672,14 +700,20 @@ export const ITEMS: ItemDef[] = [
   {
     key: 'ironwood_armor', name: 'Ironwood Armor', slot: 'armor', rarity: 'epic', tradeable: true,
     stat: 'tripReduction', value: 0.11, palette: 'wood', station: 'capital', maxDurability: 210,
-    inputs: { ironwood: 3, silkweave_fiber: 2, shard_verdant: 1 },
+    inputs: { ironwood: 3, heartoak: 8, bentwood: 4, pine_pitch: 4, reinforced_frame: 2, shard_verdant: 1 },
     description: 'Grown, not forged. Marketplace-tradeable.',
   },
   {
     key: 'beastfang_boots', name: 'Beastfang Boots', slot: 'boots', rarity: 'epic', tradeable: true,
     stat: 'travelSpeed', value: 0.11, palette: 'pelt', station: 'capital', maxDurability: 190,
-    inputs: { beastfang_hide: 2, obsidian_shard: 1, relic: 1 },
+    inputs: { beastfang_hide: 3, dire_pelt: 8, lacquered_hide: 4, sinew: 4, reinforced_frame: 2, relic: 1 },
     description: 'Something fast died for these. Marketplace-tradeable.',
+  },
+  {
+    key: 'silkweave_gloves', name: 'Silkweave Gloves', slot: 'gloves', rarity: 'epic', tradeable: true,
+    stat: 'processingSpeed', value: 0.11, palette: 'fiber', station: 'capital', maxDurability: 195,
+    inputs: { silkweave_fiber: 3, hemp: 8, canvas: 4, beeswax: 4, reinforced_frame: 2, shard_zephyr: 1 },
+    description: 'Spun so fine the work goes quicker for feeling less. Marketplace-tradeable.',
   },
 ]
 

@@ -22,6 +22,7 @@
  */
 import { computed, ref, watch } from 'vue'
 import {
+  BIOME_SCRAP,
   MATERIALS,
   RARITY_LABEL,
   RARITY_RANK,
@@ -32,6 +33,7 @@ import {
   skillForSlot,
 } from '@/game/catalog'
 import {
+  rawRole,
   SOURCE_COLOR,
   SOURCE_ICON,
   SOURCE_KINDS,
@@ -45,11 +47,26 @@ import { formatPercent } from '@/game/formulas'
 import { EQUIPMENT, ECONOMY, PROCESSING, BAG } from '@/game/balance'
 import { ACTION_PATHS } from '@/icons/actions'
 import { BIOME_LABEL } from '@/theme/palette'
+import {
+  BIOME_VARIANTS,
+  VARIANT_DESCRIPTION,
+  VARIANT_RINGS,
+  type VariantDef,
+} from '@/game/variants'
 import { itemIcon, materialIcon } from '@/icons/procedural'
+import { variantSpecimen } from '@/map/props'
 import SvgIcon from '@/components/SvgIcon.vue'
-import type { EquipSlot, ItemDef, Material, MaterialTier } from '@/game/types'
+import type {
+  Biome,
+  EquipSlot,
+  ItemDef,
+  Material,
+  MaterialKey,
+  MaterialTier,
+  VariantKey,
+} from '@/game/types'
 
-type Half = 'materials' | 'equipment'
+type Half = 'materials' | 'equipment' | 'tiles'
 
 const half = ref<Half>('materials')
 const query = ref('')
@@ -69,24 +86,84 @@ const matches = (haystack: string) =>
 
 // ------------------------------------------------------------------ materials
 
-const TIER_NAME: Record<MaterialTier, string> = {
-  0: 'Scrap',
-  1: 'Raw',
-  2: 'Refined',
-  3: 'Rare',
-  4: 'Raid',
+/**
+ * A tier is not always one kind of thing, so the page bands rather than tiers.
+ *
+ * Tier 0 holds two things §4 is emphatic are different: scrap is what a hex
+ * gives up to bare hands, junk is the rubbish carried out alongside, and the
+ * argument about what a missing tool costs you only applies to the first.
+ * Tier 1 holds three: the ground's own grades, and the two bench stocks. One
+ * paragraph cannot be true of all of them, and thirty-five cards in a single
+ * unlabelled run is a wall rather than a list.
+ */
+interface Band {
+  key: string
+  tier: MaterialTier
+  name: string
+  note: string
+  holds: (mat: Material) => boolean
 }
 
-/** One structural fact per tier -- the thing that is true of all five of them. */
-const TIER_NOTE: Record<MaterialTier, string> = {
-  0: 'What a hex gives up to bare hands, on any ring: the same haul as the real thing, a fraction of the worth. Outside the twenty on purpose — it feeds no recipe and reaches no other tier, so it never enters the economy the sinks have to balance.',
-  1: `Biome-locked, on the outer and middle rings, and the bulk of what fills a bag: ${BAG.units} units and ${BAG.rows} kinds is all a prospector carries, and a haul that puts you over either one keeps you on the hex until you sell, process or drop it.`,
-  2: `Made at settlements, never mined. A village runs one line of five, a city two, a capital all of them — which is most of what makes a capital worth the walk. Every station has ${PROCESSING.publicSlots} public slots, first come first served, so a busy capital queues.`,
-  3: `Contested ring only, and capped at ${ECONOMY.rareWalletCap} per wallet. A thousand bot wallets get a thousand capped hauls, which is the point.`,
-  4: 'Dungeon-sourced and not biome-locked. Shards are typed to their dungeon, so a top-tier tool always means crossing the map.',
-}
+const SCRAP_KEYS = new Set<string>(Object.values(BIOME_SCRAP))
 
-const TIERS: MaterialTier[] = [0, 1, 2, 3, 4]
+const BANDS: Band[] = [
+  {
+    key: 'scrap',
+    tier: 0,
+    name: 'Scrap',
+    note: 'What a hex gives up to bare hands, on any ring: the same haul as the real thing, a fraction of the worth. It feeds no recipe and reaches no other tier, so it never enters the economy the sinks have to balance — it exists to make your first tool obviously worth buying.',
+    holds: (mat) => SCRAP_KEYS.has(mat.key),
+  },
+  {
+    key: 'junk',
+    tier: 0,
+    name: 'Junk',
+    note: 'Sells for the same copper and feeds the same nothing, but it is not scrap: this is the rubbish carried out alongside a real haul, not what a missing tool costs you. Kept apart because that distinction is the whole of the argument above.',
+    holds: () => true,
+  },
+  {
+    key: 'ground',
+    tier: 1,
+    name: 'The ground',
+    note: `Four grades of every biome, and the variant of hex you are standing on decides which one you get. The base grade is everywhere; the better ones start at the middle ring and the best is contested. This is the bulk of what fills a bag — ${BAG.units} units and ${BAG.rows} kinds is all a prospector carries, and a haul over either keeps you on the hex until you sell, process or drop it.`,
+    holds: (mat) => rawRole(mat.key) === 'ground',
+  },
+  {
+    key: 'reagent',
+    tier: 1,
+    name: "The alchemist's stock",
+    note: 'Two per biome, and the consumable bench runs on these alone — no potion wants anything a smith would bid for. Biome-locked like every other raw, and worth more than scrap, which §4 makes a rule rather than a tuning value.',
+    holds: (mat) => rawRole(mat.key) === 'reagent',
+  },
+  {
+    key: 'component',
+    tier: 1,
+    name: 'The smith and the armorer',
+    note: 'The same idea again, for the other two benches: two per biome, one named for each. Every crafted thing wants its line’s component, so these sit beside the raw and the refined in every recipe rather than replacing them.',
+    holds: (mat) => rawRole(mat.key) === 'component',
+  },
+  {
+    key: 'refined',
+    tier: 2,
+    name: 'Refined',
+    note: `Made at settlements, never mined, and every grade refines on the same three-to-one the base line does — a better grade is a better material, never a better ratio. A village runs one line of five, a city two, a capital all of them, which is most of what makes a capital worth the walk. Every station has ${PROCESSING.publicSlots} public slots, first come first served, so a busy capital queues.`,
+    holds: () => true,
+  },
+  {
+    key: 'rare',
+    tier: 3,
+    name: 'Rare',
+    note: `Contested ring only, on ground that finally looks like itself, and capped at ${ECONOMY.rareWalletCap} per wallet. A thousand bot wallets get a thousand capped hauls, which is the point.`,
+    holds: () => true,
+  },
+  {
+    key: 'raid',
+    tier: 4,
+    name: 'Raid',
+    note: 'Dungeon-sourced and not biome-locked. Shards are typed to their dungeon, so a top-tier tool always means crossing the map.',
+    holds: () => true,
+  },
+]
 
 interface MaterialEntry {
   mat: Material
@@ -114,14 +191,92 @@ const materialEntries = computed<MaterialEntry[]>(() =>
   }),
 )
 
-const materialsByTier = computed(() => {
-  const groups = {} as Record<MaterialTier, MaterialEntry[]>
-  for (const tier of TIERS) groups[tier] = []
+/**
+ * First band whose tier matches and whose predicate says yes, so the last band
+ * of a tier is its catch-all and nothing can fall out of the list entirely.
+ */
+const materialsByBand = computed(() => {
+  const groups: Record<string, MaterialEntry[]> = {}
+  for (const band of BANDS) groups[band.key] = []
+
   for (const entry of materialEntries.value) {
-    if (matches(entry.hay)) groups[entry.mat.tier].push(entry)
+    if (!matches(entry.hay)) continue
+    const band = BANDS.find((b) => b.tier === entry.mat.tier && b.holds(entry.mat))
+    if (band) groups[band.key]!.push(entry)
   }
+
   return groups
 })
+
+
+// ---------------------------------------------------------------------- tiles
+
+/**
+ * §5.3 -- a biome is four kinds of ground, and the variant decides what the hex
+ * gives up.
+ *
+ * The other two halves answer "where does this come from" for a thing you can
+ * hold. This one answers it for the ground itself, which is the only place the
+ * four grades and their rings can be compared side by side -- the map shows you
+ * one hex at a time, and by design shows you nothing at all about the ones you
+ * have not scouted.
+ */
+const RING_REACH: Record<string, string> = {
+  outer: 'Everywhere, including the safe outer rim',
+  mid: 'Middle ring and inward',
+  inner: 'Contested ring only',
+}
+
+const GRADE_LABEL: Record<string, string> = {
+  common: 'Base',
+  uncommon: 'Better',
+  rare: 'Best',
+  epic: 'Contested',
+}
+
+interface TileEntry {
+  key: string
+  name: string
+  grade: string
+  tint: string
+  material: Material
+  reach: string
+  blurb: string
+  hay: string
+}
+
+interface TileGroup {
+  biome: Biome
+  entries: TileEntry[]
+}
+
+const tileGroups = computed<TileGroup[]>(() =>
+  (Object.keys(BIOME_VARIANTS) as Biome[]).map((biome) => ({
+    biome,
+    entries: BIOME_VARIANTS[biome]
+      .map((variant: VariantDef) => {
+        const material = MATERIALS[variant.material as MaterialKey]
+        const rings: string[] = VARIANT_RINGS[variant.key] ?? []
+        const entry: TileEntry = {
+          key: variant.key,
+          name: variant.name,
+          grade: GRADE_LABEL[variant.grade] ?? variant.grade,
+          tint: variant.tint,
+          material,
+          reach: RING_REACH[rings[0] ?? 'outer'] ?? '',
+          blurb: VARIANT_DESCRIPTION[variant.key] ?? '',
+          hay: '',
+        }
+        entry.hay = [entry.name, entry.blurb, material.name, entry.reach].join(' ')
+        return entry
+      })
+      .filter((e: TileEntry) => matches(e.hay)),
+  })).filter((g: TileGroup) => g.entries.length),
+)
+
+const tileCount = computed(() =>
+  tileGroups.value.reduce<number>((n, g) => n + g.entries.length, 0),
+)
 
 // ------------------------------------------------------------------ equipment
 
@@ -221,7 +376,7 @@ const shownGroups = computed(() =>
 )
 
 const materialCount = computed(() =>
-  TIERS.reduce<number>((n, tier) => n + materialsByTier.value[tier].length, 0),
+  BANDS.reduce<number>((n, band) => n + materialsByBand.value[band.key]!.length, 0),
 )
 
 const itemCount = computed(() => groups.value.reduce((n, g) => n + g.entries.length, 0))
@@ -249,6 +404,9 @@ function nature(item: ItemDef): string {
           </button>
           <button type="button" :class="{ on: half === 'equipment' }" @click="half = 'equipment'">
             Equipment <span class="tally">{{ itemCount }}</span>
+          </button>
+          <button type="button" :class="{ on: half === 'tiles' }" @click="half = 'tiles'">
+            Ground <span class="tally">{{ tileCount }}</span>
           </button>
         </div>
 
@@ -280,15 +438,15 @@ function nature(item: ItemDef): string {
           Nothing matches “{{ query }}”.
         </p>
 
-        <section v-for="tier in TIERS" :key="tier" v-show="materialsByTier[tier].length">
+        <section v-for="band in BANDS" :key="band.key" v-show="materialsByBand[band.key]!.length">
           <div class="sect">
-            <h3>Tier {{ tier }} <span class="dot">·</span> {{ TIER_NAME[tier] }}</h3>
-            <span class="tally">{{ materialsByTier[tier].length }}</span>
+            <h3>Tier {{ band.tier }} <span class="dot">·</span> {{ band.name }}</h3>
+            <span class="tally">{{ materialsByBand[band.key]!.length }}</span>
           </div>
-          <p class="tiny muted sect-note">{{ TIER_NOTE[tier] }}</p>
+          <p class="tiny muted sect-note">{{ band.note }}</p>
 
           <div class="entries">
-            <article v-for="entry in materialsByTier[tier]" :key="entry.mat.key" class="entry">
+            <article v-for="entry in materialsByBand[band.key]!" :key="entry.mat.key" class="entry">
               <div class="head">
                 <SvgIcon :svg="materialIcon(entry.mat, 30)" boxed :size="30" />
                 <div class="grow">
@@ -369,7 +527,7 @@ function nature(item: ItemDef): string {
       </template>
 
       <!-- ------------------------------------------------------- equipment -->
-      <template v-else>
+      <template v-else-if="half === 'equipment'">
         <p v-if="!itemCount" class="nothing tiny muted">Nothing matches “{{ query }}”.</p>
 
         <section v-for="group in shownGroups" :key="group.key">
@@ -439,11 +597,64 @@ function nature(item: ItemDef): string {
         </section>
       </template>
 
+      <!-- ----------------------------------------------------------- tiles -->
+      <template v-if="half === 'tiles'">
+        <p v-if="!tileCount" class="nothing tiny muted">
+          Nothing matches “{{ query }}”.
+        </p>
+
+        <section v-for="group in tileGroups" :key="group.biome">
+          <div class="sect">
+            <h3>{{ BIOME_LABEL[group.biome] }}</h3>
+            <span class="tally">{{ group.entries.length }}</span>
+          </div>
+
+          <div class="entries">
+            <article v-for="tile in group.entries" :key="tile.key" class="entry">
+              <div class="head">
+                <span class="specimen" v-html="variantSpecimen(tile.key as VariantKey, 76)" />
+                <div class="grow">
+                  <span class="label eyebrow">{{ tile.grade }}</span>
+                  <strong class="name">{{ tile.name }}</strong>
+                </div>
+              </div>
+
+              <p v-if="tile.blurb" class="tiny muted desc">{{ tile.blurb }}</p>
+
+              <dl class="rails">
+                <div class="rail" :style="{ '--road': SOURCE_COLOR.mine }">
+                  <dt class="label">Gives up</dt>
+                  <dd>
+                    <span class="pip mat">
+                      <SvgIcon :svg="materialIcon(tile.material, 15)" />{{ tile.material.name }}
+                    </span>
+                  </dd>
+                </div>
+
+                <!-- Neutral rail: how far in you have to walk is not a road the
+                     material arrives by, it is a fact about the ground. -->
+                <div class="rail out">
+                  <dt class="label">Found</dt>
+                  <dd>{{ tile.reach }}</dd>
+                </div>
+              </dl>
+            </article>
+          </div>
+        </section>
+      </template>
+
       <p class="tiny muted footnote">
         <template v-if="half === 'materials'">
           Resources never move between players — there is no trade, no gift, no
           mailbox. Everything above is either dug out of the ground yourself or
           made from something that was.
+        </template>
+        <template v-else-if="half === 'tiles'">
+          Terrain is a pure function of where it is and the world seed, so the
+          client draws the land itself at any distance — but a hex outside your
+          sight keeps everything only the server knows: what is depleted, who is
+          working it, and what it would pay. Four grades a biome, and the better
+          ground is further in on purpose.
         </template>
         <template v-else>
           A bench reaches exactly as far as its tier, whatever you carry to it, and
@@ -677,6 +888,18 @@ section + section {
   display: flex;
   align-items: center;
   gap: 9px;
+}
+
+/* §13.2 -- a real tile, drawn by the same renderer the map uses, props and all.
+   Tint alone would show half the difference: the treatment is the other half,
+   and four greens are far easier to tell apart with trees standing on them.
+   Line-height zero because the SVG is taller than its own tile and would
+   otherwise push the name off the baseline. */
+.specimen {
+  flex: 0 0 auto;
+  display: block;
+  line-height: 0;
+  margin: -18px 0 -14px;
 }
 
 .eyebrow {

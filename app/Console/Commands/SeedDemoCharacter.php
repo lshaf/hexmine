@@ -32,20 +32,22 @@ class SeedDemoCharacter extends Command
     /**
      * §7.6 -- a kit that fits in the bag, because everything now has to.
      *
-     * Five stacks, not twenty. Units are the limit that bites (§7.6), and these
-     * five plus three potions and three unworn items land at 99 of 120 -- a bag
+     * Six stacks, not twenty. Units are the limit that bites (§7.6), and these
+     * six plus three potions and three unworn items land at 99 of 120 -- a bag
      * with a haul or two of room in it, which is the state most screens want to
      * be shown in. A demo character who cannot walk would be a demo of the
      * wrong thing.
      *
      * One stack per tier that has one, so every §4 band still has something to
-     * render on the bag screen.
+     * render on the bag screen. Heartknot is the sixth: no recipe on the weapon
+     * bench is component-free any more, so a kit without one cannot craft.
      *
      * @var array<string,int>
      */
     private const MATERIALS = [
-        'wood' => 44,
+        'wood' => 36,
         'iron_ore' => 24,
+        'heartknot' => 8,
 
         'planks' => 16,
 

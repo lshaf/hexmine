@@ -39,21 +39,21 @@ class GenerateWorldgenFixture extends Command
         // sheet, and sized from Balance rather than pinned to one map: sampling
         // coordinates that fall off the map would leave the guard testing
         // nothing.
-        $cols = Balance::MAP_COLS;
-        $rows = Balance::MAP_ROWS;
+        $size = Balance::mapSize();
+        $radius = Balance::mapRadius();
 
         $coords = [];
         for ($i = 0; $i < 240; $i++) {
-            $coords[] = [($i * 977) % $cols, ($i * 613 + 31) % $rows];
+            $coords[] = [($i * 977) % $size - $radius, ($i * 613 + 31) % $size - $radius];
         }
 
         // The four that have to be in every fixture: a dungeon mouth, the dead
-        // centre, and both corners.
+        // centre, and both far corners -- which are now opposite in sign (§5.1).
         $mouth = WorldGen::dungeonSites()[0];
         $coords[] = [$mouth['col'], $mouth['row']];
-        $coords[] = [intdiv($cols, 2), intdiv($rows, 2)];
         $coords[] = [0, 0];
-        $coords[] = [$cols - 1, $rows - 1];
+        $coords[] = [-$radius, -$radius];
+        $coords[] = [$radius, $radius];
 
         $lines = [];
         foreach ($coords as [$col, $row]) {
@@ -63,6 +63,7 @@ class GenerateWorldgenFixture extends Command
             $lines[] = implode('|', [
                 "{$col},{$row}",
                 $tile['biome'],
+                $tile['variant'],
                 $tile['ring'],
                 $tile['material'] ?? '-',
                 $tile['baseSeconds'],

@@ -16,8 +16,8 @@ class MiningController extends GameController
         $character = $this->character($request);
 
         $validated = $request->validate([
-            'col' => ['required', 'integer', 'min:0', 'max:'.(Balance::MAP_COLS - 1)],
-            'row' => ['required', 'integer', 'min:0', 'max:'.(Balance::MAP_ROWS - 1)],
+            'col' => ['required', 'integer', 'min:'.(-Balance::mapRadius()), 'max:'.Balance::mapRadius()],
+            'row' => ['required', 'integer', 'min:'.(-Balance::mapRadius()), 'max:'.Balance::mapRadius()],
         ]);
 
         $job = $this->game->startMining($character, (int) $validated['col'], (int) $validated['row']);
@@ -35,8 +35,8 @@ class MiningController extends GameController
         $character = $this->character($request);
 
         $validated = $request->validate([
-            'col' => ['required', 'integer', 'min:0', 'max:'.(Balance::MAP_COLS - 1)],
-            'row' => ['required', 'integer', 'min:0', 'max:'.(Balance::MAP_ROWS - 1)],
+            'col' => ['required', 'integer', 'min:'.(-Balance::mapRadius()), 'max:'.Balance::mapRadius()],
+            'row' => ['required', 'integer', 'min:'.(-Balance::mapRadius()), 'max:'.Balance::mapRadius()],
         ]);
 
         $job = $this->game->startHunt($character, (int) $validated['col'], (int) $validated['row']);

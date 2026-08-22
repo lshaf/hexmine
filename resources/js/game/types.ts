@@ -30,6 +30,22 @@ export type ScrapKey = 'branch' | 'ore_chips' | 'torn_hide' | 'gravel' | 'chaff'
 
 export type RawKey = 'wood' | 'iron_ore' | 'pelt' | 'stone' | 'fiber'
 
+/**
+ * §5.3 Tier 1 -- the grades above the base raw, two per biome. Biome-locked
+ * exactly as the base is; what changes is which variant of the ground drops it.
+ */
+export type GradeRawKey =
+  | 'hardwood'
+  | 'heartoak'
+  | 'hematite'
+  | 'meteoric_iron'
+  | 'thick_pelt'
+  | 'dire_pelt'
+  | 'basalt'
+  | 'granite'
+  | 'flax'
+  | 'hemp'
+
 export type RefinedKey =
   | 'planks'
   | 'ingots'
@@ -37,6 +53,19 @@ export type RefinedKey =
   | 'cut_stone'
   | 'cloth'
   | 'reinforced_frame'
+
+/** §5.3 Tier 2 -- what each grade refines into, on the same 3:1 as the base. */
+export type GradeRefinedKey =
+  | 'beams'
+  | 'bentwood'
+  | 'steel_ingots'
+  | 'skysteel'
+  | 'boiled_leather'
+  | 'lacquered_hide'
+  | 'dressed_basalt'
+  | 'polished_granite'
+  | 'linen'
+  | 'canvas'
 
 export type RareKey =
   | 'ironwood'
@@ -63,11 +92,11 @@ export type ReagentKey =
   | 'toadstool'
   | 'birch_sap'
   | 'lichen'
-  | 'alum'
+  | 'stonewort'
   | 'bitterroot'
-  | 'marrow'
+  | 'yarrow'
   | 'ashcap'
-  | 'emberdust'
+  | 'sagebrush'
   | 'blue_nettle'
   | 'clover'
 
@@ -83,12 +112,58 @@ export type JunkKey =
   | 'cinder'
   | 'thistle'
 
+/**
+ * §4 Tier 1 -- the smith's and the armorer's raw stock, two per biome. Same
+ * model as ReagentKey: biome-locked, gathered off a hex, worth more than scrap.
+ */
+export type ComponentKey =
+  | 'heartknot'
+  | 'pine_pitch'
+  | 'flux_salt'
+  | 'slate_scale'
+  | 'horn'
+  | 'sinew'
+  | 'whetgrit'
+  | 'tar_seep'
+  | 'quench_reed'
+  | 'beeswax'
+
+/**
+ * §5.3 -- a biome is four kinds of ground, one per equipment rung. The key is
+ * the biome for the base grade and `biome_grade` above it, so the base tiles
+ * keep reading as plain 'forest' wherever a variant was not the question.
+ */
+export type VariantKey =
+  | 'forest'
+  | 'forest_uncommon'
+  | 'forest_rare'
+  | 'forest_epic'
+  | 'mountain'
+  | 'mountain_uncommon'
+  | 'mountain_rare'
+  | 'mountain_epic'
+  | 'plains'
+  | 'plains_uncommon'
+  | 'plains_rare'
+  | 'plains_epic'
+  | 'badlands'
+  | 'badlands_uncommon'
+  | 'badlands_rare'
+  | 'badlands_epic'
+  | 'grassland'
+  | 'grassland_uncommon'
+  | 'grassland_rare'
+  | 'grassland_epic'
+
 export type MaterialKey =
   | ScrapKey
   | JunkKey
   | RawKey
+  | GradeRawKey
   | ReagentKey
+  | ComponentKey
   | RefinedKey
+  | GradeRefinedKey
   | RareKey
   | RaidKey
 
@@ -96,6 +171,8 @@ export interface Material {
   key: MaterialKey
   name: string
   tier: MaterialTier
+  /** Which craft bench the component was named for. Flavour: nothing reads it. */
+  bench?: 'weapon' | 'armor'
   /** Biome lock for tier 1 and tier 3. Raid + refined materials are unlocked. */
   biome?: Biome
   /** Accent colour for the procedural icon system, §13.1. */
@@ -207,6 +284,13 @@ export interface ItemDef {
    * action, and the unique index on character_buffs says exactly that.
    */
   scope?: BuffScope
+  /**
+   * §8.0 -- the one fixed line a unique carries on top of its three rolled
+   * options. Named, not costed: loot tables (§14.3) and combat (§14.2) are both
+   * undesigned, so this states an intent the almanac shows as pending. Never a
+   * percentage -- the ceiling is +15% and the rolled options already reach it.
+   */
+  perk?: string
   /** Fractional bonus, e.g. 0.06 = +6%. */
   value: number
   palette: Material['palette']
@@ -340,6 +424,8 @@ export interface Tile {
   col: number
   row: number
   biome: Biome
+  /** §5.3 -- which of the biome's four grades this ground is. */
+  variant: VariantKey
   ring: Ring
   /** Undefined on barren capital-ring tiles, §5.2. */
   material?: MaterialKey

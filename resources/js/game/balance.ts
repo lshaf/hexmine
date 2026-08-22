@@ -18,10 +18,12 @@ export const HOUR = 60 * MINUTE
  */
 
 export const MAP = {
-  /** §5.1. Server-authoritative: the client is handed cols/rows by
-   *  GET /api/world, so these are documentation, not the source of truth. */
-  cols: 500,
-  rows: 500,
+  /** §5.1. Server-authoritative: the client is handed these by GET /api/world,
+   *  so they are documentation, not the source of truth. The map is square and
+   *  centred on the origin -- a radius of 200 is every column and every row
+   *  from -200 to 200, so `size` is `radius * 2 + 1`. */
+  radius: 2500,
+  size: 5001,
   seed: 0x5eed_1a3f,
   /** Biome lattice, §5.3. Cell size in tiles, and how many cells make up one
    *  coherent region. Patches must be small enough that a second biome is a

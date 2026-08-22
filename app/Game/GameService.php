@@ -54,11 +54,12 @@ class GameService
      */
     public function pickSpawn(int $seed): array
     {
-        $angle = Hash::rand01(Hash::hash2($seed, 1, Balance::MAP_SEED)) * M_PI * 2;
-        $radius = 0.78 + Hash::rand01(Hash::hash2($seed, 2, Balance::MAP_SEED)) * 0.14;
-        $startCol = (int) round(Balance::MAP_COLS / 2 + cos($angle) * $radius * (Balance::MAP_COLS / 2));
-        $startRow = (int) round(Balance::MAP_ROWS / 2 + sin($angle) * $radius * (Balance::MAP_ROWS / 2));
+        $angle = Hash::rand01(Hash::hash2($seed, 1, Balance::mapSeed())) * M_PI * 2;
+        $radius = 0.78 + Hash::rand01(Hash::hash2($seed, 2, Balance::mapSeed())) * 0.14;
+        $startCol = (int) round(cos($angle) * $radius * Balance::mapRadius());
+        $startRow = (int) round(sin($angle) * $radius * Balance::mapRadius());
 
+        $edge = Balance::mapRadius();
         $fallback = ['col' => $startCol, 'row' => $startRow];
         $range = Balance::SPAWN_VILLAGE_RADIUS;
 
@@ -68,8 +69,8 @@ class GameService
                     if (max(abs($dc), abs($dr)) !== $ring) {
                         continue;
                     }
-                    $col = min(Balance::MAP_COLS - 1, max(0, $startCol + $dc));
-                    $row = min(Balance::MAP_ROWS - 1, max(0, $startRow + $dr));
+                    $col = min($edge, max(-$edge, $startCol + $dc));
+                    $row = min($edge, max(-$edge, $startRow + $dr));
 
                     if (WorldGen::biomeOf($col, $row) !== 'forest') {
                         continue;
@@ -428,7 +429,7 @@ class GameService
         $seed = Hash::hash2(
             (int) $character->id + $this->now() % 100000,
             crc32($def['name']),
-            Balance::MAP_SEED,
+            Balance::mapSeed(),
         );
 
         return Formulas::rollOptions($def, $seed, $extra);
@@ -450,7 +451,7 @@ class GameService
         $roll = Hash::rand01(Hash::hash2(
             (int) $character->id,
             $this->now() % 100000,
-            Balance::MAP_SEED ^ $salt,
+            Balance::mapSeed() ^ $salt,
         ));
 
         return $roll < $chance ? 1 : 0;
@@ -471,7 +472,7 @@ class GameService
         $roll = Hash::rand01(Hash::hash2(
             (int) $character->id,
             $this->now() % 100000,
-            Balance::MAP_SEED ^ 0xba2a,
+            Balance::mapSeed() ^ 0xba2a,
         ));
 
         return $roll < Balance::CAPITAL_SHOP_OPTION_CHANCE ? 1 : 0;
@@ -834,9 +835,9 @@ class GameService
     public function worldConfig(): array
     {
         return [
-            'seed' => Balance::MAP_SEED,
-            'cols' => Balance::MAP_COLS,
-            'rows' => Balance::MAP_ROWS,
+            'seed' => Balance::mapSeed(),
+            'size' => Balance::mapSize(),
+            'radius' => Balance::mapRadius(),
             'biomeCell' => Balance::BIOME_CELL,
             'biomeRegionCells' => Balance::BIOME_REGION_CELLS,
             'rings' => [
@@ -1134,7 +1135,7 @@ class GameService
         $skillLevel = (int) ($character->skills()->where('skill_key', 'hunting')->value('level') ?? 1);
 
         $rolled = Hash::randInt(
-            Hash::hash2($col, $row + $herdUntil, Balance::MAP_SEED ^ 0x8eed),
+            Hash::hash2($col, $row + $herdUntil, Balance::mapSeed() ^ 0x8eed),
             Balance::HUNT_PELT_MIN,
             Balance::HUNT_PELT_MAX,
         );
@@ -1299,7 +1300,7 @@ class GameService
 
                 // §5.1 -- worked-out tiles regrow rather than dying.
                 $exhausted = Hash::rand01(
-                    Hash::hash2($job->col + $now, $job->row, Balance::MAP_SEED ^ 0xdeed)
+                    Hash::hash2($job->col + $now, $job->row, Balance::mapSeed() ^ 0xdeed)
                 ) < Balance::DEPLETE_CHANCE;
 
                 if ($exhausted) {
@@ -1327,7 +1328,7 @@ class GameService
                 // previewHunt() for why that is not a tuning value.
                 if (! $bare) {
                     $roll = Hash::rand01(
-                        Hash::hash2($job->col + $job->id, $job->row + $now, Balance::MAP_SEED ^ 0x3550)
+                        Hash::hash2($job->col + $job->id, $job->row + $now, Balance::mapSeed() ^ 0x3550)
                     );
 
                     if ($roll < Balance::HUNT_ESSENCE_CHANCE) {
@@ -1581,7 +1582,7 @@ class GameService
         // Anywhere on the map, seen or not (§5.6). Distance is the whole cost:
         // the far side of the world is a walk of days, which is a decision the
         // clock enforces on its own. The only refusal left is the map's edge.
-        if ($col < 0 || $col >= Balance::MAP_COLS || $row < 0 || $row >= Balance::MAP_ROWS) {
+        if (! WorldGen::inBounds($col, $row)) {
             throw new GameException('There is nothing past the edge of the map.', 'off_map');
         }
 

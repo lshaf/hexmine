@@ -23,9 +23,74 @@ final class Balance
 
     // ---------------------------------------------------------------- map §5
 
-    public const MAP_COLS = 200;
-    public const MAP_ROWS = 200;
-    public const MAP_SEED = 0x5eed1a3f;
+    /**
+     * §5.1 -- the map is measured from the middle out, and (0,0) is the middle.
+     *
+     * One radius, because the map is square and always has been. A radius of
+     * 200 means every column and every row from -200 to 200 inclusive, so the
+     * grid is 401 a side. Signed coordinates are what make the ring maths honest:
+     * a ring is a distance from the origin rather than from an arbitrary point
+     * halfway along an unsigned axis, and the dead centre of the world is the
+     * one coordinate you never have to look up.
+     *
+     * Read from config/game.php, so the size and the seed of the world are
+     * deployment settings rather than a code edit. Methods and not constants
+     * for exactly that reason -- a const cannot ask config() anything.
+     *
+     * Ship value: 2500, for the 5000x5000 of §5.
+     */
+    public static function mapRadius(): int
+    {
+        return self::$mapRadius ??= max(1, (int) config('game.map.radius', 200));
+    }
+
+    /** Tiles per axis, both ends included. Derived -- never configure this. */
+    public static function mapSize(): int
+    {
+        return self::mapRadius() * 2 + 1;
+    }
+
+    /**
+     * The world's seed, masked to 32 bits.
+     *
+     * Hash::hash2 is a bit-for-bit port of the JavaScript one and only agrees
+     * with it inside that width, so a seed configured wider would generate a
+     * world the client cannot reproduce. Hex and decimal are both accepted:
+     * `intval` with base 0 reads the 0x prefix the way the source did.
+     */
+    public static function mapSeed(): int
+    {
+        if (self::$mapSeed !== null) {
+            return self::$mapSeed;
+        }
+
+        $seed = config('game.map.seed', 0x5eed1a3f);
+
+        return self::$mapSeed = (is_string($seed) ? intval($seed, 0) : (int) $seed) & 0xFFFFFFFF;
+    }
+
+    /**
+     * Memoised because the seed is read once per hashed coordinate, and a tile
+     * is several hashes. A container lookup in that loop costs whole seconds
+     * over a map-wide walk.
+     */
+    private static ?int $mapRadius = null;
+
+    private static ?int $mapSeed = null;
+
+    /**
+     * Drop the memoised map settings.
+     *
+     * Only a test changing config/game.php at runtime needs this, and it must
+     * also clear WorldGen's caches -- a different seed is a different world, so
+     * every biome and cell already remembered is wrong. WorldGen::forget() does
+     * both, and is the one to call.
+     */
+    public static function forgetMapConfig(): void
+    {
+        self::$mapRadius = null;
+        self::$mapSeed = null;
+    }
 
     /** Biome lattice, §5.3. Cell size in tiles, and cells per coherent region. */
     public const BIOME_CELL = 9;

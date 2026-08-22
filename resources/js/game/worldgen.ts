@@ -1,7 +1,7 @@
 /**
  * Client-side world generation, §5.
  *
- * The map is cols x rows as the server declares it, and none of it is stored.
+ * The map is square, as wide as the server declares, and none of it is stored.
  * Every tile is a pure function of (col, row, seed), so the client derives
  * terrain locally and the server only sends what it cannot know: which tiles are
  * worked out and which have miners on them.
@@ -19,13 +19,25 @@
  * `npm run parity` checks this file against the very same fixture; run both.
  */
 import { hash2, rand01, randInt } from './hash'
+import { BIOME_VARIANTS, type VariantDef } from './variants'
 import { hexDistance } from '@/map/hexGeometry'
-import type { Biome, MaterialKey, Ring, Settlement, SettlementTier, SkillKey, Tile } from './types'
+import type {
+  Biome,
+  MaterialKey,
+  Ring,
+  Settlement,
+  SettlementTier,
+  SkillKey,
+  Tile,
+  VariantKey,
+} from './types'
 
 export interface WorldConfig {
   seed: number
-  cols: number
-  rows: number
+  /** §5.1 -- the map is square. Coordinates run -radius..radius inclusive. */
+  radius: number
+  /** Tiles a side, both ends included. Derived: radius * 2 + 1. */
+  size: number
   biomeCell: number
   biomeRegionCells: number
   rings: { center: number; inner: number; mid: number }
@@ -67,12 +79,23 @@ function cfg(): WorldConfig {
 
 // --------------------------------------------------------------- ring layout
 
+/**
+ * §5.1 -- is this hex on the map at all? The mirror of WorldGen::inBounds().
+ *
+ * The one place the client decides where the edge is, so the render loop and
+ * the atlas cannot disagree about it.
+ */
+export function inBounds(col: number, row: number): boolean {
+  const c = cfg()
+  return Math.abs(col) <= c.radius && Math.abs(row) <= c.radius
+}
+
 /** Normalised distance from map centre, 0 at the capital ring, 1 at the rim. */
 export function radiusOf(col: number, row: number): number {
   const c = cfg()
-  const maxRadius = Math.min(c.cols, c.rows) / 2
-  const dc = (col - c.cols / 2) / maxRadius
-  const dr = (row - c.rows / 2) / maxRadius
+  const maxRadius = c.radius
+  const dc = col / maxRadius
+  const dr = row / maxRadius
   return Math.sqrt(dc * dc + dr * dr)
 }
 
@@ -144,7 +167,7 @@ function cellSeed(cx: number, cy: number): CellSeed {
 }
 
 export function biomeOf(col: number, row: number): Biome {
-  const cacheKey = row * cfg().cols + col
+  const cacheKey = (row + cfg().radius) * cfg().size + (col + cfg().radius)
   const hit = biomeCache.get(cacheKey)
   if (hit) return hit
 
@@ -328,8 +351,8 @@ function crowdedByBetter(tier: SettlementTier, col: number, row: number): boolea
     // within minGap hexes is also within minGap columns and rows -- these are
     // every cell that could hold one. Negative cells hold nothing: their sites
     // would land off the map.
-    const cxMin = Math.max(0, Math.floor((col - minGap) / cell))
-    const cyMin = Math.max(0, Math.floor((row - minGap) / cell))
+    const cxMin = Math.floor((col - minGap) / cell)
+    const cyMin = Math.floor((row - minGap) / cell)
 
     for (let cx = cxMin; cx <= Math.floor((col + minGap) / cell); cx++) {
       for (let cy = cyMin; cy <= Math.floor((row + minGap) / cell); cy++) {
@@ -374,6 +397,9 @@ function nameFor(col: number, row: number, tier: SettlementTier): string {
 
 /** The settlement on this tile, if any. Pure function of position. */
 export function settlementAt(col: number, row: number): Settlement | undefined {
+  // §5.1 -- nobody lives off the edge, and the lattice extends past it.
+  if (!inBounds(col, row)) return undefined
+
   const ring = ringOf(col, row)
   const tier = TIER_FOR_RING[ring]
   if (!tier) return undefined
@@ -430,7 +456,6 @@ export function settlementMarksIn(
   rowMax: number,
   tiers: SettlementTier[] = ['village', 'city', 'capital'],
 ): SettlementMark[] {
-  const c = cfg()
   const out: SettlementMark[] = []
 
   for (const tier of tiers) {
@@ -445,7 +470,7 @@ export function settlementMarksIn(
 
         const [col, row] = site
         if (col < colMin || col > colMax || row < rowMin || row > rowMax) continue
-        if (col < 0 || row < 0 || col >= c.cols || row >= c.rows) continue
+        if (!inBounds(col, row)) continue
         if (crowdedByBetter(tier, col, row)) continue
 
         out.push({ col, row, tier, name: nameFor(col, row, tier) })
@@ -486,6 +511,32 @@ export interface TileMutation {
   regrowsAt?: number
 }
 
+/**
+ * §5.3 -- which of the biome's four variants this hex turned out to be.
+ *
+ * The mirror of WorldGen::variantOf(). A weighted walk in fixed grade order
+ * over the ring's column, which sums to 1 by construction. Fixed order is what
+ * keeps the client's answer identical to the server's: same table, same roll,
+ * same stopping place.
+ */
+export function variantOf(
+  col: number,
+  row: number,
+  biome: Biome,
+  ring: Ring,
+): VariantDef {
+  const variants = BIOME_VARIANTS[biome]
+  const roll = rand01(hash2(col, row, cfg().seed ^ 0xc3))
+
+  let seen = 0
+  for (const variant of variants) {
+    seen += variant.weights[ring as 'outer' | 'mid' | 'inner'] ?? 0
+    if (roll < seen) return variant
+  }
+
+  return variants[0]
+}
+
 /** Build a tile. `mutation` is the only server-owned state a tile can carry. */
 export function generateTile(
   col: number,
@@ -501,7 +552,6 @@ export function generateTile(
 
   const hTime = hash2(col, row, c.seed ^ 0xa1)
   const hYield = hash2(col, row, c.seed ^ 0xb2)
-  const hRare = hash2(col, row, c.seed ^ 0xc3)
 
   // §5.2 -- the capital ring is barren of resources. That is the pressure that
   // forces traffic outward for materials and inward for processing.
@@ -509,17 +559,18 @@ export function generateTile(
   // A depleted tile keeps its material: it is drained, not dead (§5.1), and
   // callers gate on regrowsAt. The UI needs it to draw the right remnants.
   let material: MaterialKey | undefined
+  let variant: VariantKey = biome
   if (ring !== 'center' && !settlement) {
-    material =
-      ring === 'inner' && rand01(hRare) < c.rareSpawnChance
-        ? c.biomeRare[biome]
-        : c.biomeMaterial[biome]
+    const picked = variantOf(col, row, biome, ring)
+    variant = picked.key
+    material = picked.material as MaterialKey
   }
 
   return {
     col,
     row,
     biome,
+    variant,
     ring,
     material,
     baseSeconds: randInt(hTime, c.baseMinSeconds, c.baseMaxSeconds),

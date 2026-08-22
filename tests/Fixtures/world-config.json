@@ -1,7 +1,7 @@
 {
     "seed": 1592597055,
-    "cols": 200,
-    "rows": 200,
+    "size": 401,
+    "radius": 200,
     "biomeCell": 9,
     "biomeRegionCells": 5,
     "rings": {
@@ -13,7 +13,7 @@
     "baseMaxSeconds": 3600,
     "rareSpawnChance": 0.18,
     "slotsPerTile": 2,
-    "herdLifetimeMs": 14400000,
+    "herdLifetimeMs": 240000,
     "herdChance": 0.06,
     "biomes": [
         "forest",
@@ -87,32 +87,32 @@
     ],
     "dungeonSites": [
         {
-            "col": 100,
-            "row": 95,
+            "col": 0,
+            "row": -10,
             "key": "rootvault",
             "name": "Rootvault"
         },
         {
-            "col": 105,
-            "row": 98,
+            "col": 9,
+            "row": -3,
             "key": "deepshaft",
             "name": "Deepshaft"
         },
         {
-            "col": 103,
-            "row": 104,
+            "col": 6,
+            "row": 8,
             "key": "beastwarren",
             "name": "Beastwarren"
         },
         {
-            "col": 97,
-            "row": 104,
+            "col": -6,
+            "row": 8,
             "key": "ashpit",
             "name": "Ashpit"
         },
         {
-            "col": 95,
-            "row": 98,
+            "col": -9,
+            "row": -3,
             "key": "windhollow",
             "name": "Windhollow"
         }

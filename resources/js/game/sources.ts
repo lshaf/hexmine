@@ -16,6 +16,7 @@ import { HUNTING, PROCESSING } from './balance'
 import {
   BIOME_SCRAP,
   DUNGEONS,
+  isScrap,
   ITEMS,
   MATERIALS,
   RECIPES,
@@ -26,6 +27,9 @@ import {
   stationForRarity,
 } from './catalog'
 import { BIOME_LABEL } from '@/theme/palette'
+import { VARIANT_BY_MATERIAL, VARIANT_LABEL, VARIANT_RINGS } from './variants'
+import { REAGENTS } from './alchemy'
+import { COMPONENTS } from './components'
 import type { ItemDef, Material, MaterialKey, SettlementTier } from './types'
 
 /** The five roads. Nothing in the world arrives by a sixth. */
@@ -91,6 +95,25 @@ export interface SourceLine {
   pending?: boolean
 }
 
+/**
+ * §4 -- what kind of raw a Tier 1 material is.
+ *
+ * Four things share the tier and arrive by different roads, so the almanac
+ * cannot describe them in one sentence. `ground` is what a hex gives up and is
+ * the only one with a tool and a variant behind it; the other three are the
+ * bench stocks, and two of those have no faucet on the map yet.
+ */
+export type RawRole = 'ground' | 'reagent' | 'component'
+
+const REAGENT_KEYS = new Set<string>(REAGENTS.map((m) => m.key))
+const COMPONENT_KEYS = new Set<string>(COMPONENTS.map((m) => m.key))
+
+export function rawRole(key: MaterialKey): RawRole {
+  if (REAGENT_KEYS.has(key)) return 'reagent'
+  if (COMPONENT_KEYS.has(key)) return 'component'
+  return 'ground'
+}
+
 const article = (word: string) => (/^[aeiou]/i.test(word) ? 'an' : 'a')
 
 const title = (word: string) => word.charAt(0).toUpperCase() + word.slice(1)
@@ -104,11 +127,40 @@ const minutes = (seconds: number) => Math.round(seconds / 60)
  * leads to it -- pelt is the clearest case, since a herd is a genuine
  * alternative to working a plains hex (§5.5).
  */
+/**
+ * §5.2 -- how far in you have to walk before this ground turns up. Silent for
+ * the base grade, which is everywhere, and the phrase only earns its space when
+ * it is telling you something.
+ */
+function ringNote(variant: string): string {
+  const rings = VARIANT_RINGS[variant as keyof typeof VARIANT_RINGS] ?? []
+  if (rings.length >= 3) return ''
+  if (rings.length === 1) return ', contested ring only'
+  return ', middle ring and inward'
+}
+
 export function materialSources(mat: Material): SourceLine[] {
   const lines: SourceLine[] = []
 
   switch (mat.tier) {
     case 0: {
+      // §4.0 -- junk is NOT scrap, and the difference is the whole of the
+      // argument this tier makes. Scrap is what a hex gives up to bare hands,
+      // so it has a tool and a displaced material behind it. Junk is the
+      // rubbish carried out alongside a real haul: no tool, nothing displaced,
+      // and nothing on the map drops it yet either.
+      if (!isScrap(mat.key)) {
+        lines.push({
+          kind: 'mine',
+          where: `${BIOME_LABEL[mat.biome!]} hex, alongside the haul`,
+          pending: true,
+          note:
+            'Not what a missing tool costs you — that is scrap. This is what ' +
+            'comes up with everything else. No hex drops it yet.',
+        })
+        break
+      }
+
       const skill = SKILL_BY_KEY[skillForMaterial(mat.key)]
       const tool = slotForSkill(skill.key)
       // Whatever is true of all five scrap lives in the tier note, not here.
@@ -125,11 +177,35 @@ export function materialSources(mat: Material): SourceLine[] {
     }
 
     case 1: {
+      const role = rawRole(mat.key)
+
+      // §4 -- the two bench stocks are in the catalog and recipes want them,
+      // but no hex drops one yet. Saying "mine it in a forest" would be a
+      // straight lie, and saying nothing would read as "comes from nowhere".
+      if (role !== 'ground') {
+        const bench = role === 'reagent' ? 'consumable' : (mat.bench ?? 'craft')
+        lines.push({
+          kind: 'mine',
+          where: `${BIOME_LABEL[mat.biome!]} hex`,
+          pending: true,
+          note:
+            `Stock for the ${bench} bench, biome-locked like every other raw. ` +
+            'No hex drops it yet — the recipes that want it are real, the faucet is not.',
+        })
+        break
+      }
+
       const skill = SKILL_BY_KEY[skillForMaterial(mat.key)]
       const tool = slotForSkill(skill.key)
+      // §5.3 -- a grade names the ground it comes off, not just the biome. Four
+      // kinds of forest give four different things, and which one you are
+      // standing on is the whole question.
+      const variant = VARIANT_BY_MATERIAL[mat.key]
       lines.push({
         kind: 'mine',
-        where: `${BIOME_LABEL[mat.biome!]} hex · ${skill.name}`,
+        where: variant
+          ? `${VARIANT_LABEL[variant]} · ${skill.name}${ringNote(variant)}`
+          : `${BIOME_LABEL[mat.biome!]} hex · ${skill.name}`,
         note:
           `Needs ${article(tool)} ${tool}. Without one the hex gives ` +
           `${MATERIALS[BIOME_SCRAP[mat.biome!]].name.toLowerCase()} instead.`,
@@ -183,7 +259,7 @@ export function materialSources(mat: Material): SourceLine[] {
       // carries them. `where` already says the only thing that differs.
       lines.push({
         kind: 'mine',
-        where: `${BIOME_LABEL[mat.biome!]} hex, contested ring only`,
+        where: `${VARIANT_LABEL[VARIANT_BY_MATERIAL[mat.key]!]}, contested ring only`,
       })
       break
     }

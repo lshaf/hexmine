@@ -47,8 +47,18 @@ function fail(what: string, expected: string, actual: string): void {
 const lines = readFileSync(resolve(fixtures, 'worldgen.txt'), 'utf8').trim().split('\n')
 
 for (const line of lines) {
-  const [coord, biome, ring, material, baseSeconds, baseYield, settlement, dungeon, propSeed] =
-    line.split('|')
+  const [
+    coord,
+    biome,
+    variant,
+    ring,
+    material,
+    baseSeconds,
+    baseYield,
+    settlement,
+    dungeon,
+    propSeed,
+  ] = line.split('|')
   const [col, row] = coord!.split(',').map(Number)
 
   const tile = generateTile(col!, row!, 0)
@@ -56,6 +66,7 @@ for (const line of lines) {
 
   const actual = [
     tile.biome,
+    tile.variant,
     tile.ring,
     tile.material ?? '-',
     String(tile.baseSeconds),
@@ -67,6 +78,7 @@ for (const line of lines) {
 
   const expected = [
     biome,
+    variant,
     ring,
     material,
     baseSeconds,
@@ -89,22 +101,27 @@ console.log(`tiles: ${lines.length} checked`)
  * brute force, so check that against the slow path over a few boxes -- one per
  * ring, since the tier a site is allowed to be depends on where it lands.
  */
-const span = Math.min(config.cols, config.rows)
+const span = config.size
 
 /**
- * Placed as fractions of the map, not fixed coordinates: a box that falls off
- * the edge is not a test. settlementAt() has no bounds guard and
- * settlementMarksIn() does, so an off-map box reports every settlement in it as
- * "missing" and drowns any real disagreement in noise.
+ * Placed as fractions of the map, not fixed coordinates, so the boxes follow
+ * MAP_RADIUS rather than being pinned to one map size.
+ *
+ * §5.1 -- coordinates are signed and centred, so fraction 0 is the far west
+ * edge, 0.5 is the origin, and 1 is the far east. A box is still kept clear of
+ * the very edge: both sides now refuse to place a settlement off the map, but a
+ * box that is half void is testing half as much.
  */
+const at = (f: number) => Math.round((f - 0.5) * span)
+
 const BOXES = [
   { col: 0.02, row: 0.04, w: 0.18, h: 0.18 }, // outer rim, villages
   { col: 0.24, row: 0.28, w: 0.16, h: 0.16 }, // mid ring, cities
   { col: 0.48, row: 0.48, w: 0.24, h: 0.24 }, // dead centre, capitals
   { col: 0.78, row: 0.16, w: 0.2, h: 0.2 }, // the far rim
 ].map((b) => ({
-  col: Math.round(b.col * span),
-  row: Math.round(b.row * span),
+  col: at(b.col),
+  row: at(b.row),
   w: Math.round(b.w * span),
   h: Math.round(b.h * span),
 }))

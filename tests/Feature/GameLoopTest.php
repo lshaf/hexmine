@@ -359,8 +359,8 @@ final class GameLoopTest extends TestCase
     {
         $now = $this->game->now();
 
-        for ($col = 0; $col < Balance::MAP_COLS; $col++) {
-            for ($row = 0; $row < Balance::MAP_ROWS; $row++) {
+        for ($col = -Balance::mapRadius(); $col <= Balance::mapRadius(); $col++) {
+            for ($row = -Balance::mapRadius(); $row <= Balance::mapRadius(); $row++) {
                 $tile = $this->game->buildTile($col, $row, $now);
                 if (($tile['herdUntil'] ?? null) !== null && $tile['herdUntil'] > $now) {
                     $this->character->update(['col' => $col, 'row' => $row]);
@@ -470,32 +470,34 @@ final class GameLoopTest extends TestCase
     }
 
     /**
-     * §2 -- the tradeable potions are gated by a per-wallet cap, not by rarity.
+     * §2 -- no potion is tradeable, because nothing capped stands behind one.
      *
-     * Epic and legendary are NFTs (§8.0), and §2 forbids a path from grind time
-     * to external value. What closes it is that both rungs want a Tier 3 rare,
-     * and every Tier 3 is capped per wallet -- the same gate every NFT tool
-     * already stands behind.
+     * The bench runs on reagents alone: Tier 1, uncapped, mined by anybody. An
+     * NFT rung on that stock would be exactly the grind-to-external-value path
+     * §2 exists to close, so the shelf stops at prestige. Should a wallet-capped
+     * alchemy input ever land, this is the test to reopen.
      */
-    public function test_tradeable_potions_are_gated_by_a_wallet_cap(): void
+    public function test_potions_are_never_tradeable(): void
     {
         $checked = 0;
 
         foreach (\App\Game\Catalog::items() as $key => $def) {
-            if (empty($def['consumable']) || ! $def['tradeable']) {
+            if (empty($def['consumable'])) {
                 continue;
             }
+
+            $this->assertFalse($def['tradeable'], "{$key} is a tradeable potion off uncapped stock");
 
             $capped = array_filter(
                 array_keys($def['inputs'] ?? []),
                 fn (string $m) => \App\Game\Catalog::walletCap($m) !== null,
             );
 
-            $this->assertNotEmpty($capped, "{$key} is tradeable but wants nothing wallet-capped");
+            $this->assertEmpty($capped, "{$key} wants a capped material -- the NFT rung can come back");
             $checked++;
         }
 
-        $this->assertGreaterThanOrEqual(20, $checked, 'the tradeable rungs are missing');
+        $this->assertGreaterThanOrEqual(60, $checked, 'the potion shelf is missing');
     }
 
     /** §4.0 -- junk sells for a copper, feeds nothing, and reaches no tier. */
@@ -550,6 +552,425 @@ final class GameLoopTest extends TestCase
         foreach ($byBiome as $biome => $keys) {
             $this->assertCount(2, $keys, "{$biome} does not have two reagents");
         }
+    }
+
+    /**
+     * §4 -- the smith and the armorer have their own raw stock, as the
+     * alchemist does.
+     *
+     * Ten craft components on the reagent model: Tier 1, biome-locked, two per
+     * biome, and every one worth more than the scrap floor §4.0 makes a rule.
+     * Two per biome so one recipe can want two things off a single kind of
+     * ground, and one bench each so neither craft is short of a line.
+     */
+    public function test_craft_components_are_biome_locked_and_outsell_the_rubbish(): void
+    {
+        $components = array_keys(\App\Game\Components::CRAFT);
+        $this->assertCount(10, $components);
+
+        $byBiome = [];
+        $byBench = [];
+
+        foreach ($components as $key) {
+            $def = \App\Game\Catalog::material($key);
+            $this->assertNotNull($def, "{$key} is not in the catalog");
+            $this->assertSame(1, $def['tier'], "{$key} is not a raw material");
+            $this->assertGreaterThan(1, $def['npcPrice'], "{$key} sells for scrap money");
+            $this->assertNotNull($def['biome'] ?? null, "{$key} comes from no kind of ground");
+            $this->assertNull($def['walletCap'] ?? null, "{$key} is capped, which Tier 1 never is");
+
+            $byBiome[$def['biome']][] = $key;
+            $byBench[$def['bench']][] = $key;
+        }
+
+        $this->assertCount(5, $byBiome, 'components do not cover the five biomes');
+        foreach ($byBiome as $biome => $keys) {
+            $this->assertCount(2, $keys, "{$biome} does not have two components");
+        }
+
+        $benches = array_keys($byBench);
+        sort($benches);
+        $this->assertSame(['armor', 'weapon'], $benches, 'a component names an unknown bench');
+        $this->assertCount(5, $byBench['weapon'], 'the weapon bench is short a component');
+        $this->assertCount(5, $byBench['armor'], 'the armor bench is short a component');
+    }
+
+    /**
+     * §5.1 -- the world is measured from the middle out, and (0,0) is the middle.
+     *
+     * A radius of 200 is every column from -200 to 200, so both ends are on the
+     * map and the count is the odd number 401. The origin being the centre is
+     * the part everything else leans on: the rings are a distance from it, the
+     * dungeon mouths are placed around it, and the atlas draws its circles on it.
+     */
+    public function test_the_map_is_measured_from_the_origin_out(): void
+    {
+        $radius = Balance::mapRadius();
+
+        $this->assertSame($radius * 2 + 1, Balance::mapSize());
+
+        // Both ends inclusive, and one step past either is off.
+        foreach ([[-$radius, 0], [$radius, 0], [0, -$radius], [0, $radius], [0, 0]] as [$col, $row]) {
+            $this->assertTrue(\App\Game\WorldGen::inBounds($col, $row), "{$col},{$row} should be on the map");
+        }
+        foreach ([[-$radius - 1, 0], [$radius + 1, 0], [0, -$radius - 1], [0, $radius + 1]] as [$col, $row]) {
+            $this->assertFalse(\App\Game\WorldGen::inBounds($col, $row), "{$col},{$row} should be off the map");
+        }
+
+        // The origin is the dead centre, and the corners are the rim.
+        $this->assertSame('center', \App\Game\WorldGen::ringOf(0, 0));
+        $this->assertSame('outer', \App\Game\WorldGen::ringOf($radius, $radius));
+        $this->assertSame('outer', \App\Game\WorldGen::ringOf(-$radius, -$radius));
+
+        // Opposite corners are the same distance out, which is only true if the
+        // centre really is the origin rather than somewhere along a signed axis.
+        $this->assertEqualsWithDelta(
+            \App\Game\WorldGen::radiusOf($radius, $radius),
+            \App\Game\WorldGen::radiusOf(-$radius, -$radius),
+            1e-9,
+        );
+    }
+
+    /**
+     * §5.1 -- the size and the seed of the world are settings, not a code edit.
+     *
+     * A different seed has to be a different world, and a different radius a
+     * different edge, or the .env knobs are decorative. Both caches are dropped
+     * around the change: the seed is memoised precisely because it is read once
+     * per hashed coordinate, and a stale one would answer for the old world.
+     */
+    public function test_the_map_size_and_seed_come_from_config(): void
+    {
+        $before = [];
+        foreach ([[0, 0], [10, -14], [-33, 7]] as [$col, $row]) {
+            $before["{$col},{$row}"] = \App\Game\WorldGen::biomeOf($col, $row);
+        }
+
+        try {
+            config(['game.map.seed' => '0xdeadbeef', 'game.map.radius' => 40]);
+            \App\Game\WorldGen::forget();
+
+            $this->assertSame(0xdeadbeef, Balance::mapSeed(), 'the seed did not come from config');
+            $this->assertSame(40, Balance::mapRadius());
+            $this->assertSame(81, Balance::mapSize(), 'the count is not derived from the radius');
+
+            // The edge moved with it.
+            $this->assertTrue(\App\Game\WorldGen::inBounds(40, 0));
+            $this->assertFalse(\App\Game\WorldGen::inBounds(41, 0));
+
+            $after = [];
+            foreach ([[0, 0], [10, -14], [-33, 7]] as [$col, $row]) {
+                $after["{$col},{$row}"] = \App\Game\WorldGen::biomeOf($col, $row);
+            }
+
+            $this->assertNotSame($before, $after, 'a new seed generated the same ground');
+        } finally {
+            config([
+                'game.map.seed' => '0x5eed1a3f',
+                'game.map.radius' => 200,
+            ]);
+            \App\Game\WorldGen::forget();
+        }
+
+        // And the world came back, which is what makes the seed a seed.
+        foreach ($before as $coord => $biome) {
+            [$col, $row] = array_map('intval', explode(',', $coord));
+            $this->assertSame($biome, \App\Game\WorldGen::biomeOf($col, $row));
+        }
+    }
+
+    /** A hex seed and the decimal it spells are the same world. */
+    public function test_the_seed_accepts_hex_or_decimal(): void
+    {
+        try {
+            config(['game.map.seed' => '0x5eed1a3f']);
+            \App\Game\WorldGen::forget();
+            $hex = Balance::mapSeed();
+
+            config(['game.map.seed' => (string) 0x5eed1a3f]);
+            \App\Game\WorldGen::forget();
+            $this->assertSame($hex, Balance::mapSeed(), 'decimal and hex disagree');
+
+            // Anything wider than the hash is masked, not silently divergent.
+            config(['game.map.seed' => 0x1_5eed_1a3f]);
+            \App\Game\WorldGen::forget();
+            $this->assertSame($hex, Balance::mapSeed(), 'the seed was not masked to 32 bits');
+        } finally {
+            config(['game.map.seed' => '0x5eed1a3f']);
+            \App\Game\WorldGen::forget();
+        }
+    }
+
+    /**
+     * §5.1 -- nobody lives off the edge, and the lattice does not stop there.
+     *
+     * The settlement lattice is infinite: it will happily place a village in a
+     * cell beyond the rim. The atlas walks cells and the slow path walks tiles,
+     * so if only one of them knew where the map ended the two would disagree
+     * about every border cell.
+     */
+    public function test_no_settlement_stands_off_the_map(): void
+    {
+        $radius = Balance::mapRadius();
+
+        $found = 0;
+        for ($col = $radius + 1; $col <= $radius + 40; $col++) {
+            for ($row = -20; $row <= 20; $row++) {
+                if (\App\Game\WorldGen::settlementAt($col, $row) !== null) {
+                    $found++;
+                }
+            }
+        }
+
+        $this->assertSame(0, $found, 'the lattice placed settlements past the rim');
+
+        // And the guard did not cost anything inside the map: the rim still
+        // carries the villages §6 puts there.
+        $inside = 0;
+        for ($col = $radius - 40; $col <= $radius; $col++) {
+            for ($row = -20; $row <= 20; $row++) {
+                if (\App\Game\WorldGen::settlementAt($col, $row) !== null) {
+                    $inside++;
+                }
+            }
+        }
+
+        $this->assertGreaterThan(0, $inside, 'the rim lost its settlements to the bounds guard');
+    }
+
+    /**
+     * §5.3 -- a biome is four kinds of ground, and the weights have to hold.
+     *
+     * The variant walk in WorldGen::variantOf() adds a ring's column until it
+     * passes the roll. If a column does not sum to 1 the walk falls off the end
+     * and every hex past that point silently becomes the base grade.
+     */
+    public function test_every_biome_has_four_grades_and_the_weights_close(): void
+    {
+        foreach (\App\Game\Catalog::BIOMES as $biome) {
+            $variants = \App\Game\Variants::BIOME_VARIANTS[$biome];
+            $this->assertCount(4, $variants, "{$biome} does not have four variants");
+            $this->assertSame(
+                \App\Game\Variants::GRADES,
+                array_column($variants, 'grade'),
+                "{$biome} is out of grade order",
+            );
+
+            foreach (['outer', 'mid', 'inner'] as $ring) {
+                $total = 0.0;
+                foreach ($variants as $variant) {
+                    $total += $variant['weights'][$ring];
+                }
+                $this->assertEqualsWithDelta(1.0, $total, 1e-9, "{$biome} {$ring} weights do not close");
+            }
+        }
+    }
+
+    /**
+     * §5.2 -- the outer rim is safe ground and poor ground.
+     *
+     * Only the base grade spawns there, the Tier 3 rare only in the contested
+     * ring, and the rare grade with it. That gradient is the whole reason to
+     * walk inward, so it is asserted rather than left to the weight table.
+     */
+    public function test_grades_are_gated_by_ring(): void
+    {
+        $expected = [
+            'common' => ['outer', 'mid', 'inner'],
+            'uncommon' => ['mid', 'inner'],
+            'rare' => ['inner'],
+            'epic' => ['inner'],
+        ];
+
+        foreach (\App\Game\Catalog::BIOMES as $biome) {
+            foreach (\App\Game\Variants::BIOME_VARIANTS[$biome] as $variant) {
+                $rings = [];
+                foreach (['outer', 'mid', 'inner'] as $ring) {
+                    if ($variant['weights'][$ring] > 0) {
+                        $rings[] = $ring;
+                    }
+                }
+
+                $this->assertSame(
+                    $expected[$variant['grade']],
+                    $rings,
+                    "{$variant['key']} spawns in the wrong rings",
+                );
+            }
+        }
+
+        // §5.3 -- and the Tier 3 rate is still the one Balance names.
+        foreach (\App\Game\Catalog::BIOMES as $biome) {
+            $epic = \App\Game\Variants::BIOME_VARIANTS[$biome][3];
+            $this->assertSame('epic', $epic['grade']);
+            $this->assertEqualsWithDelta(
+                Balance::RARE_SPAWN_CHANCE,
+                $epic['weights']['inner'],
+                1e-9,
+                'the rare spawn rate drifted off Balance',
+            );
+        }
+    }
+
+    /**
+     * §5.3 -- a variant gives up its own material, and the map says which.
+     *
+     * The Tier 3 rares used to spawn on a tile that looked exactly like the
+     * plain biome next to it. Every variant now carries its own tint and its
+     * own prop treatment, and no two share a tint.
+     */
+    public function test_every_variant_has_its_own_material_and_its_own_face(): void
+    {
+        $materials = [];
+        $tints = [];
+
+        foreach (\App\Game\Catalog::BIOMES as $biome) {
+            foreach (\App\Game\Variants::BIOME_VARIANTS[$biome] as $variant) {
+                $def = \App\Game\Catalog::material($variant['material']);
+                $this->assertNotNull($def, "{$variant['key']} gives up a material nothing knows");
+                $this->assertContains($def['tier'], [1, 3], "{$variant['key']} gives up a processed material");
+
+                $materials[] = $variant['material'];
+                $tints[] = $variant['tint'];
+
+                $this->assertNotSame('', $variant['props'], "{$variant['key']} draws nothing");
+                $this->assertMatchesRegularExpression('/^#[0-9a-f]{6}$/', $variant['tint']);
+            }
+        }
+
+        $this->assertCount(20, $materials);
+        $this->assertSame($materials, array_unique($materials), 'two variants give up the same material');
+        $this->assertSame($tints, array_unique($tints), 'two variants share a tint');
+    }
+
+    /**
+     * §5.3 -- a grade refines on the same 3:1 the base line does.
+     *
+     * A better grade is a better material, never a better ratio. Making the
+     * good ore also process cheaper would turn one ladder into two, and the
+     * second one would be invisible.
+     */
+    public function test_grade_processing_matches_the_base_ratio(): void
+    {
+        $this->assertCount(10, \App\Game\Variants::PROCESSING);
+
+        foreach (\App\Game\Variants::PROCESSING as $key => $recipe) {
+            $this->assertSame(3, $recipe['inputQty'], "{$key} does not cost three raw");
+            $this->assertSame(1, $recipe['outputQty'], "{$key} does not make one");
+            $this->assertSame(1, \App\Game\Catalog::materialTier($recipe['input']));
+            $this->assertSame(2, \App\Game\Catalog::materialTier($recipe['output']));
+            $this->assertContains($recipe['skill'], \App\Game\Catalog::SKILLS);
+
+            // The line that gathers the raw is the line that processes it.
+            $this->assertSame(
+                \App\Game\Catalog::skillForMaterial($recipe['input']),
+                $recipe['skill'],
+                "{$key} is processed by the wrong line",
+            );
+        }
+    }
+
+    /**
+     * §5.3 -- the ground a hex turns out to be is stable and ring-legal.
+     *
+     * Terrain is a pure function of (col, row, seed), and the client generates
+     * it locally from the same table. A variant that moved between two calls,
+     * or one that turned up in a ring its weights forbid, would put the two
+     * generators permanently out of step.
+     */
+    public function test_the_variant_roll_is_stable_and_respects_its_ring(): void
+    {
+        $legal = ['outer' => ['common'], 'mid' => ['common', 'uncommon']];
+        $seen = [];
+
+        for ($col = 40; $col < 120; $col += 3) {
+            for ($row = 40; $row < 120; $row += 3) {
+                $tile = \App\Game\WorldGen::generateTile($col, $row, 0);
+                if ($tile['material'] === null) {
+                    continue;
+                }
+
+                $again = \App\Game\WorldGen::generateTile($col, $row, 0);
+                $this->assertSame($tile['variant'], $again['variant'], 'the ground moved between two calls');
+
+                $variant = \App\Game\WorldGen::variantOf($col, $row, $tile['biome'], $tile['ring']);
+                $this->assertSame($tile['variant'], $variant['key']);
+                $this->assertSame($variant['material'], $tile['material']);
+
+                if (isset($legal[$tile['ring']])) {
+                    $this->assertContains(
+                        $variant['grade'],
+                        $legal[$tile['ring']],
+                        "a {$variant['grade']} hex turned up in the {$tile['ring']} ring",
+                    );
+                }
+
+                $seen[$variant['grade']] = true;
+            }
+        }
+
+        // All four grades have to actually occur, or a weight is effectively zero.
+        foreach (\App\Game\Variants::GRADES as $grade) {
+            $this->assertArrayHasKey($grade, $seen, "no {$grade} ground anywhere on the map");
+        }
+    }
+
+    /**
+     * §4 -- every component is actually wanted by something.
+     *
+     * A material nothing asks for is a row in the bag and a line in the shop
+     * that pays for neither. The whole reason these ten exist is that the two
+     * craft benches stopped borrowing the alchemist's shelf.
+     */
+    public function test_every_craft_component_feeds_a_recipe(): void
+    {
+        $wanted = [];
+        foreach (\App\Game\Catalog::items() as $def) {
+            foreach (array_keys($def['inputs'] ?? []) as $input) {
+                $wanted[$input] = true;
+            }
+        }
+
+        foreach (array_keys(\App\Game\Components::CRAFT) as $key) {
+            $this->assertArrayHasKey($key, $wanted, "{$key} feeds no recipe at all");
+        }
+    }
+
+    /**
+     * The crafted recipes are hand-written on both sides, so they can drift.
+     *
+     * Materials and consumables are generated from one spec and cannot; the 28
+     * crafted items are not, and a recipe that disagrees between the server and
+     * the client shows the player a cost they will not be charged.
+     */
+    public function test_crafted_recipes_agree_between_php_and_typescript(): void
+    {
+        // §8.0's top two rungs are generated into their own file, so the client
+        // side of the catalog is two files rather than one.
+        $ts = file_get_contents(base_path('resources/js/game/catalog.ts'))
+            .file_get_contents(base_path('resources/js/game/toptier.ts'));
+        $checked = 0;
+
+        foreach (\App\Game\Catalog::items() as $key => $def) {
+            if (! isset($def['inputs']) || ! empty($def['consumable'])) {
+                continue;
+            }
+
+            $pattern = "/key: '".preg_quote($key, '/')."',.*?inputs: \{([^}]*)\}/s";
+            $this->assertMatchesRegularExpression($pattern, $ts, "{$key} has no recipe in catalog.ts");
+            preg_match($pattern, $ts, $m);
+
+            $client = [];
+            foreach (explode(',', trim($m[1])) as $pair) {
+                [$material, $qty] = array_map('trim', explode(':', $pair));
+                $client[$material] = (int) $qty;
+            }
+
+            $this->assertSame($def['inputs'], $client, "{$key} costs different things on the two sides");
+            $checked++;
+        }
+
+        $this->assertSame(37, $checked, 'the crafted list changed size');
     }
 
     /**
@@ -773,11 +1194,11 @@ final class GameLoopTest extends TestCase
         [$col, $row] = $this->standOnAHerd();
 
         // Half a map away in both axes, so this is well outside any sight the
-        // Explorer tree can reach -- the scan above starts at 0,0, so simply
-        // standing there could leave the herd inside the disc.
+        // Explorer tree can reach. Mirroring through the origin is the simplest
+        // way to be far from a herd wherever the scan above happened to find it.
         $this->character->update([
-            'col' => ($col + intdiv(Balance::MAP_COLS, 2)) % Balance::MAP_COLS,
-            'row' => ($row + intdiv(Balance::MAP_ROWS, 2)) % Balance::MAP_ROWS,
+            'col' => -$col === $col ? Balance::mapRadius() : -$col,
+            'row' => -$row === $row ? Balance::mapRadius() : -$row,
         ]);
 
         $preview = $this->game->previewHunt($this->character->fresh(), $col, $row);
@@ -993,7 +1414,7 @@ final class GameLoopTest extends TestCase
     public function test_crafting_teaches_the_job_whose_bench_made_it(): void
     {
         $this->standAtWoodcuttingVillage();
-        $this->give(['planks' => 8]);
+        $this->give(['wood' => 12, 'planks' => 8, 'heartknot' => 8]);
 
         $before = $this->character->jobLevels()->where('job_key', 'smith')->first()->xp;
         $this->game->craftItem($this->character->fresh(), 'hewn_axe');
@@ -1021,7 +1442,7 @@ final class GameLoopTest extends TestCase
     public function test_nothing_outside_a_raid_can_level_a_battle_job(): void
     {
         $this->standAtWoodcuttingVillage();
-        $this->give(['planks' => 8, 'cloth' => 8, 'leather' => 8]);
+        $this->give(['wood' => 12, 'fiber' => 12, 'planks' => 8, 'cloth' => 8, 'leather' => 8, 'heartknot' => 8, 'beeswax' => 8]);
 
         $this->game->craftItem($this->character->fresh(), 'hewn_axe');
         $this->game->craftItem($this->character->fresh(), 'work_gloves');
@@ -1112,13 +1533,13 @@ final class GameLoopTest extends TestCase
         }
         $this->grantNodes($keys);
 
-        $this->give(['planks' => 40]);
-        $before = $this->game->held($this->character->fresh(), 'planks');
+        $this->give(['wood' => 40, 'planks' => 40, 'heartknot' => 40]);
+        $before = $this->game->held($this->character->fresh(), 'wood');
         $this->game->craftItem($this->character->fresh(), 'hewn_axe');
-        $spent = $before - $this->game->held($this->character->fresh(), 'planks');
+        $spent = $before - $this->game->held($this->character->fresh(), 'wood');
 
         $this->assertGreaterThan(0, $spent, 'a maxed Smith crafted out of thin air');
-        $this->assertLessThan(4, $spent, 'the discount did nothing at all');
+        $this->assertLessThan(6, $spent, 'the discount did nothing at all');
     }
 
     /**
@@ -1587,11 +2008,9 @@ final class GameLoopTest extends TestCase
      */
     public function test_legendary_and_unique_are_reachable_from_nowhere(): void
     {
-        foreach (\App\Game\Catalog::items() as $key => $def) {
-            // Unique is drop-only and dungeons do not exist, so nothing may
-            // even be defined at that rarity yet.
-            $this->assertNotSame('unique', $def['rarity'], "{$key} is unique but dungeons do not exist");
+        $uniques = 0;
 
+        foreach (\App\Game\Catalog::items() as $key => $def) {
             // Legendary MAY be defined -- §8.5's top rung of potions is -- but
             // the only bench that reaches it is a guild hall, and there are
             // none. The invariant is unreachability, not absence: a legendary
@@ -1603,7 +2022,23 @@ final class GameLoopTest extends TestCase
                     "{$key} is legendary but does not need a guild hall",
                 );
             }
+
+            // Unique may be defined too, and for the same reason: the ladder is
+            // easier to reason about whole than with a hole at the top. What it
+            // may NOT have is a road. No bench, no shop, no recipe -- it drops,
+            // and §8.0 stops tradeability at legendary because a tradeable drop
+            // is precisely the grind->external-value faucet §2 exists to close.
+            if ($def['rarity'] === 'unique') {
+                $uniques++;
+                $this->assertFalse($def['tradeable'], "{$key} is a tradeable unique");
+                $this->assertArrayNotHasKey('inputs', $def, "{$key} is unique and craftable");
+                $this->assertArrayNotHasKey('goldPrice', $def, "{$key} is unique and for sale");
+                $this->assertArrayNotHasKey('station', $def, "{$key} is unique and has a bench");
+                $this->assertNotEmpty($def['perk'] ?? null, "{$key} is unique with no fixed perk");
+            }
         }
+
+        $this->assertGreaterThan(0, $uniques, 'the top of the ladder is missing');
 
         // The gates themselves are defined, and point somewhere no player is.
         $this->assertSame('guild', Balance::stationForRarity('legendary'));
@@ -1801,7 +2236,7 @@ final class GameLoopTest extends TestCase
 
         $add = new \ReflectionMethod($this->game, 'addMaterial');
         $add->setAccessible(true);
-        foreach (['ingots' => 40, 'planks' => 40, 'cloth' => 40, 'leather' => 40] as $key => $qty) {
+        foreach (['wood' => 40, 'ingots' => 40, 'planks' => 40, 'cloth' => 40, 'leather' => 40, 'heartknot' => 40] as $key => $qty) {
             $add->invoke($this->game, $this->character, $key, $qty);
         }
 
@@ -2021,11 +2456,33 @@ final class GameLoopTest extends TestCase
         $this->assertSame($far['col'], (int) $this->character->col);
     }
 
-    /** The edge of the map is the one place a road cannot go. */
+    /**
+     * The edge of the map is the one place a road cannot go.
+     *
+     * §5.1 -- coordinates are signed and the origin is the middle, so the edge
+     * is on all four sides and -1 is ordinary ground. Every one of the four is
+     * checked: an inclusive bound is easy to get wrong on exactly one of them.
+     */
     public function test_travel_refuses_to_leave_the_map(): void
     {
-        $this->expectException(\App\Game\GameException::class);
-        $this->game->travelTo($this->character, -1, (int) $this->character->row);
+        $radius = Balance::mapRadius();
+
+        // The corners themselves are on the map, and must stay walkable.
+        $this->assertTrue(\App\Game\WorldGen::inBounds(-$radius, -$radius));
+        $this->assertTrue(\App\Game\WorldGen::inBounds($radius, $radius));
+
+        $off = [[-$radius - 1, 0], [$radius + 1, 0], [0, -$radius - 1], [0, $radius + 1]];
+
+        foreach ($off as [$col, $row]) {
+            $this->assertFalse(\App\Game\WorldGen::inBounds($col, $row));
+
+            try {
+                $this->game->travelTo($this->character->fresh(), $col, $row);
+                $this->fail("travel to {$col},{$row} was allowed off the map");
+            } catch (\App\Game\GameException $e) {
+                $this->assertSame('off_map', $e->errorCode);
+            }
+        }
     }
 
     // ------------------------------------------------------------ explorer §7.5
@@ -2467,9 +2924,15 @@ final class GameLoopTest extends TestCase
     {
         $config = $this->game->worldConfig();
 
-        foreach (['seed', 'cols', 'rows', 'biomeCell', 'rings', 'namePrefixes', 'dungeonSites'] as $key) {
+        foreach (['seed', 'size', 'radius', 'biomeCell', 'rings', 'namePrefixes', 'dungeonSites'] as $key) {
             $this->assertArrayHasKey($key, $config, "world config is missing {$key}");
         }
+
+        // §5.1 -- the map is square, so one radius describes it and the side is
+        // derived. Two axes would be two chances to configure a rectangle the
+        // ring maths does not expect.
+        $this->assertSame(Balance::mapRadius() * 2 + 1, $config['size']);
+        $this->assertArrayNotHasKey('cols', $config, 'the map is square; there is no separate width');
 
         $this->assertCount(5, $config['dungeonSites']);
         $this->assertLessThan(4000, strlen(json_encode($config)));

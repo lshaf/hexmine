@@ -156,11 +156,11 @@ function ensureRaster(): void {
   ctx.fillRect(0, 0, rw, rh)
 
   for (let col = firstCol; col <= rightCol; col += stepCol) {
-    if (col < 0 || col >= cfg.cols) continue
+    if (Math.abs(col) > cfg.radius) continue
     const x = (col - leftCol) * px
 
     for (let row = firstRow; row <= bottomRow; row += stepRow) {
-      if (row < 0 || row >= cfg.rows) continue
+      if (Math.abs(row) > cfg.radius) continue
       ctx.fillStyle = BIOME_COLOR[sample(col, row)]
       ctx.fillRect(x, (row - topRow) * py, blockW, blockH)
     }
@@ -223,8 +223,8 @@ function draw(): void {
   ctx.drawImage(raster, offsetX, offsetY)
 
   const cfg = worldParams()
-  const maxRadius = Math.min(cfg.cols, cfg.rows) / 2
-  const mid = toCanvas(cfg.cols / 2, cfg.rows / 2)
+  const maxRadius = cfg.radius
+  const mid = toCanvas(0, 0)
 
   // §5.2 -- the rings are the map's real structure, so the chart states them.
   ctx.save()
@@ -379,9 +379,11 @@ function clampCentre(col: number, row: number): { col: number; row: number } {
   const halfCols = size.value.w / 2 / pxPerCol.value
   const halfRows = size.value.h / 2 / pxPerRow.value
 
+  // §5.1 -- the map runs -radius..radius, so the far edge is negative on two
+  // sides. When the chart is wider than the world the centre is the origin.
   return {
-    col: halfCols * 2 >= cfg.cols ? cfg.cols / 2 : clamp(col, halfCols, cfg.cols - halfCols),
-    row: halfRows * 2 >= cfg.rows ? cfg.rows / 2 : clamp(row, halfRows, cfg.rows - halfRows),
+    col: halfCols * 2 >= cfg.size ? 0 : clamp(col, halfCols - cfg.radius, cfg.radius - halfCols),
+    row: halfRows * 2 >= cfg.size ? 0 : clamp(row, halfRows - cfg.radius, cfg.radius - halfRows),
   }
 }
 

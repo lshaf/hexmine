@@ -12,8 +12,9 @@
  *   material -> accent colour
  *   rarity   -> hex frame, ornamentation grows per tier
  */
-import { GOLD, MATERIAL_PALETTE, RARITY_TREATMENT, VELLUM_DIM, shade } from '@/theme/palette'
-import type { EquipSlot, Material, MaterialTier, Rarity } from '@/game/types'
+import { HERB_ACCENT, MATERIAL_PALETTE, RARITY_TREATMENT, shade } from '@/theme/palette'
+import { HERB_FORMS, formFor, formShape, gradeRank, keySeed, type Ink } from './forms'
+import type { EquipSlot, Material, Rarity } from '@/game/types'
 
 const VIEW = 40
 const C = VIEW / 2
@@ -207,41 +208,18 @@ export function itemIcon({ slot, rarity, palette, size = 40 }: IconOptions): str
  * palette. Same principle -- generated, never drawn.
  */
 export function materialIcon(mat: Material, size = 32): string {
-  const accent = MATERIAL_PALETTE[mat.palette]
-  const dark = shade(accent, -0.32)
-  const light = shade(accent, 0.24)
-  const id = nextId()
+  // §4 -- the herbalist's shelf is green, whatever ground it grew on.
+  const form = formFor(mat)
+  const accent = HERB_FORMS.has(form) ? HERB_ACCENT : MATERIAL_PALETTE[mat.palette]
 
-  const shapes: Record<MaterialTier, string> = {
-    // Scrap: broken offcuts, scattered. Nothing about it reads as a resource,
-    // which is the point -- §4.0 wants it to look like what it is worth.
-    0: `<path d="M8 27 L13 18 L17 21 L14 30 Z" fill="${accent}" stroke="${dark}" stroke-width="1.1" stroke-linejoin="round"/>
-        <path d="M17 9 L24 12 L21 20 L15 17 Z" fill="${light}" stroke="${dark}" stroke-width="1.1" stroke-linejoin="round"/>
-        <path d="M24 22 L31 24 L29 31 L23 29 Z" fill="${accent}" stroke="${dark}" stroke-width="1.1" stroke-linejoin="round"/>`,
-    // Raw: a rough, irregular lump.
-    1: `<path d="M9 26 L7 15 L15 8 L27 10 L32 20 L26 30 L14 31 Z" fill="${accent}" stroke="${dark}" stroke-width="1.2" stroke-linejoin="round"/>
-        <path d="M15 8 L18 19 L9 26" fill="none" stroke="${light}" stroke-width="1.1"/>`,
-    // Refined: stacked, squared-off bars.
-    2: `<rect x="7" y="21" width="26" height="8" rx="1.6" fill="${accent}" stroke="${dark}" stroke-width="1.1"/>
-        <rect x="10" y="13" width="20" height="8" rx="1.6" fill="${light}" stroke="${dark}" stroke-width="1.1"/>
-        <rect x="14" y="7" width="12" height="7" rx="1.6" fill="${accent}" stroke="${dark}" stroke-width="1.1"/>`,
-    // Rare: a faceted crystal.
-    3: `<defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stop-color="${light}"/><stop offset="100%" stop-color="${dark}"/>
-        </linearGradient></defs>
-        <path d="M20 4 L31 15 L26 33 L14 33 L9 15 Z" fill="url(#${id})" stroke="${GOLD}" stroke-width="1.2" stroke-linejoin="round"/>
-        <path d="M20 4 L20 33 M9 15 L31 15" stroke="${GOLD}" stroke-width="0.7"/>`,
-    // Raid: a sealed relic core.
-    4: `<defs><radialGradient id="${id}">
-          <stop offset="0%" stop-color="${light}"/><stop offset="100%" stop-color="${dark}"/>
-        </radialGradient></defs>
-        <circle cx="20" cy="20" r="12" fill="url(#${id})" stroke="${GOLD}" stroke-width="1.2"/>
-        <path d="M20 8 L20 32 M8 20 L32 20" stroke="${GOLD}" stroke-width="0.8"/>
-        <circle cx="20" cy="20" r="4.5" fill="${VELLUM_DIM}"/>`,
+  const ink: Ink = {
+    fill: accent,
+    dark: shade(accent, -0.42),
+    light: shade(accent, 0.26),
   }
 
   return `<svg viewBox="0 0 40 40" width="${size}" height="${size}" role="img" aria-hidden="true">
-    ${shapes[mat.tier]}
+    ${formShape(form, ink, keySeed(mat.key), gradeRank(mat.key))}
   </svg>`
 }
 

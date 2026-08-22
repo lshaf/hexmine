@@ -25,7 +25,7 @@ import {
   tileToScreen,
 } from './hexGeometry'
 import { herdProp, tileProps } from './props'
-import { BIOME_COLOR, GOLD, VELLUM, depletedColor, shade } from '@/theme/palette'
+import { GOLD, VELLUM, depletedColor, shade, variantColor } from '@/theme/palette'
 import type { Job, Tile, TravelState } from '@/game/types'
 
 const props = defineProps<{
@@ -227,7 +227,7 @@ const renderTiles = computed<RenderTile[]>(() =>
   paintersSort(props.tiles).map((tile) => {
     const { x, y } = tileToScreen(tile.col, tile.row)
     const depleted = tile.regrowsAt > props.now
-    const base = depleted ? depletedColor(tile.biome) : BIOME_COLOR[tile.biome]
+    const base = depleted ? depletedColor(tile.variant) : variantColor(tile.variant)
     const distance = hexDistance(props.characterCol, props.characterRow, tile.col, tile.row)
     const inSight = distance <= props.sight
 

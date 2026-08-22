@@ -31,7 +31,7 @@ import type {
   TravelState,
 } from '@/game/types'
 import { TUTORIAL, TUTORIAL_OUTRO, tutorialStep } from '@/game/tutorial'
-import { configureWorld, generateTile } from '@/game/worldgen'
+import { configureWorld, generateTile, inBounds, worldParams } from '@/game/worldgen'
 import { hexDistance, visibleTiles } from '@/map/hexGeometry'
 
 /** Which overlay is open over the map, if any. */
@@ -105,6 +105,12 @@ export const useGame = defineStore('game', () => {
 
     const built: Tile[] = []
     for (const coord of visibleTiles(col, row, w, h)) {
+      // §5.1 -- the map ends, and the render must end with it. visibleTiles()
+      // returns a rectangle around the camera without knowing where the edge
+      // is, so tiles past it used to be generated and drawn: terrain outside
+      // the world, on ground travelTo() would refuse to walk to.
+      if (!inBounds(coord.col, coord.row)) continue
+
       const k = key(coord.col, coord.row)
       built.push(
         generateTile(coord.col, coord.row, now.value, {
@@ -116,9 +122,20 @@ export const useGame = defineStore('game', () => {
     tiles.value = built
   }
 
-  /** Move the camera. Local only -- tiles are generated, never fetched. */
+  /**
+   * Move the camera. Local only -- tiles are generated, never fetched.
+   *
+   * §5.1 -- the centre is held on the map. Without this a pan can carry the
+   * camera off the edge and leave the viewport empty, which reads as a broken
+   * render rather than as an edge.
+   */
   function setView(col: number, row: number): void {
-    view.value = { ...view.value, col, row }
+    const { radius } = worldParams()
+    view.value = {
+      ...view.value,
+      col: Math.max(-radius, Math.min(radius, col)),
+      row: Math.max(-radius, Math.min(radius, row)),
+    }
     rebuildTiles()
   }
 

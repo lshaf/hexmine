@@ -8,8 +8,10 @@
  * painter's-algorithm sort (§13.2): a mountain has to occlude the hexes behind it.
  */
 import { hash2, rand01, randInt } from '@/game/hash'
-import { BIOME_COLOR, shade } from '@/theme/palette'
-import type { SettlementTier, Tile } from '@/game/types'
+import { shade, variantColor } from '@/theme/palette'
+import { HEX_SIDE_PATH, HEX_TOP_PATH, ROW_STEP } from './hexGeometry'
+import { VARIANT_PROPS } from '@/game/variants'
+import type { SettlementTier, Tile, VariantKey } from '@/game/types'
 
 /** Escape nothing -- all values are numbers we generate. Kept tiny on purpose. */
 const poly = (points: string, fill: string, stroke?: string) =>
@@ -78,6 +80,150 @@ function tuft(x: number, y: number, color: string): string {
     poly(`${x},${y - 6} ${x + 1.4},${y} ${x - 1.4},${y}`, c) +
     poly(`${x - 3.5},${y - 4} ${x - 2.4},${y} ${x - 4.6},${y}`, c) +
     poly(`${x + 3.5},${y - 4} ${x + 4.6},${y} ${x + 2.4},${y}`, c)
+  )
+}
+
+
+/**
+ * §5.3 -- the grade treatments. A variant is not just a tint: the props change
+ * shape or density with it, so contested ground reads as different ground while
+ * the map is moving, at roughly 40px inside a 58x34 hex.
+ */
+
+function broadleaf(x: number, y: number, scale: number, color: string): string {
+  const trunk = shade(color, -0.55)
+  const r = 7 * scale
+  const h = 11 * scale
+  return (
+    rect(x - 1.2 * scale, y - h + r, 2.4 * scale, h - r + 1, trunk) +
+    `<ellipse cx="${x}" cy="${y - h}" rx="${r}" ry="${r * 0.82}" fill="${color}"/>` +
+    `<ellipse cx="${x - r * 0.4}" cy="${y - h}" rx="${r * 0.5}" ry="${r * 0.6}" fill="${shade(color, -0.14)}"/>`
+  )
+}
+
+/** Old growth: fewer, taller, and buttressed at the foot. */
+function giant(x: number, y: number, scale: number, color: string): string {
+  const trunk = shade(color, -0.58)
+  const h = 26 * scale
+  const w = 8 * scale
+  return (
+    poly(`${x - 3.5 * scale},${y} ${x + 3.5 * scale},${y} ${x + 1.6 * scale},${y - 8 * scale} ${x - 1.6 * scale},${y - 8 * scale}`, trunk) +
+    poly(`${x},${y - h} ${x + w},${y - 7 * scale} ${x - w},${y - 7 * scale}`, color) +
+    poly(`${x},${y - h} ${x},${y - 7 * scale} ${x - w},${y - 7 * scale}`, shade(color, -0.18)) +
+    poly(`${x},${y - h * 0.72} ${x + w * 1.15},${y - 2 * scale} ${x - w * 1.15},${y - 2 * scale}`, shade(color, -0.08))
+  )
+}
+
+/** Ironwood: the same giant, banded, so the metal in it shows at a glance. */
+function ironwoodTree(x: number, y: number, scale: number, color: string): string {
+  const band = '#9aa6a0'
+  return (
+    giant(x, y, scale, color) +
+    rect(x - 3.2 * scale, y - 6 * scale, 6.4 * scale, 1.4, band) +
+    rect(x - 2.6 * scale, y - 3 * scale, 5.2 * scale, 1.2, shade(band, -0.2))
+  )
+}
+
+/** A peak with the ore band showing in the face. */
+function bandedPeak(x: number, y: number, scale: number, color: string, seam: string): string {
+  const h = 22 * scale
+  const w = 15 * scale
+  return (
+    poly(`${x},${y - h} ${x + w},${y} ${x - w},${y}`, shade(color, -0.28)) +
+    poly(`${x},${y - h} ${x},${y} ${x - w},${y}`, shade(color, 0.2)) +
+    poly(`${x - w * 0.55},${y - h * 0.22} ${x + w * 0.2},${y - h * 0.52} ${x + w * 0.3},${y - h * 0.4} ${x - w * 0.5},${y - h * 0.1}`, seam)
+  )
+}
+
+/** Crater field: a rim ring with the strike still sitting in it. */
+function crater(x: number, y: number, scale: number, color: string): string {
+  const rim = shade(color, -0.3)
+  const floor = shade(color, -0.52)
+  return (
+    `<ellipse cx="${x}" cy="${y}" rx="${13 * scale}" ry="${5.5 * scale}" fill="${rim}"/>` +
+    `<ellipse cx="${x}" cy="${y - 0.6 * scale}" rx="${8.5 * scale}" ry="${3.4 * scale}" fill="${floor}"/>` +
+    poly(`${x + 1.5 * scale},${y - 7 * scale} ${x + 4.5 * scale},${y - 1 * scale} ${x - 1.5 * scale},${y - 1 * scale}`, shade(color, 0.14))
+  )
+}
+
+/** Basalt: hexagonal columns, cracked square along their own joints. */
+function column(x: number, y: number, scale: number, color: string): string {
+  const w = 4 * scale
+  const h = 13 * scale
+  return (
+    rect(x - w, y - h, w * 2, h, shade(color, -0.24)) +
+    rect(x - w, y - h, w * 0.8, h, shade(color, -0.06)) +
+    poly(`${x - w},${y - h} ${x},${y - h - 2.5 * scale} ${x + w},${y - h} ${x},${y - h + 2.2 * scale}`, shade(color, 0.16))
+  )
+}
+
+/** Granite: one flat slab the weather never got under. */
+function shelf(x: number, y: number, scale: number, color: string): string {
+  const w = 15 * scale
+  const h = 5 * scale
+  return (
+    poly(`${x - w},${y} ${x - w * 0.78},${y - h} ${x + w * 0.86},${y - h} ${x + w},${y}`, shade(color, -0.2)) +
+    poly(`${x - w * 0.78},${y - h} ${x + w * 0.86},${y - h} ${x + w * 0.7},${y - h - 2.4 * scale} ${x - w * 0.6},${y - h - 2.4 * scale}`, shade(color, 0.18))
+  )
+}
+
+/** Obsidian: glass, so it gets a highlight nothing else on the map has. */
+function glassShard(x: number, y: number, scale: number, color: string): string {
+  const h = 13 * scale
+  const w = 5 * scale
+  return (
+    poly(`${x},${y - h} ${x + w},${y} ${x - w},${y}`, shade(color, -0.45)) +
+    poly(`${x},${y - h} ${x - w * 0.35},${y} ${x - w},${y}`, shade(color, 0.3)) +
+    poly(`${x + w * 0.1},${y - h * 0.8} ${x + w * 0.42},${y - h * 0.2} ${x + w * 0.16},${y - h * 0.2}`, '#c9c2d6')
+  )
+}
+
+/** Ribs in the grass. The herds keep off this stretch for a reason. */
+function bones(x: number, y: number, color: string): string {
+  const bone = '#d8d2c0'
+  return (
+    tuft(x - 6, y, color) +
+    `<path d="M ${x - 4} ${y} q 4 -7 9 -1" stroke="${bone}" stroke-width="1.4" fill="none"/>` +
+    `<path d="M ${x - 1} ${y} q 4 -6 8 -1" stroke="${shade(bone, -0.18)}" stroke-width="1.2" fill="none"/>`
+  )
+}
+
+/** Tusks, for the ground the beastfang herds hold. */
+function fangs(x: number, y: number, color: string): string {
+  const ivory = '#e2dac4'
+  return (
+    tuft(x + 5, y, color) +
+    `<path d="M ${x - 5} ${y} q 1 -8 6 -9" stroke="${ivory}" stroke-width="2" fill="none" stroke-linecap="round"/>` +
+    `<path d="M ${x} ${y} q 1 -6 5 -7" stroke="${shade(ivory, -0.2)}" stroke-width="1.6" fill="none" stroke-linecap="round"/>`
+  )
+}
+
+/** Flax in flower: a week a year, and it is how you find the meadow. */
+function flowering(x: number, y: number, color: string): string {
+  return (
+    tuft(x, y, color) +
+    `<circle cx="${x}" cy="${y - 7}" r="1.5" fill="#7d90c4"/>` +
+    `<circle cx="${x - 3.6}" cy="${y - 5}" r="1.2" fill="#8fa0cf"/>`
+  )
+}
+
+/** Hemp: over head height, which is why sight stops in it. */
+function tallStalk(x: number, y: number, color: string): string {
+  const c = shade(color, -0.26)
+  return (
+    rect(x, y - 13, 1.3, 13, c) +
+    rect(x - 4, y - 10, 1.1, 10, shade(color, -0.14)) +
+    rect(x + 4, y - 11, 1.1, 11, shade(color, -0.2)) +
+    poly(`${x + 0.6},${y - 16} ${x + 3},${y - 11} ${x - 2},${y - 11}`, c)
+  )
+}
+
+/** Silkweave: a strand between the stems, and nobody asks what spun it. */
+function silk(x: number, y: number, color: string): string {
+  return (
+    tuft(x, y, color) +
+    `<path d="M ${x - 7} ${y - 8} q 7 4 14 -2" stroke="#e6e2d2" stroke-width="0.9" fill="none"/>` +
+    `<path d="M ${x - 4} ${y - 10} q 4 6 8 1" stroke="#cfc9bb" stroke-width="0.7" fill="none"/>`
   )
 }
 
@@ -231,7 +377,7 @@ export function tileProps(tile: Tile, depleted: boolean): string {
   if (tile.dungeon) return dungeonProp()
   if (tile.settlement) return settlementProp(tile.settlement.tier, tile.propSeed)
 
-  const base = BIOME_COLOR[tile.biome]
+  const base = variantColor(tile.variant)
   const seed = tile.propSeed
   let out = ''
 
@@ -241,8 +387,13 @@ export function tileProps(tile: Tile, depleted: boolean): string {
     return { x: randInt(hx, -17, 17), y: randInt(hy, -4, 9) }
   }
 
-  switch (tile.biome) {
-    case 'forest': {
+  // §5.3 -- the treatment comes off the variant, not the biome. Four grades of
+  // forest are four different stands of trees; the base grade is the one that
+  // still draws what it always drew.
+  const treatment = VARIANT_PROPS[tile.variant] ?? 'conifers'
+
+  switch (treatment) {
+    case 'conifers': {
       const count = depleted ? 2 : randInt(hash2(tile.col, tile.row, seed), 2, 4)
       for (let i = 0; i < count; i++) {
         const p = spot(i)
@@ -253,7 +404,34 @@ export function tileProps(tile: Tile, depleted: boolean): string {
       }
       break
     }
-    case 'mountain': {
+    case 'broadleaf': {
+      const count = depleted ? 2 : 3
+      for (let i = 0; i < count; i++) {
+        const p = spot(i)
+        out += depleted
+          ? stump(p.x, p.y, base)
+          : broadleaf(p.x, p.y, 0.7 + rand01(hash2(i, tile.col, seed)) * 0.35, base)
+      }
+      break
+    }
+    case 'giants': {
+      const count = depleted ? 1 : 2
+      for (let i = 0; i < count; i++) {
+        const p = spot(i)
+        out += depleted
+          ? stump(p.x, p.y, base)
+          : giant(p.x * 0.7, p.y, 0.72 + rand01(hash2(i, tile.row, seed)) * 0.22, base)
+      }
+      break
+    }
+    case 'ironwood': {
+      const p = spot(0)
+      out += depleted
+        ? stump(p.x, p.y, base)
+        : ironwoodTree(p.x * 0.6, p.y, 0.78, base)
+      break
+    }
+    case 'peaks': {
       const p = spot(0)
       out += depleted
         ? rockShard(p.x, p.y, 0.7, base)
@@ -264,7 +442,26 @@ export function tileProps(tile: Tile, depleted: boolean): string {
       }
       break
     }
-    case 'badlands': {
+    case 'banded': {
+      const p = spot(0)
+      out += depleted
+        ? rockShard(p.x, p.y, 0.7, base)
+        : bandedPeak(p.x * 0.4, p.y, 0.66 + rand01(seed) * 0.36, base, '#8c3f34')
+      break
+    }
+    case 'mythril': {
+      const p = spot(0)
+      out += depleted
+        ? rockShard(p.x, p.y, 0.7, base)
+        : bandedPeak(p.x * 0.4, p.y, 0.7 + rand01(seed) * 0.3, base, '#cfe2ea')
+      break
+    }
+    case 'crater': {
+      const p = spot(0)
+      out += crater(p.x * 0.5, p.y + 2, depleted ? 0.7 : 0.95, base)
+      break
+    }
+    case 'shards': {
       const count = depleted ? 1 : 3
       for (let i = 0; i < count; i++) {
         const p = spot(i)
@@ -272,8 +469,68 @@ export function tileProps(tile: Tile, depleted: boolean): string {
       }
       break
     }
-    case 'plains':
-    case 'grassland': {
+    case 'columns': {
+      const count = depleted ? 2 : 3
+      for (let i = 0; i < count; i++) {
+        const p = spot(i)
+        out += column(p.x * 0.8, p.y, depleted ? 0.55 : 0.7 + rand01(hash2(i, tile.col, seed)) * 0.3, base)
+      }
+      break
+    }
+    case 'shelf': {
+      const p = spot(0)
+      out += shelf(p.x * 0.35, p.y + 2, depleted ? 0.7 : 0.95, base)
+      break
+    }
+    case 'glass': {
+      const count = depleted ? 1 : 2
+      for (let i = 0; i < count; i++) {
+        const p = spot(i)
+        out += glassShard(p.x, p.y, depleted ? 0.6 : 0.85 + rand01(hash2(i, tile.row, seed)) * 0.3, base)
+      }
+      break
+    }
+    case 'grazed': {
+      const count = depleted ? 1 : 4
+      for (let i = 0; i < count; i++) {
+        const p = spot(i)
+        out += tuft(p.x, p.y, shade(base, -0.08))
+      }
+      break
+    }
+    case 'bones': {
+      out += bones(spot(0).x, spot(0).y, base)
+      if (!depleted) out += tuft(spot(1).x, spot(1).y, base)
+      break
+    }
+    case 'fangs': {
+      out += fangs(spot(0).x, spot(0).y, base)
+      if (!depleted) out += tuft(spot(2).x, spot(2).y, base)
+      break
+    }
+    case 'flowering': {
+      const count = depleted ? 1 : 3
+      for (let i = 0; i < count; i++) {
+        const p = spot(i)
+        out += depleted ? tuft(p.x, p.y, base) : flowering(p.x, p.y, base)
+      }
+      break
+    }
+    case 'tall': {
+      const count = depleted ? 1 : 3
+      for (let i = 0; i < count; i++) {
+        const p = spot(i)
+        out += depleted ? tuft(p.x, p.y, base) : tallStalk(p.x, p.y, base)
+      }
+      break
+    }
+    case 'silk': {
+      out += silk(spot(0).x, spot(0).y, base)
+      if (!depleted) out += tuft(spot(2).x, spot(2).y, base)
+      break
+    }
+    case 'tufts':
+    default: {
       const count = depleted ? 1 : 3
       for (let i = 0; i < count; i++) {
         const p = spot(i)
@@ -284,6 +541,67 @@ export function tileProps(tile: Tile, depleted: boolean): string {
   }
 
   return out
+}
+
+
+/**
+ * One tile, drawn on its own, for the almanac's ground tab.
+ *
+ * §5.3 gave every biome four variants and §13.2 tells them apart by tint AND by
+ * prop treatment -- so a flat colour chip shows half the difference. Four
+ * greens next to each other are hard work; four greens with conifers, broadleaf
+ * crowns, two buttressed giants and a banded trunk on them are not.
+ *
+ * The same `tileProps` the map calls, on the same squashed hex with the same
+ * extruded slab, so what the reference page shows is what the ground looks
+ * like. The seed is fixed rather than per-tile: this is one specimen of a kind
+ * of ground, not a place, and a specimen that reshuffled every render would be
+ * harder to compare against the card beside it.
+ */
+const SPECIMEN_SEED = 0x51ec
+
+export function variantSpecimen(variant: VariantKey, size = 66): string {
+  const tile = {
+    col: 0,
+    row: 0,
+    variant,
+    propSeed: SPECIMEN_SEED,
+    settlement: undefined,
+    dungeon: undefined,
+    herdUntil: undefined,
+  } as unknown as Tile
+
+  const top = variantColor(variant)
+  const side = shade(top, -0.4)
+  const edge = shade(top, -0.2)
+
+  // A prop is filled with its own ground's colour, so on the map a tree only
+  // reads because it stands in front of the DARKER slab of the tile behind it
+  // (§13.2's painter's sort is what guarantees that). Draw one specimen alone
+  // and there is nothing behind it, so the silhouette disappears into the fill.
+  // The neighbour directly upslope is put back for exactly that reason -- it is
+  // what the hex actually looks like in place, not a vignette behind it.
+  const backTop = shade(top, -0.3)
+  const back =
+    `<g transform="translate(0,${-ROW_STEP})">` +
+    `<path d="${HEX_SIDE_PATH}" fill="${shade(backTop, -0.4)}"/>` +
+    `<path d="${HEX_TOP_PATH}" fill="${backTop}"/>` +
+    '</g>'
+
+  // Tall props stand well above their own tile -- a giant reaches ~26px up --
+  // so the box is far deeper above the centre than below it.
+  const w = 62
+  const boxH = 82
+  const h = Math.round((size * boxH) / w)
+
+  return (
+    `<svg viewBox="-31 -54 ${w} ${boxH}" width="${size}" height="${h}" aria-hidden="true">` +
+    back +
+    `<path d="${HEX_SIDE_PATH}" fill="${side}"/>` +
+    `<path d="${HEX_TOP_PATH}" fill="${top}" stroke="${edge}" stroke-width="0.5"/>` +
+    tileProps(tile, false) +
+    '</svg>'
+  )
 }
 
 /** Rendered separately so a herd can sit on top of whatever terrain is there. */

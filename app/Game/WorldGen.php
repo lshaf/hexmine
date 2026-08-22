@@ -7,7 +7,7 @@ namespace App\Game;
 /**
  * Deterministic world generation, §5. Port of `frontend/src/game/worldgen.ts`.
  *
- * The map is Balance::MAP_COLS x MAP_ROWS and none of it is stored. Every tile
+ * The map is square, Balance::mapSize() a side, and none of it is stored. Every tile
  * is a pure function of (col, row, seed), so the client derives identical
  * terrain without the server shipping a map. Only *mutations* -- depletion
  * timers and occupied slots -- ever reach a table.
@@ -18,8 +18,10 @@ namespace App\Game;
  */
 final class WorldGen
 {
-    private const CENTER_COL = Balance::MAP_COLS / 2;
-    private const CENTER_ROW = Balance::MAP_ROWS / 2;
+    /** §5.1 -- the middle of the world is the origin, and always was. */
+    private const CENTER_COL = 0;
+
+    private const CENTER_ROW = 0;
 
     /** Fine cells per coherent region, and how strongly the region dominates. */
     private const COARSE_DOMINANCE = 0.6;
@@ -35,12 +37,41 @@ final class WorldGen
 
     private static function maxRadius(): float
     {
-        return min(Balance::MAP_COLS, Balance::MAP_ROWS) / 2;
+        return Balance::mapRadius();
     }
 
     // --------------------------------------------------------------- rings
 
     /** Normalised distance from map centre, 0 at the capital ring, 1 at the rim. */
+    /**
+     * Forget everything derived from the map settings.
+     *
+     * The world is a pure function of (col, row, seed) and none of it is
+     * stored, which is exactly why the caches here are safe -- right up until
+     * the seed or the radius changes underneath them. A test that reaches into
+     * config/game.php calls this; nothing in normal operation needs it.
+     */
+    public static function forget(): void
+    {
+        self::$biomeCache = [];
+        self::$cellCache = [];
+        Balance::forgetMapConfig();
+    }
+
+    /**
+     * §5.1 -- is this hex on the map at all?
+     *
+     * The one place the edge is decided. Travel, mining and the client's render
+     * loop all ask here rather than each spelling out the comparison, because
+     * three copies of an inclusive bound is three chances to be off by one.
+     */
+    public static function inBounds(int $col, int $row): bool
+    {
+        $radius = Balance::mapRadius();
+
+        return abs($col) <= $radius && abs($row) <= $radius;
+    }
+
     public static function radiusOf(int $col, int $row): float
     {
         $dc = ($col - self::CENTER_COL) / self::maxRadius();
@@ -93,21 +124,21 @@ final class WorldGen
             return self::$cellCache[$cacheKey];
         }
 
-        $hx = Hash::hash2($cx, $cy, Balance::MAP_SEED ^ 0xb10e);
-        $hy = Hash::hash2($cy, $cx, Balance::MAP_SEED ^ 0xb11e);
-        $hMix = Hash::hash2($cx * 7 + $cy * 13, $cx - $cy, Balance::MAP_SEED ^ 0xb12e);
+        $hx = Hash::hash2($cx, $cy, Balance::mapSeed() ^ 0xb10e);
+        $hy = Hash::hash2($cy, $cx, Balance::mapSeed() ^ 0xb11e);
+        $hMix = Hash::hash2($cx * 7 + $cy * 13, $cx - $cy, Balance::mapSeed() ^ 0xb12e);
 
         $hCoarse = Hash::hash2(
             (int) floor($cx / Balance::BIOME_REGION_CELLS),
             (int) floor($cy / Balance::BIOME_REGION_CELLS),
-            Balance::MAP_SEED ^ 0xc0a5,
+            Balance::mapSeed() ^ 0xc0a5,
         );
         $coarse = Catalog::BIOMES[Hash::randInt($hCoarse, 0, count(Catalog::BIOMES) - 1)];
 
         $biome = Hash::rand01($hMix) < self::COARSE_DOMINANCE
             ? $coarse
             : Catalog::BIOMES[Hash::randInt(
-                Hash::hash2($cx, $cy, Balance::MAP_SEED ^ 0xd1a1),
+                Hash::hash2($cx, $cy, Balance::mapSeed() ^ 0xd1a1),
                 0,
                 count(Catalog::BIOMES) - 1,
             )];
@@ -128,7 +159,8 @@ final class WorldGen
 
     public static function biomeOf(int $col, int $row): string
     {
-        $cacheKey = $row * Balance::MAP_COLS + $col;
+        $cacheKey = ($row + Balance::mapRadius()) * Balance::mapSize()
+            + ($col + Balance::mapRadius());
         if (isset(self::$biomeCache[$cacheKey])) {
             return self::$biomeCache[$cacheKey];
         }
@@ -223,8 +255,8 @@ final class WorldGen
         ['cell' => $cell, 'minGap' => $minGap, 'salt' => $salt] = self::LATTICE[$tier];
 
         return [
-            $cellCol * $cell + self::siteOffset($cell, $minGap, Hash::hash2($cellCol, $cellRow, Balance::MAP_SEED ^ $salt)),
-            $cellRow * $cell + self::siteOffset($cell, $minGap, Hash::hash2($cellRow, $cellCol, Balance::MAP_SEED ^ ($salt + 1))),
+            $cellCol * $cell + self::siteOffset($cell, $minGap, Hash::hash2($cellCol, $cellRow, Balance::mapSeed() ^ $salt)),
+            $cellRow * $cell + self::siteOffset($cell, $minGap, Hash::hash2($cellRow, $cellCol, Balance::mapSeed() ^ ($salt + 1))),
         ];
     }
 
@@ -233,7 +265,7 @@ final class WorldGen
     {
         ['chance' => $chance, 'salt' => $salt] = self::LATTICE[$tier];
 
-        return Hash::rand01(Hash::hash2($cellCol, $cellRow, Balance::MAP_SEED ^ ($salt + 2))) <= $chance;
+        return Hash::rand01(Hash::hash2($cellCol, $cellRow, Balance::mapSeed() ^ ($salt + 2))) <= $chance;
     }
 
     /**
@@ -288,10 +320,11 @@ final class WorldGen
 
             // Hex distance is never below the larger axial difference, so
             // anything within minGap hexes is also within minGap columns and
-            // rows -- these are every cell that could hold one. Negative cells
-            // hold nothing: their sites would land off the map.
-            $cxMin = max(0, (int) floor(($col - $minGap) / $cell));
-            $cyMin = max(0, (int) floor(($row - $minGap) / $cell));
+            // rows -- these are every cell that could hold one. Cell indices go
+            // negative west and north of the origin (§5.1) and those cells are
+            // as real as any other, so the scan must not clamp them away.
+            $cxMin = (int) floor(($col - $minGap) / $cell);
+            $cyMin = (int) floor(($row - $minGap) / $cell);
             $cxMax = (int) floor(($col + $minGap) / $cell);
             $cyMax = (int) floor(($row + $minGap) / $cell);
 
@@ -320,7 +353,7 @@ final class WorldGen
         $picked = [];
 
         for ($i = 0; $i < $count; $i++) {
-            $h = Hash::hash2($col, $row + $i * 977, Balance::MAP_SEED ^ 0x5171);
+            $h = Hash::hash2($col, $row + $i * 977, Balance::mapSeed() ^ 0x5171);
             $index = Hash::randInt($h, 0, count($pool) - 1);
             $picked[] = $pool[$index];
             array_splice($pool, $index, 1);
@@ -331,8 +364,8 @@ final class WorldGen
 
     private static function nameFor(int $col, int $row, string $tier): string
     {
-        $hp = Hash::hash2($col, $row, Balance::MAP_SEED ^ 0x7ae1);
-        $hs = Hash::hash2($row, $col, Balance::MAP_SEED ^ 0x7ae2);
+        $hp = Hash::hash2($col, $row, Balance::mapSeed() ^ 0x7ae1);
+        $hs = Hash::hash2($row, $col, Balance::mapSeed() ^ 0x7ae2);
 
         $base = Catalog::NAME_PREFIXES[Hash::randInt($hp, 0, count(Catalog::NAME_PREFIXES) - 1)]
             .Catalog::NAME_SUFFIXES[Hash::randInt($hs, 0, count(Catalog::NAME_SUFFIXES) - 1)];
@@ -347,6 +380,13 @@ final class WorldGen
     /** The settlement on this tile, if any. Pure function of position. */
     public static function settlementAt(int $col, int $row): ?array
     {
+        // §5.1 -- nobody lives off the edge. The lattice happily extends past
+        // it, so without this the slow path and the atlas's cell walk disagree
+        // about the border cells.
+        if (! self::inBounds($col, $row)) {
+            return null;
+        }
+
         $ring = self::ringOf($col, $row);
         $tier = self::TIER_FOR_RING[$ring];
         if ($tier === null) {
@@ -412,13 +452,13 @@ final class WorldGen
 
         $sites = [];
         $count = count(Catalog::DUNGEONS);
-        $radius = Balance::RING_CENTER * 0.62 * (min(Balance::MAP_COLS, Balance::MAP_ROWS) / 2);
+        $radius = Balance::RING_CENTER * 0.62 * Balance::mapRadius();
 
         foreach (Catalog::DUNGEONS as $index => $dungeon) {
             $angle = (M_PI * 2 * $index) / $count - M_PI / 2;
             $sites[] = [
-                'col' => (int) round(Balance::MAP_COLS / 2 + cos($angle) * $radius),
-                'row' => (int) round(Balance::MAP_ROWS / 2 + sin($angle) * $radius),
+                'col' => (int) round(cos($angle) * $radius),
+                'row' => (int) round(sin($angle) * $radius),
                 'dungeon' => $dungeon,
             ];
         }
@@ -451,13 +491,43 @@ final class WorldGen
 
         $lifetime = Balance::scaled(Balance::HERD_LIFETIME_MS);
         $bucket = intdiv($now, $lifetime);
-        $h = Hash::hash2($col * 31 + $bucket, $row * 17 + $bucket, Balance::MAP_SEED ^ 0xbeef);
+        $h = Hash::hash2($col * 31 + $bucket, $row * 17 + $bucket, Balance::mapSeed() ^ 0xbeef);
 
         if (Hash::rand01($h) > Balance::HERD_CHANCE) {
             return null;
         }
 
         return ($bucket + 1) * $lifetime;
+    }
+
+    /**
+     * §5.3 -- which of the biome's four variants this hex turned out to be.
+     *
+     * A weighted walk in fixed grade order over the ring's column, which sums
+     * to 1 by construction (the generator asserts it). Fixed order is what
+     * makes the roll reproducible on the client: both sides walk the same table
+     * with the same number and stop in the same place.
+     *
+     * The outer rim can only ever be the base grade, so a walk there always
+     * stops on the first row -- safe ground and poor ground, exactly as §5.2
+     * asks for.
+     *
+     * @return array{key:string,grade:string,name:string,material:string,tint:string,props:string,weights:array<string,float>}
+     */
+    public static function variantOf(int $col, int $row, string $biome, string $ring): array
+    {
+        $variants = Variants::BIOME_VARIANTS[$biome];
+        $roll = Hash::rand01(Hash::hash2($col, $row, Balance::mapSeed() ^ 0xc3));
+
+        $seen = 0.0;
+        foreach ($variants as $variant) {
+            $seen += $variant['weights'][$ring] ?? 0.0;
+            if ($roll < $seen) {
+                return $variant;
+            }
+        }
+
+        return $variants[0];
     }
 
     /**
@@ -473,9 +543,8 @@ final class WorldGen
         $settlement = self::settlementAt($col, $row);
         $dungeon = self::dungeonAt($col, $row);
 
-        $hTime = Hash::hash2($col, $row, Balance::MAP_SEED ^ 0xa1);
-        $hYield = Hash::hash2($col, $row, Balance::MAP_SEED ^ 0xb2);
-        $hRare = Hash::hash2($col, $row, Balance::MAP_SEED ^ 0xc3);
+        $hTime = Hash::hash2($col, $row, Balance::mapSeed() ^ 0xa1);
+        $hYield = Hash::hash2($col, $row, Balance::mapSeed() ^ 0xb2);
 
         // §5.2 -- the capital ring is barren. That is the pressure that forces
         // traffic outward for materials and inward for processing.
@@ -483,11 +552,11 @@ final class WorldGen
         // A depleted tile keeps its material: it is drained, not dead (§5.1), and
         // callers gate on regrowsAt. The UI needs the material to keep rendering
         // the right remnants while it regrows.
+        $variant = null;
         $material = null;
         if ($ring !== 'center' && $settlement === null) {
-            $material = ($ring === 'inner' && Hash::rand01($hRare) < Balance::RARE_SPAWN_CHANCE)
-                ? Catalog::BIOME_RARE[$biome]
-                : Catalog::BIOME_MATERIAL[$biome];
+            $variant = self::variantOf($col, $row, $biome, $ring);
+            $material = $variant['material'];
         }
 
         $regrowsAt = $mutation['regrowsAt'] ?? 0;
@@ -496,6 +565,7 @@ final class WorldGen
             'col' => $col,
             'row' => $row,
             'biome' => $biome,
+            'variant' => $variant['key'] ?? $biome,
             'ring' => $ring,
             'material' => $material,
             'baseSeconds' => Hash::randInt($hTime, Balance::MINING_BASE_MIN_SECONDS, Balance::MINING_BASE_MAX_SECONDS),
@@ -505,7 +575,7 @@ final class WorldGen
             'settlement' => $settlement,
             'dungeon' => $dungeon ? ['key' => $dungeon['key'], 'name' => $dungeon['name']] : null,
             'herdUntil' => self::herdUntil($col, $row, $biome, $now),
-            'propSeed' => Hash::hash2($col, $row, Balance::MAP_SEED ^ 0xf00d),
+            'propSeed' => Hash::hash2($col, $row, Balance::mapSeed() ^ 0xf00d),
         ];
     }
 }

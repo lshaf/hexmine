@@ -35,4 +35,32 @@ return [
     */
     'auto_provision' => (bool) env('GAME_AUTO_PROVISION', true),
 
+    /*
+    |--------------------------------------------------------------------------
+    | The map
+    |--------------------------------------------------------------------------
+    |
+    | Nothing about the world is stored: every tile is a pure function of its
+    | coordinates and the seed (CLAUDE.md §5), so these two values ARE the world.
+    | Change either and every hex on it changes with it.
+    |
+    | The map is square, so one radius covers it. Measured from the middle out
+    | (§5.1): 200 means every column and every row from -200 to 200 inclusive,
+    | so the grid is 401 a side. Ship value is 2500, for the 5000x5000 of §5.
+    |
+    | The client is handed all three by GET /api/world at boot rather than
+    | compiling them in, so this file is the single source of truth and no
+    | frontend edit is needed. What a change DOES need is a regenerated parity
+    | fixture: `php artisan game:worldgen-fixture`, then `npm run parity`.
+    |
+    | The seed accepts hex (0x5eed1a3f) or decimal, and is masked to 32 bits --
+    | the hash is a bit-for-bit port of the JavaScript one and only agrees with
+    | it inside that width.
+    |
+    */
+    'map' => [
+        'radius' => (int) env('GAME_MAP_RADIUS', 200),
+        'seed' => env('GAME_MAP_SEED', '0x5eed1a3f'),
+    ],
+
 ];

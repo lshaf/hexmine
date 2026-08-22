@@ -24,32 +24,24 @@ PALETTE = {
     'forest': 'wood', 'mountain': 'iron', 'plains': 'pelt',
     'badlands': 'stone', 'grassland': 'fiber',
 }
-RAW = {
-    'forest': 'wood', 'mountain': 'iron_ore', 'plains': 'pelt',
-    'badlands': 'stone', 'grassland': 'fiber',
-}
-REFINED = {
-    'forest': 'planks', 'mountain': 'ingots', 'plains': 'leather',
-    'badlands': 'cut_stone', 'grassland': 'cloth',
-}
-RARE = {
-    'forest': 'ironwood', 'mountain': 'mythril_ore', 'plains': 'beastfang_hide',
-    'badlands': 'obsidian_shard', 'grassland': 'silkweave_fiber',
-}
-
 # ------------------------------------------------------------------ reagents
-# §4 Tier 1: raw, biome-locked, decays over cap. Two per biome so a recipe can
-# want two different things from one place. Every one sells for MORE than the
-# 1-gold scrap floor, which §4.0 makes a rule rather than a tuning value.
+# §4 Tier 1: raw, biome-locked. Two per biome so a recipe can want two different
+# things from one place. Every one sells for MORE than the 1-gold scrap floor,
+# which §4.0 makes a rule rather than a tuning value.
+#
+# All ten are BOTANICAL, and that is a rule rather than flavour. The consumable
+# bench is the herbalist's, so its whole stock is something that grows: a shelf
+# with a mineral and a bone on it reads as a smithy, and the three benches are
+# only legible apart because their stocks are.
 REAGENTS = [
     ('toadstool',   'Toadstool',   'forest',    3, 'Pulled from the shaded side of a stump. Bitter enough to work.'),
     ('birch_sap',   'Birch Sap',   'forest',    2, 'Tapped in the cold hour. Runs slow and keeps well.'),
     ('lichen',      'Lichen',      'mountain',  3, 'Scraped off north-facing rock. It grows a finger a decade.'),
-    ('alum',        'Alum',        'mountain',  4, 'Crusted white in the old workings. Puckers the mouth.'),
+    ('stonewort',   'Stonewort',   'mountain',  4, 'Grows out of bare rock on nothing at all. Bitter, and it keeps.'),
     ('bitterroot',  'Bitterroot',  'plains',    3, 'Dug where the herds will not graze. They know why.'),
-    ('marrow',      'Marrow',      'plains',    4, 'Cracked out and rendered. Nothing else carries a draught so far.'),
+    ('yarrow',      'Yarrow',      'plains',    4, 'Flat white heads over the whole range. Every field surgeon carries it.'),
     ('ashcap',      'Ashcap',      'badlands',  3, 'Comes up grey on burnt ground, a season after the fire.'),
-    ('emberdust',   'Emberdust',   'badlands',  4, 'Sifted from a vent that has not gone cold in living memory.'),
+    ('sagebrush',   'Sagebrush',   'badlands',  4, 'Silver-leaved and shin-high. Burns sweet and steeps sweeter.'),
     ('blue_nettle', 'Blue Nettle', 'grassland', 2, 'Stings through leather. Worth the hands it costs.'),
     ('clover',      'Clover',      'grassland', 2, 'Common as dirt, and half the shelf starts here.'),
 ]
@@ -72,13 +64,19 @@ JUNK = [
 # `mats` is how many DIFFERENT materials the recipe wants, and it never rises
 # with rank: a common draught is a muddle of four cheap things, a legendary
 # philtre is two perfect ones.
+#
+# Nothing here is tradeable. §2 lets an item be an NFT only when a per-wallet
+# cap stands behind its inputs, and the bench now runs on reagents alone --
+# Tier 1, uncapped, and mined by anyone. A tradeable rung on top of that would
+# be the grind-to-external-value path the threat model exists to close, so the
+# potion shelf stops at prestige.
 RANKS = [
     # rarity,      value, station,   tradeable, mats
     ('common',     0.03,  'village', False,     4),
     ('uncommon',   0.05,  'city',    False,     3),
     ('rare',       0.08,  'capital', False,     3),
-    ('epic',       0.11,  'capital', True,      2),
-    ('legendary',  0.14,  'guild',   True,      2),
+    ('epic',       0.11,  'capital', False,     2),
+    ('legendary',  0.14,  'guild',   False,     2),
 ]
 
 VESSEL = {
@@ -177,26 +175,35 @@ def consumables():
 
 
 def inputs_for(rarity, scope, mats):
-    """Recipes get shorter and sharper as they climb.
+    """Reagents and nothing else. Recipes get shorter and sharper as they climb.
 
-    Epic and legendary are the two tradeable rungs (§8.0), so §2 requires their
-    gate to be a per-wallet cap rather than a rarity label: both want a Tier 3
-    rare, which is wallet-capped, and legendary wants a raid drop on top. That
-    is the same gate every NFT tool already stands behind.
+    The bench runs on its own stock (§4): the ten reagents feed potions, and
+    nothing a smith or an armorer would want is on the list. Two crafters never
+    bid against each other for the same pile, so an alchemist's demand cannot
+    price a gathering line out of its own equipment ladder.
+
+    Rank is carried by depth instead of by breadth. A common draught is a
+    muddle of four cheap things pulled off two kinds of ground; a legendary
+    philtre is the local pair, in quantity, and nothing else.
+
+    NOTE: epic and legendary no longer want a Tier 3 rare, so the per-wallet
+    cap that §8.5 used to gate the two tradeable rungs is not behind them any
+    more. Their inputs are uncapped.
     """
     b = SCOPE_BIOME[scope]
     r = [k for k, _, bio, _, _ in REAGENTS if bio == b]
+    s = [k for k, _, bio, _, _ in REAGENTS if bio == SECOND[b]]
 
     if rarity == 'common':
-        return {r[0]: 3, r[1]: 2, RAW[b]: 4, RAW[SECOND[b]]: 2}
+        return {r[0]: 3, r[1]: 2, s[0]: 2, s[1]: 2}
     if rarity == 'uncommon':
-        return {r[0]: 3, r[1]: 2, REFINED[b]: 2}
+        return {r[0]: 3, r[1]: 3, s[0]: 2}
     if rarity == 'rare':
-        return {r[0]: 2, REFINED[b]: 2, 'reinforced_frame': 1}
+        return {r[0]: 4, r[1]: 3, s[1]: 3}
     if rarity == 'epic':
-        return {RARE[b]: 1, r[0]: 3}
+        return {r[0]: 6, r[1]: 4}
 
-    return {RARE[b]: 2, 'relic': 1}
+    return {r[0]: 8, r[1]: 6}
 
 
 # The neighbouring biome a common recipe reaches into, so the cheapest tier is

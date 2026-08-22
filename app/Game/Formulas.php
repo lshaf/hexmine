@@ -122,7 +122,7 @@ final class Formulas
         for ($i = 0; $i < $slots; $i++) {
             // Uncommon may come up empty; everything above it always fills.
             if ($def['rarity'] === 'uncommon' && $i < Balance::OPTION_ROLLS['uncommon']) {
-                if (Hash::rand01(Hash::hash2($seed, 900 + $i, Balance::MAP_SEED)) >= Balance::OPTION_CHANCE_UNCOMMON) {
+                if (Hash::rand01(Hash::hash2($seed, 900 + $i, Balance::mapSeed())) >= Balance::OPTION_CHANCE_UNCOMMON) {
                     continue;
                 }
             }
@@ -133,11 +133,11 @@ final class Formulas
                 break;
             }
 
-            $pick = $choices[Hash::randInt(Hash::hash2($seed, 910 + $i, Balance::MAP_SEED), 0, count($choices) - 1)];
+            $pick = $choices[Hash::randInt(Hash::hash2($seed, 910 + $i, Balance::mapSeed()), 0, count($choices) - 1)];
             $used[] = $pick;
 
             $steps = (int) round((Balance::OPTION_MAX - Balance::OPTION_MIN) * 100);
-            $roll = Hash::randInt(Hash::hash2($seed, 920 + $i, Balance::MAP_SEED), 0, $steps);
+            $roll = Hash::randInt(Hash::hash2($seed, 920 + $i, Balance::mapSeed()), 0, $steps);
 
             $out[] = [
                 'stat' => $pick,

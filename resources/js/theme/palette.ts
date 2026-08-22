@@ -3,7 +3,8 @@
  * the map causes ghost-hex artefacts through neighbours, so every shade a tile
  * needs is precomputed to an opaque hex string here.
  */
-import type { Biome } from '@/game/types'
+import { VARIANT_TINT } from '@/game/variants'
+import type { Biome, VariantKey } from '@/game/types'
 
 export const INK = '#141b18'
 export const INK_PANEL = '#1d2622'
@@ -64,11 +65,19 @@ export function desaturate(hex: string, amount: number): string {
 }
 
 /**
- * §13.3 -- a depleted tile uses a darker, desaturated variant of its OWN biome
+ * §5.3 -- the fill for a hex, which is its variant's tint rather than its
+ * biome's. Four grades of forest are four greens, or the contested ground would
+ * go on looking like the safe ground next to it.
+ */
+export const variantColor = (variant: VariantKey): string =>
+  VARIANT_TINT[variant] ?? BIOME_COLOR[variant as Biome]
+
+/**
+ * §13.3 -- a depleted tile uses a darker, desaturated variant of its OWN
  * colour, never grey. The land is drained, not dead, and it will regrow.
  */
-export const depletedColor = (biome: Biome): string =>
-  shade(desaturate(BIOME_COLOR[biome], 0.45), -0.28)
+export const depletedColor = (variant: VariantKey): string =>
+  shade(desaturate(variantColor(variant), 0.45), -0.28)
 
 /** Material accent colours for the procedural icon system, §13.1. */
 export const MATERIAL_PALETTE = {
@@ -79,6 +88,16 @@ export const MATERIAL_PALETTE = {
   fiber: '#d9cfa8',
   raid: VIOLET,
 } as const
+
+/**
+ * §4 -- the herbalist's ten, and the only green in the material set.
+ *
+ * A reagent takes this instead of its biome accent. Which ground it grew on is
+ * already on the card; what the icon has to say at 15px is which of the three
+ * benches wants it, and a shelf that is all one green says that instantly.
+ * Deliberately off the biome scale so it never reads as a sixth terrain.
+ */
+export const HERB_ACCENT = '#7d9464'
 
 /**
  * §8.1 -- rarity treatment for equipment icons. Rarity is the one thing a player
