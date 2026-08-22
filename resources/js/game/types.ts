@@ -55,7 +55,42 @@ export type RaidKey =
   | 'relic'
   | 'core'
 
-export type MaterialKey = ScrapKey | RawKey | RefinedKey | RareKey | RaidKey
+/**
+ * §4 Tier 1 -- the alchemist's raw stock, two per biome. Raw like wood and
+ * iron: biome-locked, decays over cap, and worth more than scrap.
+ */
+export type ReagentKey =
+  | 'toadstool'
+  | 'birch_sap'
+  | 'lichen'
+  | 'alum'
+  | 'bitterroot'
+  | 'marrow'
+  | 'ashcap'
+  | 'emberdust'
+  | 'blue_nettle'
+  | 'clover'
+
+/**
+ * §4.0 Tier 0 -- junk. Sells for a copper, feeds no recipe, reaches no tier.
+ * Kept apart from ScrapKey because scrap is what a hex gives up to bare hands
+ * and this is not: it is simply the rubbish you carry out alongside.
+ */
+export type JunkKey =
+  | 'deadfall'
+  | 'slag'
+  | 'bone_splinter'
+  | 'cinder'
+  | 'thistle'
+
+export type MaterialKey =
+  | ScrapKey
+  | JunkKey
+  | RawKey
+  | ReagentKey
+  | RefinedKey
+  | RareKey
+  | RaidKey
 
 export interface Material {
   key: MaterialKey
@@ -128,6 +163,22 @@ export type StatKey =
   | 'power'
   | 'defence'
 
+/**
+ * §8.5 -- what a buff can be pointed at.
+ *
+ * The five gathering lines are the §7.2 skills, so a line-scoped buff lands on
+ * exactly the trips that line already governs. `travel` and `processing` are
+ * the two other things a character spends real time on.
+ */
+export type BuffScope = SkillKey | 'travel' | 'processing'
+
+/**
+ * §8.0 -- the bench a recipe needs, which is not the same as a settlement tier.
+ * Village, city and capital are places on the map; a guild hall is not one, and
+ * legendary work is reachable only there. Mirrors Balance::stationForRarity().
+ */
+export type CraftStation = SettlementTier | 'guild'
+
 export interface ItemDef {
   key: string
   name: string
@@ -147,6 +198,15 @@ export interface ItemDef {
    */
   tradeable: boolean
   stat: StatKey
+  /**
+   * §8.5 -- the action this buff applies to, on consumables only.
+   *
+   * A potion no longer boosts a stat everywhere; it boosts it on one thing you
+   * do. That is what lets sixty of them exist without sixty of them stacking:
+   * two potions are only rivals when they buff the same stat on the same
+   * action, and the unique index on character_buffs says exactly that.
+   */
+  scope?: BuffScope
   /** Fractional bonus, e.g. 0.06 = +6%. */
   value: number
   palette: Material['palette']
@@ -154,8 +214,8 @@ export interface ItemDef {
   goldPrice?: number
   /** Crafting inputs; absent for shop items. */
   inputs?: Partial<Record<MaterialKey, number>>
-  /** Station required to craft, §6. */
-  station?: SettlementTier
+  /** Station required to craft, §6. `guild` is unreachable -- §8.0. */
+  station?: CraftStation
   /** Absent on consumables: nothing that is drunk wears out. */
   maxDurability?: number
   description: string
@@ -165,6 +225,14 @@ export interface ItemDef {
 export interface ActiveBuff {
   key: string
   stat: StatKey
+  /**
+   * §8.5 -- the action this buff applies to. `global` is the unscoped case,
+   * which is what every buff was before potions were locked to one action.
+   *
+   * The bag has to show it: two live buffs on the same stat are not a
+   * contradiction, they are two different things you are better at.
+   */
+  scope: BuffScope | 'global'
   value: number
   /** Server-clock deadline. The client counts down against it, never ticks it. */
   expiresAt: number

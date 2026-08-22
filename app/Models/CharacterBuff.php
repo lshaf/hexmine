@@ -15,7 +15,7 @@ use Illuminate\Database\Eloquent\Model;
  */
 class CharacterBuff extends Model
 {
-    protected $fillable = ['character_id', 'item_key', 'stat', 'value', 'expires_at'];
+    protected $fillable = ['character_id', 'item_key', 'stat', 'scope', 'value', 'expires_at'];
 
     protected $casts = ['value' => 'float', 'expires_at' => 'integer'];
 

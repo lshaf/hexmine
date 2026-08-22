@@ -54,8 +54,6 @@ final class Balance
     /** Depleted tiles regrow after ~9h, §5.1. */
     public const REGROW_MS = 9 * self::HOUR;
 
-    public const MINING_AP_COST = 2;
-
     /** Chance a collected tile is worked out and enters regrowth. */
     public const DEPLETE_CHANCE = 0.34;
 
@@ -76,8 +74,6 @@ final class Balance
      * hex for its seam; a herd is not a seam.
      */
     public const HUNT_BASE_SECONDS = 25 * 60;
-
-    public const HUNT_AP_COST = 1;
 
     /** Pelt haul before skill, gear and ring are applied. */
     public const HUNT_PELT_MIN = 2;
@@ -107,10 +103,6 @@ final class Balance
     // ----------------------------------------------------------- character §7
 
     public const STARTING_GOLD = 25;
-    public const STARTING_AP = 20;
-    public const BASE_AP_MAX = 20;
-    public const AP_PER_LEVEL = 4;
-    public const AP_REGEN_MS = 4 * self::MINUTE;
     /**
      * §7.4.1 -- 100 levels, and one skill point each. The cap is the point: 100
      * points buys three complete 30-node trees with 10 spare, deliberately just
@@ -451,11 +443,6 @@ final class Balance
     public static function skillXpForLevel(int $level): int
     {
         return (int) round(45 * $level ** 1.4);
-    }
-
-    public static function apMax(int $level): int
-    {
-        return self::BASE_AP_MAX + ($level - 1) * self::AP_PER_LEVEL;
     }
 
     /**

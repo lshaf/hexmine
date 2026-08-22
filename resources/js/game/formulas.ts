@@ -6,7 +6,7 @@
  * IMPORTANT: the server owns these numbers. This module exists so the client
  * can *predict* and display them; it must never be the authority.
  */
-import { CHARACTER, EQUIPMENT, MINING, PROCESSING, SKILLS } from './balance'
+import { EQUIPMENT, MINING, PROCESSING, SKILLS } from './balance'
 import { ITEM_BY_KEY, skillForSlot } from './catalog'
 import type {
   Rarity,
@@ -159,31 +159,6 @@ export function processingTime(
 
 // ----------------------------------------------------------------- character
 
-export const apMax = (level: number): number =>
-  CHARACTER.baseApMax + (level - 1) * CHARACTER.apPerLevel
-
-/**
- * Lazy AP regeneration. Stored as (ap, apUpdatedAt); the value at any moment is
- * derived, never ticked. This is what keeps the client from asserting time.
- */
-export function regenerateAp(
-  ap: number,
-  apUpdatedAt: number,
-  level: number,
-  now: number,
-  regenMs: number,
-): { ap: number; apUpdatedAt: number } {
-  const max = apMax(level)
-  if (ap >= max) return { ap, apUpdatedAt: now }
-
-  const gained = Math.floor((now - apUpdatedAt) / regenMs)
-  if (gained <= 0) return { ap, apUpdatedAt }
-
-  const next = Math.min(max, ap + gained)
-  // Keep the remainder so partial progress toward the next point is not lost.
-  const consumed = next >= max ? now - apUpdatedAt : gained * regenMs
-  return { ap: next, apUpdatedAt: apUpdatedAt + consumed }
-}
 
 /** Level-ups can cascade if a large XP grant lands at once. */
 export function applyXp(

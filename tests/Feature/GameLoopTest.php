@@ -205,14 +205,12 @@ final class GameLoopTest extends TestCase
         $this->assertNotNull($found, 'no woodcutting village within spawn radius');
     }
 
-    public function test_mining_spends_ap_and_yields_on_collect(): void
+    public function test_mining_yields_on_collect(): void
     {
         $col = $this->character->col;
         $row = $this->character->row;
-        $apBefore = $this->character->ap;
 
         $job = $this->game->startMining($this->character, $col, $row);
-        $this->assertSame($apBefore - Balance::MINING_AP_COST, $this->character->ap);
 
         // A trip never moves anyone: you were standing here to start it.
         $this->assertSame($col, $this->character->col);
@@ -411,6 +409,241 @@ final class GameLoopTest extends TestCase
         $this->assertSame(1, Player::where('wallet', $wallet)->count());
     }
 
+    /** §8.5 -- every potion names the action it buffs. Sixty, twelve a rung. */
+    public function test_every_consumable_is_locked_to_one_action(): void
+    {
+        $byRank = [];
+
+        foreach (\App\Game\Catalog::items() as $key => $def) {
+            if (empty($def['consumable'])) {
+                continue;
+            }
+
+            $this->assertArrayHasKey('scope', $def, "{$key} buffs everything at once");
+            $this->assertContains(
+                $def['scope'],
+                ['woodcutting', 'mining', 'hunting', 'quarrying', 'harvesting', 'travel', 'processing'],
+                "{$key} names an action nothing does",
+            );
+
+            $byRank[$def['rarity']][] = $key;
+        }
+
+        foreach (['common', 'uncommon', 'rare', 'epic', 'legendary'] as $rarity) {
+            $this->assertGreaterThanOrEqual(
+                10,
+                count($byRank[$rarity] ?? []),
+                "{$rarity} has fewer than ten potions",
+            );
+        }
+    }
+
+    /**
+     * A recipe never wants MORE different materials as it climbs.
+     *
+     * A common draught is a muddle of four cheap things; a legendary philtre is
+     * two perfect ones. Every consumable wants at least two, so nothing is a
+     * one-ingredient shortcut.
+     */
+    public function test_better_potions_ask_for_no_more_materials_than_worse_ones(): void
+    {
+        $worst = [];
+
+        foreach (\App\Game\Catalog::items() as $key => $def) {
+            if (empty($def['consumable'])) {
+                continue;
+            }
+
+            $count = count($def['inputs'] ?? []);
+            $this->assertGreaterThanOrEqual(2, $count, "{$key} is a one-material recipe");
+            $worst[$def['rarity']] = max($worst[$def['rarity']] ?? 0, $count);
+        }
+
+        $ladder = ['common', 'uncommon', 'rare', 'epic', 'legendary'];
+        for ($i = 1; $i < count($ladder); $i++) {
+            $this->assertLessThanOrEqual(
+                $worst[$ladder[$i - 1]],
+                $worst[$ladder[$i]],
+                "{$ladder[$i]} asks for more materials than {$ladder[$i - 1]}",
+            );
+        }
+    }
+
+    /**
+     * §2 -- the tradeable potions are gated by a per-wallet cap, not by rarity.
+     *
+     * Epic and legendary are NFTs (§8.0), and §2 forbids a path from grind time
+     * to external value. What closes it is that both rungs want a Tier 3 rare,
+     * and every Tier 3 is capped per wallet -- the same gate every NFT tool
+     * already stands behind.
+     */
+    public function test_tradeable_potions_are_gated_by_a_wallet_cap(): void
+    {
+        $checked = 0;
+
+        foreach (\App\Game\Catalog::items() as $key => $def) {
+            if (empty($def['consumable']) || ! $def['tradeable']) {
+                continue;
+            }
+
+            $capped = array_filter(
+                array_keys($def['inputs'] ?? []),
+                fn (string $m) => \App\Game\Catalog::walletCap($m) !== null,
+            );
+
+            $this->assertNotEmpty($capped, "{$key} is tradeable but wants nothing wallet-capped");
+            $checked++;
+        }
+
+        $this->assertGreaterThanOrEqual(20, $checked, 'the tradeable rungs are missing');
+    }
+
+    /** §4.0 -- junk sells for a copper, feeds nothing, and reaches no tier. */
+    public function test_junk_is_worth_a_copper_and_feeds_no_recipe(): void
+    {
+        $junk = ['deadfall', 'slag', 'bone_splinter', 'cinder', 'thistle'];
+
+        foreach ($junk as $key) {
+            $def = \App\Game\Catalog::material($key);
+            $this->assertNotNull($def, "{$key} is not in the catalog");
+            $this->assertSame(1, $def['npcPrice'], "{$key} sells for more than a copper");
+            $this->assertSame(0, $def['tier'], "{$key} is not tier zero");
+        }
+
+        foreach (\App\Game\Catalog::items() as $key => $def) {
+            foreach (array_keys($def['inputs'] ?? []) as $input) {
+                $this->assertNotContains($input, $junk, "{$key} is crafted from junk");
+            }
+        }
+
+        foreach (\App\Game\Catalog::recipes() as $key => $recipe) {
+            $this->assertNotContains($recipe['input'], $junk, "{$key} processes junk");
+            $this->assertNotContains($recipe['output'], $junk, "{$key} produces junk");
+        }
+    }
+
+    /**
+     * §4.0 -- every reagent outsells scrap and junk.
+     *
+     * The gap between what bare hands bring back and what a real material is
+     * worth is the whole argument for buying a first tool, and §4.0 calls it a
+     * rule rather than a tuning value. A one-gold reagent would close it.
+     */
+    public function test_reagents_outsell_the_rubbish(): void
+    {
+        $reagents = array_keys(\App\Game\Alchemy::REAGENTS);
+        $this->assertCount(10, $reagents);
+
+        foreach ($reagents as $key) {
+            $def = \App\Game\Catalog::material($key);
+            $this->assertSame(1, $def['tier'], "{$key} is not a raw material");
+            $this->assertGreaterThan(1, $def['npcPrice'], "{$key} sells for scrap money");
+            $this->assertNotNull($def['biome'] ?? null, "{$key} comes from no kind of ground");
+        }
+
+        // Two per biome, so a recipe can want two different things off one tile.
+        $byBiome = [];
+        foreach ($reagents as $key) {
+            $byBiome[\App\Game\Catalog::material($key)['biome']][] = $key;
+        }
+        $this->assertCount(5, $byBiome, 'reagents do not cover the five biomes');
+        foreach ($byBiome as $biome => $keys) {
+            $this->assertCount(2, $keys, "{$biome} does not have two reagents");
+        }
+    }
+
+    /**
+     * §8.5 -- a scoped buff pays out on its own action and on no other.
+     *
+     * This is the rule that lets sixty potions exist. Without it every one of
+     * them would be a flat stat increase and the shelf would be a power ladder.
+     */
+    public function test_a_scoped_buff_only_counts_on_its_own_action(): void
+    {
+        // Forest Draught: +3% yield, woodcutting only.
+        $this->game->useConsumable($this->giveDrink('forest_draught'), 'forest_draught');
+
+        $wood = $this->game->bonuses($this->character->fresh(), 'woodcutting');
+        $iron = $this->game->bonuses($this->character->fresh(), 'mining');
+
+        $this->assertEqualsWithDelta(0.03, $wood['yield'], 0.0001, 'the draught did nothing for its own line');
+        $this->assertEqualsWithDelta(0.0, $iron['yield'], 0.0001, 'a woodcutting draught helped a mining trip');
+    }
+
+    /** Same stat, different actions: both run. Same stat, same action: refresh. */
+    public function test_two_actions_can_be_buffed_at_once_but_one_action_cannot_stack(): void
+    {
+        $this->game->useConsumable($this->giveDrink('forest_draught'), 'forest_draught');
+        $this->game->useConsumable($this->giveDrink('deepseam_draught'), 'deepseam_draught');
+
+        $this->assertSame(2, $this->character->fresh()->buffs()->count(), 'two actions did not both take');
+        $this->assertEqualsWithDelta(0.03, $this->game->bonuses($this->character->fresh(), 'woodcutting')['yield'], 0.0001);
+        $this->assertEqualsWithDelta(0.03, $this->game->bonuses($this->character->fresh(), 'mining')['yield'], 0.0001);
+
+        // A second of the same kind restarts the clock rather than stacking.
+        $this->game->useConsumable($this->giveDrink('forest_draught'), 'forest_draught');
+
+        $this->assertSame(2, $this->character->fresh()->buffs()->count(), 'the same potion stacked');
+        $this->assertEqualsWithDelta(
+            0.03,
+            $this->game->bonuses($this->character->fresh(), 'woodcutting')['yield'],
+            0.0001,
+            'drinking twice doubled the effect',
+        );
+    }
+
+    /**
+     * §8.1 rule 1 -- scoping buys more potions, never a higher ceiling.
+     *
+     * Every buff that lands on one action still feeds that action's single
+     * aggregate and is clamped by the same STAT_CEILING as gear and tree nodes.
+     */
+    public function test_stacking_scoped_potions_on_one_action_still_stops_at_the_ceiling(): void
+    {
+        // Every rung of the woodcutting-yield ladder at once.
+        foreach (['forest_draught', 'forest_tonic', 'forest_flask', 'forest_elixir', 'forest_philtre'] as $key) {
+            $character = $this->giveDrink($key);
+            \App\Models\CharacterBuff::updateOrCreate(
+                ['character_id' => $character->id, 'stat' => 'yield', 'scope' => 'woodcutting'],
+                [
+                    'item_key' => $key,
+                    'value' => \App\Game\Catalog::item($key)['value'],
+                    'expires_at' => $this->game->now() + 3_600_000,
+                ],
+            );
+        }
+
+        $this->assertLessThanOrEqual(
+            Balance::STAT_CEILING,
+            $this->game->bonuses($this->character->fresh(), 'woodcutting')['yield'],
+            'the potion shelf climbed past the global ceiling',
+        );
+    }
+
+    /** §8.5 -- travel and processing are actions too, and get their own potions. */
+    public function test_the_road_and_the_bench_get_their_own_potions(): void
+    {
+        $this->game->useConsumable($this->giveDrink('road_tonic'), 'road_tonic');
+        $this->game->useConsumable($this->giveDrink('guild_cordial'), 'guild_cordial');
+
+        $road = $this->game->bonuses($this->character->fresh(), 'travel');
+        $bench = $this->game->bonuses($this->character->fresh(), 'processing');
+        $field = $this->game->bonuses($this->character->fresh(), 'woodcutting');
+
+        $this->assertGreaterThan(0, $road['travelSpeed'], 'the road tonic did nothing on the road');
+        $this->assertGreaterThan(0, $bench['processingSpeed'], 'the cordial did nothing at the bench');
+        $this->assertEqualsWithDelta(0.0, $field['travelSpeed'], 0.0001, 'a road tonic followed you into the forest');
+    }
+
+    /** Put one of a potion on the shelf and hand back the character. */
+    private function giveDrink(string $key): Character
+    {
+        $character = $this->character->fresh();
+        $character->consumables()->updateOrCreate(['item_key' => $key], ['quantity' => 1]);
+
+        return $character->fresh();
+    }
+
     /** Equip a working bow, so the hunting line has its §8.0 tool. */
     private function equipBow(): void
     {
@@ -437,10 +670,7 @@ final class GameLoopTest extends TestCase
 
         $essence = 0;
         for ($i = 0; $i < 40; $i++) {
-            $character = $this->character->fresh();
-            $character->update(['ap' => Balance::apMax($character->level)]);
-
-            $job = $this->game->startHunt($character->fresh(), $col, $row);
+            $job = $this->game->startHunt($this->character->fresh(), $col, $row);
             $job->update(['ends_at' => $this->game->now() - 1]);
 
             $result = $this->game->collectJob($this->character->fresh(), $job->id);
@@ -464,10 +694,7 @@ final class GameLoopTest extends TestCase
         $this->assertSame(0.0, $preview['essenceChance']);
 
         for ($i = 0; $i < 25; $i++) {
-            $character = $this->character->fresh();
-            $character->update(['ap' => Balance::apMax($character->level)]);
-
-            $job = $this->game->startHunt($character->fresh(), $col, $row);
+            $job = $this->game->startHunt($this->character->fresh(), $col, $row);
             $job->update(['ends_at' => $this->game->now() - 1]);
 
             $result = $this->game->collectJob($this->character->fresh(), $job->id);
@@ -1361,8 +1588,21 @@ final class GameLoopTest extends TestCase
     public function test_legendary_and_unique_are_reachable_from_nowhere(): void
     {
         foreach (\App\Game\Catalog::items() as $key => $def) {
-            $this->assertNotSame('legendary', $def['rarity'], "{$key} is legendary but guilds do not exist");
+            // Unique is drop-only and dungeons do not exist, so nothing may
+            // even be defined at that rarity yet.
             $this->assertNotSame('unique', $def['rarity'], "{$key} is unique but dungeons do not exist");
+
+            // Legendary MAY be defined -- §8.5's top rung of potions is -- but
+            // the only bench that reaches it is a guild hall, and there are
+            // none. The invariant is unreachability, not absence: a legendary
+            // whose station were a capital would be forgeable today.
+            if ($def['rarity'] === 'legendary') {
+                $this->assertSame(
+                    'guild',
+                    $def['station'] ?? null,
+                    "{$key} is legendary but does not need a guild hall",
+                );
+            }
         }
 
         // The gates themselves are defined, and point somewhere no player is.
@@ -2155,8 +2395,6 @@ final class GameLoopTest extends TestCase
         // Every strap taken, and none of them by what this hex pays.
         $this->fillStraps([$material]);
 
-        $ap = (int) $this->character->fresh()->ap;
-
         try {
             $this->game->startMining($this->character->fresh(), $col, $row);
             $this->fail('started a dig with nowhere to put it');
@@ -2164,7 +2402,8 @@ final class GameLoopTest extends TestCase
             $this->assertSame('no_room', $e->errorCode);
         }
 
-        $this->assertSame($ap, (int) $this->character->fresh()->ap, 'a refused dig still charged AP');
+        // Nothing was spent and nothing was started: the tile is still free.
+        $this->assertNull($this->game->miningTrip($this->character->fresh()));
     }
 
     /**

@@ -131,7 +131,7 @@ class SeedDemoCharacter extends Command
         $this->table(['', ''], [
             ['wallet', $player->wallet],
             ['session', $sessionId ?? 'unbound — rerun without --wallet once the app has opened a session'],
-            ['level', self::LEVEL.'  (AP '.Balance::apMax(self::LEVEL).')'],
+            ['level', (string) self::LEVEL],
             ['gold', (string) self::GOLD],
             ['materials', count(self::MATERIALS).' kinds, '.array_sum(self::MATERIALS).' units'],
             ['equipment', count(self::ITEMS).' items, '
@@ -207,8 +207,6 @@ class SeedDemoCharacter extends Command
 
         $character->level = self::LEVEL;
         $character->xp = (int) round(Balance::xpForLevel(self::LEVEL) * 0.42);
-        $character->ap = Balance::apMax(self::LEVEL);
-        $character->ap_updated_at = $now;
         $character->gold = self::GOLD;
         $character->presence_settlement_id = null;
         $character->tutorial_step = $this->option('tutorial') ? 0 : Tutorial::DONE;

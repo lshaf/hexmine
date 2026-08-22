@@ -59,7 +59,6 @@ export const MINING = {
   slotsPerTile: 2,
   /** Depleted tiles regrow after ~9h, §5.1. */
   regrowMs: 9 * HOUR,
-  apCost: 2,
   /** Leaving a hex mid-progress forfeits partial yield, §11.1. */
   abandonRefund: 0,
 } as const
@@ -68,7 +67,6 @@ export const HUNTING = {
   /** Herd markers decay after ~4h, §5.5. */
   markerLifetimeMs: 4 * HOUR,
   baseSeconds: 25 * 60,
-  apCost: 1,
   peltYield: [2, 5] as const,
   essenceChance: 0.35,
 } as const
@@ -86,11 +84,6 @@ export const PROCESSING = {
 
 export const CHARACTER = {
   startingGold: 25,
-  startingAp: 20,
-  /** Level unlocks capacity, never power, §7.1. */
-  apPerLevel: 4,
-  baseApMax: 20,
-  apRegenMs: 4 * MINUTE,
   /**
    * §7.4.4 -- sized against measured income, not picked. ~197,000 XP to level
    * 100 against a career average of ~1,080 char XP a day is roughly 182 days of

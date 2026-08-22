@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Character extends Model
 {
     protected $fillable = [
-        'player_id', 'name', 'level', 'xp', 'ap', 'ap_updated_at', 'gold',
+        'player_id', 'name', 'level', 'xp', 'gold',
         'col', 'row', 'presence_settlement_id', 'tutorial_step',
         'travel_to_col', 'travel_to_row', 'travel_started_at', 'travel_ends_at',
     ];
@@ -19,8 +19,6 @@ class Character extends Model
     protected $casts = [
         'level' => 'integer',
         'xp' => 'integer',
-        'ap' => 'integer',
-        'ap_updated_at' => 'integer',
         'gold' => 'integer',
         'col' => 'integer',
         'row' => 'integer',

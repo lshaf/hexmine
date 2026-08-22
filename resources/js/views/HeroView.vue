@@ -306,9 +306,9 @@ const statKeys: StatKey[] = ['tripReduction', 'travelSpeed', 'processingSpeed']
           <span>Soulbound — one character per wallet, non-transferable</span>
         </div>
         <p class="tiny muted" style="margin: 0; line-height: 1.5">
-          Levels buy capacity: action points and access to deeper tiles. Not the
-          bag, and not the road — those are the Explorer's, and the only way to
-          earn them is to walk. Levels never buy raw power.
+          Levels buy capacity: access to deeper tiles. Not the bag, and not the
+          road — those are the Explorer's, and the only way to earn them is to
+          walk. Levels never buy raw power.
         </p>
       </div>
     </section>

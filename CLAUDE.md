@@ -28,7 +28,7 @@ structured so botting is *economically pointless* rather than technically preven
 | No P2P resource trade | Direct player-to-player resource transfer does **not exist**. Removes the laundering/arbitrage vector entirely. |
 | Gold has no NFT bridge | Gold buys *common and uncommon* only. Gold can never be converted to NFT value. |
 | Sybil cost | One-time character mint fee per wallet + **wallet must hold a minimum crypto balance for ≥7 continuous days** before it can act. |
-| Soft caps | Bag limits (§7.6), per-wallet rare-material caps, AP regen limits. A bot with 1000 wallets gets 1000× capped, non-liquid output, and 1000 bags that have to be emptied by hand. |
+| Soft caps | Bag limits (§7.6), per-wallet rare-material caps, storage caps. A bot with 1000 wallets gets 1000× capped, non-liquid output, and 1000 bags that have to be emptied by hand. |
 | Server authority | All timers are **server-side**. Client never asserts elapsed time. |
 
 **Rule for any new feature:** if it creates a path from "grind time" to "external value,"
@@ -60,7 +60,7 @@ The three currencies are strictly separated. No backdoor converts one into anoth
 
 ---
 
-## 4. Materials (20 total, plus 5 scrap)
+## 4. Materials (30 total, plus 10 tier-0)
 
 ### Tier 0 — Scrap (5, biome-locked, **not part of the 20**)
 
@@ -88,10 +88,19 @@ worth, and no recipe anywhere will take it.
   will not get its material out. The UI must say this as a warning, never as a
   refusal.
 
-Scrap sits outside the 20 deliberately: it never enters the economy the §11 sinks
-have to balance.
+Scrap sits outside the count deliberately: it never enters the economy the §11
+sinks have to balance.
 
-### Tier 1 — Raw (5, biome-locked, the bulk of what fills a bag)
+**Junk (5) sits outside it too, and is not scrap.** Deadfall, Slag, Bone
+Splinter, Cinder and Thistle sell for 1 gold, feed no recipe and reach no tier —
+but they are not what a hex gives up to bare hands, they are the rubbish carried
+out alongside. Keeping the two apart matters because §4.0's argument is about
+what a *missing tool* costs you, and junk has nothing to do with tools.
+
+### Tier 1 — Raw (15, biome-locked, the bulk of what fills a bag)
+
+The five the gathering lines are named for:
+
 | Material | Biome |
 |---|---|
 | Wood | Forest |
@@ -99,6 +108,21 @@ have to balance.
 | Pelt | Plains/Tundra |
 | Stone | Badlands |
 | Fiber | Grassland |
+
+And ten **reagents**, two per biome, which are what the consumable bench (§8.4)
+runs on. Two rather than one so a recipe can want two different things off a
+single kind of ground:
+
+| Biome | Reagents |
+|---|---|
+| Forest | Toadstool · Birch Sap |
+| Mountain | Lichen · Alum |
+| Plains | Bitterroot · Marrow |
+| Badlands | Ashcap · Emberdust |
+| Grassland | Blue Nettle · Clover |
+
+Reagents are raw like any other: biome-locked, and **selling for more than
+scrap**, which §4.0 makes a rule rather than a tuning value.
 
 ### Tier 2 — Refined (6)
 | Output | Input |
@@ -303,8 +327,15 @@ accelerates an already-capped queue.
 things, not the character — this prevents power-account selling.
 
 ### 7.1 Level
-Level unlocks **capacity, not power**: AP pool, access to higher-tier hexes and
-dungeon floors. A whale can out-scale logistics but never out-damage a grinder.
+Level unlocks **capacity, not power**: access to higher-tier hexes and dungeon
+floors. A whale can out-scale logistics but never out-damage a grinder.
+
+> **Action points are gone.** AP gated a trip on a pool that refilled on a
+> clock, which put a second timer underneath the one the trip already runs. A
+> limit on how much can be done in a day will come back, but it is not going to
+> be that one, so the pool and its columns were removed rather than left
+> dormant and half-true. Nothing currently rations how many trips a day a
+> character may take — that is a known gap, not an oversight.
 
 Three things are deliberately *not* on that list. Travel range, because there is
 no reach to unlock (§5.6). Sight, because the only thing that widens the eye is
@@ -650,9 +681,9 @@ than growing a detail panel that would push the comb off its own screen.
 
 The bag cell in the top-right turns ember when either limit is reached, and that
 is the only place the state is reported outside the bag itself. It is
-deliberately **not** in the instrument cluster: those needles measure what you
-can *do* next — action points, and the level that gates where you may go — and
-the bag is about what you are *holding*.
+deliberately **not** in the instrument cluster: that needle measures how far
+along you are — the level that gates where you may go — and the bag is about
+what you are *holding*.
 
 ---
 
@@ -815,11 +846,31 @@ disagree.
 - **Stackable, never equipped.** They live in their own table, not with
   equipment: a potion has no durability and no slot, so a row per object would
   be wrong.
-- Using one spends it and starts a **timed buff** on one stat.
+- Using one spends it and starts a **timed buff** on one stat, **for one
+  action**. A potion is not a flat stat increase; it is bought for a specific
+  thing you do. The actions are the five §7.2 gathering lines plus `travel` and
+  `processing`.
 - **Buffs expire, and that expiry is the sink** (§11.1). Nothing here may ever be
   permanent — a permanent effect only accumulates, which the north star forbids.
-- **One buff per stat.** A second of the same kind refreshes the clock rather
-  than stacking, or a player could bank an afternoon of potions into one window.
+- **One buff per stat, per action.** A second of the same kind refreshes the
+  clock rather than stacking, or a player could bank an afternoon of potions
+  into one window — that part is unchanged, and still enforced by a unique index
+  rather than by code. What scoping adds is that a woodcutting draught and a
+  mining draught are *different things you are better at*, so both may run. The
+  ceiling on any one action is exactly what it was, because the clamp applies to
+  that action's aggregate alone.
+- **Sixty of them, twelve a rung**, across all six rarities: yield and trip time
+  on each of the five lines, plus the road and the bench. Scoping is what makes
+  that many potions safe — sixty flat stat boosts would be a power ladder you
+  can drink.
+- **Recipes get shorter as they climb.** The number of *different* materials a
+  potion wants never rises with rarity: a common draught is a muddle of four
+  cheap things, a legendary philtre is two perfect ones. Every one wants at
+  least two, so nothing is a one-ingredient shortcut.
+- **Epic and legendary are tradeable (§8.0), and §2 gates them with a cap, not a
+  label.** Both rungs require a Tier 3 rare, and every Tier 3 is capped per
+  wallet — the same gate every NFT tool stands behind. Legendary needs a guild
+  hall, so like legendary equipment it is defined and reachable from nowhere.
 - Buffs feed the same aggregate as gear and are **clamped by the same ceiling**.
   A potion that could push a stat past `STAT_CEILING` would be a power ladder
   you can drink.

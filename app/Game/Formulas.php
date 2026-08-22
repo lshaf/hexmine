@@ -236,31 +236,6 @@ final class Formulas
 
     // --------------------------------------------------------- character §7.1
 
-    /**
-     * Lazy AP regeneration. Stored as (ap, apUpdatedAt); the value at any moment
-     * is derived, never ticked. That is what keeps the client from asserting time
-     * and keeps regen correct across arbitrary offline gaps.
-     *
-     * @return array{ap:int,apUpdatedAt:int}
-     */
-    public static function regenerateAp(int $ap, int $apUpdatedAt, int $level, int $now, int $regenMs): array
-    {
-        $max = Balance::apMax($level);
-        if ($ap >= $max) {
-            return ['ap' => $ap, 'apUpdatedAt' => $now];
-        }
-
-        $gained = intdiv(max(0, $now - $apUpdatedAt), $regenMs);
-        if ($gained <= 0) {
-            return ['ap' => $ap, 'apUpdatedAt' => $apUpdatedAt];
-        }
-
-        $next = min($max, $ap + $gained);
-        // Keep the remainder so partial progress toward the next point survives.
-        $consumed = $next >= $max ? $now - $apUpdatedAt : $gained * $regenMs;
-
-        return ['ap' => $next, 'apUpdatedAt' => $apUpdatedAt + $consumed];
-    }
 
     /**
      * Apply XP, cascading level-ups if a large grant lands at once.

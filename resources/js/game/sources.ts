@@ -342,7 +342,14 @@ export function materialUses(mat: Material): MaterialUses {
 }
 
 /** Shop tiers that stock an item, for the trader line. */
-export const stocksAt = (item: ItemDef): SettlementTier[] =>
-  (Object.keys(STATION_RANK) as SettlementTier[]).filter(
-    (tier) => STATION_RANK[tier] >= STATION_RANK[item.station ?? 'village'],
+export const stocksAt = (item: ItemDef): SettlementTier[] => {
+  // §8.0 -- a guild hall is not a settlement, and no settlement reaches past
+  // it. Legendary work is stocked and craftable nowhere a player can stand.
+  if (item.station === 'guild') return []
+
+  const need = item.station ?? 'village'
+
+  return (Object.keys(STATION_RANK) as SettlementTier[]).filter(
+    (tier) => STATION_RANK[tier] >= STATION_RANK[need],
   )
+}

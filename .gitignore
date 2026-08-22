@@ -42,3 +42,4 @@ Thumbs.db
 # Local agent/editor state that is machine-specific, not project state.
 /.claude/settings.local.json
 desktop.ini
+scripts/__pycache__/

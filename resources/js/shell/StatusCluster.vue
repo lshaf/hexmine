@@ -22,7 +22,6 @@
  */
 import { computed, onBeforeUnmount, ref } from 'vue'
 import { useGame } from '@/stores/game'
-import { formatSpan } from '@/game/formulas'
 import { copyText, shortWallet } from '@/game/identity'
 import { walletSeal } from '@/icons/sigil'
 
@@ -52,16 +51,6 @@ async function copyWallet(): Promise<void> {
 
 onBeforeUnmount(() => clearTimeout(resetCopied))
 
-/**
- * Time until the next action point, against the server clock. Null once the
- * tick is due -- the number is about to move anyway.
- */
-const nextAp = computed(() => {
-  if (!char.value || char.value.ap >= char.value.apMax) return null
-  const remaining = char.value.apUpdatedAt + char.value.apRegenMs - game.now
-  return remaining > 0 ? formatSpan(remaining) : null
-})
-
 interface Scale {
   key: string
   at: number
@@ -73,10 +62,8 @@ const scales = computed<Scale[]>(() => {
   const c = char.value
   if (!c) return []
 
-  return [
-    { key: 'AP', at: c.ap, of: c.apMax, accent: 'var(--copper)' },
-    { key: `Lv ${c.level}`, at: c.xp, of: c.xpToNext, accent: 'var(--gold)' },
-  ]
+  // Action points are gone: the level bar is the only scale left on the HUD.
+  return [{ key: `Lv ${c.level}`, at: c.xp, of: c.xpToNext, accent: 'var(--gold)' }]
 })
 
 const pct = (s: Scale) => `${Math.min(100, Math.max(0, (s.at / s.of) * 100))}%`
@@ -152,7 +139,6 @@ const pct = (s: Scale) => `${Math.min(100, Math.max(0, (s.at / s.of) * 100))}%`
       </div>
     </div>
 
-    <p v-if="nextAp" class="tick-in label">Next point in {{ nextAp }}</p>
   </div>
 </template>
 

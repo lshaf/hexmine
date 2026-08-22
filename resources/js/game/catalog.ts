@@ -4,15 +4,19 @@
  * data a Laravel seeder will eventually own -- one file makes the port mechanical.
  */
 import { ECONOMY, EQUIPMENT } from './balance'
+import { CONSUMABLES, JUNK, REAGENTS } from './alchemy'
 import type {
   Biome,
   EquipSlot,
   GatherSlot,
+  BuffScope,
   ItemDef,
+  JunkKey,
   Material,
   MaterialKey,
   RareKey,
   RawKey,
+  ReagentKey,
   Recipe,
   Rarity,
   Ring,
@@ -26,6 +30,11 @@ import type {
 // ------------------------------------------------------------- materials §4
 
 export const MATERIALS: Record<MaterialKey, Material> = {
+  // §4 -- generated, see scripts/gen_alchemy.py. Reagents are Tier 1 raw and
+  // junk is Tier 0; neither is typed here so the two catalogs cannot drift.
+  ...Object.fromEntries([...REAGENTS, ...JUNK].map((m) => [m.key, m])) as
+    Record<ReagentKey | JunkKey, Material>,
+
   // Tier 0 -- Scrap, §4.0. What bare hands bring back when you have no tool for
   // the line. Sells for a copper, feeds no recipe, and exists only to make the
   // first tool obviously worth buying.
@@ -283,6 +292,24 @@ export const recipesForLines = (lines: SkillKey[]): Recipe[] =>
 
 /** Human-readable names for the stats items modify. The raw keys are camelCase
  *  and must never reach the screen. */
+/**
+ * §8.5 -- what a buff's action is called on the shelf.
+ *
+ * A potion is bought for one thing you do, so the bag has to name that thing:
+ * "+3% yield when woodcutting" is a different offer from "+3% yield", and the
+ * player is choosing between twelve of them a rung.
+ */
+export const SCOPE_LABEL: Record<BuffScope | 'global', string> = {
+  woodcutting: 'when woodcutting',
+  mining: 'when mining',
+  hunting: 'when hunting',
+  quarrying: 'when quarrying',
+  harvesting: 'when harvesting',
+  travel: 'on the road',
+  processing: 'at the bench',
+  global: 'everywhere',
+}
+
 export const STAT_LABEL: Record<StatKey, string> = {
   yield: 'yield',
   // 'off' matters: every use of this is a reduction shown with a + sign, and
@@ -400,6 +427,9 @@ export const SLOT_LABEL: Record<EquipSlot, string> = {
  * never from one line having better tools available than the rest.
  */
 export const ITEMS: ItemDef[] = [
+  // §8.5 -- sixty action-scoped potions, generated alongside the PHP copy.
+  ...CONSUMABLES,
+
   // -- Basic: gold shop, +3-5%, §8.
   //    `station` is the smallest settlement that stocks the item -- villages
   //    carry the basics, better gear is a reason to walk to a city.
@@ -638,41 +668,6 @@ export const ITEMS: ItemDef[] = [
   },
   // -- Consumables, §8.5. No slot and no durability: a potion is spent, it
   //    starts a timed buff, and the buff expiring is the sink (§11.1).
-  {
-    key: 'forest_draught', name: 'Forest Draught', rarity: 'common', tradeable: false,
-    stat: 'yield', value: 0.03, palette: 'wood', station: 'village',
-    consumable: true,
-    inputs: { planks: 2, fiber: 4 },
-    description: 'Bitter, resinous, and it keeps your arms swinging for half an hour.',
-  },
-  {
-    key: 'road_tonic', name: 'Road Tonic', rarity: 'common', tradeable: false,
-    stat: 'travelSpeed', value: 0.03, palette: 'fiber', station: 'village',
-    consumable: true,
-    inputs: { cloth: 2, fiber: 4 },
-    description: 'Drunk at the gate, not on the road. Your legs stop asking questions.',
-  },
-  {
-    key: 'quarry_salts', name: 'Quarry Salts', rarity: 'uncommon', tradeable: false,
-    stat: 'tripReduction', value: 0.05, palette: 'stone', station: 'city',
-    consumable: true,
-    inputs: { cut_stone: 3, cloth: 3 },
-    description: 'Tastes like the inside of a mine. You work faster to be done sooner.',
-  },
-  {
-    key: 'guild_cordial', name: 'Guild Cordial', rarity: 'uncommon', tradeable: false,
-    stat: 'processingSpeed', value: 0.05, palette: 'pelt', station: 'city',
-    consumable: true,
-    inputs: { leather: 3, cloth: 4 },
-    description: 'What the line foremen drink. The queue does not move faster; you do.',
-  },
-  {
-    key: 'prospectors_flask', name: "Prospector's Flask", rarity: 'rare', tradeable: false,
-    stat: 'yield', value: 0.08, palette: 'iron', station: 'capital',
-    consumable: true,
-    inputs: { reinforced_frame: 1, ingots: 3, cloth: 3 },
-    description: 'Capital-blended and priced like it. Every hex gives up a little more.',
-  },
 
   {
     key: 'ironwood_armor', name: 'Ironwood Armor', slot: 'armor', rarity: 'epic', tradeable: true,

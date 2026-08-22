@@ -21,13 +21,13 @@
  * a backdrop-filter, which would otherwise become the containing block for
  * anything fixed inside it.
  */
-import { computed, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useGame } from '@/stores/game'
-import { ITEM_BY_KEY, MATERIALS, RARITY_LABEL, SLOT_LABEL, STAT_LABEL } from '@/game/catalog'
+import { ITEM_BY_KEY, MATERIALS, RARITY_LABEL, SCOPE_LABEL, SLOT_LABEL, STAT_LABEL } from '@/game/catalog'
 import { formatPercent } from '@/game/formulas'
 import { itemIcon, materialIcon } from '@/icons/procedural'
 import SvgIcon from '@/components/SvgIcon.vue'
-import type { MaterialKey, OwnedItem, StatKey } from '@/game/types'
+import type { ItemDef, MaterialKey, OwnedItem } from '@/game/types'
 
 const game = useGame()
 
@@ -106,6 +106,104 @@ const bag = computed(() => game.bag)
 /** Straps with nothing on them. Drawn, never stated. */
 const free = computed(() => Math.max(0, (bag.value?.rowCap ?? 0) - slots.value.length))
 
+/**
+ * Every strap in one list, full ones first, so the comb is a single flow and a
+ * cell's position in it is its index. Two loops would have made the stagger
+ * below lie the moment the first empty strap landed mid-row.
+ */
+const cells = computed<Array<Slot | null>>(() => [
+  ...slots.value,
+  ...Array.from({ length: free.value }, () => null),
+])
+
+/*
+ * §13.2 -- the comb is tiled the way the map tiles, because the straps are
+ * ground you are carrying.
+ *
+ * Flat-top hexes: a column step of three quarters of a width, a row step of a
+ * full height, and every other column dropped half a height. The only thing
+ * that differs from the map is that the count is not fixed -- the comb takes as
+ * many columns as the panel gives it and then steps down, so a wide panel reads
+ * as a seam running across it rather than a plaque centred in it.
+ *
+ * The column count has to be measured rather than assumed: the stagger is a
+ * property of the *column*, and CSS can only count children. With an odd number
+ * of columns, `nth-child(even)` would put the same column up on one row and
+ * down on the next, and the tiling would come apart.
+ */
+const COL_STEP = 0.75
+const MIN_COLUMNS = 3
+
+const combEl = ref<HTMLElement | null>(null)
+const columns = ref(6)
+
+function measure(el: HTMLElement): void {
+  const style = getComputedStyle(el)
+  const step = parseFloat(style.getPropertyValue('--slot-w')) * COL_STEP
+  if (!step) return
+
+  // A track is three quarters of a cell; the last cell overhangs its track by
+  // the remaining quarter, and the padding is what reserves room for it.
+  // clientWidth still carries that padding, so take it off before counting --
+  // leaving it in buys a column the comb then hangs off the edge of.
+  const inner = el.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)
+  const next = Math.max(MIN_COLUMNS, Math.floor(inner / step))
+
+  if (next !== columns.value) columns.value = next
+}
+
+let observer: ResizeObserver | null = null
+
+watch(combEl, (el) => {
+  observer?.disconnect()
+  observer = null
+  if (!el) return
+
+  observer = new ResizeObserver(() => measure(el))
+  observer.observe(el)
+  measure(el)
+})
+
+onBeforeUnmount(() => observer?.disconnect())
+
+/** Odd columns hang half a hex lower, which is what makes the cells nest. */
+const dropped = (index: number) => (index % columns.value) % 2 === 1
+
+/**
+ * Sit every icon on its own drawn bounds, so the rim around it is the same
+ * width on every strap.
+ *
+ * The icons are authored in a 40x40 box and none of them fills it: a raw lump
+ * lives in x 7..32, a stack of bars in y 7..29, a rarity frame in almost the
+ * whole thing. Rendering the *box* therefore lands a different margin in every
+ * cell -- measured on a real bag, 10.7px on one and 13.2px on the next -- and
+ * the ones drawn slightly high sit slightly high in the hexagon too.
+ *
+ * getBBox() reports the ink in user units, which is exactly the box the art
+ * should be scaled by. Re-pointing the viewBox at it makes every icon fill its
+ * cell identically, whatever it was authored inside. It reads the ink rather
+ * than the current viewBox, so running it twice on the same element is a no-op.
+ */
+function fitToInk(root: HTMLElement): void {
+  for (const svg of root.querySelectorAll('svg')) {
+    const ink = svg.getBBox()
+    if (!ink.width || !ink.height) continue
+
+    svg.setAttribute('viewBox', `${ink.x} ${ink.y} ${ink.width} ${ink.height}`)
+    // The rim is the same on all four sides, so the ink has to take the shape
+    // of the box it is given rather than letterbox itself inside it.
+    svg.setAttribute('preserveAspectRatio', 'none')
+  }
+}
+
+const popEl = ref<HTMLElement | null>(null)
+
+watch([combEl, cells, popEl], async () => {
+  await nextTick()
+  if (combEl.value) fitToInk(combEl.value)
+  if (popEl.value) fitToInk(popEl.value)
+}, { immediate: true })
+
 const overUnits = computed(() =>
   bag.value ? bag.value.units > bag.value.unitCap : false,
 )
@@ -145,8 +243,17 @@ async function drink(key: string): Promise<void> {
   if (!game.consumables[key]) close()
 }
 
-/** A buff already running on this stat, so drinking again reads as a refresh. */
-const runningOn = (stat: StatKey) => game.buffs.find((b) => b.stat === stat) ?? null
+/**
+ * A buff already running on this potion's stat AND its action, so drinking
+ * again reads as a refresh.
+ *
+ * §8.5 -- matching on the stat alone was right when a buff applied everywhere.
+ * Now it would call a Forest Draught a "Refresh" while a Deepseam Draught is
+ * running, because both are yield: two different things you are better at, not
+ * one thing twice.
+ */
+const runningOn = (def: ItemDef) =>
+  game.buffs.find((b) => b.stat === def.stat && b.scope === (def.scope ?? 'global')) ?? null
 
 const minutesLeft = (expiresAt: number) =>
   Math.max(0, Math.ceil((expiresAt - game.now) / 60000))
@@ -203,28 +310,30 @@ async function scrap(item: OwnedItem): Promise<void> {
       </p>
     </section>
 
-    <!-- Kinds. Places rather than a quantity, so a comb of straps. -->
-    <div class="slots">
-      <button
-        v-for="slot in slots"
-        :key="slot.id"
-        class="slot"
-        type="button"
-        :title="slot.name"
-        :aria-label="slot.name"
-        @click="open(slot)"
-      >
-        <span class="hex">
-          <span class="face"><SvgIcon :svg="slot.icon" :size="ICON" /></span>
-        </span>
-        <span v-if="slot.kind !== 'gear'" class="qty mono">{{ slot.qty }}</span>
-      </button>
+    <!-- Kinds. Places rather than a quantity, so a comb of straps -- and the
+         empty ones are drawn exactly like the full ones, which is what makes
+         room something you can see rather than subtract. -->
+    <div ref="combEl" class="slots" :style="{ '--cols': columns }">
+      <template v-for="(cell, i) in cells" :key="cell ? cell.id : `free-${i}`">
+        <button
+          v-if="cell"
+          class="slot"
+          :class="{ dropped: dropped(i) }"
+          type="button"
+          :title="cell.name"
+          :aria-label="cell.name"
+          @click="open(cell)"
+        >
+          <span class="hex">
+            <span class="face"><SvgIcon :svg="cell.icon" :size="ICON" /></span>
+          </span>
+          <span v-if="cell.kind !== 'gear'" class="qty mono">{{ cell.qty }}</span>
+        </button>
 
-      <!-- Free space, drawn. An empty strap is the same hexagon as a full one,
-           which is what makes room something you can see rather than subtract. -->
-      <span v-for="n in free" :key="`free-${n}`" class="slot empty" aria-hidden="true">
-        <span class="hex"><span class="face" /></span>
-      </span>
+        <span v-else class="slot empty" :class="{ dropped: dropped(i) }" aria-hidden="true">
+          <span class="hex"><span class="face" /></span>
+        </span>
+      </template>
     </div>
 
     <p class="tiny muted straps">
@@ -246,7 +355,7 @@ async function scrap(item: OwnedItem): Promise<void> {
         <div class="pop-scrim" @click="close" />
         <div class="pop plate">
           <div class="pop-inner">
-            <header class="pop-head">
+            <header ref="popEl" class="pop-head">
               <span class="hex big">
                 <span class="face"><SvgIcon :svg="picked.icon" :size="40" /></span>
               </span>
@@ -305,14 +414,15 @@ async function scrap(item: OwnedItem): Promise<void> {
             <!-- Potion: drinking it is both the use and the way to free a strap. -->
             <template v-else-if="picked.kind === 'potion' && def">
               <p class="tiny fact">
-                {{ formatPercent(def.value) }} {{ STAT_LABEL[def.stat] }} while it lasts
-                <template v-if="runningOn(def.stat)">
-                  · {{ minutesLeft(runningOn(def.stat)!.expiresAt) }} min left
+                {{ formatPercent(def.value) }} {{ STAT_LABEL[def.stat] }}
+                <strong>{{ SCOPE_LABEL[def.scope ?? 'global'] }}</strong>
+                <template v-if="runningOn(def)">
+                  · {{ minutesLeft(runningOn(def)!.expiresAt) }} min left
                 </template>
               </p>
               <div class="acts">
                 <button class="btn btn-sm" type="button" :disabled="game.busy" @click="drink(picked.key)">
-                  {{ runningOn(def.stat) ? 'Refresh' : 'Drink' }}
+                  {{ runningOn(def) ? 'Refresh' : 'Drink' }}
                 </button>
               </div>
             </template>
@@ -391,13 +501,18 @@ async function scrap(item: OwnedItem): Promise<void> {
 .slots {
   --slot-w: 56px;
   --slot-h: 48px;
+  --cols: 6;
   display: grid;
-  grid-template-columns: repeat(6, calc(var(--slot-w) * 0.75));
+  /* §13.2's tiling: colStep = W * 0.75, rowStep = H. The count comes from the
+     panel rather than from here -- see measure() -- so the comb fills the width
+     it is given and then steps down. */
+  grid-template-columns: repeat(var(--cols), calc(var(--slot-w) * 0.75));
   grid-auto-rows: var(--slot-h);
-  justify-content: center;
+  justify-content: start;
   margin-top: 16px;
-  /* The cells overhang their column to the right and the last row's dropped
-     cells overhang the bottom. Both are reserved here rather than clipped. */
+  /* Each cell overhangs its column to the right by the quarter width the
+     nesting saves, and the dropped column overhangs the last row by half a
+     height. Both are reserved rather than clipped. */
   padding: 0 calc(var(--slot-w) * 0.25) calc(var(--slot-h) / 2) 0;
 }
 
@@ -411,7 +526,9 @@ async function scrap(item: OwnedItem): Promise<void> {
   cursor: pointer;
 }
 
-.slot:nth-child(even) {
+/* Odd columns hang half a hex lower. Keyed off the column rather than the child
+   index, because the two only agree when the count happens to be even. */
+.slot.dropped {
   transform: translateY(calc(var(--slot-h) / 2));
 }
 
@@ -437,12 +554,32 @@ async function scrap(item: OwnedItem): Promise<void> {
  * strap at a glance -- which is the whole reason the comb is drawn rather than
  * counted. The count then sits on top of it; overlapping the art is fine,
  * because the pill behind it carries its own contrast.
+ *
+ * Lifted two pixels off centre. A flat-top hexagon is widest across its middle
+ * and the count hangs at its foot, so art centred by arithmetic sits low to the
+ * eye. This is an optical correction, not a layout one.
  */
-.slots :deep(.svg-icon),
-.slots :deep(.svg-icon svg) {
-  display: block;
+.slots :deep(.svg-icon) {
+  display: grid;
+  place-items: center;
   width: 100%;
   height: 100%;
+}
+
+/*
+ * One rim, the same on every side and every strap. The art is fitted to its own
+ * ink by fitToInk() above, so this box is what the drawing actually becomes:
+ * inset by --rim from a 54x46 face, which is 44x36 of art.
+ *
+ * There is no optical lift any more. A lift is exactly the thing that makes the
+ * top and bottom gaps differ, and an even rim is worth more than the half pixel
+ * of centring it bought.
+ */
+.slots :deep(.svg-icon svg) {
+  --rim: 5px;
+  display: block;
+  width: calc(100% - var(--rim) * 2);
+  height: calc(100% - var(--rim) * 2);
 }
 
 /* The art covers the face, so a background swap would never be seen on a full
@@ -534,12 +671,21 @@ async function scrap(item: OwnedItem): Promise<void> {
   flex: 0 0 auto;
 }
 
-/* Same rule as the comb: the art is the cell. */
-.pop-head :deep(.svg-icon),
-.pop-head :deep(.svg-icon svg) {
-  display: block;
+/* Same rule as the comb, and the same rim: a portrait hexagon that reads
+   differently from the strap it was tapped on would be two systems. */
+.pop-head :deep(.svg-icon) {
+  display: grid;
+  place-items: center;
   width: 100%;
   height: 100%;
+}
+
+/* The same rim as a strap, so tapping one does not resize what is on it. */
+.pop-head :deep(.svg-icon svg) {
+  --rim: 5px;
+  display: block;
+  width: calc(100% - var(--rim) * 2);
+  height: calc(100% - var(--rim) * 2);
 }
 
 .pop-head strong {

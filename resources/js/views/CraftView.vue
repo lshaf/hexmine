@@ -88,6 +88,9 @@ function hasStation(item: ItemDef): boolean {
   const here = station.value
   if (!here) return false
   if (!stationReaches(here.tier, item.rarity)) return false
+  // §8.0 -- the guild hall does not exist, so nothing that needs one is
+  // craftable from any settlement a player can be standing in.
+  if (item.station === 'guild') return false
 
   return !item.station || STATION_RANK[here.tier] >= STATION_RANK[item.station]
 }

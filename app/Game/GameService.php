@@ -123,8 +123,6 @@ class GameService
                 'name' => 'Prospector',
                 'level' => 1,
                 'xp' => 0,
-                'ap' => Balance::STARTING_AP,
-                'ap_updated_at' => $now,
                 'gold' => Balance::STARTING_GOLD,
                 'col' => $spawn['col'],
                 'row' => $spawn['row'],
@@ -180,22 +178,7 @@ class GameService
 
         $dirtyTravel = $this->arriveIfDue($character, $now);
 
-        $regen = Formulas::regenerateAp(
-            $character->ap,
-            $character->ap_updated_at,
-            $character->level,
-            $now,
-            Balance::scaled(Balance::AP_REGEN_MS),
-        );
-
-        $dirty = $dirtyTravel;
-        if ($regen['ap'] !== $character->ap || $regen['apUpdatedAt'] !== $character->ap_updated_at) {
-            $character->ap = $regen['ap'];
-            $character->ap_updated_at = $regen['apUpdatedAt'];
-            $dirty = true;
-        }
-
-        if ($dirty) {
+        if ($dirtyTravel) {
             $character->save();
         }
     }
@@ -510,8 +493,19 @@ class GameService
         // is clamped by the same ceiling. A potion that could push a stat past
         // STAT_CEILING would be a power ladder you can drink, which §8.1 rule 1
         // exists to prevent.
+        //
+        // §8.5 -- a scoped buff joins the sum only when its own action is the
+        // one being costed. `global` always counts; a line scope counts on that
+        // line's work; `travel` and `processing` are asked for by name. This is
+        // the same filter §7.4.3 already applies to line-locked tree nodes, and
+        // it is what lets sixty potions exist without sixty of them stacking.
         $buffs = [];
         foreach ($this->liveBuffs($character) as $buff) {
+            $scope = $buff->scope ?? 'global';
+            if ($scope !== 'global' && $scope !== $line) {
+                continue;
+            }
+
             $buffs[$buff->stat] = ($buffs[$buff->stat] ?? 0) + $buff->value;
         }
 
@@ -594,16 +588,25 @@ class GameService
             $now = $this->now();
             $expiresAt = $now + Balance::scaled(Balance::BUFF_MS);
 
-            // One buff per stat. Drinking a second of the same kind restarts the
-            // clock instead of stacking -- stacking would let a player bank an
-            // afternoon of potions into one enormous window.
+            // §8.5 -- one buff per stat PER ACTION. Drinking a second of the
+            // same kind restarts the clock instead of stacking, which is what
+            // stops an afternoon of potions being banked into one window; but a
+            // woodcutting draught and a mining draught are different things and
+            // both may run. A potion with no scope is global, as all five were.
+            $scope = $def['scope'] ?? 'global';
+
             CharacterBuff::updateOrCreate(
-                ['character_id' => $character->id, 'stat' => $def['stat']],
+                ['character_id' => $character->id, 'stat' => $def['stat'], 'scope' => $scope],
                 ['item_key' => $key, 'value' => $def['value'], 'expires_at' => $expiresAt],
             );
             $character->unsetRelation('buffs');
 
-            return ['stat' => $def['stat'], 'value' => $def['value'], 'expiresAt' => $expiresAt];
+            return [
+                'stat' => $def['stat'],
+                'scope' => $scope,
+                'value' => $def['value'],
+                'expiresAt' => $expiresAt,
+            ];
         });
     }
 
@@ -667,8 +670,10 @@ class GameService
     /** §8.3 -- the character's own walking pace, in wall-clock ms per hex. */
     public function travelMsPerHex(Character $character): int
     {
+        // §8.5 -- 'travel' by name, or a road potion would be filtered out of
+        // the one thing it was drunk for.
         return Balance::scaled(
-            Balance::travelMsPerHex($this->bonuses($character)['travelSpeed']),
+            Balance::travelMsPerHex($this->bonuses($character, 'travel')['travelSpeed']),
         );
     }
 
@@ -742,14 +747,6 @@ class GameService
 
         $character->level = $result['level'];
         $character->xp = $result['xp'];
-
-        if ($result['levelsGained'] > 0) {
-            // A new level raises the AP ceiling; top up so it feels immediate.
-            $character->ap = min(
-                Balance::apMax($character->level),
-                $character->ap + $result['levelsGained'] * Balance::AP_PER_LEVEL,
-            );
-        }
 
         return $result['levelsGained'];
     }
@@ -972,7 +969,6 @@ class GameService
                 'skill' => null,
                 'scrap' => false,
                 'note' => null,
-                'apCost' => Balance::MINING_AP_COST,
                 'unseen' => true,
             ];
         }
@@ -992,7 +988,6 @@ class GameService
             'skill' => null,
             'scrap' => false,
             'note' => null,
-            'apCost' => Balance::MINING_AP_COST,
             'unseen' => false,
         ];
 
@@ -1056,8 +1051,6 @@ class GameService
                 : 'You are already working a hex. Finish that one first.';
         } elseif ($distance !== 0) {
             $reason = 'You are standing elsewhere. Travel to this hex to work it.';
-        } elseif ($character->ap < Balance::MINING_AP_COST) {
-            $reason = 'Not enough action points.';
         }
 
         return [
@@ -1080,7 +1073,6 @@ class GameService
             'skill' => $skillKey,
             'scrap' => $bare,
             'note' => $note,
-            'apCost' => Balance::MINING_AP_COST,
             'unseen' => false,
         ];
     }
@@ -1111,7 +1103,6 @@ class GameService
             'scrap' => false,
             'essenceChance' => 0.0,
             'note' => null,
-            'apCost' => Balance::HUNT_AP_COST,
             'unseen' => false,
         ];
 
@@ -1175,7 +1166,6 @@ class GameService
                 ? 'Your reward is waiting. Claim it before working anything else.'
                 : 'You are already working a hex. Finish that one first.',
             $distance !== 0 => 'You are standing elsewhere. Travel to this hex to hunt it.',
-            $character->ap < Balance::HUNT_AP_COST => 'Not enough action points.',
             default => null,
         };
 
@@ -1201,7 +1191,6 @@ class GameService
             }
 
             $now = $this->now();
-            $character->ap -= Balance::HUNT_AP_COST;
 
             $job = GameJob::create([
                 'character_id' => $character->id,
@@ -1240,11 +1229,6 @@ class GameService
                 $name = Catalog::material($preview['material'])['name'] ?? $preview['material'];
                 $this->requireFreeRow($character, $name);
             }
-
-            if ($character->ap < $preview['apCost']) {
-                throw new GameException('Not enough action points.', 'no_ap');
-            }
-            $character->ap -= $preview['apCost'];
 
             $now = $this->now();
             $slot = $this->occupiedSlots($col, $row);
@@ -1494,7 +1478,8 @@ class GameService
                 $recipe['baseSeconds'] * $count,
                 $settlement['tier'],
                 $presence,
-                $this->bonuses($character)['processingSpeed'],
+                // §8.5 -- named, for the same reason travel is.
+                $this->bonuses($character, 'processing')['processingSpeed'],
             );
 
             $job = GameJob::create([
@@ -2505,10 +2490,6 @@ class GameService
                 'level' => $character->level,
                 'xp' => $character->xp,
                 'xpToNext' => Balance::xpForLevel($character->level),
-                'ap' => $character->ap,
-                'apMax' => Balance::apMax($character->level),
-                'apRegenMs' => Balance::scaled(Balance::AP_REGEN_MS),
-                'apUpdatedAt' => $character->ap_updated_at,
                 'gold' => $character->gold,
                 'col' => $character->col,
                 'row' => $character->row,
@@ -2578,6 +2559,9 @@ class GameService
             'buffs' => array_map(fn (CharacterBuff $b) => [
                 'key' => $b->item_key,
                 'stat' => $b->stat,
+                // §8.5 -- which action it applies to. The bag has to say so, or
+                // two buffs on the same stat read as a contradiction.
+                'scope' => $b->scope ?? 'global',
                 'value' => $b->value,
                 'expiresAt' => $b->expires_at,
             ], $this->liveBuffs($character)),

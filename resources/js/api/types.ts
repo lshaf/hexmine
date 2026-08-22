@@ -30,12 +30,6 @@ export interface CharacterDto {
   level: number
   xp: number
   xpToNext: number
-  ap: number
-  apMax: number
-  /** Millis per AP point, so the client can render a live regen bar. */
-  apRegenMs: number
-  /** When the current AP value was last settled, server clock. */
-  apUpdatedAt: number
   gold: number
   col: number
   row: number
@@ -215,7 +209,6 @@ export interface TilePreview {
   /** Why the haul is scrap, naming the tool that would fix it. */
   note: string | null
   material: MaterialKey | null
-  apCost: number
   /**
    * §5.6 -- true when the hex is outside sight, and everything above it is
    * therefore blank rather than zero. The server will not cost an unscouted
@@ -249,7 +242,6 @@ export interface HuntPreview {
    */
   essenceChance: number
   note: string | null
-  apCost: number
   unseen: boolean
 }
 

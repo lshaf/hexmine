@@ -70,7 +70,14 @@ final class Catalog
             'shard_zephyr' => ['name' => 'Zephyr Shard', 'tier' => 4, 'palette' => 'raid', 'npcPrice' => 0, 'description' => 'Windhollow signature drop.'],
             'relic' => ['name' => 'Relic', 'tier' => 4, 'palette' => 'raid', 'npcPrice' => 0, 'description' => 'Deep-floor rarity. Pity-timer protected.'],
             'core' => ['name' => 'Core', 'tier' => 4, 'palette' => 'raid', 'npcPrice' => 0, 'description' => 'Boss-only. Gates the best equipment tier.'],
-        ];
+        ]
+            // §4 -- the alchemist's raw stock, two per biome so a recipe can
+            // want two different things off one kind of ground. Generated, not
+            // typed: see scripts/gen_alchemy.py.
+            + Alchemy::REAGENTS
+            // §4.0 -- junk. Sells for a copper and reaches no tier, exactly as
+            // the bare-hands scrap does; it is simply never what a hex gives up.
+            + Alchemy::JUNK;
     }
 
     public static function material(string $key): ?array
@@ -322,18 +329,13 @@ final class Catalog
             'obsidian_sledge' => ['name' => 'Obsidian Sledge', 'slot' => 'hammer', 'rarity' => 'epic', 'tradeable' => true, 'stat' => 'yield', 'value' => 0.11, 'palette' => 'stone', 'station' => 'capital', 'maxDurability' => 200, 'inputs' => ['obsidian_shard' => 3, 'reinforced_frame' => 2, 'shard_cinder' => 1], 'description' => 'Glass that lands like iron. Marketplace-tradeable.'],
             'silkweave_sickle' => ['name' => 'Silkweave Sickle', 'slot' => 'sickle', 'rarity' => 'epic', 'tradeable' => true, 'stat' => 'yield', 'value' => 0.11, 'palette' => 'fiber', 'station' => 'capital', 'maxDurability' => 200, 'inputs' => ['silkweave_fiber' => 3, 'reinforced_frame' => 2, 'shard_zephyr' => 1], 'description' => 'The grass parts before it arrives. Marketplace-tradeable.'],
 
-            // ------------------------------------ Consumables, §8.5 -- no slot
-            // A potion has no slot and no durability. It is spent, it starts a
-            // timed buff, and the buff expiring is the sink (§11.1).
-            'forest_draught' => ['name' => 'Forest Draught', 'rarity' => 'common', 'tradeable' => false, 'stat' => 'yield', 'value' => 0.03, 'palette' => 'wood', 'station' => 'village', 'consumable' => true, 'inputs' => ['planks' => 2, 'fiber' => 4], 'description' => 'Bitter, resinous, and it keeps your arms swinging for half an hour.'],
-            'road_tonic' => ['name' => 'Road Tonic', 'rarity' => 'common', 'tradeable' => false, 'stat' => 'travelSpeed', 'value' => 0.03, 'palette' => 'fiber', 'station' => 'village', 'consumable' => true, 'inputs' => ['cloth' => 2, 'fiber' => 4], 'description' => 'Drunk at the gate, not on the road. Your legs stop asking questions.'],
-            'quarry_salts' => ['name' => 'Quarry Salts', 'rarity' => 'uncommon', 'tradeable' => false, 'stat' => 'tripReduction', 'value' => 0.05, 'palette' => 'stone', 'station' => 'city', 'consumable' => true, 'inputs' => ['cut_stone' => 3, 'cloth' => 3], 'description' => 'Tastes like the inside of a mine. You work faster to be done sooner.'],
-            'guild_cordial' => ['name' => 'Guild Cordial', 'rarity' => 'uncommon', 'tradeable' => false, 'stat' => 'processingSpeed', 'value' => 0.05, 'palette' => 'pelt', 'station' => 'city', 'consumable' => true, 'inputs' => ['leather' => 3, 'cloth' => 4], 'description' => 'What the line foremen drink. The queue does not move faster; you do.'],
-            'prospectors_flask' => ['name' => "Prospector's Flask", 'rarity' => 'rare', 'tradeable' => false, 'stat' => 'yield', 'value' => 0.08, 'palette' => 'iron', 'station' => 'capital', 'consumable' => true, 'inputs' => ['reinforced_frame' => 1, 'ingots' => 3, 'cloth' => 3], 'description' => 'Capital-blended and priced like it. Every hex gives up a little more.'],
-
             'ironwood_armor' => ['name' => 'Ironwood Armor', 'slot' => 'armor', 'rarity' => 'epic', 'tradeable' => true, 'stat' => 'tripReduction', 'value' => 0.11, 'palette' => 'wood', 'station' => 'capital', 'maxDurability' => 210, 'inputs' => ['ironwood' => 3, 'silkweave_fiber' => 2, 'shard_verdant' => 1], 'description' => 'Grown, not forged. Marketplace-tradeable.'],
             'beastfang_boots' => ['name' => 'Beastfang Boots', 'slot' => 'boots', 'rarity' => 'epic', 'tradeable' => true, 'stat' => 'travelSpeed', 'value' => 0.11, 'palette' => 'pelt', 'station' => 'capital', 'maxDurability' => 190, 'inputs' => ['beastfang_hide' => 2, 'obsidian_shard' => 1, 'relic' => 1], 'description' => 'Something fast died for these. Marketplace-tradeable.'],
-        ];
+        ]
+            // §8.5 -- sixty potions, twelve a rung. No slot and no durability:
+            // a potion is spent, it starts a timed buff on ONE ACTION, and the
+            // buff expiring is the sink (§11.1). Generated, not typed.
+            + Alchemy::CONSUMABLES;
     }
 
     public static function item(string $key): ?array
