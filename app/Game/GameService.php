@@ -184,7 +184,11 @@ class GameService
     {
         $now = $this->now();
 
-        $dirtyTravel = $this->arriveIfDue($character, $now);
+        // §9.5.3 -- the road is walked before it is arrived at. A pack met
+        // halfway ends the journey where it stands, so interception is asked
+        // first and arrival only gets what is left.
+        $dirtyTravel = $this->interceptIfDue($character, $now);
+        $dirtyTravel = $this->arriveIfDue($character, $now) || $dirtyTravel;
 
         if ($dirtyTravel) {
             $character->save();
@@ -803,9 +807,27 @@ class GameService
      * only the tool for `$line` wears -- the axe on your back does not blunt
      * itself while you are down a mine. Everything worn on the body wears every
      * trip regardless.
+     *
+     * §8.2 -- AT ZERO THE THING IS GONE, on a trip exactly as in a fight. It
+     * used to go inactive and wait for a repair, which made repair optional: an
+     * item at zero cost nothing to leave at zero, so the sink only ever
+     * collected from players who wanted their gear back. Destruction moves the
+     * whole bill forward -- you repair to KEEP the thing, not to un-break it --
+     * and that is what makes it the largest sink in the game (§11.1).
+     *
+     * Destroyed items are named through `$destroyed`, because nothing may be
+     * taken quietly. The trip preview says it first (§9.5.5's rule, applied to
+     * a hex): an hour of work that ends in a lost axe must be a decision the
+     * player made, not one they discovered.
+     *
+     * @param  list<string>  $destroyed  filled with the names of anything that ran out
      */
-    private function drainDurability(Character $character, int $amount, ?string $line = null): int
-    {
+    private function drainDurability(
+        Character $character,
+        int $amount,
+        ?string $line = null,
+        array &$destroyed = [],
+    ): int {
         $drained = 0;
         foreach ($character->items as $item) {
             if (! $item->equipped || $item->durability <= 0) {
@@ -819,10 +841,19 @@ class GameService
             if ($toolLine !== null && $toolLine !== $line) {
                 continue;
             }
-            // §8.2 -- at 0 an item is broken and inactive, never destroyed.
-            $item->durability = max(0, $item->durability - $amount);
+
+            $left = max(0, (int) $item->durability - $amount);
+            $drained += min($amount, (int) $item->durability);
+
+            if ($left <= 0) {
+                $destroyed[] = $def['name'];
+                $item->delete();
+
+                continue;
+            }
+
+            $item->durability = $left;
             $item->save();
-            $drained += $amount;
         }
 
         return $drained;
@@ -1530,7 +1561,9 @@ class GameService
             // roll is unreachable a second time. A CORPSE is not cleared by a
             // loss, so its seed folds in the clock: without that, losing to it
             // once would mean losing to it forever, and the debt would be a
-            // wall rather than a walk.
+            // wall rather than a walk. In MILLISECONDS for that same reason --
+            // rounded to the second, a run of quick attempts shares one seed
+            // and repeats one answer, which is the same wall in a new coat.
             $seed = $carrier !== null
                 ? Hash::hash2(
                     $col * 71 + (int) $carrier->id,
@@ -1610,6 +1643,11 @@ class GameService
             $gold = 0;
             $xp = 0;
 
+            $spoils = [];
+            $lost = 0;
+            $looted = null;
+            $leftBehind = null;
+
             if ($won) {
                 $gold = Hash::randInt(
                     Hash::hash2($col, $row, $seed ^ 0x901d),
@@ -1622,6 +1660,20 @@ class GameService
                     $xp = Balance::JOB_XP_PER_BATTLE_TIER * (int) $monster['tier'];
                     $this->grantJobXp($character, $job['job'], $xp);
                 }
+
+                // §9.5.8 -- what came off it. Unlike gold these need straps, so
+                // a full bag loses the surplus rather than refusing the fight:
+                // the fight was often not your idea (§9.5.3), and a refusal at
+                // this point would be a pin with no way out.
+                foreach (Drops::battleSpoils($monster, $seed) as $key => $quantity) {
+                    $granted = $this->addMaterial($character, $key, $quantity);
+                    if ($granted > 0) {
+                        $spoils[$key] = $granted;
+                    }
+                    $lost += $quantity - $granted;
+                }
+
+                $looted = $this->takeLootedGear($character, $monster, $seed, $leftBehind);
             }
 
             // §9.5.7 -- the rule that produces a death, and it is narrow: a
@@ -1649,11 +1701,17 @@ class GameService
                 }
 
                 $carrier->delete();
+                Live::push('carrier.gone', ['col' => $col, 'row' => $row]);
             }
 
             if ($pin !== null) {
                 // Cleared win or lose (§9.5.1): after the roll there is no pack.
                 Packs::clear($col, $row, $pin['bucket'], (int) $pin['until'], $now);
+
+                // §9.5.1 -- clearing is SHARED, so everybody watching this
+                // ground has to hear about it. The event says where, not what:
+                // a client that gets it re-reads the disc it is allowed to see.
+                Live::push('pack.cleared', ['col' => $col, 'row' => $row]);
             }
 
             $stolen = null;
@@ -1686,6 +1744,11 @@ class GameService
                 'job' => $job['job'],
                 'jobXp' => $xp,
                 'wear' => $wear,
+                // §9.5.8 -- monster materials, and the kit it was using.
+                'spoils' => $spoils,
+                'spoilsLost' => $lost,
+                'looted' => $looted,
+                'leftBehind' => $leftBehind,
                 'destroyed' => array_values(array_map(
                     static fn (array $w) => $w['name'],
                     array_filter($wear, static fn (array $w) => $w['destroyed']),
@@ -1703,6 +1766,70 @@ class GameService
                 'wokeAt' => $woke,
             ];
         });
+    }
+
+    /**
+     * §9.5.8 -- the kit the monster was using, at 5-50% of its life.
+     *
+     * Never past rare, whatever the tier, and that ceiling is a §2 rule rather
+     * than a tuning value: epic is where gear becomes mintable (§8.0), so a
+     * monster that dropped one would be exactly the grind->NFT faucet the
+     * threat model exists to close. A harder pack answers with better OPTION
+     * ROLLS instead -- the same mechanism the capital bazaar uses (§8.0.1), and
+     * the reason a centre kill can hand you a rare carrying three lines.
+     *
+     * §7.6 -- it needs a strap. Without one it is named as left behind rather
+     * than forced in or silently dropped: an unwinnable refusal at the end of a
+     * fight you did not pick would be worse than either.
+     *
+     * @return array<string,mixed>|null
+     */
+    private function takeLootedGear(
+        Character $character,
+        array $monster,
+        int $seed,
+        ?string &$leftBehind,
+    ): ?array {
+        $key = Drops::lootedGear($monster, $seed);
+        if ($key === null) {
+            return null;
+        }
+
+        $def = Catalog::item($key);
+        if ($def === null) {
+            return null;
+        }
+
+        if (! $this->hasFreeRow($character)) {
+            $leftBehind = $def['name'];
+
+            return null;
+        }
+
+        $max = (int) ($def['maxDurability'] ?? 1);
+        $durability = max(1, (int) round($max * Hash::randInt(
+            Hash::hash2($seed, 41, Balance::mapSeed() ^ 0x5909),
+            Balance::LOOT_DURABILITY_MIN_PERCENT,
+            Balance::LOOT_DURABILITY_MAX_PERCENT,
+        ) / 100));
+
+        // §8.0.1 -- harder packs roll better options, never better rarity.
+        $item = CharacterItem::create([
+            'character_id' => $character->id,
+            'item_key' => $key,
+            'durability' => $durability,
+            'equipped' => false,
+            'options' => $this->rollFor($character, $def, intdiv((int) $monster['tier'], 2)),
+        ]);
+
+        return [
+            'key' => $key,
+            'name' => $def['name'],
+            'rarity' => $def['rarity'],
+            'durability' => $durability,
+            'maxDurability' => $max,
+            'options' => $item->options,
+        ];
     }
 
     /**
@@ -1731,20 +1858,43 @@ class GameService
     }
 
     /**
-     * §9.5.7 -- every corpse on the map, for everybody.
+     * §9.5.7 -- the corpses this character can see, and the two halves differ.
      *
-     * Deliberately not bounded by sight: §13.2's rule is that you may always
-     * see THAT something is there and never what is happening there, and a
-     * marked enemy holding somebody's week of work is the sharpest case of it.
-     * A recovery you cannot find is not a recovery.
+     * YOUR OWN, at any distance and through any fog. It is your row, it is on a
+     * clock, and a debt you cannot find is not a debt -- it is a fine with extra
+     * steps. This is the one thing in the game outside the fog, and it is
+     * outside it for exactly one wallet.
+     *
+     * ANYBODY ELSE'S, only inside sight. A stranger's corpse is not owed to you,
+     * and a map-wide list of them would be a scanner: every death on the server,
+     * live, with the good ones worth racing to. Finding one is the interesting
+     * part, and §5.6's disc is what keeps it that way.
+     *
+     * On the road sight is zero (§5.6), so the strangers wink out and your own
+     * does not. That asymmetry is the rule working, not a hole in it.
      *
      * @return list<array<string,mixed>>
      */
     public function liveCarriers(Character $character): array
     {
+        $range = $this->sightRadius($character);
+        $col = (int) $character->col;
+        $row = (int) $character->row;
+
         return Carrier::where('expires_at', '>', $this->now())
+            ->where(function ($q) use ($character, $col, $row, $range) {
+                $q->where('owner_character_id', $character->id)
+                    ->orWhere(function ($near) use ($col, $row, $range) {
+                        // The box is the cheap index scan; the disc is below.
+                        $near->whereBetween('col', [$col - $range, $col + $range])
+                            ->whereBetween('row', [$row - $range, $row + $range]);
+                    });
+            })
             ->orderBy('expires_at')
             ->get()
+            ->filter(fn (Carrier $c) => (int) $c->owner_character_id === (int) $character->id
+                || HexGeometry::distance($col, $row, $c->col, $c->row) <= $range)
+            ->values()
             ->map(fn (Carrier $c) => [
                 'col' => $c->col,
                 'row' => $c->row,
@@ -1827,6 +1977,13 @@ class GameService
             'loot' => $taken,
             'label' => $taken['label'],
             'expires_at' => $now + Balance::scaled(Balance::CARRIER_LIFETIME_MS),
+        ]);
+
+        // §9.5.7 -- anybody in sight of this hex can see it, so anybody in
+        // sight of this hex is told to look again.
+        Live::push('carrier.raised', [
+            'col' => (int) $character->col,
+            'row' => (int) $character->row,
         ]);
 
         return ['label' => $taken['label'], 'kind' => $taken['kind']];
@@ -2012,6 +2169,7 @@ class GameService
                 'scrap' => false,
                 'note' => null,
                 'unseen' => true,
+                'warnings' => [],
                 // §9.5.3 -- unknown rather than false, strictly, but the pin is
                 // about the ground under your feet and this hex is not it. The
                 // key is here because every caller reads it, and a preview
@@ -2046,6 +2204,7 @@ class GameService
             'unseen' => false,
             // §9.5.3 -- something is standing on the hex you are on.
             'pinned' => false,
+            'warnings' => [],
         ];
 
         if ($pin !== null) {
@@ -2137,6 +2296,11 @@ class GameService
 
         $trip = Formulas::tripTime($tile['baseSeconds'], $skillLevel, $bonuses['tripReduction']);
 
+        // §8.2 -- nothing is destroyed without warning, and a trip wears gear
+        // like a fight does. An hour of work that ends in a lost axe has to be
+        // a decision the player made rather than one they discovered.
+        $warnings = $gathering ? [] : $this->wearWarnings($character, $skillKey);
+
         // You work the hex you are standing on -- there is no reaching across the
         // map for a seam. Everything above is a fact about the tile and holds
         // wherever it is read from, so a hex you are only scouting still reports
@@ -2193,7 +2357,46 @@ class GameService
             // §9.5.3 -- nothing is standing on you, or this return was never
             // reached: the pin refuses above, before any of this is costed.
             'pinned' => false,
+            // §8.2 -- what this trip would finish off.
+            'warnings' => $warnings,
         ];
+    }
+
+    /**
+     * §8.2 -- gear a trip on this line would wear out entirely.
+     *
+     * The same promise the fight preview makes (§9.5.5), kept on the other
+     * verb: destruction is the largest sink in the game and it may never be a
+     * surprise. Line-locked exactly as the wear is -- the axe on your back is
+     * not at risk while you are down a mine.
+     *
+     * @return list<string>
+     */
+    private function wearWarnings(Character $character, ?string $line): array
+    {
+        $out = [];
+
+        foreach ($character->items as $item) {
+            if (! $item->equipped || $item->durability <= 0) {
+                continue;
+            }
+
+            $def = Catalog::item($item->item_key);
+            if ($def === null) {
+                continue;
+            }
+
+            $toolLine = Catalog::skillForSlot($def['slot'] ?? '');
+            if ($toolLine !== null && $toolLine !== $line) {
+                continue;
+            }
+
+            if ((int) $item->durability <= Balance::DRAIN_PER_MINE) {
+                $out[] = $def['name'].' will not survive this trip.';
+            }
+        }
+
+        return $out;
     }
 
     /**
@@ -2469,6 +2672,9 @@ class GameService
 
             $gained = [];
             $durabilityLost = 0;
+            // §8.2 -- anything the trip wore out entirely, named in the result
+            // that killed it.
+            $destroyed = [];
 
             if ($job->kind === 'mining') {
                 // §4 -- the haul is the same SIZE the tile card promised and a
@@ -2484,7 +2690,12 @@ class GameService
                     : $job->quantity * 4;
 
                 // Nothing was in your hands, so nothing wore out.
-                $durabilityLost = $this->drainDurability($character, Balance::DRAIN_PER_MINE, $job->skill_key);
+                $durabilityLost = $this->drainDurability(
+                    $character,
+                    Balance::DRAIN_PER_MINE,
+                    $job->skill_key,
+                    $destroyed,
+                );
 
                 // §5.1 -- worked-out tiles regrow rather than dying.
                 $exhausted = Hash::rand01(
@@ -2508,7 +2719,12 @@ class GameService
 
                 // A bow is drawn, so a bow wears. The other four slots idle,
                 // §8.0 rule 2 -- drainDurability already scopes to the line.
-                $durabilityLost = $this->drainDurability($character, Balance::DRAIN_PER_MINE, 'hunting');
+                $durabilityLost = $this->drainDurability(
+                    $character,
+                    Balance::DRAIN_PER_MINE,
+                    'hunting',
+                    $destroyed,
+                );
 
                 // No depletion and no TileState row: the herd was the resource,
                 // and it leaves on its own clock whatever anybody does here.
@@ -2531,6 +2747,7 @@ class GameService
                     'characterXp' => 0,
                     'levelsGained' => 0,
                     'durabilityLost' => 0,
+                    'destroyed' => [],
                 ];
             } else {
                 $granted = $this->addMaterial($character, $job->output_key, $job->quantity);
@@ -2583,6 +2800,7 @@ class GameService
                 'characterXp' => $characterXp,
                 'levelsGained' => $levelsGained,
                 'durabilityLost' => $durabilityLost,
+                'destroyed' => $destroyed,
             ];
         });
     }
@@ -2892,6 +3110,7 @@ class GameService
         $character->travel_to_row = $row;
         $character->travel_started_at = $now;
         $character->travel_ends_at = $now + $distance * $this->travelMsPerHex($character);
+        $character->travel_scanned_hexes = 0;
         $character->save();
 
         // §8.5 -- the arrival time above is already costed with whatever was
@@ -3002,6 +3221,79 @@ class GameService
         ];
     }
 
+    /**
+     * §9.5.3 -- a pack met on the road ends the journey where it stands.
+     *
+     * "Travel ends at that hex. The rest of the road is not walked." Nothing
+     * resumes by itself either: when the hex is free you are standing on it,
+     * not at the destination you set out for, and the next move is a decision
+     * you make again.
+     *
+     * LAZY, and it has to be. Simulating a walk hex by hex would mean a job per
+     * traveller per ten minutes; instead the road is caught up whenever the
+     * character is next read, from the high-water mark to wherever the clock
+     * says they have got to. §5.6's promise holds -- a journey of two hundred
+     * hexes and one of a single hex still cost the same two requests, because
+     * this rides a read that was happening anyway.
+     *
+     * Each hex is tested at THE TIME YOU WOULD HAVE STEPPED ON IT, not at the
+     * time anybody happens to look. Packs are time-bucketed (§9.5.1), so a walk
+     * long enough to cross a bucket boundary meets whatever spawned ahead of
+     * it, and an hour offline resolves to the same road as an hour watching
+     * (§16).
+     *
+     * The one thing that is not a pure function of the clock is CLEARING, which
+     * is shared: a pack somebody else settled before you looked is one you
+     * simply walked past. That is the right reading of a shared world rather
+     * than a hole in the determinism -- the hazard was gone, and it was gone
+     * for everybody.
+     */
+    private function interceptIfDue(Character $character, int $now): bool
+    {
+        if (! $this->isTravelling($character) || ! Balance::packsEnabled()) {
+            return false;
+        }
+
+        $perHex = $this->journeyPerHex($character);
+        $path = $this->travelPath($character);
+        $started = (int) $character->travel_started_at;
+
+        // Where the clock says they are. The destination hex is included: a
+        // pack standing on the far end stops you there just the same, and it is
+        // the pin they will find when they look (§9.5.3).
+        $reached = min(count($path) - 1, intdiv(max(0, $now - $started), $perHex));
+        $scanned = (int) $character->travel_scanned_hexes;
+
+        if ($reached <= $scanned) {
+            return false;
+        }
+
+        for ($i = $scanned + 1; $i <= $reached; $i++) {
+            $hex = $path[$i];
+            $steppedAt = $started + $i * $perHex;
+
+            $pack = WorldGen::generateTile($hex['col'], $hex['row'], $steppedAt)['pack'] ?? null;
+            if ($pack === null) {
+                continue;
+            }
+
+            if (Packs::isCleared($hex['col'], $hex['row'], $pack['bucket'])) {
+                continue;
+            }
+
+            $character->col = $hex['col'];
+            $character->row = $hex['row'];
+            $this->clearTravel($character);
+            $this->grantExplorerXp($character, $i);
+
+            return true;
+        }
+
+        $character->travel_scanned_hexes = $reached;
+
+        return true;
+    }
+
     /** Land a journey whose clock has run out. Called from settle, never directly. */
     private function arriveIfDue(Character $character, int $now): bool
     {
@@ -3030,6 +3322,7 @@ class GameService
         $character->travel_to_row = null;
         $character->travel_started_at = null;
         $character->travel_ends_at = null;
+        $character->travel_scanned_hexes = 0;
     }
 
     // ------------------------------------------------------------- location

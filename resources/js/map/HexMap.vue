@@ -289,9 +289,9 @@ const renderTiles = computed<RenderTile[]>(() =>
       // else. Beyond the ring the map says what the ground is and who lives on
       // it, never what is happening there (§13.2).
       pack: inSight ? packProp(tile) : '',
-      // §9.5.7 -- and this one is drawn at ANY distance. The exception is the
-      // point: you may always see that a corpse is out there, which is what
-      // makes deciding to walk to it possible.
+      // §9.5.7 -- drawn wherever the server sent one, INCLUDING outside the
+      // ring. Which ones it sends is the rule: your own through any fog, and
+      // anybody else's only inside sight. The client does not re-derive that.
       corpse: corpse ? corpseProp(corpse.mine) : '',
       corpseLabel: corpse ? `${corpse.owner}'s corpse` : null,
       depleted,

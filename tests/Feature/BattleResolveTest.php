@@ -85,6 +85,73 @@ final class BattleResolveTest extends TestCase
         $this->character = $this->character->fresh();
     }
 
+    /**
+     * Stand on a hex that has a pack on it RIGHT NOW.
+     *
+     * packHexes() snapshots the world at one instant; the fight reads the clock
+     * again. The test clock runs at GAME_TIME_SCALE, so a two-hour bucket is
+     * two minutes here and a hex listed a moment ago may genuinely be empty by
+     * the time we swing at it. Re-asking is the honest fix -- the alternative
+     * is a test that fails whenever it straddles a bucket.
+     *
+     * @return array<string,mixed>
+     */
+    private function standOnALivePack(): array
+    {
+        foreach ($this->packHexes() as $pack) {
+            $this->standOn($pack);
+
+            if ($this->game->packHere($this->character->fresh()) !== null) {
+                return $pack;
+            }
+        }
+
+        $this->fail('no live pack anywhere on the map');
+    }
+
+    /**
+     * Is the row a carrier is holding back in the bag?
+     *
+     * Asked of the loot itself rather than of a material this test happened to
+     * put there: the theft is TRULY random (§9.5.7), and a win on the way to
+     * the loss drops spoils, so what it takes is not something a test may
+     * assume.
+     */
+    private function holds(array $loot): bool
+    {
+        return match ($loot['kind']) {
+            'material' => $this->game->held($this->character->fresh(), $loot['key']) > 0,
+            'consumable' => $this->game->heldConsumable($this->character->fresh(), $loot['key']) > 0,
+            default => $this->character->fresh()->items()
+                ->where('item_key', $loot['key'])
+                ->where('equipped', false)
+                ->exists(),
+        };
+    }
+
+    /**
+     * Swing at the corpse until it goes down.
+     *
+     * A carrier's roll folds in the clock (§9.5.7) precisely so that losing to
+     * it once is not losing to it forever -- which means even a 95% kit misses
+     * one in twenty, and a test that assumed otherwise would be flaky by
+     * design. Retrying is what a player does, and it is what this does.
+     *
+     * @return array<string,mixed>
+     */
+    private function killCarrier(\App\Models\Character $fighter, int $tries = 12): array
+    {
+        for ($i = 0; $i < $tries; $i++) {
+            $result = $this->game->fight($fighter->fresh());
+
+            if ($result['won']) {
+                return $result;
+            }
+        }
+
+        $this->fail('a legendary kit never put a treeline monster down');
+    }
+
     /** Put a stack in the bag, through the service so the row rules apply. */
     private function give(string $key, int $quantity): void
     {
@@ -126,6 +193,12 @@ final class BattleResolveTest extends TestCase
 
             $this->standOn($pack);
 
+            // The bucket may have rolled since packHexes() looked (see
+            // standOnALivePack): an empty hex is not a fight.
+            if ($this->game->packHere($this->character->fresh()) === null) {
+                continue;
+            }
+
             // Measured across THIS fight rather than the run of them: the walk
             // to a losing pack may cross winning ones, and their gold is not
             // what the loss did or did not pay.
@@ -152,10 +225,7 @@ final class BattleResolveTest extends TestCase
      */
     public function test_the_pack_is_cleared_win_or_lose(): void
     {
-        foreach ($this->packHexes() as $pack) {
-            $this->standOn($pack);
-            break;
-        }
+        $this->standOnALivePack();
 
         $this->assertNotNull($this->game->packHere($this->character->fresh()));
 
@@ -182,10 +252,7 @@ final class BattleResolveTest extends TestCase
         // than a death, so the character is still standing where it happened.
         $this->equip('longwatch_carapace');
 
-        foreach ($this->packHexes() as $pack) {
-            $this->standOn($pack);
-            break;
-        }
+        $this->standOnALivePack();
 
         $this->game->fight($this->character->fresh());
 
@@ -249,10 +316,7 @@ final class BattleResolveTest extends TestCase
         $this->equip('unmoved_sabatons');
         $this->equip('gauntlets_of_the_last_word');
 
-        foreach ($this->packHexes() as $pack) {
-            $this->standOn($pack);
-            break;
-        }
+        $this->standOnALivePack();
 
         $result = $this->game->fight($this->character->fresh());
 
@@ -286,10 +350,7 @@ final class BattleResolveTest extends TestCase
     {
         $sword = $this->equip('notched_sword', 1);
 
-        foreach ($this->packHexes() as $pack) {
-            $this->standOn($pack);
-            break;
-        }
+        $this->standOnALivePack();
 
         $result = $this->game->fight($this->character->fresh());
 
@@ -319,6 +380,11 @@ final class BattleResolveTest extends TestCase
 
         foreach ($this->packHexes() as $pack) {
             $this->standOn($pack);
+
+            if ($this->game->packHere($this->character->fresh()) === null) {
+                continue;
+            }
+
             $result = $this->game->fight($this->character->fresh());
 
             foreach ($result['wear'] as $row) {
@@ -398,17 +464,61 @@ final class BattleResolveTest extends TestCase
         $this->assertSame($result['stolen']['label'], $carrier->label);
 
         // The row really is gone from the bag until somebody walks back for it.
-        $this->assertSame(0, $this->game->held($this->character->fresh(), 'wood'));
+        $this->assertFalse($this->holds($carrier->loot), 'the stolen row was still in the bag');
 
-        // §9.5.7 -- and it is on the map for anybody, not only its owner.
+        // §9.5.7 -- the owner sees it through any fog. They woke at a
+        // settlement, which is nowhere near where they fell.
+        $mine = collect($this->game->liveCarriers($this->character->fresh()))
+            ->firstWhere(fn (array $c) => $c['col'] === $carrier->col && $c['row'] === $carrier->row);
+
+        $this->assertNotNull($mine, 'a prospector could not find their own corpse');
+        $this->assertTrue($mine['mine']);
+        $this->assertGreaterThan(
+            $this->game->sightRadius($this->character->fresh()),
+            \App\Game\HexGeometry::distance(
+                (int) $this->character->fresh()->col,
+                (int) $this->character->fresh()->row,
+                $carrier->col,
+                $carrier->row,
+            ),
+            'the corpse happened to be in sight, so this proves nothing',
+        );
+    }
+
+    /**
+     * §9.5.7 -- and a stranger's corpse obeys the fog like everything else.
+     *
+     * A map-wide list of every death on the server would be a scanner, with the
+     * rich ones worth racing to. Finding one is the interesting part.
+     */
+    public function test_somebody_elses_corpse_is_only_visible_in_sight(): void
+    {
+        $this->equip('notched_sword');
+        $this->give('wood', 9);
+
+        $this->fightUntil(false);
+        $carrier = Carrier::first();
+        $this->assertNotNull($carrier);
+
         $stranger = $this->game->createCharacter(
             Player::create(['wallet' => '0xother', 'session_id' => 'other']),
         );
 
-        $seen = collect($this->game->liveCarriers($stranger))
+        $this->assertSame(
+            [],
+            $this->game->liveCarriers($stranger),
+            'a stranger saw a corpse across the map',
+        );
+
+        // Walk over to it and it is simply there, like anything else in sight.
+        $stranger->col = $carrier->col;
+        $stranger->row = $carrier->row;
+        $stranger->save();
+
+        $seen = collect($this->game->liveCarriers($stranger->fresh()))
             ->firstWhere(fn (array $c) => $c['col'] === $carrier->col && $c['row'] === $carrier->row);
 
-        $this->assertNotNull($seen, 'a corpse was hidden from another wallet');
+        $this->assertNotNull($seen, 'a corpse underfoot was invisible');
         $this->assertFalse($seen['mine']);
     }
 
@@ -430,13 +540,12 @@ final class BattleResolveTest extends TestCase
         $this->character->row = $carrier->row;
         $this->character->save();
 
-        $result = $this->game->fight($this->character->fresh());
+        $result = $this->killCarrier($this->character);
 
-        $this->assertTrue($result['won'], 'a legendary kit lost to a treeline monster');
         $this->assertTrue($result['corpse']['mine']);
         $this->assertSame($carrier->label, $result['recovered']);
         $this->assertNull($result['burned']);
-        $this->assertSame(9, $this->game->held($this->character->fresh(), 'wood'));
+        $this->assertTrue($this->holds($carrier->loot), 'the row did not come home');
         $this->assertNull(Carrier::find($carrier->id));
     }
 
@@ -478,16 +587,33 @@ final class BattleResolveTest extends TestCase
         $stranger->row = $carrier->row;
         $stranger->save();
 
-        $result = $this->game->fight($stranger->fresh());
+        $result = $this->killCarrier($stranger);
 
-        $this->assertTrue($result['won']);
         $this->assertFalse($result['corpse']['mine']);
         $this->assertSame($carrier->label, $result['burned']);
         $this->assertNull($result['recovered']);
 
-        // Nothing crossed accounts, and nothing came back.
-        $this->assertSame(0, $this->game->held($stranger->fresh(), 'wood'));
-        $this->assertSame(0, $this->game->held($this->character->fresh(), 'wood'));
+        // §2 -- nothing crossed accounts, and nothing came back to its owner.
+        $loot = $carrier->loot;
+        $this->assertFalse($this->holds($loot), 'a burned row came back to its owner');
+
+        // Measured against what the KILL legitimately paid: a monster drops
+        // spoils, and a burned carapace and a dropped carapace are the same
+        // material. What must not happen is the row arriving on top of that.
+        if ($loot['kind'] === 'material') {
+            $this->assertSame(
+                $result['spoils'][$loot['key']] ?? 0,
+                $this->game->held($stranger->fresh(), $loot['key']),
+                'the row crossed accounts',
+            );
+        } else {
+            $this->assertSame(
+                ($result['looted']['key'] ?? null) === $loot['key'] ? 1 : 0,
+                $stranger->fresh()->items()->where('item_key', $loot['key'])->count(),
+                'the row crossed accounts',
+            );
+        }
+
         $this->assertNull(Carrier::find($carrier->id));
     }
 
@@ -526,10 +652,7 @@ final class BattleResolveTest extends TestCase
     {
         $this->equip('notched_sword');
 
-        foreach ($this->packHexes() as $pack) {
-            $this->standOn($pack);
-            break;
-        }
+        $this->standOnALivePack();
 
         $preview = $this->game->previewBattle($this->character->fresh());
 
@@ -539,5 +662,147 @@ final class BattleResolveTest extends TestCase
             implode(' ', $preview['warnings']),
             'fighting bare-chested was not flagged as fatal',
         );
+    }
+
+    // ------------------------------------------------------------ drops §9.5.8
+
+    /**
+     * §9.5.8 -- combat feeds combat. Two families off the monster, and the
+     * grade is its tier: the plate line the smith and armorer want, the ichor
+     * line the consumable bench wants, and nothing from the mining economy.
+     */
+    public function test_a_win_drops_monster_materials(): void
+    {
+        $this->equip('the_last_argument');
+        $this->equip('longwatch_carapace');
+
+        $seen = [];
+
+        foreach ($this->packHexes() as $pack) {
+            $this->standOn($pack);
+
+            if ($this->game->packHere($this->character->fresh()) === null) {
+                continue;
+            }
+
+            $result = $this->game->fight($this->character->fresh());
+            $this->character = $this->character->fresh();
+
+            if (! $result['won']) {
+                continue;
+            }
+
+            foreach (array_keys($result['spoils']) as $key) {
+                $this->assertArrayHasKey($key, \App\Game\Spoils::STOCK, "{$key} is not a spoil");
+                $seen[$key] = true;
+            }
+
+            $this->assertNotEmpty($result['spoils'], 'a win dropped no materials at all');
+
+            if (count($seen) >= 2) {
+                return;
+            }
+        }
+
+        $this->fail('never saw both spoil families');
+    }
+
+    /**
+     * §2 -- looted gear stops at rare, whatever the tier.
+     *
+     * Epic is where gear becomes mintable (§8.0), so a monster that dropped one
+     * is precisely the grind->NFT faucet the threat model exists to close. A
+     * harder pack answers with better option rolls instead.
+     */
+    public function test_looted_gear_never_passes_rare(): void
+    {
+        $this->equip('the_last_argument');
+        $this->equip('longwatch_carapace');
+
+        $found = 0;
+
+        foreach ($this->packHexes() as $pack) {
+            $this->standOn($pack);
+
+            if ($this->game->packHere($this->character->fresh()) === null) {
+                continue;
+            }
+
+            $result = $this->game->fight($this->character->fresh());
+            $this->character = $this->character->fresh();
+
+            $loot = $result['looted'] ?? null;
+            if ($loot === null) {
+                continue;
+            }
+
+            $found++;
+            $this->assertContains($loot['rarity'], ['common', 'uncommon', 'rare'], 'a monster dropped a mintable rung');
+
+            // §9.5.8 -- 5-50% of its life. It walks straight into the repair bill.
+            $this->assertGreaterThan(0, $loot['durability']);
+            $this->assertLessThanOrEqual(
+                (int) round($loot['maxDurability'] * Balance::LOOT_DURABILITY_MAX_PERCENT / 100),
+                $loot['durability'],
+                'looted gear arrived barely used',
+            );
+
+            $this->assertArrayHasKey($loot['key'], \App\Game\BattleGear::ITEMS, 'a monster was carrying a sickle');
+
+            if ($found >= 3) {
+                return;
+            }
+        }
+
+        $this->assertGreaterThan(0, $found, 'nothing was ever looted');
+    }
+
+    /** §9.5.8 -- a loss takes; it never gives. */
+    public function test_a_loss_drops_nothing(): void
+    {
+        $this->equip('notched_sword');
+        $this->equip('longwatch_carapace');
+
+        $result = $this->fightUntil(false);
+
+        $this->assertSame([], $result['spoils']);
+        $this->assertNull($result['looted']);
+    }
+
+    /**
+     * §7.6 -- loot needs a strap, and without one it is named rather than
+     * forced in. A refusal at the end of a fight you did not pick would be a
+     * pin with no way out.
+     */
+    public function test_a_full_bag_leaves_the_loot_on_the_ground(): void
+    {
+        $this->equip('the_last_argument');
+        $this->equip('longwatch_carapace');
+
+        // Fill every strap with something else.
+        foreach (array_slice(array_keys(\App\Game\Catalog::materials()), 0, Balance::BAG_ROWS) as $key) {
+            $this->give($key, 1);
+        }
+
+        $this->assertFalse($this->game->hasFreeRow($this->character->fresh()));
+
+        foreach ($this->packHexes() as $pack) {
+            $this->standOn($pack);
+
+            if ($this->game->packHere($this->character->fresh()) === null) {
+                continue;
+            }
+
+            $result = $this->game->fight($this->character->fresh());
+            $this->character = $this->character->fresh();
+
+            if (($result['leftBehind'] ?? null) !== null) {
+                $this->assertNull($result['looted'], 'loot was forced into a full bag');
+
+                return;
+            }
+        }
+
+        $this->markTestSkipped('no loot rolled while the bag was full');
     }
 }

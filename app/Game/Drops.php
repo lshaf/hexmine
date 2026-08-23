@@ -251,6 +251,159 @@ final class Drops
     }
 
     /**
+     * §9.5.8 -- what comes off a monster, beside the gold.
+     *
+     * Two families and nothing else: a plate/hide line the smith and the
+     * armorer want, an ichor/organ line the consumable bench wants. Combat
+     * feeds combat, and that containment is what makes a whole new faucet safe
+     * under §2 -- nothing here touches the mining economy, and nothing here is
+     * Tier 3, Tier 4 or mintable.
+     *
+     * The grade is the monster's tier, and the RARE roll is the grade above it,
+     * which is §9.5.4's rule said the other way round: "rare for that rung" is
+     * the spoil one grade up. It picks a line rather than always the plate,
+     * because the top of the ichor ladder is wanted by eight recipes and has to
+     * come off something.
+     *
+     * @return array<string,int>
+     */
+    public static function battleSpoils(array $monster, int $seed): array
+    {
+        $grade = max(1, min(5, (int) $monster['tier']));
+        $lines = Spoils::BY_GRADE[$grade];
+        $out = [];
+
+        // The plate line every time: it is what the ninety battle-gear pieces
+        // are made of, and a ladder whose bottom rung is a coin flip is a
+        // ladder nobody climbs.
+        $out[$lines['plate']] = Hash::randInt(
+            Hash::hash2($seed, 11, Balance::mapSeed() ^ 0x5901),
+            self::PLATE_MIN,
+            self::PLATE_MAX,
+        );
+
+        // The ichor line about half the time. Potions are drunk and gone, so
+        // the faucet is smaller and steadier rather than absent.
+        if (Hash::rand01(Hash::hash2($seed, 13, Balance::mapSeed() ^ 0x5902)) < self::ICHOR_CHANCE) {
+            $out[$lines['ichor']] = Hash::randInt(
+                Hash::hash2($seed, 17, Balance::mapSeed() ^ 0x5903),
+                self::ICHOR_MIN,
+                self::ICHOR_MAX,
+            );
+        }
+
+        $above = Spoils::BY_GRADE[$grade + 1] ?? null;
+        if ($above !== null
+            && Hash::rand01(Hash::hash2($seed, 19, Balance::mapSeed() ^ 0x5904)) < self::RARE_SPOIL_CHANCE) {
+            $line = Hash::rand01(Hash::hash2($seed, 23, Balance::mapSeed() ^ 0x5905)) < 0.5
+                ? 'plate'
+                : 'ichor';
+
+            $key = $above[$line];
+            $out[$key] = ($out[$key] ?? 0) + 1;
+        }
+
+        return $out;
+    }
+
+    /** §9.5.8 -- the plate line drops every win; the ichor line about half. */
+    public const PLATE_MIN = 1;
+
+    public const PLATE_MAX = 3;
+
+    public const ICHOR_CHANCE = 0.5;
+
+    public const ICHOR_MIN = 1;
+
+    public const ICHOR_MAX = 2;
+
+    /**
+     * §9.5.4 -- "rare for that rung" is the spoil one grade up.
+     *
+     * Split across the two lines by a coin flip, so the effective rate for any
+     * ONE material is half this. The top of each ladder is deliberately a
+     * project -- four Revenant Plate is about forty centre kills -- but the
+     * ichor line feeds potions, which are drunk and gone, so it cannot be so
+     * thin that a legendary philtre is a season's work.
+     */
+    public const RARE_SPOIL_CHANCE = 0.2;
+
+    /**
+     * §9.5.8 -- the kit the monster was using, and the cap on it is a §2 rule.
+     *
+     * Epic is where gear becomes mintable (§8.0), so a monster that drops one
+     * is precisely the grind->NFT faucet the threat model exists to close.
+     * RARE IS THE CEILING, whatever the tier: a centre-ring kill answers with
+     * better OPTION ROLLS instead (§8.0.1), which is the same mechanism the
+     * capital bazaar already uses.
+     *
+     * @return string|null the item key, or null when it was carrying nothing worth taking
+     */
+    public static function lootedGear(array $monster, int $seed): ?string
+    {
+        if (Hash::rand01(Hash::hash2($seed, 29, Balance::mapSeed() ^ 0x5906)) >= self::LOOT_CHANCE) {
+            return null;
+        }
+
+        $tier = (int) $monster['tier'];
+        $rungs = self::LOOT_RUNGS[$tier] ?? self::LOOT_RUNGS[1];
+        $rung = $rungs[Hash::randInt(
+            Hash::hash2($seed, 31, Balance::mapSeed() ^ 0x5907),
+            0,
+            count($rungs) - 1,
+        )];
+
+        $pool = self::lootPool()[$rung] ?? [];
+        if ($pool === []) {
+            return null;
+        }
+
+        return $pool[Hash::randInt(
+            Hash::hash2($seed, 37, Balance::mapSeed() ^ 0x5908),
+            0,
+            count($pool) - 1,
+        )];
+    }
+
+    public const LOOT_CHANCE = 0.18;
+
+    /** Tier -> the rungs it may have been wearing. Never past rare (§2). */
+    public const LOOT_RUNGS = [
+        1 => ['common'],
+        2 => ['common', 'uncommon'],
+        3 => ['uncommon', 'rare'],
+        4 => ['rare'],
+    ];
+
+    /**
+     * Battle gear by rung, built once. Only battle gear: a monster is not
+     * carrying a sickle, and a looted gathering tool would put combat on the
+     * mining ladder, which §8 rule 5 keeps apart in the other direction.
+     *
+     * @return array<string,list<string>>
+     */
+    private static function lootPool(): array
+    {
+        static $pool = null;
+
+        if ($pool !== null) {
+            return $pool;
+        }
+
+        $pool = [];
+        foreach (BattleGear::ITEMS as $key => $def) {
+            $rarity = (string) $def['rarity'];
+            if (! isset(self::LOOT_RUNGS[1]) || ! in_array($rarity, ['common', 'uncommon', 'rare'], true)) {
+                continue;
+            }
+
+            $pool[$rarity][] = $key;
+        }
+
+        return $pool;
+    }
+
+    /**
      * Split a haul across its table.
      *
      * One draw per unit, so the total is exactly what the tile card promised

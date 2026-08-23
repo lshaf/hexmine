@@ -221,7 +221,17 @@ final class Balance
      * clamp means never certain and never hopeless -- the same instinct as
      * §7.3's floor on a trip.
      */
-    public const BATTLE_BAND = 10;
+    /**
+     * §9.5.5 -- how many points of margin span hopeless to certain.
+     *
+     * The knob that decides whether a fight is a decision or a lookup. At 10 it
+     * was neither: monster stats are twenty to forty points apart, so every
+     * matchup saturated at the 5% or 95% clamp and the whole band collapsed
+     * into "you win" and "you don't". At 20 the ladder is legible instead --
+     * a rung beats its own tier around 60-80%, is a real risk one tier up
+     * around 30-50%, and is properly outmatched two tiers up.
+     */
+    public const BATTLE_BAND = 20;
 
     public const BATTLE_ODDS_MIN = 0.05;
 
@@ -246,6 +256,17 @@ final class Balance
 
     /** A loss costs half again. Being driven off is harder on the kit than winning. */
     public const WEAR_LOSS_MULTIPLIER = 1.5;
+
+    /**
+     * §9.5.8 -- looted gear comes off a thing that was using it.
+     *
+     * A wide band on purpose: half-worn is a real find and one-twentieth is
+     * scrap with a name. Either way it walks straight into §11.1's repair bill,
+     * which is what keeps a free weapon from being a free weapon.
+     */
+    public const LOOT_DURABILITY_MIN_PERCENT = 5;
+
+    public const LOOT_DURABILITY_MAX_PERCENT = 50;
 
     /**
      * §9.5.7 -- how far a death looks for a roof.

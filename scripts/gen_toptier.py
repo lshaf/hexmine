@@ -53,6 +53,26 @@ STAT = {
     'gloves': 'processingSpeed',
 }
 
+# §9.5.4 -- "Every armor, boots and gloves item gains attack and defence next to
+# its work stat." Every rung below this one already did; these two did not, which
+# left a legendary wardencoat worth LESS in a fight than a common travel cloak
+# and made the doc's "a full legendary work set is a coin toss against a tier-3
+# pack" plainly false -- it was hopeless.
+#
+# Deliberately far under the battle rung of the same rarity (legendary battle
+# armor is 2/18 against 1/9 here). That gap IS §9.5.4's shape: work gear reaches
+# the contested ring, the centre asks for battle gear, and giving up trip time
+# and travel speed is the decision rather than a level being.
+#
+# The five gathering tools stay at nothing, because §8 rule 5 keeps combat and
+# gathering apart in both directions: a weapon never gathers, and a sickle never
+# fights.
+PAIR = {
+    'armor':  {'legendary': (1, 9),  'unique': (2, 10)},
+    'boots':  {'legendary': (0, 5),  'unique': (0, 6)},
+    'gloves': {'legendary': (5, 1),  'unique': (6, 2)},
+}
+
 PALETTE = {
     'forest': 'wood', 'mountain': 'iron', 'plains': 'pelt',
     'badlands': 'stone', 'grassland': 'fiber',
@@ -121,15 +141,20 @@ def rows():
         biome = SLOTS[slot][0]
         lkey, lname, ldesc = LEGENDARY[slot]
         ukey, uname, uperk, udesc = UNIQUE[slot]
+        lattack, ldefence = PAIR.get(slot, {}).get('legendary', (0, 0))
+        uattack, udefence = PAIR.get(slot, {}).get('unique', (0, 0))
+
         yield {
             'key': lkey, 'name': lname, 'slot': slot, 'rarity': 'legendary',
             'tradeable': True, 'stat': STAT[slot], 'value': 0.14,
+            'attack': lattack, 'defence': ldefence,
             'palette': PALETTE[biome], 'station': 'guild', 'maxDurability': 240,
             'inputs': legendary_inputs(slot), 'perk': None, 'description': ldesc,
         }
         yield {
             'key': ukey, 'name': uname, 'slot': slot, 'rarity': 'unique',
             'tradeable': False, 'stat': STAT[slot], 'value': 0.15,
+            'attack': uattack, 'defence': udefence,
             'palette': PALETTE[biome], 'station': None, 'maxDurability': 260,
             'inputs': None, 'perk': uperk, 'description': udesc,
         }
@@ -171,6 +196,9 @@ def emit_php():
             f"'value' => {i['value']}",
             f"'palette' => '{i['palette']}'",
         ]
+        if i['attack'] or i['defence']:
+            parts.append(f"'attack' => {i['attack']}")
+            parts.append(f"'defence' => {i['defence']}")
         if i['station']:
             parts.append(f"'station' => '{i['station']}'")
         parts.append(f"'maxDurability' => {i['maxDurability']}")
@@ -204,6 +232,9 @@ def emit_ts():
             f"value: {i['value']}",
             f"palette: '{i['palette']}'",
         ]
+        if i['attack'] or i['defence']:
+            parts.append(f"attack: {i['attack']}")
+            parts.append(f"defence: {i['defence']}")
         if i['station']:
             parts.append(f"station: '{i['station']}'")
         parts.append(f"maxDurability: {i['maxDurability']}")

@@ -83,7 +83,19 @@ const gather = computed(() => underfoot.value?.gather)
  * words the preview would have shown. The only thing that takes a verb off the
  * dock is the hex genuinely not having it: no seam, or no herd.
  */
-const mineHint = computed(() => underfoot.value?.reason ?? `${underfoot.value?.yield ?? 0} units`)
+/**
+ * §8.2 -- a trip that would finish a tool off says so on the button.
+ *
+ * The same promise the fight preview makes, on the other verb: destruction is
+ * the largest sink in the game and it may never be a surprise. It outranks the
+ * yield, because "7 units" is what you came for and "this is your last swing
+ * with that axe" is what would change your mind.
+ */
+const wearWarning = computed(() => underfoot.value?.warnings?.[0] ?? null)
+
+const mineHint = computed(
+  () => underfoot.value?.reason ?? wearWarning.value ?? `${underfoot.value?.yield ?? 0} units`,
+)
 const gatherHint = computed(() => gather.value?.reason ?? `${gather.value?.yield ?? 0} units by hand`)
 
 /**

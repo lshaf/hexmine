@@ -12,6 +12,7 @@
  */
 import type {
   ActiveBuff,
+  ItemOption,
   Job,
   MaterialKey,
   OwnedItem,
@@ -282,6 +283,11 @@ export interface WorkPreview {
    */
   pinned: boolean
   /**
+   * §8.2 -- gear this trip would wear out entirely, named before it happens.
+   * Line-locked like the wear: the axe on your back is not at risk in a mine.
+   */
+  warnings: string[]
+  /**
    * §5.6 -- true when the hex is outside sight, and everything above it is
    * therefore blank rather than zero. The server will not cost an unscouted
    * hex, so the card reports the walk instead of the seam.
@@ -338,16 +344,21 @@ export interface MapMutations {
   occupied: Array<[number, number, number]>
   /** §9.5.1 -- packs in sight that somebody has already fought, win or lose. */
   cleared: Array<[number, number]>
-  /** §9.5.7 -- every corpse on the map, and deliberately not bounded by sight. */
+  /**
+   * §9.5.7 -- the corpses this character can see: their own through any fog,
+   * anybody else's only inside sight.
+   */
   carriers: Carrier[]
 }
 
 /**
  * §9.5.7 -- a marked enemy holding somebody's row, standing where they fell.
  *
- * The one thing in the game outside the fog: drawn for everybody at any
- * distance, because a recovery you cannot find is not a recovery. What it is
- * holding is named; what it would cost to take is not, until you are there.
+ * Your own is the one thing in the game outside the fog, because a debt you
+ * cannot find is a fine with extra steps. Somebody else's obeys the fog like
+ * everything else -- a live map of every death on the server would be a
+ * scanner. What it holds is named; what it would cost to take is not, until you
+ * are standing there.
  */
 export interface Carrier {
   col: number
@@ -428,6 +439,21 @@ export interface BattleResult {
   wear: BattleWear[]
   /** §8.2 -- named here because nothing may be destroyed quietly. */
   destroyed: string[]
+  /** §9.5.8 -- monster materials, keyed by material. Combat feeds combat. */
+  spoils: Record<string, number>
+  /** Units that had no strap to land on (§7.6). */
+  spoilsLost: number
+  /** §9.5.8 -- the kit it was using, at 5-50% and never past rare. */
+  looted: {
+    key: string
+    name: string
+    rarity: string
+    durability: number
+    maxDurability: number
+    options: ItemOption[]
+  } | null
+  /** Loot the bag had no room for, named rather than silently dropped. */
+  leftBehind: string | null
   /** §9.5.7 -- what was standing here, when it was a corpse rather than a pack. */
   corpse: { mine: boolean; label: string; owner: string | null } | null
   /** The row that came home, when its owner was the one standing over it. */
@@ -464,6 +490,8 @@ export interface CollectResult {
   characterXp: number
   levelsGained: number
   durabilityLost: number
+  /** §8.2 -- gear the trip finished off. Named, because nothing goes quietly. */
+  destroyed: string[]
 }
 
 export interface QueueSlot {

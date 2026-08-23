@@ -193,6 +193,13 @@ onBeforeUnmount(() => {
         <p v-if="haul.lostToOverflow" class="tiny note bad">
           {{ haul.lostToOverflow }} units would not fit and were left behind.
         </p>
+
+        <!-- §8.2 -- at zero the thing is gone, on a trip exactly as in a fight.
+             Named here because nothing may be taken quietly. -->
+        <p v-if="haul.destroyed?.length" class="tiny note bad">
+          {{ haul.destroyed.join(', ') }} wore through and
+          {{ haul.destroyed.length === 1 ? 'is' : 'are' }} gone.
+        </p>
       </div>
     </div>
   </div>

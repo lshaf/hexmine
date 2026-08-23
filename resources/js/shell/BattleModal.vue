@@ -18,6 +18,11 @@
  */
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ACTION_PATHS } from '@/icons/actions'
+import { MATERIALS } from '@/game/catalog'
+import { itemIcon, materialIcon } from '@/icons/procedural'
+import SvgIcon from '@/components/SvgIcon.vue'
+import { optionStatLine } from '@/game/formulas'
+import { ITEM_BY_KEY } from '@/game/catalog'
 import type { BattleResult } from '@/api/types'
 
 const props = defineProps<{ battle: BattleResult }>()
@@ -32,6 +37,18 @@ const jobName = computed(() => {
   const key = props.battle.job
   return key ? key[0]!.toUpperCase() + key.slice(1) : null
 })
+
+/** §9.5.8 -- what came off it, biggest stack first. */
+const spoils = computed(() =>
+  Object.entries(props.battle.spoils ?? {})
+    .map(([key, qty]) => ({ mat: MATERIALS[key as keyof typeof MATERIALS], qty }))
+    .filter((r) => r.mat)
+    .sort((a, b) => b.qty - a.qty),
+)
+
+const lootDef = computed(() =>
+  props.battle.looted ? (ITEM_BY_KEY[props.battle.looted.key] ?? null) : null,
+)
 
 const settled = ref(false)
 
@@ -103,6 +120,55 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
             </span>
           </div>
         </div>
+
+        <!-- §9.5.8 -- combat feeds combat: two families off the monster and
+             nothing from the mining economy. -->
+        <ul v-if="spoils.length" class="spoils">
+          <li v-for="row in spoils" :key="row.mat.key">
+            <SvgIcon :svg="materialIcon(row.mat, 20)" />
+            <span class="grow name">{{ row.mat.name }}</span>
+            <span class="qty readout good">+{{ row.qty }}</span>
+          </li>
+        </ul>
+
+        <!-- §9.5.8 -- the kit it was using, at 5-50% and never past rare: epic
+             is where gear becomes mintable, and a monster that dropped one
+             would be the grind-to-NFT faucet §2 exists to close. -->
+        <div v-if="battle.looted" class="inset loot">
+          <div class="row">
+            <SvgIcon
+              v-if="lootDef"
+              :svg="itemIcon({
+                slot: lootDef.slot,
+                family: lootDef.family,
+                rarity: lootDef.rarity,
+                palette: lootDef.palette,
+                size: 26,
+              })"
+            />
+            <span class="grow">
+              <strong class="tiny">{{ battle.looted.name }}</strong>
+              <span class="tiny muted block">
+                Taken off it · {{ battle.looted.durability }}/{{ battle.looted.maxDurability }}
+              </span>
+            </span>
+          </div>
+          <span
+            v-for="option in battle.looted.options"
+            :key="option.stat + option.value"
+            class="tiny option"
+          >
+            {{ lootDef ? optionStatLine(option, lootDef) : option.stat }}
+          </span>
+        </div>
+
+        <p v-if="battle.leftBehind" class="tiny note bad">
+          {{ battle.leftBehind }} had nowhere to go and was left on the ground.
+        </p>
+
+        <p v-else-if="battle.spoilsLost" class="tiny note bad">
+          {{ battle.spoilsLost }} units would not fit and were left behind.
+        </p>
 
         <!-- §9.5.6 -- wear IS the combat system, so it is the detail this
              receipt owes: the weapon on the gap to their guard, and the one
@@ -265,6 +331,44 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 
 .wear li.gone .left {
   color: var(--ember);
+}
+
+/* ----------------------------------------------------------------- spoils */
+
+.spoils {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.spoils li {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 12px;
+}
+
+.loot {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.loot .row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.block {
+  display: block;
+}
+
+.option {
+  color: var(--copper);
 }
 
 .death {

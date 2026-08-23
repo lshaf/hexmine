@@ -53,6 +53,13 @@ The three currencies are strictly separated. No backdoor converts one into anoth
 - Buys **common and uncommon only** (§8.0) — never convertible to NFT
 
 ### 3.3 NFT
+
+> **Not built in this stage, and last in the build order.** Nothing
+> blockchain-related is implemented beyond **wallet login**, which already
+> exists. Everything below is settled design and none of it is a work item yet:
+> the systems that make the game playable come first, and the on-chain exit is
+> the final thing added, not something the rest is shaped around.
+
 - The *only* externally tradeable value
 - Categories: bundles, rare materials, top-tier equipment, cosmetics
 - Sourced from: marketplace purchase, or crafting with Tier 3 + Tier 4 materials
@@ -219,8 +226,14 @@ mentally navigable map. Rare-material biome variants sit inside/near the PvP rin
 
 ### 5.5 Hunting grounds
 Not a tile type. **Temporary herd markers** spawn on open **Plains** hexes and decay after
-~4h. Yields Pelt (Tier 1) + small Essence (Tier 4) — the only activity bridging the mining
-and raid material tracks. No party, no raid charge, just time.
+~4h. Yields Pelt, the plains animal parts (horn, sinew), the biome's critter and a little of
+whatever grows there. No party, no raid charge, just time.
+
+**No Tier 4, and that is a §2 rule rather than a tuning value.** Essence used to be
+on this table, as "the only activity bridging the mining and raid material tracks".
+A herd on a four-hour clock that anyone with a crude bow can shoot is a faucet for
+the one tier the dungeons exist to gate, and §9.4's ladder is supposed to end at a
+boss rather than at a deer. Raid materials come from raids.
 
 **Plains and nowhere else, because that is hunting's ground.** Herds briefly wandered
 onto every biome, on the argument that a bow should be worth carrying on a walk you took
@@ -917,8 +930,13 @@ the game, §11.1.)*
   because the resale rate and the NPC's repair rate are set independently and
   nothing else would keep them in the right order.
 - **Nothing is destroyed without warning.** Durability is on the item, and any
-  action that could take the last of it says so first (§9.5). An idle game may
-  take something expensive from a player; it may never take it by surprise.
+  action that could take the last of it says so first — the fight preview
+  (§9.5.5) and the hex preview alike. An idle game may take something expensive
+  from a player; it may never take it by surprise.
+- **It reaches the trip, not only the fight.** Mining and hunting wear the
+  line's tool, and at zero that tool is gone the same way a weapon is. The
+  warning is line-locked exactly as the wear is: the axe on your back is not at
+  risk while you are down a mine.
 - Nothing minted can be destroyed, because minting takes it out of the game
   (§3.3). Destruction reaches every rung that is actually *in* a bag.
 - **Tuning decision still open:** repair cost must be cheaper than crafting new, but not
@@ -1312,11 +1330,18 @@ a cheap epic with nothing capped underneath it would be the grind→NFT path the
 threat model exists to close.
 
 **Work gear reaches the contested ring; the centre asks for battle gear.** A
-full legendary *work* set is a coin toss against a tier-3 pack and hopeless
-against the centre's two, while a legendary battle set clears them. That is the
-intended shape of the last step inward: it is a kit decision rather than a level
-one, and it is the first time in the game that giving up trip time and travel
-speed is the right call.
+full legendary *work* set handles a tier-3 pack comfortably — around 80% — and
+is a coin flip at best against the centre's two, around a third, while a
+legendary battle set clears them at roughly three in four. That is the intended
+shape of the last step inward: it is a kit decision rather than a level one, and
+it is the first time in the game that giving up trip time and travel speed is
+the right call.
+
+**Every worn piece carries the pair, at every rung including the top two.** The
+legendary and unique work pieces were written before §9.5.4 and had none, which
+made a Wardencoat worth less in a fight than a common travel cloak. They are far
+under the battle piece of the same rarity — 1/9 against 2/18 for armor — and
+that gap *is* the trade above, rather than an accident of tuning.
 
 #### 9.5.5 One roll, and it is a margin
 
@@ -1325,8 +1350,8 @@ strike = myAttack  - itsDefence
 hold   = myDefence - itsAttack
 margin = (strike + hold) / 2
 
-odds   = clamp(0.5 + margin / 20, 0.05, 0.95)   // the band, as a chance
-win    if U(0, 1) < odds                        // U seeded, server-side
+odds   = clamp(0.5 + margin / (2 * BAND), 0.05, 0.95)   // BAND = 20
+win    if U(0, 1) < odds                                // U seeded, server-side
 ```
 
 **The band is what makes it a decision.** A straight comparison decides every
@@ -1334,6 +1359,15 @@ fight before it is tapped — scout the number and you either always win or neve
 engage — and there is nothing left to choose. A band turns it into a *known
 risk*, and the 5%/95% clamp means never certain and never hopeless, which is the
 same instinct as §7.3's floor.
+
+**`BATTLE_BAND` is the one number that decides whether any of that is true.** It
+started at 10 and had to be 20. Monster stats are twenty to forty points apart
+(§9.5.2), so at 10 every matchup saturated on a clamp and the band collapsed
+back into the straight comparison it exists to replace: 95% or 5%, with almost
+nothing between. At 20 a rung beats its own tier around 60–80%, is a real risk
+one tier up at 30–50%, and is properly outmatched two tiers up. Widen it further
+and the ladder flattens the other way — at 40 a common kit is a third of the way
+to killing a centre monster, which makes the ladder decorative.
 
 **The roll is against the odds, not against the margin**, and at the edges those
 are two different games. Adding U(−10, +10) to a margin of +15 wins every throw,
@@ -1395,10 +1429,19 @@ costs:
    at ten minutes a hex it is a real one.
 2. The pack takes **one row from your bag** — truly random, gear or material.
 3. **The pack does not despawn.** It becomes a **carrier**, named for what it
-   took, drawn on the map for **everybody** as a `XXX's corpse` glyph
-   **regardless of sight** — §13.2's rule exactly: you may always see *that*
-   something is there, never what is happening there. It lives **24h**, and the
-   clock is on the glyph.
+   took, drawn as a `XXX's corpse` glyph. It lives **24h**, and the clock is on
+   the glyph. **Who sees it is two rules, not one:**
+   - **Its owner sees it through any fog, at any distance.** It is their row, on
+     a clock, and a debt you cannot find is a fine with extra steps. This is the
+     only thing in the game outside the fog, and it is outside it for exactly
+     one wallet.
+   - **Everybody else sees it only inside sight** (§5.6). A stranger's corpse is
+     not owed to you, and a map-wide list of them would be a *scanner* — every
+     death on the server, live, with the rich ones worth racing to. Finding one
+     is the interesting part.
+
+   On the road sight is zero, so strangers' corpses wink out and your own does
+   not. That asymmetry is the rule working.
 4. **You** kill it and the row comes home, on top of its ordinary drops.
 
 **A corpse stands, but it does not pin.** A pack owns the hex it is on for two
@@ -1694,6 +1737,9 @@ The working approach, after several failed attempts:
   settlement glyph — tier only, no name.** Nothing else: no props, no slot pips,
   no labels. The glyph is what makes deciding to walk somewhere possible; the
   absence of everything else is what makes arriving worth something.
+- **One exception, and it is one wallet wide: your own corpse** (§9.5.7). It is
+  drawn through any fog at any distance, because it holds a row of yours on a
+  24h clock. Anybody else's obeys the fog like everything else.
 - Tiling: flat-top hexes, `colStep = W * 0.75`, `rowStep = H`, odd columns offset by `H/2`.
 - **Layout with inline styles, not Tailwind arbitrary values** (`w-[390px]` etc. silently
   failed in the artifact sandbox and collapsed the viewport to zero height). Use a flex

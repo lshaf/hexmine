@@ -14,6 +14,7 @@ class Character extends Model
         'player_id', 'name', 'level', 'xp', 'gold',
         'col', 'row', 'presence_settlement_id',
         'travel_to_col', 'travel_to_row', 'travel_started_at', 'travel_ends_at',
+        'travel_scanned_hexes',
     ];
 
     protected $casts = [
@@ -26,6 +27,7 @@ class Character extends Model
         'travel_to_row' => 'integer',
         'travel_started_at' => 'integer',
         'travel_ends_at' => 'integer',
+        'travel_scanned_hexes' => 'integer',
     ];
 
     public function player(): BelongsTo
