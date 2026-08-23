@@ -19,14 +19,6 @@ return [
     'time_scale' => (int) env('GAME_TIME_SCALE', 1),
 
     /*
-     * §16 -- how long one SSE connection is held before the client is asked to
-     * reconnect. A stream costs a worker for as long as it is open, so this is
-     * a bound rather than a preference: EventSource reconnects on its own and
-     * hands its cursor back, so nothing is missed across the gap.
-     */
-    'live_hold_seconds' => (float) env('GAME_LIVE_HOLD_SECONDS', 25),
-
-    /*
     |--------------------------------------------------------------------------
     | Map combat, §9.5
     |--------------------------------------------------------------------------

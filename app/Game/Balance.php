@@ -287,6 +287,21 @@ final class Balance
     public const CARRIER_LIFETIME_MS = 24 * self::HOUR;
 
     /**
+     * §9.5.5 -- how long a fight takes.
+     *
+     * It is a skirmish on a road, not a project: shorter than the shortest
+     * bench run (§8.4) and far shorter than a trip, because the pin (§9.5.3)
+     * already holds you in place while it runs and a long clock on top would
+     * make one pack a lost afternoon.
+     *
+     * Scaled by tier, so the centre's two cost more of the day than the
+     * treeline's -- and through scaled() like every clock in the game.
+     */
+    public const BATTLE_BASE_SECONDS = 3 * self::MINUTE;
+
+    public const BATTLE_SECONDS_PER_TIER = 2 * self::MINUTE;
+
+    /**
      * §9.5.8 -- what a win teaches the battle job that fought it.
      *
      * Paid per monster tier, so the centre's two are worth four times the

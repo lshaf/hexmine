@@ -26,6 +26,7 @@ import type {
   TilePreview,
 } from '@/api/types'
 import type {
+  BattleJob,
   Job,
   MaterialKey,
   FieldJob,
@@ -122,13 +123,20 @@ export const useGame = defineStore('game', () => {
   const mutations = ref<MapMutations>({ depleted: [], occupied: [], cleared: [], carriers: [] })
 
   /**
-   * §9.5.7 -- the corpses this character can see.
+   * §9.5.7 -- every corpse this character can see, from both halves.
    *
-   * Not folded into the tiles: a carrier is not a property of the ground, it is
-   * somebody's row standing where they fell. Scoped server-side -- your own
-   * arrives from any distance, a stranger's only from inside sight.
+   * Two sources because they are two different facts. YOURS ride the player
+   * state: they are yours, they are on a clock, and the fog does not apply to
+   * them. ANYBODY ELSE'S ride the map, inside sight like everything else on it
+   * -- a live list of every death on the server would be a scanner.
+   *
+   * Joined here rather than folded into the tiles: a carrier is not a property
+   * of the ground, it is somebody's row standing where they fell.
    */
-  const carriers = computed(() => mutations.value.carriers ?? [])
+  const carriers = computed(() => [
+    ...(state.value?.carriers ?? []),
+    ...(mutations.value.carriers ?? []),
+  ])
 
   /**
    * Generated tiles for the current view. shallowRef because this is a few
@@ -254,58 +262,6 @@ export const useGame = defineStore('game', () => {
   const tileAt = (col: number, row: number): Tile | undefined =>
     tiles.value.find((t) => t.col === col && t.row === row)
 
-  // ------------------------------------------------------------------- live
-
-  /**
-   * §16 -- the handful of facts that are somebody else's decision.
-   *
-   * Almost nothing needs a stream: terrain is generated locally, a pack is a
-   * hash, and every clock is a timestamp already in hand. What does is the
-   * ground moving because another player acted on it -- a pack settled
-   * (§9.5.1), a corpse raised or taken (§9.5.7).
-   *
-   * The stream carries NOTIFICATIONS, not state. An event says where something
-   * moved; this asks the server what that means, and gets back exactly the disc
-   * sight allows (§5.6). So the stream can never show more than a poll would --
-   * it only saves the polling.
-   *
-   * Best-effort throughout: a dropped connection, a missed event or no
-   * EventSource at all leaves the client one /api/map behind, which is where it
-   * was before any of this existed.
-   */
-  let stream: EventSource | null = null
-  let pending = 0
-
-  function watchLive(): void {
-    if (stream || typeof EventSource === 'undefined') return
-
-    stream = new EventSource('/api/live', { withCredentials: true })
-
-    // Coalesced: a busy hex can settle several packs in a second, and each one
-    // is the same one-line answer. One refresh a beat is the whole need.
-    const nudge = () => {
-      if (pending) return
-      pending = window.setTimeout(() => {
-        pending = 0
-        void refreshMutations()
-      }, 400)
-    }
-
-    for (const type of ['pack.cleared', 'carrier.raised', 'carrier.gone']) {
-      stream.addEventListener(type, nudge)
-    }
-  }
-
-  function unwatchLive(): void {
-    stream?.close()
-    stream = null
-
-    if (pending) {
-      clearTimeout(pending)
-      pending = 0
-    }
-  }
-
   // -------------------------------------------------------------- derived
 
   const character = computed(() => state.value?.character ?? null)
@@ -408,12 +364,15 @@ export const useGame = defineStore('game', () => {
   /**
     * One trip out and one processing job at a time, so both of these are a
     * single job or nothing. A trip pins the character to its hex, whether it is
-    * a seam or a herd (§5.5); processing is the NPC's work, which the player
-    * only helps along by being there (§6.2).
+    * a seam, a herd (§5.5) or a fight (§9.5.5); processing is the NPC's work,
+    * which the player only helps along by being there (§6.2).
     */
-  const fieldJob = computed<FieldJob | null>(
+  const fieldJob = computed<FieldJob | BattleJob | null>(
     () =>
-      jobs.value.find((j): j is FieldJob => j.kind === 'mining' || j.kind === 'hunting') ?? null,
+      jobs.value.find(
+        (j): j is FieldJob | BattleJob =>
+          j.kind === 'mining' || j.kind === 'hunting' || j.kind === 'battle',
+      ) ?? null,
   )
 
   const processingJob = computed<ProcessingJob | null>(
@@ -579,10 +538,6 @@ export const useGame = defineStore('game', () => {
     centreOnCharacter()
     await refreshMutations()
 
-    // Opened after the first map read, so the cursor starts from a world the
-    // client has actually seen.
-    watchLive()
-
     booted.value = true
     setInterval(() => {
       tick.value++
@@ -671,8 +626,16 @@ export const useGame = defineStore('game', () => {
    * what would not fit -- is read off the server's own response.
    */
   async function collect(jobId: string): Promise<void> {
+    const job = jobs.value.find((j) => j.id === jobId)
     const result = await act(() => api.collectJob(jobId))
-    if (result) haul.value = result
+
+    // §9.5.5 -- a fight answers with its own report rather than a haul: there
+    // is no material and no XP ladder in common, and the plate that reads it is
+    // a different plate.
+    if (result) {
+      if (job?.kind === 'battle') battle.value = result as unknown as BattleResult
+      else haul.value = result as CollectResult
+    }
 
     await refreshMutations()
     if (selected.value) await select(selected.value.col, selected.value.row)
@@ -684,17 +647,17 @@ export const useGame = defineStore('game', () => {
   }
 
   /**
-   * §9.5.5 -- settle the pack on this hex.
+   * §9.5.5 -- close with whatever is standing on this hex.
    *
-   * No coordinates: the only fight on offer is the one under your feet. The
-   * result is held for the modal rather than toasted, because a destroyed item
-   * (§8.2) has more to say than a status line holds -- and the pack is gone
-   * either way, so the map underneath has to be re-read.
+   * No coordinates: the only fight on offer is the one under your feet. It
+   * takes time now, so this starts a job and answers with nothing -- the report
+   * comes off the collect, like every other piece of work.
    */
   async function fight(): Promise<void> {
-    const result = await act(() => api.fight())
-    if (result) battle.value = result
+    await act(() => api.fight())
 
+    // The pack is spent on engagement (§9.5.5), so the map moved even though
+    // nothing has been resolved yet.
     await refreshMutations()
     if (selected.value) await select(selected.value.col, selected.value.row)
   }
@@ -804,7 +767,7 @@ export const useGame = defineStore('game', () => {
     // actions
     boot, setView, setViewport, centreOnCharacter, refreshMutations, refreshState,
     select, clearSelection,
-    haul, clearHaul, battle, fight, clearBattle, carriers, watchLive, unwatchLive,
+    haul, clearHaul, battle, fight, clearBattle, carriers,
     startMining, startGathering, startHunt, collect, abandon, travelTo, cancelTravel, startProcessing, buy,
     sell, sellItem, craft, equip, unequip, repair, discard, discardMaterial, drink, openPanel, closePanel,
     loadTree, buyNode,

@@ -139,10 +139,24 @@ final class BattleResolveTest extends TestCase
      *
      * @return array<string,mixed>
      */
-    private function killCarrier(\App\Models\Character $fighter, int $tries = 12): array
+    private function killCarrier(\App\Models\Character $fighter, Carrier $carrier, int $tries = 12): array
     {
         for ($i = 0; $i < $tries; $i++) {
-            $result = $this->game->fight($fighter->fresh());
+            // §9.5.7 -- a loss is a death, and a death wakes you at the nearest
+            // settlement. Walking back is part of the recovery, so the retry
+            // has to walk back too.
+            //
+            // FRESHENED FIRST, and that is not a nicety. The previous attempt
+            // moved this character in the database through a different
+            // instance; assigning the same coordinates to a stale one leaves
+            // them un-dirty, save() writes nothing, and the walk back silently
+            // does not happen.
+            $fighter = $fighter->fresh();
+            $fighter->col = $carrier->col;
+            $fighter->row = $carrier->row;
+            $fighter->save();
+
+            $result = $this->resolveFight($fighter);
 
             if ($result['won']) {
                 return $result;
@@ -150,6 +164,47 @@ final class BattleResolveTest extends TestCase
         }
 
         $this->fail('a legendary kit never put a treeline monster down');
+    }
+
+    /**
+     * Take the fight and see it through.
+     *
+     * §9.5.5 -- a fight is a job on a clock now, so every test that used to
+     * call one method calls two. The clock is wound forward rather than waited
+     * out; what is being tested is what the fight DOES, not that time passes.
+     *
+     * @return array<string,mixed>
+     */
+    private function resolveFight(\App\Models\Character $fighter): array
+    {
+        $job = $this->game->startBattle($fighter->fresh());
+        $job->update(['ends_at' => $this->game->now() - 1]);
+
+        return $this->game->collectJob($fighter->fresh(), $job->id);
+    }
+
+    /**
+     * The same thing, for a hex that may have emptied since we looked.
+     *
+     * A pack is time-bucketed and the test clock runs at GAME_TIME_SCALE, so a
+     * two-hour bucket is two minutes here: between checking a hex and swinging
+     * at it, the thing can genuinely have wandered off. Returning null and
+     * moving on is what a player would do, and is the only answer that does not
+     * make the suite flaky by design.
+     *
+     * @return array<string,mixed>|null
+     */
+    private function tryFight(\App\Models\Character $fighter): ?array
+    {
+        try {
+            return $this->resolveFight($fighter);
+        } catch (GameException $e) {
+            if ($e->errorCode === 'no_pack') {
+                return null;
+            }
+
+            throw $e;
+        }
     }
 
     /** Put a stack in the bag, through the service so the row rules apply. */
@@ -193,20 +248,20 @@ final class BattleResolveTest extends TestCase
 
             $this->standOn($pack);
 
-            // The bucket may have rolled since packHexes() looked (see
-            // standOnALivePack): an empty hex is not a fight.
-            if ($this->game->packHere($this->character->fresh()) === null) {
-                continue;
-            }
-
             // Measured across THIS fight rather than the run of them: the walk
             // to a losing pack may cross winning ones, and their gold is not
             // what the loss did or did not pay.
             $goldBefore = (int) $this->character->fresh()->gold;
             $standingBefore = $this->swordhand();
 
-            $result = $this->game->fight($this->character->fresh());
+            // The bucket may have rolled since packHexes() looked: an empty hex
+            // is not a fight, it is the next hex.
+            $result = $this->tryFight($this->character);
             $this->character = $this->character->fresh();
+
+            if ($result === null) {
+                continue;
+            }
 
             if ($result['won'] === $won) {
                 return $result + [
@@ -229,7 +284,7 @@ final class BattleResolveTest extends TestCase
 
         $this->assertNotNull($this->game->packHere($this->character->fresh()));
 
-        $result = $this->game->fight($this->character->fresh());
+        $result = $this->resolveFight($this->character);
         $this->assertIsBool($result['won']);
 
         $this->assertNull(
@@ -238,7 +293,7 @@ final class BattleResolveTest extends TestCase
         );
 
         try {
-            $this->game->fight($this->character->fresh());
+            $this->resolveFight($this->character);
             $this->fail('the same pack was fought twice');
         } catch (GameException $e) {
             $this->assertSame('no_pack', $e->errorCode);
@@ -254,7 +309,7 @@ final class BattleResolveTest extends TestCase
 
         $this->standOnALivePack();
 
-        $this->game->fight($this->character->fresh());
+        $this->resolveFight($this->character);
 
         $preview = $this->game->previewTile(
             $this->character->fresh(),
@@ -318,7 +373,7 @@ final class BattleResolveTest extends TestCase
 
         $this->standOnALivePack();
 
-        $result = $this->game->fight($this->character->fresh());
+        $result = $this->resolveFight($this->character);
 
         $this->assertCount(2, $result['wear'], 'a fight wore something other than two things');
 
@@ -352,7 +407,7 @@ final class BattleResolveTest extends TestCase
 
         $this->standOnALivePack();
 
-        $result = $this->game->fight($this->character->fresh());
+        $result = $this->resolveFight($this->character);
 
         $this->assertContains('Notched Sword', $result['destroyed']);
         $this->assertNull(CharacterItem::find($sword->id), 'a destroyed item was left in the bag');
@@ -381,11 +436,12 @@ final class BattleResolveTest extends TestCase
         foreach ($this->packHexes() as $pack) {
             $this->standOn($pack);
 
-            if ($this->game->packHere($this->character->fresh()) === null) {
+            // A hex listed a moment ago may be empty by the time we swing at
+            // it -- see tryFight(). Skipping is what a player would do.
+            $result = $this->tryFight($this->character);
+            if ($result === null) {
                 continue;
             }
-
-            $result = $this->game->fight($this->character->fresh());
 
             foreach ($result['wear'] as $row) {
                 $max = \App\Game\Catalog::item(
@@ -410,12 +466,8 @@ final class BattleResolveTest extends TestCase
 
     // ------------------------------------------------------------ death §9.5.7
 
-    /**
-     * §9.5.7 -- the narrow rule. A loss becomes a death when NOTHING absorbed
-     * it: no armor at all, or the piece that would have taken the hit went with
-     * it. Fighting bare-chested is not merely worse, it is how you die.
-     */
-    public function test_a_loss_with_nothing_to_absorb_it_is_a_death(): void
+    /** §9.5.7 -- a loss is a death, whatever you were wearing when you took it. */
+    public function test_a_loss_is_a_death(): void
     {
         $this->equip('notched_sword');
         $this->give('wood', 12);
@@ -433,17 +485,26 @@ final class BattleResolveTest extends TestCase
         $this->assertNotNull(WorldGen::settlementAt($woke['col'], $woke['row']));
     }
 
-    /** §9.5.7 -- and something on you to take the hit is what prevents it. */
-    public function test_armor_is_what_stands_between_a_loss_and_a_death(): void
+    /**
+     * §9.5.7 -- and armor does not change that. It decides whether you LOSE,
+     * because defence feeds the hold and the hold is half the margin; it does
+     * not decide what losing costs.
+     *
+     * It used to: a loss was only a death when nothing absorbed it. That made
+     * the interesting question "am I wearing anything" rather than "should I
+     * take this fight", and the second one is what the odds are printed for.
+     */
+    public function test_armor_does_not_change_what_a_loss_costs(): void
     {
         $this->equip('notched_sword');
         $this->equip('longwatch_carapace');
+        $this->give('wood', 9);
 
         $result = $this->fightUntil(false);
 
-        $this->assertFalse($result['died']);
-        $this->assertNull($result['stolen']);
-        $this->assertNull($result['wokeAt']);
+        $this->assertTrue($result['died'], 'a loss in full armor was survived');
+        $this->assertNotNull($result['stolen']);
+        $this->assertNotNull($result['wokeAt']);
     }
 
     /**
@@ -466,9 +527,10 @@ final class BattleResolveTest extends TestCase
         // The row really is gone from the bag until somebody walks back for it.
         $this->assertFalse($this->holds($carrier->loot), 'the stolen row was still in the bag');
 
-        // §9.5.7 -- the owner sees it through any fog. They woke at a
+        // §9.5.7 -- the owner sees it through any fog, and it rides the player
+        // state rather than the map for exactly that reason. They woke at a
         // settlement, which is nowhere near where they fell.
-        $mine = collect($this->game->liveCarriers($this->character->fresh()))
+        $mine = collect($this->game->ownCarriers($this->character->fresh()))
             ->firstWhere(fn (array $c) => $c['col'] === $carrier->col && $c['row'] === $carrier->row);
 
         $this->assertNotNull($mine, 'a prospector could not find their own corpse');
@@ -506,16 +568,20 @@ final class BattleResolveTest extends TestCase
 
         $this->assertSame(
             [],
-            $this->game->liveCarriers($stranger),
+            $this->game->carriersInSight($stranger),
             'a stranger saw a corpse across the map',
         );
+
+        // And it is not on their state either -- that endpoint is what is
+        // theirs, and this is not.
+        $this->assertSame([], $this->game->ownCarriers($stranger));
 
         // Walk over to it and it is simply there, like anything else in sight.
         $stranger->col = $carrier->col;
         $stranger->row = $carrier->row;
         $stranger->save();
 
-        $seen = collect($this->game->liveCarriers($stranger->fresh()))
+        $seen = collect($this->game->carriersInSight($stranger->fresh()))
             ->firstWhere(fn (array $c) => $c['col'] === $carrier->col && $c['row'] === $carrier->row);
 
         $this->assertNotNull($seen, 'a corpse underfoot was invisible');
@@ -540,7 +606,7 @@ final class BattleResolveTest extends TestCase
         $this->character->row = $carrier->row;
         $this->character->save();
 
-        $result = $this->killCarrier($this->character);
+        $result = $this->killCarrier($this->character, $carrier);
 
         $this->assertTrue($result['corpse']['mine']);
         $this->assertSame($carrier->label, $result['recovered']);
@@ -587,7 +653,7 @@ final class BattleResolveTest extends TestCase
         $stranger->row = $carrier->row;
         $stranger->save();
 
-        $result = $this->killCarrier($stranger);
+        $result = $this->killCarrier($stranger, $carrier);
 
         $this->assertFalse($result['corpse']['mine']);
         $this->assertSame($carrier->label, $result['burned']);
@@ -645,8 +711,9 @@ final class BattleResolveTest extends TestCase
     }
 
     /**
-     * §8.2 / §9.5.7 -- a death is never a surprise. The preview says so while
-     * there is still a choice to make.
+     * §8.2 / §9.5.7 -- a death is never a surprise. Losing IS dying, so the
+     * preview states it every time rather than checking a condition: the odds
+     * are half the decision and what a loss costs is the other half.
      */
     public function test_the_preview_warns_that_a_loss_here_would_be_a_death(): void
     {
@@ -658,9 +725,9 @@ final class BattleResolveTest extends TestCase
 
         $this->assertNotEmpty($preview['warnings']);
         $this->assertStringContainsString(
-            'a death',
+            'Lose and you die',
             implode(' ', $preview['warnings']),
-            'fighting bare-chested was not flagged as fatal',
+            'the terms of the fight were not stated before it was taken',
         );
     }
 
@@ -681,11 +748,12 @@ final class BattleResolveTest extends TestCase
         foreach ($this->packHexes() as $pack) {
             $this->standOn($pack);
 
-            if ($this->game->packHere($this->character->fresh()) === null) {
+            // A hex listed a moment ago may be empty by the time we swing at
+            // it -- see tryFight(). Skipping is what a player would do.
+            $result = $this->tryFight($this->character);
+            if ($result === null) {
                 continue;
             }
-
-            $result = $this->game->fight($this->character->fresh());
             $this->character = $this->character->fresh();
 
             if (! $result['won']) {
@@ -724,11 +792,12 @@ final class BattleResolveTest extends TestCase
         foreach ($this->packHexes() as $pack) {
             $this->standOn($pack);
 
-            if ($this->game->packHere($this->character->fresh()) === null) {
+            // A hex listed a moment ago may be empty by the time we swing at
+            // it -- see tryFight(). Skipping is what a player would do.
+            $result = $this->tryFight($this->character);
+            if ($result === null) {
                 continue;
             }
-
-            $result = $this->game->fight($this->character->fresh());
             $this->character = $this->character->fresh();
 
             $loot = $result['looted'] ?? null;
@@ -789,11 +858,12 @@ final class BattleResolveTest extends TestCase
         foreach ($this->packHexes() as $pack) {
             $this->standOn($pack);
 
-            if ($this->game->packHere($this->character->fresh()) === null) {
+            // A hex listed a moment ago may be empty by the time we swing at
+            // it -- see tryFight(). Skipping is what a player would do.
+            $result = $this->tryFight($this->character);
+            if ($result === null) {
                 continue;
             }
-
-            $result = $this->game->fight($this->character->fresh());
             $this->character = $this->character->fresh();
 
             if (($result['leftBehind'] ?? null) !== null) {

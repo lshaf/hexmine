@@ -201,7 +201,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
         </p>
 
         <div v-if="battle.died" class="inset death">
-          <strong class="tiny">Nothing took the hit.</strong>
+          <strong class="tiny">It put you down.</strong>
           <p v-if="battle.stolen" class="tiny muted">
             It kept <strong>{{ battle.stolen.label }}</strong> and is still standing
             where you fell. Kill it yourself and the row comes home — anybody else

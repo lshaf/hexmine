@@ -19,7 +19,7 @@ class GameJob extends Model
     protected $fillable = [
         'character_id', 'kind', 'status', 'col', 'row', 'slot', 'material_key',
         'settlement_id', 'recipe_key', 'output_key', 'presence', 'quantity',
-        'skill_key', 'started_at', 'ends_at',
+        'skill_key', 'started_at', 'ends_at', 'payload',
     ];
 
     protected $casts = [
@@ -30,6 +30,7 @@ class GameJob extends Model
         'presence' => 'boolean',
         'started_at' => 'integer',
         'ends_at' => 'integer',
+        'payload' => 'array',
     ];
 
     /** Ready to collect. Derived from the clock, never from a stored flag. */

@@ -464,7 +464,7 @@ export interface Recipe {
 
 // ---------------------------------------------------------------- jobs
 
-export type JobKind = 'mining' | 'hunting' | 'processing' | 'craft'
+export type JobKind = 'mining' | 'hunting' | 'processing' | 'craft' | 'battle'
 export type JobStatus = 'active' | 'ready'
 
 /**
@@ -530,7 +530,31 @@ export interface CraftJob extends BenchJob {
   skill: string
 }
 
-export type Job = FieldJob | ProcessingJob | CraftJob
+/**
+ * §9.5.5 -- a fight under way.
+ *
+ * On a hex like a trip and pinning you the same way, but carrying nothing about
+ * how it went: the roll happened when it started and is held server-side until
+ * the fight is collected. A countdown to an outcome the client already knew
+ * would be a countdown to nothing.
+ */
+export interface BattleJob {
+  id: string
+  kind: 'battle'
+  status: JobStatus
+  col: number
+  row: number
+  slot: null
+  quantity: number
+  startedAt: number
+  endsAt: number
+  /** The battle job it will teach, or a stand-in when nothing is armed. */
+  skill: string
+  /** What is being fought, for the glyph and the name. */
+  monster: string | null
+}
+
+export type Job = FieldJob | ProcessingJob | CraftJob | BattleJob
 
 // --------------------------------------------------------------- travelling
 

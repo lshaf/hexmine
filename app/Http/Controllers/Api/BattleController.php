@@ -22,17 +22,22 @@ class BattleController extends GameController
     }
 
     /**
-     * §9.5.5 -- settle it. Takes no coordinates for the same reason the
-     * preview does not, and no confirmation flag either: the odds and the
-     * warning were on the preview, and asking twice is not a safeguard.
+     * §9.5.5 -- close with it. Takes no coordinates for the same reason the
+     * preview does not, and no confirmation flag either: the odds and what a
+     * loss costs were both on the preview, and asking twice is not a safeguard.
+     *
+     * Answers with the JOB, not the outcome. A fight takes time now, and the
+     * report comes off the collect like every other piece of work.
      */
     public function store(Request $request): JsonResponse
     {
         $character = $this->character($request);
+        $job = $this->game->startBattle($character);
 
-        // No message: the result plate is the whole report, and a toast beside
-        // it would be the same news twice -- the worse of the two, since a
-        // fight can destroy something (§8.2) and a status line cannot say so.
-        return $this->respond($character, $this->game->fight($character));
+        return $this->respond(
+            $character,
+            $this->game->jobPayload($job),
+            'You close with it.',
+        );
     }
 }

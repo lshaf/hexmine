@@ -225,8 +225,11 @@ mentally navigable map. Rare-material biome variants sit inside/near the PvP rin
   in a radius). Fills outward naturally.
 
 ### 5.5 Hunting grounds
-Not a tile type. **Temporary herd markers** spawn on open **Plains** hexes and decay after
-~4h. Yields Pelt, the plains animal parts (horn, sinew), the biome's critter and a little of
+Not a tile type. **Temporary herd markers** spawn on open **Plains** hexes — open
+meaning neither water nor a settlement nor a dungeon mouth, for the reason §9.5.1
+keeps packs off a capital: a settlement is worked ground (§6), and a deer in the
+market square is the same category error as a monster camped on the only
+five-line bench in the region. They decay after ~4h. Yields Pelt, the plains animal parts (horn, sinew), the biome's critter and a little of
 whatever grows there. No party, no raid charge, just time.
 
 **No Tier 4, and that is a §2 rule rather than a tuning value.** Essence used to be
@@ -1259,7 +1262,9 @@ A pack does **not** force a fight. It stops you, which is a different thing.
 **This is never the dead end §5.6 forbids**, and the reason is exactly that a
 **loss clears the pack too**. A character who wandered in over their head is
 never parked: they can always fight, bare-handed if their gear is gone, and
-losing is a legitimate way out. It costs durability and pays nothing.
+losing is a legitimate way out — an expensive one, since losing is dying
+(§9.5.7), but never a locked door. It pays nothing and costs durability, a row,
+and the walk back.
 
 Which is why **a loss grants no XP at all.** Half XP for losing sounds generous
 and is a trickle you can farm by dying on purpose. Losing is an exit, not a
@@ -1375,9 +1380,33 @@ while the number the player was shown says 95% — so the clamp would be a claim
 the die does not honour. The preview is a promise, which makes the number on it
 the one the fight has to be settled by.
 
+**A fight takes time, and you are held on that hex while it runs.** It used to
+be instant, which made a pack a button rather than an engagement: tap, read the
+plate, walk on. The clock is short — three minutes plus two a tier, so five at
+the treeline and eleven in the centre, well under the cheapest bench run (§8.4)
+because the pin (§9.5.3) is already holding you and a long clock on top would
+make one pack a lost afternoon.
+
+Three things follow, and all three are the same rule the rest of the game runs
+on:
+
+- **The roll happens when you close, and is stored.** Exactly as a trip records
+  the material its tool could reach: the kit that took the fight is the kit that
+  fought it, and swapping to a better sword while the timer runs buys nothing.
+- **The pack is spent on engagement, not on resolution.** While you are swinging
+  at it there is no pack for anybody else either.
+- **A fight cannot be abandoned.** §9.5.3 offers exactly two exits from a pack
+  and once the first is chosen there is no third — dropping it would be a way to
+  duck a loss, and a loss is a death (§9.5.7).
+
 **The odds are shown before you commit**, off a preview like `previewGather`,
 alongside the monster's numbers and any warning about gear that will not survive
 (§8.2). Server-computed and server-seeded, like every other outcome (§16).
+
+**What a loss costs is printed beside them, every time.** Not as a condition
+that sometimes applies — losing is dying (§9.5.7), so it is the terms of the
+fight rather than a hazard to check for. The odds are half the decision; what
+they are odds *of* is the other half.
 
 #### 9.5.6 Durability wear *is* the combat system
 
@@ -1416,14 +1445,18 @@ without is cheap and loses.
 
 #### 9.5.7 Death — when nothing was left to take the hit
 
-Death is the third outcome, and the rule that produces it is narrow:
+Death is not a third outcome. It is what losing *is*:
 
-> **A loss becomes a death when nothing absorbed it** — no armor equipped at
-> all, or the piece that would have taken the hit was destroyed in that same
-> exchange.
+> **A loss is a death.** Whatever you were wearing when you took the fight.
 
-Fighting bare-chested is therefore not merely worse, it is how you die. What it
-costs:
+*(It used to be narrow — a loss only killed you when nothing absorbed it, no
+armor at all or the piece that would have taken the hit going with it. That made
+the interesting question "am I wearing anything" rather than "should I take this
+fight", and the second one is what the odds exist to be read for. **Armor still
+decides whether you lose** — defence feeds the hold and the hold is half the
+margin — it simply no longer decides what losing costs.)*
+
+What it costs:
 
 1. You wake at the **nearest settlement**. The walk back is the first bill, and
    at ten minutes a hex it is a real one.
@@ -1434,7 +1467,10 @@ costs:
    - **Its owner sees it through any fog, at any distance.** It is their row, on
      a clock, and a debt you cannot find is a fine with extra steps. This is the
      only thing in the game outside the fog, and it is outside it for exactly
-     one wallet.
+     one wallet — so it rides the **player state**, not the map. That split is
+     what keeps the two endpoints meaning one thing each: the state is what is
+     *yours* and is bounded by nothing, the map is what is *around you* and is
+     bounded by sight.
    - **Everybody else sees it only inside sight** (§5.6). A stranger's corpse is
      not owed to you, and a map-wide list of them would be a *scanner* — every
      death on the server, live, with the rich ones worth racing to. Finding one

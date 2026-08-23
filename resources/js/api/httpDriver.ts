@@ -125,8 +125,8 @@ export class HttpDriver implements GameApi {
     return request<BattlePreview>('/battle/preview')
   }
 
-  fight(): Promise<ActionResult<BattleResult>> {
-    return post<ActionResult<BattleResult>>('/battle')
+  fight(): Promise<ActionResult<Job>> {
+    return post<ActionResult<Job>>('/battle')
   }
 
   startMining(col: number, row: number): Promise<ActionResult<Job>> {
@@ -141,8 +141,8 @@ export class HttpDriver implements GameApi {
     return post<ActionResult<Job>>('/hunting', { col, row })
   }
 
-  collectJob(jobId: string): Promise<ActionResult<CollectResult>> {
-    return post<ActionResult<CollectResult>>(`/jobs/${jobId}/collect`)
+  collectJob(jobId: string): Promise<ActionResult<CollectResult | BattleResult>> {
+    return post<ActionResult<CollectResult | BattleResult>>(`/jobs/${jobId}/collect`)
   }
 
   abandonJob(jobId: string): Promise<ActionResult<null>> {

@@ -188,9 +188,14 @@ watch(
 
 const packHint = computed(() => {
   const b = battle.value
-  if (!b?.canFight) return 'Nothing here will let you work'
+  if (!b) return 'Nothing here will let you work'
+  if (b.reason) return b.reason
 
-  return `${Math.round((b.odds ?? 0) * 100)}% · you ${b.attack}/${b.defence} · it ${b.monster?.attack}/${b.monster?.defence}`
+  // §9.5.5 -- the odds, both pairs, and how long the swing takes. What a loss
+  // costs is on the warning line underneath, because it is not a number.
+  const clock = b.seconds ? ` · ${formatDuration(b.seconds * 1000)}` : ''
+
+  return `${Math.round((b.odds ?? 0) * 100)}% · you ${b.attack}/${b.defence} · it ${b.monster?.attack}/${b.monster?.defence}${clock}`
 })
 
 const corpseHint = computed(() => {
@@ -211,6 +216,13 @@ const huntHint = computed(() => {
 
 const claimHint = computed(() => {
   if (!trip.value) return ''
+
+  // §9.5.5 -- a fight has no units and no partial anything. What is waiting is
+  // the answer to a question you already asked.
+  if (trip.value.kind === 'battle') {
+    return ready.value ? 'See how it went' : 'Still swinging'
+  }
+
   if (ready.value) return `${trip.value.quantity} units waiting`
   return trip.value.kind === 'hunting' ? 'Still working this herd' : 'Still working this hex'
 })
@@ -236,9 +248,10 @@ const processHint = computed(() => {
  */
 const doing = computed(() => {
   if (!trip.value) return null
-  if (ready.value) return 'Reward ready'
+  if (ready.value) return trip.value.kind === 'battle' ? 'The fight is over' : 'Reward ready'
 
-  const verb = trip.value.kind === 'hunting' ? 'Hunting' : 'Working'
+  const verb =
+    trip.value.kind === 'battle' ? 'Fighting' : trip.value.kind === 'hunting' ? 'Hunting' : 'Working'
 
   return `${verb} · ${formatDuration(trip.value.endsAt - game.now)}`
 })
@@ -289,14 +302,18 @@ function hunted(): void {
         <template v-if="trip">
           <HexAction
             small
-            icon="claim"
-            label="Claim"
+            :icon="trip.kind === 'battle' ? 'battle' : 'claim'"
+            :label="trip.kind === 'battle' ? 'Result' : 'Claim'"
             :primary="ready"
             :disabled="!ready || game.busy"
             :hint="claimHint"
             @activate="game.collect(trip.id)"
           />
+          <!-- §9.5.5 -- a fight is not one of the things you may walk away
+               from. §9.5.3 offers two exits from a pack and once the first is
+               chosen there is no third. -->
           <HexAction
+            v-if="trip.kind !== 'battle'"
             small
             icon="drop"
             label="Drop"

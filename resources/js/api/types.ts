@@ -95,6 +95,14 @@ export interface PlayerState {
   jobs: Job[]
   /** Settlement the player is currently present at, §6.2. */
   presenceAt: string | null
+  /**
+   * §9.5.7 -- YOUR corpses, at any distance and through any fog.
+   *
+   * Here rather than on the map, and that split is what makes the two
+   * endpoints mean one thing each: this is what is yours and is bounded by
+   * nothing, the map is what is around you and is bounded by sight (§5.6).
+   */
+  carriers: Carrier[]
   /** The journey under way, or null when standing still. */
   travel: TravelState | null
   /**
@@ -344,10 +352,7 @@ export interface MapMutations {
   occupied: Array<[number, number, number]>
   /** §9.5.1 -- packs in sight that somebody has already fought, win or lose. */
   cleared: Array<[number, number]>
-  /**
-   * §9.5.7 -- the corpses this character can see: their own through any fog,
-   * anybody else's only inside sight.
-   */
+  /** §9.5.7 -- other people's corpses, inside sight like everything else here. */
   carriers: Carrier[]
 }
 
@@ -385,6 +390,8 @@ export interface BattlePreview {
   reason: string | null
   /** Unix ms the pack wanders off, which is the other way out of the pin. */
   until?: number
+  /** §9.5.5 -- how long the swing takes. A fight is work, not a button. */
+  seconds?: number
   monster?: {
     key: string
     name: string
@@ -518,14 +525,16 @@ export interface GameApi {
   previewTile(col: number, row: number): Promise<TilePreview>
   /** §9.5.5 -- no coordinates: the only fight on offer is the one under your feet. */
   previewBattle(): Promise<BattlePreview>
-  fight(): Promise<ActionResult<BattleResult>>
+  /** §9.5.5 -- starts a fight and answers with the JOB; the report is on collect. */
+  fight(): Promise<ActionResult<Job>>
 
   startMining(col: number, row: number): Promise<ActionResult<Job>>
   /** §4.0 -- the same hex, by hand. Its own call because it is its own verb. */
   startGathering(col: number, row: number): Promise<ActionResult<Job>>
   /** §5.5 -- work a herd marker. Its own verb, not a mode of mining. */
   startHunt(col: number, row: number): Promise<ActionResult<Job>>
-  collectJob(jobId: string): Promise<ActionResult<CollectResult>>
+  /** §9.5.5 -- a battle job answers with a BattleResult, everything else a haul. */
+  collectJob(jobId: string): Promise<ActionResult<CollectResult | BattleResult>>
   abandonJob(jobId: string): Promise<ActionResult<null>>
 
   getStation(settlementId: string): Promise<StationState>
