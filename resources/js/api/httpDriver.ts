@@ -181,6 +181,10 @@ export class HttpDriver implements GameApi {
     })
   }
 
+  sellEquipment(ownedId: string): Promise<ActionResult<{ gold: number }>> {
+    return post<ActionResult<{ gold: number }>>(`/shop/equipment-sales/${ownedId}`, {})
+  }
+
   getQuests(): Promise<Record<string, QuestDef>> {
     return request<{ quests: Record<string, QuestDef> }>('/quests').then((r) => r.quests)
   }
@@ -189,8 +193,8 @@ export class HttpDriver implements GameApi {
     return post<ActionResult<QuestReward>>(`/quests/${quest}/claim`, {})
   }
 
-  craftItem(itemKey: string): Promise<ActionResult<OwnedItem>> {
-    return post<ActionResult<OwnedItem>>('/crafting', { item: itemKey })
+  craftItem(itemKey: string): Promise<ActionResult<Job>> {
+    return post<ActionResult<Job>>('/crafting', { item: itemKey })
   }
 
   equipItem(ownedId: string): Promise<ActionResult<null>> {

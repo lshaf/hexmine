@@ -1168,7 +1168,12 @@ class GameService
             // generation constant: the algorithm is mirrored, the numbers are
             // not, so tuning the rings cannot silently desync the two.
             'packLifetimeMs' => Balance::scaled(Balance::PACK_LIFETIME_MS),
-            'packChance' => Balance::PACK_CHANCE,
+            // Zeroed rather than omitted when the roads are quiet, so the
+            // client's mirror of packAt() agrees with the server's instead of
+            // drawing packs nobody can meet.
+            'packChance' => Balance::packsEnabled()
+                ? Balance::PACK_CHANCE
+                : array_map(static fn () => 0.0, Balance::PACK_CHANCE),
             'biomes' => Catalog::BIOMES,
             'biomeMaterial' => Catalog::BIOME_MATERIAL,
             'biomeRare' => Catalog::BIOME_RARE,
@@ -1894,6 +1899,27 @@ class GameService
                 throw new GameException('Still working.', 'not_ready');
             }
 
+            // §6, §8.4 -- anything left at a bench is claimed AT that bench.
+            //
+            // A settlement is a place (§6), and work left in one is work left
+            // somewhere. Claiming it from the other side of the map would make
+            // the building a mailbox: carry materials in, walk off, collect
+            // wherever you happen to be. The walk back is what makes choosing
+            // which capital to use a decision rather than a formality.
+            if ($job->settlement_id !== null) {
+                $bench = $this->settlement((string) $job->settlement_id);
+                $away = $this->isTravelling($character)
+                    || (int) $character->col !== (int) $bench['col']
+                    || (int) $character->row !== (int) $bench['row'];
+
+                if ($away) {
+                    throw new GameException(
+                        "That is waiting for you at {$bench['name']}.",
+                        'not_present',
+                    );
+                }
+            }
+
             $gained = [];
             $durabilityLost = 0;
 
@@ -1939,6 +1965,26 @@ class GameService
 
                 // No depletion and no TileState row: the herd was the resource,
                 // and it leaves on its own clock whatever anybody does here.
+            } elseif ($job->kind === 'craft') {
+                // §8.4 -- the bench hands over one thing, not a haul. Nothing
+                // here goes through the material ledger, so `gained` stays
+                // empty and the receipt names the item instead.
+                $made = $this->finishCraft($character, $job);
+                $lostToOverflow = 0;
+                $xpAmount = 0;
+
+                $job->delete();
+                $character->save();
+
+                return [
+                    'gained' => [],
+                    'lostToOverflow' => 0,
+                    'made' => $made,
+                    'xp' => ['skill' => null, 'amount' => 0],
+                    'characterXp' => 0,
+                    'levelsGained' => 0,
+                    'durabilityLost' => 0,
+                ];
             } else {
                 $granted = $this->addMaterial($character, $job->output_key, $job->quantity);
                 $lostToOverflow = $job->quantity - $granted;
@@ -2585,7 +2631,19 @@ class GameService
     // ------------------------------------------------------------------- craft
 
     /** @return CharacterItem|CharacterConsumable a new object, or the grown stack */
-    public function craftItem(Character $character, string $itemKey): Model
+    /**
+     * §8.4 -- put a thing on a bench. It is not made until it is collected.
+     *
+     * Everything that can refuse does so HERE, before a single material is
+     * spent: the bench's reach, the strap the output will need (§7.6), and the
+     * stock itself. What happens later is only the clock.
+     *
+     * One craft per settlement, and no cap beyond that. A bench is a place, not
+     * a queue you can stack five deep -- and since the claim needs you standing
+     * where you left it (§8.4), the real limit is how far apart the benches are
+     * and how much walking you are prepared to do.
+     */
+    public function startCraft(Character $character, string $itemKey): GameJob
     {
         return DB::transaction(function () use ($character, $itemKey) {
             $def = Catalog::item($itemKey);
@@ -2612,16 +2670,24 @@ class GameService
                 $this->requireSettlement($character, 'craft', $def['station']);
             }
 
-            // §7.4.3 -- a Smith's cheaper crafts do not make an Armorer's
-            // cheaper, so the discount is read from the job whose bench this is.
-            // Never below one of anything: a free craft is not a discount, it is
-            // a hole in the §11 materials sink.
+            if ($this->craftJobAt($character, $here['id']) !== null) {
+                throw new GameException(
+                    "You already have something on the bench at {$here['name']}.",
+                    'busy',
+                );
+            }
+
             // §7.6 -- a potion joins a shelf it may already have; anything with
-            // a slot is a new row every time, because gear does not stack.
+            // a slot is a new row every time, because gear does not stack. Asked
+            // now AND again on collection: an hour is long enough to fill a bag.
             if (empty($def['consumable']) || $this->heldConsumable($character, $itemKey) <= 0) {
                 $this->requireFreeRow($character, $def['name']);
             }
 
+            // §7.4.3 -- a Smith's cheaper crafts do not make an Armorer's
+            // cheaper, so the discount is read from the job whose bench this is.
+            // Never below one of anything: a free craft is not a discount, it is
+            // a hole in the §11 materials sink.
             $effects = $this->craftEffects($character, $this->jobForItem($def));
             $inputs = [];
             foreach ($def['inputs'] as $key => $qty) {
@@ -2638,59 +2704,134 @@ class GameService
                 $this->takeMaterial($character, $key, $qty);
             }
 
-            // §12 -- the item and its bench, so a quest may name either.
-            $this->fireQuest($character, 'craft', 1, $itemKey);
-            $this->fireQuest($character, 'craft', 1, Catalog::category($def));
-            $character->save();
+            $now = $this->now();
+            $presence = $character->presence_settlement_id === $here['id'];
 
-            // §7.4 -- the bench that made it is the job that learns from it, and
-            // a better piece teaches more: common 10 through epic 40.
-            $jobKey = $this->jobForItem($def);
-            if ($jobKey !== null) {
-                $this->grantJobXp(
-                    $character,
-                    $jobKey,
-                    Balance::JOB_XP_PER_RARITY_RANK * (Balance::rarityRank($def['rarity']) + 1),
+            // The same clock processing runs on (§6): the bench's tier, whether
+            // you are standing over it, and whatever the gloves are worth. One
+            // model for both, because they are the same building.
+            $seconds = Formulas::processingTime(
+                Balance::CRAFT_BASE_SECONDS[$def['rarity']] ?? Balance::CRAFT_BASE_SECONDS['common'],
+                $here['tier'],
+                $presence,
+                $this->bonuses($character, 'processing')['processingSpeed'],
+            );
+
+            return GameJob::create([
+                'character_id' => $character->id,
+                'kind' => 'craft',
+                'status' => 'active',
+                'settlement_id' => $here['id'],
+                'output_key' => $itemKey,
+                'presence' => $presence,
+                'quantity' => 1,
+                // §8.4 -- the bench, not a gathering line: a craft belongs to
+                // the smith, the armorer or the alchemist, and that is the job
+                // it will teach when it comes off (§7.4).
+                'skill_key' => $this->jobForItem($def) ?? 'smith',
+                'started_at' => $now,
+                'ends_at' => $now + Balance::scaled($seconds * 1000),
+            ]);
+        });
+    }
+
+    /** §8.4 -- what this character has on the bench at one settlement. */
+    public function craftJobAt(Character $character, string $settlementId): ?GameJob
+    {
+        return $character->jobs()
+            ->where('kind', 'craft')
+            ->where('settlement_id', $settlementId)
+            ->first();
+    }
+
+    /**
+     * §8.4 -- take the finished thing off the bench.
+     *
+     * The rolls happen HERE rather than when the work started: an option is a
+     * property of the thing that came out, and reading the tree at the moment
+     * it is handed over means a node bought while it cooled still counts.
+     */
+    private function finishCraft(Character $character, GameJob $job): array
+    {
+        $itemKey = (string) $job->output_key;
+        $def = Catalog::item($itemKey);
+
+        if ($def === null) {
+            throw new GameException('Whatever this was, it is not in the catalog any more.', 'not_found');
+        }
+
+        // §7.6 -- asked again, because the bag it has to land in is an hour
+        // older than the one that was checked when the work started. Refused
+        // rather than dropped: the thing is finished and waiting, and the way
+        // out is a strap, which is always in reach.
+        if (empty($def['consumable']) || $this->heldConsumable($character, $itemKey) <= 0) {
+            $this->requireFreeRow($character, $def['name']);
+        }
+
+        // §12 -- the item and its bench, so a quest may name either. Fired on
+        // collection: a craft walked away from made nothing.
+        $this->fireQuest($character, 'craft', 1, $itemKey);
+        $this->fireQuest($character, 'craft', 1, Catalog::category($def));
+        $character->save();
+
+        // §7.4 -- the bench that made it is the job that learns from it, and
+        // a better piece teaches more: common 10 through epic 40.
+        $jobKey = $this->jobForItem($def);
+        if ($jobKey !== null) {
+            $this->grantJobXp(
+                $character,
+                $jobKey,
+                Balance::JOB_XP_PER_RARITY_RANK * (Balance::rarityRank($def['rarity']) + 1),
+            );
+        }
+
+        $effects = $this->craftEffects($character, $jobKey);
+
+        // §8.5 -- a potion stacks on a shelf. It has no durability to track
+        // and no slot to sit in, so it never becomes a CharacterItem.
+        if (! empty($def['consumable'])) {
+            $row = CharacterConsumable::firstOrNew([
+                'character_id' => $character->id,
+                'item_key' => $itemKey,
+            ]);
+
+            if ($row->quantity >= Balance::CONSUMABLE_STACK_CAP) {
+                throw new GameException(
+                    "You cannot carry more than {$row->quantity} {$def['name']}.",
+                    'at_cap',
                 );
             }
 
-            // §8.5 -- a potion stacks on a shelf. It has no durability to track
-            // and no slot to sit in, so it never becomes a CharacterItem.
-            if (! empty($def['consumable'])) {
-                $row = CharacterConsumable::firstOrNew([
-                    'character_id' => $character->id,
-                    'item_key' => $itemKey,
-                ]);
+            $row->quantity = min(Balance::CONSUMABLE_STACK_CAP, (int) $row->quantity + 1);
+            $row->save();
 
-                if ($row->quantity >= Balance::CONSUMABLE_STACK_CAP) {
-                    throw new GameException(
-                        "You cannot carry more than {$row->quantity} {$def['name']}.",
-                        'at_cap',
-                    );
-                }
+            return ['key' => $itemKey, 'name' => $def['name'], 'consumable' => true];
+        }
 
-                $row->quantity = min(Balance::CONSUMABLE_STACK_CAP, (int) $row->quantity + 1);
-                $row->save();
+        // §7.4.3 -- a better-made thing lasts longer. Capped, because
+        // durability is the repair sink and this thins it.
+        $durability = (int) round($def['maxDurability'] * (1 + $effects['craftDurability']));
 
-                return $row;
-            }
+        $item = CharacterItem::create([
+            'character_id' => $character->id,
+            'item_key' => $itemKey,
+            'durability' => $durability,
+            'equipped' => false,
+            'options' => $this->rollFor($character, $def, $this->extraRoll(
+                $character,
+                $effects['craftOption'],
+                0x5c11,
+            )),
+        ]);
 
-            // §7.4.3 -- a better-made thing lasts longer. Capped, because
-            // durability is the repair sink and this thins it.
-            $durability = (int) round($def['maxDurability'] * (1 + $effects['craftDurability']));
-
-            return CharacterItem::create([
-                'character_id' => $character->id,
-                'item_key' => $itemKey,
-                'durability' => $durability,
-                'equipped' => false,
-                'options' => $this->rollFor($character, $def, $this->extraRoll(
-                    $character,
-                    $effects['craftOption'],
-                    0x5c11,
-                )),
-            ]);
-        });
+        return [
+            'key' => $itemKey,
+            'name' => $def['name'],
+            'consumable' => false,
+            'itemId' => (string) $item->id,
+            'durability' => $durability,
+            'options' => $item->options ?? [],
+        ];
     }
 
     // ------------------------------------------------------------------ jobs §7.4
@@ -3144,6 +3285,70 @@ class GameService
         });
     }
 
+    /**
+     * §8.2 -- sell a piece of gear back to the trader.
+     *
+     * The third exit a piece of equipment has, and the three are deliberately
+     * different: **repair** keeps it, **salvage** returns a fraction of what
+     * went into it, and this returns gold scaled by what is left of it.
+     *
+     * Four refusals, and each one closes a hole rather than being a nicety:
+     *
+     *  - Not at a settlement. The trader is an NPC who stands somewhere; there
+     *    is nobody in the middle of a forest to sell an axe to (§6).
+     *  - Not while it is worn. A sale is a trade, and losing the tool off your
+     *    own belt to a mistap is worse than losing one out of the pack. Stow it
+     *    first, which is one tap and says what you are about to do.
+     *  - Not what the trader does not stock. Gold buys the bottom two rungs and
+     *    never the top (§3.2), so a crafted or NFT piece has no shelf price to
+     *    halve -- and §8.2 already gives that gear an exit in salvage.
+     *  - Not for nothing. A piece worn down past the point where half its price
+     *    still rounds to a coin is refused rather than taken for zero.
+     *
+     * §7.6 -- selling frees a row, and it works from wherever you are standing,
+     * which is what makes it one of the ways out of a full bag.
+     *
+     * @return array{gold:int,name:string}
+     */
+    public function sellItem(Character $character, int $itemId): array
+    {
+        return DB::transaction(function () use ($character, $itemId) {
+            $item = $this->ownedItem($character, $itemId);
+            $def = Catalog::item($item->item_key);
+
+            $this->requireSettlement($character, 'trade');
+
+            if ($item->equipped) {
+                throw new GameException(
+                    "{$def['name']} is on your belt. Stow it before you sell it.",
+                    'equipped',
+                );
+            }
+
+            $gold = Formulas::resaleValue($def, (int) $item->durability);
+
+            if (($def['goldPrice'] ?? 0) <= 0) {
+                throw new GameException(
+                    "The trader does not deal in {$def['name']}. Scrap it for materials instead.",
+                    'not_sellable',
+                );
+            }
+
+            if ($gold <= 0) {
+                throw new GameException(
+                    "{$def['name']} is too far gone to be worth a coin. Repair it, or scrap it for materials.",
+                    'worthless',
+                );
+            }
+
+            $character->gold += $gold;
+            $item->delete();
+            $character->save();
+
+            return ['gold' => $gold, 'name' => $def['name']];
+        });
+    }
+
     /** @return array<string,int> salvage returned */
     public function discardItem(Character $character, int $itemId): array
     {
@@ -3189,12 +3394,21 @@ class GameService
             ];
         }
 
+        $bench = $job->settlement_id !== null
+            ? $this->settlement((string) $job->settlement_id)
+            : null;
+
         return $payload + [
             'settlementId' => $job->settlement_id,
             'recipeKey' => $job->recipe_key,
             'input' => $job->material_key,
             'output' => $job->output_key,
             'presence' => $job->presence,
+            // §8.4 -- where it is waiting, because a claim now needs you
+            // standing there and "ready" on its own would be a cruel word.
+            'settlementName' => $bench['name'] ?? null,
+            'col' => $bench['col'] ?? null,
+            'row' => $bench['row'] ?? null,
         ];
     }
 

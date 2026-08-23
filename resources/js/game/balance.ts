@@ -83,6 +83,25 @@ export const PROCESSING = {
   presenceXpPerMinute: 4,
 } as const
 
+/**
+ * §8.4 -- how long a bench holds a thing, by rung. Mirrors
+ * Balance::CRAFT_BASE_SECONDS.
+ *
+ * Base seconds, before the settlement's tier, the presence bonus and the gloves
+ * are applied -- and before the game clock is. The client quotes this to answer
+ * "is it worth starting here"; the exact figure arrives with the job.
+ */
+export const CRAFT = {
+  seconds: {
+    common: 8 * 60,
+    uncommon: 14 * 60,
+    rare: 22 * 60,
+    epic: 34 * 60,
+    legendary: 50 * 60,
+    unique: 50 * 60,
+  } as const,
+} as const
+
 export const CHARACTER = {
   startingGold: 25,
   /**
@@ -201,6 +220,16 @@ export const EQUIPMENT = {
   salvageRate: 0.25,
   /** Repair must be cheaper than crafting new, but not dramatically, §8.2. */
   repairCostRate: 0.6,
+  /** §8.2 -- what the trader gives back for shop gear, before wear is applied. */
+  resaleRate: 0.5,
+  /**
+   * §3.2 -- the shelf: the higher of what a piece costs to MAKE (parts marked
+   * up, plus bench time at §8.4's clock) and what it is WORTH (gold per point
+   * of durability, per station).
+   */
+  stationGoldPerDurability: { village: 0.43, city: 1.4 },
+  shopMaterialMarkup: 1.5,
+  goldPerCraftMinute: 1,
 } as const
 
 export const ECONOMY = {

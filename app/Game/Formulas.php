@@ -298,6 +298,32 @@ final class Formulas
     }
 
     /** Salvage returned when an item is discarded, §8.2. */
+    /**
+     * §8.2 -- what a trader pays for a piece of shop gear.
+     *
+     * Half the shelf price, scaled by what is left of the item: a half-worn axe
+     * fetches half of half. Wear is already the thing the player is losing to
+     * (§8.1 rule 3), so the resale simply reports it back rather than inventing
+     * a second schedule for it.
+     *
+     * Zero for anything the trader does not stock. Gold buys the bottom two
+     * rungs and nothing else (§3.2), so there is no shelf price to halve for a
+     * crafted or NFT piece -- and §8.2's salvage is that gear's exit, not this.
+     * Zero is also what a broken piece is worth, which the caller refuses
+     * rather than paying: an idle game must not take something for nothing.
+     */
+    public static function resaleValue(array $def, int $durability): int
+    {
+        $price = $def['goldPrice'] ?? 0;
+        $max = $def['maxDurability'] ?? 0;
+
+        if ($price <= 0 || $max <= 0 || $durability <= 0) {
+            return 0;
+        }
+
+        return (int) floor($price * Balance::RESALE_RATE * (min($durability, $max) / $max));
+    }
+
     public static function salvageYield(array $def): array
     {
         $out = [];

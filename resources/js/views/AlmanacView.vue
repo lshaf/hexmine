@@ -43,7 +43,7 @@ import {
   materialUses,
 } from '@/game/sources'
 import type { SourceLine } from '@/game/sources'
-import { formatPercent, itemStatLine } from '@/game/formulas'
+import { formatPercent, itemStatLine, resaleValue } from '@/game/formulas'
 import { EQUIPMENT, ECONOMY, PROCESSING, BAG } from '@/game/balance'
 import { ACTION_PATHS } from '@/icons/actions'
 import { BIOME_LABEL } from '@/theme/palette'
@@ -67,6 +67,25 @@ import type {
   MaterialTier,
   VariantKey,
 } from '@/game/types'
+
+/**
+ * §3.2 -- what the trader will do about a thing, in one line.
+ *
+ * The almanac already answered "where does this come from"; what it never
+ * answered is "what is it worth", which is the question standing at a counter
+ * actually asks. Both halves get the same line in the same place rather than a
+ * gold chip on one and a sentence buried in a rail on the other.
+ *
+ * Equipment resale is quoted **at full condition**, because that is the only
+ * figure that is a fact about the item rather than about the particular one in
+ * your bag -- §8.2 scales it by what is left, and the trader panel quotes the
+ * real number for the real piece.
+ */
+function traderLine(def: ItemDef): { buy: number; sell: number } {
+  const buy = def.goldPrice ?? 0
+
+  return { buy, sell: resaleValue(def, def.maxDurability ?? 0) }
+}
 
 type Half = 'materials' | 'equipment' | 'tiles'
 
@@ -558,19 +577,31 @@ function nature(item: ItemDef): string {
                           {{ made.name }}
                         </span>
                       </div>
-                      <p v-if="entry.uses.sellsFor" class="tiny muted note">
-                        Or sells to the trader for {{ entry.uses.sellsFor }}g each.
-                      </p>
                     </template>
                     <p v-else class="tiny muted note flat">
                       <template v-if="entry.uses.sellsFor">
-                        Nothing. It sells for {{ entry.uses.sellsFor }}g and that is all it
-                        is for.
+                        Nothing. Selling it is all it is for.
                       </template>
                       <template v-else>
                         Nothing yet, and the trader will not take it either.
                       </template>
                     </p>
+                  </dd>
+                </div>
+
+                <!-- §3.2 -- what it is worth at a counter. Its own rail rather
+                     than a sentence inside Feeds: a price is a fact about the
+                     thing, not one of the roads it travels. -->
+                <div class="rail coin">
+                  <dt class="label">Trader</dt>
+                  <dd>
+                    <template v-if="entry.uses.sellsFor">
+                      <span class="price">{{ entry.uses.sellsFor }}g</span>
+                      <span class="tiny muted"> each</span>
+                    </template>
+                    <!-- §3.3 -- gold has no bridge to NFT value, so the trader
+                         simply will not touch a rare or a raid material. -->
+                    <span v-else class="tiny muted">Will not touch it.</span>
                   </dd>
                 </div>
               </dl>
@@ -633,8 +664,11 @@ function nature(item: ItemDef): string {
                 >
                   <dt class="label">{{ SOURCE_LABEL[source.kind] }}</dt>
                   <dd>
+                    <!-- The price is NOT here. This rail says where a thing
+                         comes from; the Trader rail below says what it costs,
+                         both directions, and one number in two places is one
+                         number too many. -->
                     <span class="where">{{ source.where }}</span>
-                    <span v-if="source.gold" class="chip chip-gold tiny">{{ source.gold }}g</span>
                     <span v-if="source.pending" class="tag">not built yet</span>
                     <div v-if="source.cost" class="cost">
                       <span v-for="c in source.cost" :key="c.key" class="pip mat">
@@ -643,6 +677,28 @@ function nature(item: ItemDef): string {
                       </span>
                     </div>
                     <p v-if="source.note" class="tiny muted note">{{ source.note }}</p>
+                  </dd>
+                </div>
+
+                <!-- §8.2 -- the counter, both directions. Resale is quoted at
+                     full condition: wear scales it, and what a particular
+                     battered piece fetches belongs on the trader screen. -->
+                <div class="rail coin">
+                  <dt class="label">Trader</dt>
+                  <dd>
+                    <template v-if="traderLine(entry.item).buy">
+                      <span class="price">{{ traderLine(entry.item).buy }}g</span>
+                      <span class="tiny muted"> new</span>
+                      <span class="tiny muted sep">·</span>
+                      <span class="price back">{{ traderLine(entry.item).sell }}g</span>
+                      <span class="tiny muted"> back, unworn</span>
+                    </template>
+                    <!-- §3.2 -- gold buys the bottom two rungs and never the
+                         top, so there is no shelf price to halve. Salvage is
+                         this gear's exit instead (§8.2). -->
+                    <span v-else class="tiny muted">
+                      Not stocked, and not bought back. Scrap it for materials.
+                    </span>
                   </dd>
                 </div>
               </dl>
@@ -1042,6 +1098,28 @@ section + section {
 
 .rail.out dt {
   color: #6d7770;
+}
+
+/* §3.2 -- the counter. Gold, because that is the one thing it deals in, and it
+   is the only gold on an entry so the eye finds the price without hunting. */
+.rail.coin {
+  --road: var(--gold);
+}
+
+.price {
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+  color: var(--gold);
+}
+
+/* Buy-back is the lesser of the two numbers and reads as the lesser: same
+   family, no colour. Two golds side by side would make them look equal. */
+.price.back {
+  color: var(--vellum);
+}
+
+.sep {
+  margin: 0 5px;
 }
 
 .rail dd {

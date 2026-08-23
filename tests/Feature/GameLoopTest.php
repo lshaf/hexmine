@@ -34,36 +34,30 @@ final class GameLoopTest extends TestCase
     {
         parent::setUp();
 
+        // §9.5.1 -- quiet roads. This file measures mining, processing and the
+        // bag; a pack wandering onto a hex mid-test pins the character and
+        // refuses all three, on a schedule nobody can see. Map combat has its
+        // own files, and they turn it back on.
+        config(['game.packs' => false]);
+
         $this->game = app(GameService::class);
         $player = Player::create(['wallet' => '0xtest', 'session_id' => 'test']);
         $this->character = $this->game->createCharacter($player);
-
-        $this->clearPackHere();
     }
 
     /**
-     * §9.5.3 -- settle whatever is standing on the character's hex.
+     * §8.4 -- a craft is a bench job now, so a test that wants the ITEM has to
+     * start it, wind the clock, and take it off the bench it was left on.
      *
-     * Packs are a hash of the hex and the clock, so on some runs one is camped
-     * on the spawn tile and pins the character: every trip, hunt and journey in
-     * this file would be refused, on a schedule nobody can see. Clearing it in
-     * setUp makes the rest of the suite deterministic, and the pin is tested on
-     * a hex chosen for holding one.
+     * Collected from where it was started, because that is the rule the bench
+     * enforces (§8.4); every caller here is already standing at one.
      */
-    private function clearPackHere(): void
+    private function craftNow(string $itemKey): array
     {
-        $pack = $this->game->packHere($this->character->fresh());
-        if ($pack === null) {
-            return;
-        }
+        $job = $this->game->startCraft($this->character->fresh(), $itemKey);
+        $job->update(['ends_at' => $this->game->now() - 1]);
 
-        \App\Game\Packs::clear(
-            (int) $this->character->col,
-            (int) $this->character->row,
-            $pack['bucket'],
-            $pack['until'],
-            0,
-        );
+        return $this->game->collectJob($this->character->fresh(), $job->id);
     }
 
     /**
@@ -1770,7 +1764,7 @@ final class GameLoopTest extends TestCase
         $this->give(['wood' => 12, 'planks' => 8, 'heartknot' => 8]);
 
         $before = $this->character->jobLevels()->where('job_key', 'smith')->first()->xp;
-        $this->game->craftItem($this->character->fresh(), 'hewn_axe');
+        $this->craftNow('hewn_axe');
         $after = $this->character->fresh()->jobLevels()->where('job_key', 'smith')->first()->xp;
 
         $this->assertGreaterThan($before, $after, 'forging an axe taught the Smith nothing');
@@ -1797,8 +1791,8 @@ final class GameLoopTest extends TestCase
         $this->standAtWoodcuttingVillage();
         $this->give(['wood' => 12, 'fiber' => 12, 'planks' => 8, 'cloth' => 8, 'leather' => 8, 'heartknot' => 8, 'beeswax' => 8]);
 
-        $this->game->craftItem($this->character->fresh(), 'hewn_axe');
-        $this->game->craftItem($this->character->fresh(), 'work_gloves');
+        $this->craftNow('hewn_axe');
+        $this->craftNow('work_gloves');
 
         // Settlements sit on worked ground, so step off it before digging.
         $open = $this->openNeighbour($this->character->col, $this->character->row);
@@ -1888,7 +1882,7 @@ final class GameLoopTest extends TestCase
 
         $this->give(['wood' => 40, 'planks' => 40, 'heartknot' => 40]);
         $before = $this->game->held($this->character->fresh(), 'wood');
-        $this->game->craftItem($this->character->fresh(), 'hewn_axe');
+        $this->craftNow('hewn_axe');
         $spent = $before - $this->game->held($this->character->fresh(), 'wood');
 
         $this->assertGreaterThan(0, $spent, 'a maxed Smith crafted out of thin air');
@@ -2831,11 +2825,11 @@ final class GameLoopTest extends TestCase
         }
 
         // Common is fine here.
-        $this->game->craftItem($this->character->fresh(), 'hewn_axe');
+        $this->craftNow('hewn_axe');
 
         // Uncommon is not, even with every material in the bag.
         try {
-            $this->game->craftItem($this->character->fresh(), 'iron_pickaxe');
+            $this->game->startCraft($this->character->fresh(), 'iron_pickaxe');
             $this->fail('a village bench forged an uncommon pickaxe');
         } catch (\App\Game\GameException $e) {
             $this->assertSame('station', $e->errorCode);
@@ -3834,6 +3828,306 @@ final class GameLoopTest extends TestCase
             'batch is not exactly the cap, per run rather than per batch',
         );
         $this->assertGreaterThan((int) $plain->quantity, (int) $skilled->quantity);
+    }
+
+    // -------------------------------------------------------- the shelf §3.2
+
+    /**
+     * §3.2 -- the shelf is priced by one rule, and the rule is two valuations.
+     *
+     * What a piece costs to MAKE -- parts marked up, plus bench time -- against
+     * what it is WORTH, which is what it lasts. The price is the higher.
+     *
+     * Hand-picked numbers drift the moment the catalog grows, and these had
+     * already drifted twice: first the gathering tools sat half again under
+     * everything added after them, and then -- once durability alone was the
+     * rule -- the village combat rung came out UNDER its own materials.
+     */
+    public function test_the_shelf_is_the_higher_of_its_two_floors(): void
+    {
+        $checked = 0;
+
+        foreach (Catalog::items() as $key => $def) {
+            $price = $def['goldPrice'] ?? 0;
+            $max = $def['maxDurability'] ?? 0;
+            $station = $def['station'] ?? null;
+            $rate = Balance::STATION_GOLD_PER_DURABILITY[$station] ?? null;
+
+            if ($price <= 0 || $max <= 0 || $rate === null) {
+                continue;
+            }
+
+            $worth = $max * $rate;
+
+            $parts = 0;
+            foreach ($def['inputs'] ?? [] as $material => $qty) {
+                $parts += (Catalog::material($material)['npcPrice'] ?? 0) * $qty;
+            }
+
+            $minutes = (Balance::CRAFT_BASE_SECONDS[$def['rarity']] ?? 0) / 60;
+            $toMake = $parts * Balance::SHOP_MATERIAL_MARKUP
+                + $minutes * Balance::GOLD_PER_CRAFT_MINUTE;
+
+            $this->assertSame(
+                (int) round(max($toMake, $worth)),
+                $price,
+                sprintf(
+                    '%s is %dg; the rule says %d (to make %.1f, worth %.1f)',
+                    $key, $price, (int) round(max($toMake, $worth)), $toMake, $worth,
+                ),
+            );
+            $checked++;
+        }
+
+        $this->assertGreaterThan(20, $checked, 'the shelf sweep found almost nothing to check');
+    }
+
+    /**
+     * §8 -- the shop must never undercut the bench.
+     *
+     * If a shelf price ever falls to what the parts are worth, crafting the
+     * thing is a straight loss and the whole §8.0 ladder inverts: the floor of
+     * the ladder would be the cheapest way to the top of it. This is the failure
+     * a durability-only rule could not see, and it had already happened.
+     */
+    public function test_no_shop_item_costs_less_than_its_own_materials(): void
+    {
+        foreach (Catalog::items() as $key => $def) {
+            $price = $def['goldPrice'] ?? 0;
+            if ($price <= 0 || ! isset($def['inputs'])) {
+                continue;
+            }
+
+            $parts = 0;
+            foreach ($def['inputs'] as $material => $qty) {
+                $parts += (Catalog::material($material)['npcPrice'] ?? 0) * $qty;
+            }
+
+            $this->assertGreaterThan(
+                $parts,
+                $price,
+                "{$key} costs {$price}g and is made of {$parts}g of materials — buying beats crafting",
+            );
+        }
+    }
+
+    /**
+     * The client and the server must agree on what a thing costs.
+     *
+     * Nothing at runtime notices when they drift: the shop draws the client's
+     * number, the server charges its own, and the player is quietly lied to. It
+     * had already happened -- five tools were 20/22/24/20/18 on the client and
+     * 12/13/14/12/11 on the server -- and it only surfaced when resale started
+     * quoting a price before the sale went through.
+     *
+     * catalog.ts is hand-maintained and the worldgen parity script does not
+     * cover it, so this reads the file as text. Crude, and it catches the whole
+     * class.
+     */
+    public function test_the_client_and_server_agree_on_every_price(): void
+    {
+        $sources = '';
+        foreach (['catalog.ts', 'battlegear.ts', 'toptier.ts', 'components.ts', 'alchemy.ts'] as $file) {
+            $path = base_path("resources/js/game/{$file}");
+            if (is_file($path)) {
+                $sources .= file_get_contents($path);
+            }
+        }
+
+        $checked = 0;
+        foreach (Catalog::items() as $key => $def) {
+            if (($def['goldPrice'] ?? 0) <= 0) {
+                continue;
+            }
+
+            // The item's own block, then the price inside it.
+            if (! preg_match("/key: '".preg_quote($key, '/')."'(.{0,1200}?)goldPrice: (\d+)/s", $sources, $m)) {
+                $this->fail("{$key} has a gold price on the server and none on the client");
+            }
+
+            $this->assertSame(
+                $def['goldPrice'],
+                (int) $m[2],
+                "{$key} costs {$def['goldPrice']} on the server and {$m[2]} on the client",
+            );
+            $checked++;
+        }
+
+        $this->assertGreaterThan(20, $checked, 'the price sweep found almost nothing to check');
+    }
+
+    // ------------------------------------------------- selling gear back §8.2
+
+    /** Buy a shop item at the village and hand back its row. */
+    private function boughtItem(string $key = 'stone_axe'): \App\Models\CharacterItem
+    {
+        $this->standAtWoodcuttingVillage();
+        $this->character->gold = 500;
+        $this->character->save();
+
+        return $this->game->buyItem($this->character->fresh(), $key);
+    }
+
+    /** §8.2 -- half the shelf price, and wear comes off the top. */
+    public function test_gear_sells_for_half_price_scaled_by_what_is_left(): void
+    {
+        $item = $this->boughtItem();
+        $def = Catalog::item('stone_axe');
+        $before = (int) $this->character->fresh()->gold;
+
+        // Full durability: exactly half, and nothing lost to rounding.
+        $this->assertSame(
+            (int) floor($def['goldPrice'] * Balance::RESALE_RATE),
+            \App\Game\Formulas::resaleValue($def, $def['maxDurability']),
+        );
+
+        // Half worn, so half of half.
+        $item->durability = (int) ($def['maxDurability'] / 2);
+        $item->save();
+
+        $expected = \App\Game\Formulas::resaleValue($def, (int) $item->durability);
+        $this->assertGreaterThan(0, $expected);
+
+        $sale = $this->game->sellItem($this->character->fresh(), $item->id);
+
+        $this->assertSame($expected, $sale['gold']);
+        $this->assertSame($before + $expected, (int) $this->character->fresh()->gold);
+        $this->assertNull(
+            $this->character->fresh()->items()->where('id', $item->id)->first(),
+            'the piece survived the sale',
+        );
+    }
+
+    /**
+     * §3.2 -- the round trip must lose money, or a trader is a gold faucet with
+     * no work in it.
+     */
+    public function test_buying_and_selling_back_never_profits(): void
+    {
+        foreach (Catalog::items() as $key => $def) {
+            if (($def['goldPrice'] ?? 0) <= 0) {
+                continue;
+            }
+
+            $this->assertLessThan(
+                $def['goldPrice'],
+                \App\Game\Formulas::resaleValue($def, $def['maxDurability']),
+                "{$key} sells back for at least what it cost",
+            );
+        }
+    }
+
+    /**
+     * §11.1 -- repairing must stay cheaper than churning, at every wear level.
+     *
+     * If selling a battered tool and buying a fresh one ever undercut the repair
+     * bill, the repair sink would switch itself off and nobody would ever pay
+     * it. The two rates are set independently -- RESALE_RATE here, the 0.6 the
+     * NPC charges over in repairItem -- so nothing but this test keeps them in
+     * the right order.
+     */
+    public function test_repairing_always_beats_selling_and_rebuying(): void
+    {
+        foreach (Catalog::items() as $key => $def) {
+            $price = $def['goldPrice'] ?? 0;
+            $max = $def['maxDurability'] ?? 0;
+            if ($price <= 0 || $max <= 0 || isset($def['inputs'])) {
+                continue;
+            }
+
+            for ($durability = 0; $durability <= $max; $durability++) {
+                $missing = $max - $durability;
+                if ($missing <= 0) {
+                    continue;
+                }
+
+                $repair = (int) ceil($price * ($missing / $max) * 0.6);
+                $churn = $price - \App\Game\Formulas::resaleValue($def, $durability);
+
+                $this->assertGreaterThan(
+                    $repair,
+                    $churn,
+                    "{$key} at {$durability}/{$max} is cheaper to replace than to repair",
+                );
+            }
+        }
+    }
+
+    /**
+     * §3.2 -- gold buys the bottom two rungs and never the top, so there is no
+     * shelf price to halve for a crafted piece. §8.2's salvage is its exit.
+     */
+    public function test_the_trader_will_not_take_gear_it_does_not_stock(): void
+    {
+        $this->standAtWoodcuttingVillage();
+        $this->give(['wood' => 12, 'planks' => 8, 'heartknot' => 8]);
+
+        $axe = $this->craftNow('hewn_axe')['made'];
+        $this->assertSame(0, Catalog::item('hewn_axe')['goldPrice'] ?? 0);
+
+        try {
+            $this->game->sellItem($this->character->fresh(), (int) $axe['itemId']);
+            $this->fail('the trader bought crafted gear');
+        } catch (\App\Game\GameException $e) {
+            $this->assertSame('not_sellable', $e->errorCode);
+        }
+    }
+
+    /** A sale is a trade: the tool comes off the belt first, deliberately. */
+    public function test_worn_gear_cannot_be_sold_off_the_belt(): void
+    {
+        $item = $this->boughtItem();
+        $this->game->equipItem($this->character->fresh(), $item->id);
+
+        try {
+            $this->game->sellItem($this->character->fresh(), $item->id);
+            $this->fail('sold the tool off the belt');
+        } catch (\App\Game\GameException $e) {
+            $this->assertSame('equipped', $e->errorCode);
+        }
+
+        // Stowing is the one tap that makes it sellable.
+        $this->game->unequipItem($this->character->fresh(), $item->id);
+        $this->assertGreaterThan(0, $this->game->sellItem($this->character->fresh(), $item->id)['gold']);
+    }
+
+    /** Nothing is taken for nothing: a piece worth no coin is refused, not eaten. */
+    public function test_a_piece_worth_nothing_is_refused_rather_than_taken(): void
+    {
+        $item = $this->boughtItem();
+        $item->durability = 0;
+        $item->save();
+
+        $before = (int) $this->character->fresh()->gold;
+
+        try {
+            $this->game->sellItem($this->character->fresh(), $item->id);
+            $this->fail('a broken piece was taken for nothing');
+        } catch (\App\Game\GameException $e) {
+            $this->assertSame('worthless', $e->errorCode);
+        }
+
+        $this->assertSame($before, (int) $this->character->fresh()->gold);
+        $this->assertNotNull(
+            $this->character->fresh()->items()->where('id', $item->id)->first(),
+            'the refused piece was eaten anyway',
+        );
+    }
+
+    /** §6 -- there is nobody in a forest to sell an axe to. */
+    public function test_gear_cannot_be_sold_away_from_a_settlement(): void
+    {
+        $item = $this->boughtItem();
+
+        $open = $this->openNeighbour($this->character->col, $this->character->row);
+        $this->character->update($open);
+
+        try {
+            $this->game->sellItem($this->character->fresh(), $item->id);
+            $this->fail('sold to nobody');
+        } catch (\App\Game\GameException $e) {
+            $this->assertSame('not_at_settlement', $e->errorCode);
+        }
     }
 
     // ----------------------------------------------------------- quests §12

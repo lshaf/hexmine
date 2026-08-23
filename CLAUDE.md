@@ -889,6 +889,26 @@ the game, §11.1.)*
 - Repair costs refined + raid materials, scaled to rarity tier, and is only ever
   possible **above** zero. There is no resurrection.
 - Discard returns a **small % salvage** — clears inventory bloat, gives obsolete gear an exit
+- **Sell it back for gold** — half the shelf price, multiplied by the fraction of
+  durability left. A piece has three exits and they are deliberately different:
+  repair *keeps* it, salvage returns a fraction of what went *into* it, and a
+  sale returns gold scaled by what is *left* of it.
+
+  Four refusals, each closing a hole rather than being a nicety. Not away from a
+  settlement — the trader is an NPC who stands somewhere (§6). Not off your own
+  belt: a sale is a trade, and losing the worn tool to a mistap is worse than
+  losing one out of the pack, so stow it first. Not what the trader does not
+  stock — gold buys the bottom two rungs and never the top (§3.2), so a crafted
+  or NFT piece has no shelf price to halve and salvage is its exit. And not for
+  nothing: a piece worn past the point where half its price still rounds to a
+  coin is refused rather than taken for zero.
+
+  **Two numbers hold this in place and neither is optional.** The round trip must
+  lose money, or a trader is a gold faucet with no work in it. And repairing must
+  stay cheaper than selling-and-rebuying at *every* wear level, or the largest
+  sink in the game (§11.1) quietly switches itself off. Both are pinned by tests,
+  because the resale rate and the NPC's repair rate are set independently and
+  nothing else would keep them in the right order.
 - **Nothing is destroyed without warning.** Durability is on the item, and any
   action that could take the last of it says so first (§9.5). An idle game may
   take something expensive from a player; it may never take it by surprise.
@@ -915,6 +935,32 @@ Beastfang Boots   = 2 Beastfang + 1 Obsidian + 1 Relic         → +15% travel  
 Gathering tools, §8.0 — one ladder, repeated per line. Yield only, and only on
 that line. The crafted starter is single-line on purpose: it is what a player can
 build straight off the opening arc's first processing run (§12 step 6).
+
+**The shop shelf is priced by one rule, and the rule is two valuations of the
+same object.** The price is the higher of them:
+
+| | What it means |
+|---|---|
+| **Cost to make** | its parts at the NPC's own poor rate, marked up by half, **plus the bench time it takes** (§8.4's craft clock, at a gold a minute) |
+| **What it is worth** | gold per point of durability, set per station — village ~0.43, city ~1.40 |
+
+Neither alone is enough, and both failures are ones this catalog actually had.
+*Worth alone* priced the village combat rung at 22g against 26–35g of materials,
+so the shop undercut its own recipe and crafting one was a straight loss — a
+shelf that beats the bench inverts §8's whole ladder. *Make-cost alone* would
+price a 40-durability axe and a 60-durability cloak the same, because neither of
+them has a recipe at all.
+
+Bench time is the smallest term and is meant to be: it is not there to set the
+number, it is there to be the difference between two pieces made of the same
+parts at different benches, which material cost alone cannot express.
+
+Hand-picked numbers drift the moment the catalog grows, and these had already
+drifted twice — first the gathering tools sat half again under everything added
+after them (§8.0 rule 4: every line gets the same ladder, and a price gap *is* a
+different ladder), then the combat rung fell under its own materials. Derived in
+`gen_battlegear.py` and pinned by a test that recomputes every shelf price from
+`Balance`, so a changed recipe reprices the item and a drifted one fails.
 
 | Line | Village +3% | City +5% | Starter +4% | Crafted +6% | NFT +12% |
 |---|---|---|---|---|---|
@@ -950,6 +996,49 @@ disagree.
 | Weapon | axe · pickaxe · bow · hammer · sickle · weapon | The five gathering tools plus the combat slot, §9.5.4 |
 | Armor | armor · boots · gloves | Worn gear, never line-locked |
 | Consumable | *none* | Having no slot is exactly what makes it the third category |
+
+**A bench takes time, and it hands over where it was left.** Crafting used to be
+instant, which made a capital a vending machine: carry the materials in, walk
+out with the item. Two rules turn it back into a place.
+
+| Rung | On the bench |
+|---|---|
+| Common | 8 min |
+| Uncommon | 14 min |
+| Rare | 22 min |
+| Epic | 34 min |
+| Legendary | 50 min |
+
+The clock is the same one §6 runs processing on — the settlement's tier, the
+presence bonus (§6.2), and whatever the gloves are worth — because they are the
+same building. The cheapest craft is longer than the longest processing run, on
+purpose: a run is a step, a craft is the thing itself.
+
+**Everything that can refuse does so before a single material is spent**: the
+bench's reach (§8.0), the strap the output will need (§7.6), and the stock. What
+happens afterwards is only the clock.
+
+**One craft per settlement.** A bench is a place, not a queue you can stack five
+deep — and the real limit is not that number, it is the walking.
+
+#### The claim happens at the bench
+
+**Anything left in a settlement is collected in that settlement**, a craft and a
+processing run alike. Claiming from the other side of the map would make the
+building a mailbox: carry the materials in, walk off, collect wherever you
+happen to be. The walk back is what makes *which* capital you use a decision.
+
+Two consequences follow, and both are the point:
+
+- **A haul you cannot reach is not a haul.** "Ready" at a village four days away
+  is a route to plan, which is why the ledger names the bench and the distance
+  rather than only the clock.
+- **The strap is asked for twice** — before the work and again when the thing is
+  handed over (§7.6). An hour is long enough to fill a bag, and the answer is a
+  refusal rather than a lost item: it stays on the bench until there is room.
+
+Nothing here touches §6.1's five public slots. Those are the processing lines;
+the three benches are their own building and queue against nobody.
 
 ### 8.5 Consumables — potions and buffs
 

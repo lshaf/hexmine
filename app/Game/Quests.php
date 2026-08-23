@@ -99,7 +99,7 @@ final class Quests
         ],
 
         'a_stone_axe' => [
-            'name' => 'Twelve Gold, Well Spent',
+            'name' => 'Gold Well Spent',
             'description' => 'Buy a Stone Axe from a village trader. Gold buys the bottom two rungs of the ladder and never the top.',
             'goal' => ['kind' => 'buy', 'subject' => 'stone_axe', 'target' => 1],
             'gold' => 20,

@@ -23,6 +23,7 @@ Ninety items is why this is generated. Hand-writing them on both sides is the
 drift the catalog has no parity test for.
 """
 import io
+import math
 
 RUNGS = ['common', 'uncommon', 'rare', 'epic', 'legendary']
 VALUE = [0.03, 0.05, 0.08, 0.11, 0.14]
@@ -40,6 +41,65 @@ DUR_SCALE = {'low': 0.85, 'medium': 1.0, 'high': 1.2}
 # which is what keeps combat gear behind combat rather than behind mining.
 SPOIL = ['cracked_carapace', 'bone_plate', 'scaled_hide', 'warped_barb', 'revenant_plate']
 
+# §3.2 -- what the shop charges, derived rather than typed.
+#
+# Two floors, and the price is the higher of them: an item is worth at least
+# what it LASTS, and at least half again what it is MADE OF. The second floor is
+# not decoration -- priced on durability alone, the village combat rung came out
+# at 22g against 26-35g of materials, so the shop undercut its own recipe and
+# crafting one was a straight loss. A shelf that beats the bench inverts §8's
+# whole ladder.
+#
+# Only the `low` grade at the two rungs gold reaches is stocked at all, and its
+# recipe is always {refined: 3, spoil: 2}, so these six prices are all the
+# generator needs to know about the material catalog.
+NPC_PRICE = {
+    'ingots': 9, 'cut_stone': 7, 'cloth': 6, 'leather': 8,
+    'cracked_carapace': 4, 'bone_plate': 7,
+}
+
+STATION_GOLD_PER_DURABILITY = {'village': 0.43, 'city': 1.40}
+
+SHOP_MATERIAL_MARKUP = 1.5
+
+# §8.4 -- a bench takes time, and time is worth something. One gold a minute,
+# flat, and the minutes come from the rarity's craft clock (Balance::
+# CRAFT_BASE_SECONDS): common 8, uncommon 14.
+#
+# It is the smaller term everywhere and that is correct -- it is not meant to
+# set the price, it is meant to be the difference between two items made of the
+# same materials at different benches, which materials alone cannot express.
+GOLD_PER_CRAFT_MINUTE = 1.0
+
+CRAFT_MINUTES = {'common': 8, 'uncommon': 14, 'rare': 22, 'epic': 34, 'legendary': 50}
+
+
+def shop_price(station, rarity, durability, inputs):
+    """What the shelf charges, §3.2.
+
+    Two ways of valuing the same object, and the price is the higher:
+
+      - what it COSTS TO MAKE: the parts at the NPC's own poor rate, marked up,
+        plus the bench time it takes.
+      - what it IS WORTH: gold per point of durability, set per station.
+
+    Neither alone is enough. Make-cost alone would price a 40-durability axe and
+    a 60-durability cloak the same, because neither has a recipe. Worth alone
+    priced the village combat rung UNDER its own materials, so the shop undercut
+    its own bench and crafting was a straight loss.
+
+    Rounded half AWAY from zero, not Python's half-to-even: PHP is the authority
+    on what a thing costs, and its round() breaks ties the other way. 52.5 is 53
+    on the server, so it has to be 53 here -- a one-gold disagreement is still a
+    client quoting a price the server will not honour.
+    """
+    parts = sum(NPC_PRICE[k] * q for k, q in inputs.items() if k in NPC_PRICE)
+    labour = CRAFT_MINUTES[rarity] * GOLD_PER_CRAFT_MINUTE
+    to_make = parts * SHOP_MATERIAL_MARKUP + labour
+    worth = durability * STATION_GOLD_PER_DURABILITY[station]
+
+    return math.floor(max(to_make, worth) + 0.5)
+
 # What "rare for this rung" means, and it is not the same thing twice: at the
 # bottom it is the spoil one grade up, at the top it is a capped Tier 3 (§2).
 RARE_EXTRA = [
@@ -54,7 +114,7 @@ GROUPS = {
     'sword': {
         'slot': 'weapon', 'family': 'sword', 'stat': 'power', 'palette': 'iron',
         'pairs': [(8, 4), (11, 6), (15, 8), (19, 10), (23, 12)],
-        'gold': [22, 110], 'dur': [60, 90, 150, 200, 240],
+        'dur': [60, 90, 150, 200, 240],
         'rare_mat': 'mythril_ore', 'component': 'flux_salt',
         'refined': ['ingots', 'ingots', 'steel_ingots', 'steel_ingots', 'skysteel'],
         'names': [
@@ -77,7 +137,7 @@ GROUPS = {
     'shield': {
         'slot': 'weapon', 'family': 'shield', 'stat': 'defence', 'palette': 'stone',
         'pairs': [(5, 8), (7, 11), (9, 15), (12, 19), (14, 23)],
-        'gold': [22, 110], 'dur': [60, 90, 150, 200, 240],
+        'dur': [60, 90, 150, 200, 240],
         'rare_mat': 'obsidian_shard', 'component': 'whetgrit',
         'refined': ['cut_stone', 'cut_stone', 'dressed_basalt', 'dressed_basalt', 'polished_granite'],
         'names': [
@@ -100,7 +160,7 @@ GROUPS = {
     'focus': {
         'slot': 'weapon', 'family': 'focus', 'stat': 'power', 'palette': 'fiber',
         'pairs': [(11, 2), (15, 3), (20, 4), (25, 5), (30, 6)],
-        'gold': [22, 110], 'dur': [60, 90, 150, 200, 240],
+        'dur': [60, 90, 150, 200, 240],
         'rare_mat': 'silkweave_fiber', 'component': 'quench_reed',
         'refined': ['cloth', 'cloth', 'linen', 'linen', 'canvas'],
         'names': [
@@ -123,7 +183,7 @@ GROUPS = {
     'armor': {
         'slot': 'armor', 'stat': 'defence', 'palette': 'pelt',
         'pairs': [(0, 4), (0, 7), (1, 12), (1, 16), (2, 21)],
-        'gold': [26, 130], 'dur': [70, 110, 170, 210, 250],
+        'dur': [70, 110, 170, 210, 250],
         'rare_mat': 'obsidian_shard', 'component': 'slate_scale',
         'refined': ['leather', 'leather', 'boiled_leather', 'boiled_leather', 'lacquered_hide'],
         'names': [
@@ -146,7 +206,7 @@ GROUPS = {
     'boots': {
         'slot': 'boots', 'stat': 'defence', 'palette': 'stone',
         'pairs': [(0, 2), (0, 3), (0, 5), (0, 7), (0, 10)],
-        'gold': [26, 130], 'dur': [70, 110, 170, 210, 250],
+        'dur': [70, 110, 170, 210, 250],
         'rare_mat': 'obsidian_shard', 'component': 'tar_seep',
         'refined': ['cut_stone', 'cut_stone', 'dressed_basalt', 'dressed_basalt', 'polished_granite'],
         'names': [
@@ -169,7 +229,7 @@ GROUPS = {
     'gloves': {
         'slot': 'gloves', 'stat': 'power', 'palette': 'iron',
         'pairs': [(2, 0), (4, 0), (7, 1), (9, 1), (12, 2)],
-        'gold': [26, 130], 'dur': [70, 110, 170, 210, 250],
+        'dur': [70, 110, 170, 210, 250],
         'rare_mat': 'mythril_ore', 'component': 'horn',
         'refined': ['ingots', 'ingots', 'steel_ingots', 'steel_ingots', 'skysteel'],
         'names': [
@@ -233,9 +293,15 @@ def items():
             for g, grade in enumerate(GRADES):
                 atk, dfn = group['pairs'][i]
                 label = group['names'][i][g]
+                durability = round(group['dur'][i] * DUR_SCALE[grade])
+                recipe = inputs_for(group, i, grade)
                 # Low is the rung's shop line as well, at the two rungs gold
                 # reaches (§3.2). Everything else is bench work.
-                gold = group['gold'][i] if (grade == 'low' and i < 2) else None
+                gold = (
+                    shop_price(STATION[i], rung, durability, recipe)
+                    if (grade == 'low' and i < 2)
+                    else None
+                )
 
                 out.append({
                     'key': key_for(label),
@@ -250,9 +316,9 @@ def items():
                     'defence': scale(dfn, PAIR_SCALE[grade]),
                     'palette': group['palette'],
                     'goldPrice': gold,
-                    'maxDurability': round(group['dur'][i] * DUR_SCALE[grade]),
+                    'maxDurability': durability,
                     'station': STATION[i],
-                    'inputs': inputs_for(group, i, grade),
+                    'inputs': recipe,
                     'description': f"{group['blurb'][i]} {group['tails'][g]}",
                 })
     return out

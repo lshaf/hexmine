@@ -79,6 +79,24 @@ export function aggregateStat(
 }
 
 /** Salvage returned when an item is discarded, §8.2. */
+/**
+ * §8.2 -- what a trader pays for a piece of shop gear.
+ *
+ * Half the shelf price, scaled by what is left of the item. Zero for anything
+ * the trader does not stock: gold buys the bottom two rungs and nothing else
+ * (§3.2), so a crafted or NFT piece has no shelf price to halve -- salvage is
+ * that gear's exit. Zero is also what a broken piece is worth, and the server
+ * refuses rather than paying it.
+ */
+export function resaleValue(def: ItemDef, durability: number): number {
+  const price = def.goldPrice ?? 0
+  const max = def.maxDurability ?? 0
+
+  if (price <= 0 || max <= 0 || durability <= 0) return 0
+
+  return Math.floor(price * EQUIPMENT.resaleRate * (Math.min(durability, max) / max))
+}
+
 export function salvageYield(def: ItemDef): Partial<Record<string, number>> {
   const out: Record<string, number> = {}
   for (const [key, qty] of Object.entries(def.inputs ?? {})) {

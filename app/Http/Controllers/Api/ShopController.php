@@ -55,4 +55,25 @@ class ShopController extends GameController
             "Sold {$validated['quantity']} {$name} for {$gold} gold.",
         );
     }
+
+    /**
+     * §8.2 -- sell one piece of gear back, at half its shelf price scaled by
+     * what is left of it.
+     *
+     * Its own endpoint rather than a flag on sell(): materials go by key and
+     * quantity because they stack, and a piece of equipment is one object with
+     * an id and a durability. One route taking either would be two calls wearing
+     * a coat.
+     */
+    public function sellEquipment(Request $request, int $item): JsonResponse
+    {
+        $character = $this->character($request);
+        $sale = $this->game->sellItem($character, $item);
+
+        return $this->respond(
+            $character,
+            ['gold' => $sale['gold']],
+            "Sold {$sale['name']} for {$sale['gold']} gold.",
+        );
+    }
 }

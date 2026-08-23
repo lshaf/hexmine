@@ -28,6 +28,7 @@ import type {
   Job,
   MaterialKey,
   FieldJob,
+  CraftJob,
   ProcessingJob,
   Settlement,
   Tile,
@@ -37,7 +38,16 @@ import { configureWorld, generateTile, inBounds, worldParams } from '@/game/worl
 import { hexDistance, visibleTiles } from '@/map/hexGeometry'
 
 /** Which overlay is open over the map, if any. */
-export type PanelKey = 'bag' | 'craft' | 'shop' | 'hero' | 'atlas' | 'skills' | 'quests'
+export type PanelKey =
+  | 'bag'
+  | 'craft'
+  | 'shop'
+  | 'hero'
+  | 'atlas'
+  | 'skills'
+  | 'quests'
+  // §8.4 -- what is on a bench somewhere, and which bench.
+  | 'bench'
 
 export interface LogEntry {
   id: number
@@ -340,6 +350,30 @@ export const useGame = defineStore('game', () => {
     () => jobs.value.find((j): j is ProcessingJob => j.kind === 'processing') ?? null,
   )
 
+  /**
+   * §6, §8.4 -- everything left in a building, soonest first.
+   *
+   * One list because they are claimed by the same rule: at the bench that holds
+   * them. A craft at a capital and a run at a village are the same kind of
+   * errand, and the ledger's job is to say which walk is worth making.
+   */
+  const benchJobs = computed(() =>
+    jobs.value
+      .filter((j): j is ProcessingJob | CraftJob => j.kind === 'processing' || j.kind === 'craft')
+      .sort((a, b) => a.endsAt - b.endsAt),
+  )
+
+  /** Finished, and you are standing where it is. The only ones you can take. */
+  const benchReady = computed(
+    () =>
+      benchJobs.value.filter(
+        (j) =>
+          j.endsAt <= now.value
+          && j.col === character.value?.col
+          && j.row === character.value?.row,
+      ).length,
+  )
+
   /** The hex underfoot, costed by the server. What the dock offers. */
   const underfoot = computed<TilePreview | null>(() => state.value?.underfoot ?? null)
 
@@ -621,6 +655,11 @@ export const useGame = defineStore('game', () => {
     await act(() => api.repairItem(ownedId))
   }
 
+  /** §8.2 -- the third exit: gold back, scaled by what is left of the piece. */
+  async function sellItem(ownedId: string): Promise<void> {
+    await act(() => api.sellEquipment(ownedId))
+  }
+
   async function discard(ownedId: string): Promise<void> {
     await act(() => api.discardItem(ownedId), 'info')
   }
@@ -651,7 +690,7 @@ export const useGame = defineStore('game', () => {
     consumables, buffs,
     tree, skillPoints, jobLevels, ownedNodes,
     questDefs, quests, questsReady, questReward,
-    activeJobs, fieldJob, processingJob, underfoot, selectedTile,
+    activeJobs, fieldJob, processingJob, benchJobs, benchReady, underfoot, selectedTile,
     currentSettlement, shopStock, sight, travelPerHexMs, travelEta,
     travel, travelProgress, travelHexesWalked, travelRemainingMs,
     // helpers
@@ -661,7 +700,7 @@ export const useGame = defineStore('game', () => {
     select, clearSelection,
     haul, clearHaul,
     startMining, startGathering, startHunt, collect, abandon, travelTo, cancelTravel, startProcessing, buy,
-    sell, craft, equip, unequip, repair, discard, discardMaterial, drink, openPanel, closePanel,
+    sell, sellItem, craft, equip, unequip, repair, discard, discardMaterial, drink, openPanel, closePanel,
     loadTree, buyNode,
     loadQuests, claimQuest, clearQuestReward,
     openStation, closeStation,

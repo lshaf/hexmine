@@ -8,8 +8,8 @@
  */
 import { computed, ref } from 'vue'
 import { useGame } from '@/stores/game'
-import { MATERIALS, shopItems } from '@/game/catalog'
-import { itemStatLine } from '@/game/formulas'
+import { ITEM_BY_KEY, MATERIALS, shopItems } from '@/game/catalog'
+import { itemStatLine, resaleValue } from '@/game/formulas'
 import { itemIcon, materialIcon } from '@/icons/procedural'
 import SvgIcon from '@/components/SvgIcon.vue'
 import type { Material, MaterialKey } from '@/game/types'
@@ -35,6 +35,35 @@ const catalog = computed(() => shopItems().filter((i) => game.shopStock.includes
 const elsewhere = computed(() => shopItems().filter((i) => !game.shopStock.includes(i.key)))
 
 const atSettlement = computed(() => game.currentSettlement !== null)
+
+/**
+ * §8.2 -- gear the trader will take back, worth most first.
+ *
+ * Worn pieces are absent on purpose: a sale is a trade, and losing the tool off
+ * your own belt to a mistap is worse than losing one out of the pack. So is
+ * anything the trader does not stock -- gold buys the bottom two rungs and never
+ * the top (§3.2), so a crafted or NFT piece has no shelf price to halve, and
+ * scrapping is that gear's exit instead.
+ *
+ * A piece worn past the point where half its price still rounds to a coin is
+ * left in too, listed and refused, rather than vanishing off the shelf: a player
+ * looking for their axe should find it and be told why it is worth nothing.
+ */
+const resellable = computed(() =>
+  game.equipment
+    .filter((e) => !e.equipped && (ITEM_BY_KEY[e.key]?.goldPrice ?? 0) > 0)
+    .map((e) => {
+      const def = ITEM_BY_KEY[e.key]!
+
+      return {
+        item: e,
+        def,
+        gold: resaleValue(def, e.durability),
+        wear: Math.round((e.durability / (def.maxDurability ?? 1)) * 100),
+      }
+    })
+    .sort((a, b) => b.gold - a.gold),
+)
 
 /** Sell quantities the player actually reaches for. */
 function amounts(qty: number): number[] {
@@ -66,7 +95,7 @@ const owned = (key: string) => game.equipment.filter((e) => e.key === key).lengt
           never a strategy — and rare and raid materials are refused outright.
         </p>
 
-        <div v-if="!sellable.length" class="inset empty">
+        <div v-if="!sellable.length && !resellable.length" class="inset empty">
           <p class="muted tiny" style="margin: 0">Nothing the trader will buy.</p>
         </div>
 
@@ -92,6 +121,42 @@ const owned = (key: string) => game.equipment.filter((e) => e.key === key).lengt
             </button>
           </div>
         </div>
+
+        <!-- §8.2 -- the third exit a piece of gear has. Repair keeps it, scrap
+             returns materials, and this returns gold scaled by what is left. -->
+        <template v-if="resellable.length">
+          <p class="label group">Equipment</p>
+          <p class="tiny muted lead">
+            Half the shelf price, and only for what the trader stocks. Wear comes
+            off the top, so a battered tool fetches a battered tool's price.
+          </p>
+
+          <div v-for="row in resellable" :key="row.item.id" class="inset row-item">
+            <SvgIcon
+              :svg="itemIcon({ slot: row.def.slot, rarity: row.def.rarity, palette: row.def.palette, size: 26 })"
+              boxed
+              :size="26"
+            />
+            <div class="grow">
+              <div class="row-between">
+                <strong class="tiny" :class="`rarity-${row.def.rarity}`">{{ row.def.name }}</strong>
+                <span class="mono tiny muted">{{ row.wear }}% left</span>
+              </div>
+              <div class="tiny muted">
+                {{ row.def.goldPrice }}g new · {{ row.gold }}g as it stands
+              </div>
+            </div>
+            <button
+              class="btn btn-sm"
+              type="button"
+              :disabled="game.busy || row.gold <= 0"
+              :title="row.gold > 0 ? `Sell for ${row.gold} gold` : 'Too far gone to be worth a coin'"
+              @click="game.sellItem(row.item.id)"
+            >
+              {{ row.gold > 0 ? `${row.gold}g` : '—' }}
+            </button>
+          </div>
+        </template>
       </template>
 
       <!-- -------------------------------------------------------- buy -->
@@ -192,6 +257,13 @@ const owned = (key: string) => game.equipment.filter((e) => e.key === key).lengt
 
 .body {
   padding-top: 14px;
+}
+
+/* A heading inside a half, not a section of its own: materials and gear are
+   the same act at the same counter. */
+.group {
+  margin: 16px 0 0;
+  color: var(--copper);
 }
 
 .lead {

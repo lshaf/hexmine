@@ -62,6 +62,10 @@ Route::middleware(ResolveCharacter::class)->group(function () {
 
     Route::post('/shop/purchases', [ShopController::class, 'purchase']);
     Route::post('/shop/sales', [ShopController::class, 'sell']);
+    // §8.2 -- gear goes back by id, not by key and quantity: it is one object
+    // with a durability, and what it fetches depends on that.
+    Route::post('/shop/equipment-sales/{item}', [ShopController::class, 'sellEquipment'])
+        ->whereNumber('item');
 
     Route::post('/crafting', [CraftingController::class, 'store']);
 

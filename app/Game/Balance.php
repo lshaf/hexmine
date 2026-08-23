@@ -172,6 +172,27 @@ final class Balance
     public const HERD_LIFETIME_MS = 4 * self::HOUR;
     public const HERD_CHANCE = 0.06;
 
+    /**
+     * §8.4 -- how long a bench holds onto a thing, by what it is making.
+     *
+     * Crafting used to be instant, which made a capital's bench a vending
+     * machine: carry the materials in, walk out with the item. A clock turns it
+     * back into a place you have to come back to -- and since a claim now needs
+     * you standing at the bench you left it on, the walk is part of the price.
+     *
+     * Read against §6's processing times: the cheapest craft is longer than the
+     * longest processing run, because a run is a step and a craft is the thing
+     * itself.
+     */
+    public const CRAFT_BASE_SECONDS = [
+        'common' => 8 * 60,
+        'uncommon' => 14 * 60,
+        'rare' => 22 * 60,
+        'epic' => 34 * 60,
+        'legendary' => 50 * 60,
+        'unique' => 50 * 60,
+    ];
+
     // ---------------------------------------------------------- map combat §9.5
 
     /**
@@ -234,6 +255,12 @@ final class Balance
      * thing between a player and losing a week of work to a mistap.
      */
     public const WEAR_CAP_FRACTION = 0.15;
+
+    /** §9.5.1 -- whether the roads hold anything at all. Off leaves them empty. */
+    public static function packsEnabled(): bool
+    {
+        return (bool) config('game.packs', true);
+    }
 
     public const PACK_CHANCE = [
         'outer' => 0.02,
@@ -554,6 +581,61 @@ final class Balance
     public const DRAIN_PER_RAID = 4;
     public const SALVAGE_RATE = 0.25;
     public const REPAIR_COST_RATE = 0.6;
+
+    /**
+     * §3.2 -- what the shop shelf charges: two ways of valuing one object, and
+     * the price is the higher of them.
+     *
+     * **What it costs to make** — the parts at the NPC's own poor rate, marked
+     * up, plus the bench time it takes (§8.4). **What it is worth** — gold per
+     * point of durability, set per station.
+     *
+     * Neither alone is enough, and both failures are real ones this catalog has
+     * already had. Worth alone priced the village combat rung at 22g against
+     * 26-35g of materials, so the shop undercut its own recipe and crafting one
+     * was a straight loss — a shelf that beats the bench inverts §8's whole
+     * ladder. Make-cost alone would price a 40-durability axe and a
+     * 60-durability cloak the same, because neither of them has a recipe at all.
+     *
+     * Materials are valued at what the NPC pays for them, which is deliberately
+     * poor (§3.2) — so that side is conservative by construction: it charges
+     * half again over the worst price the parts could fetch.
+     *
+     * Declared here and computed in scripts/gen_battlegear.py, which cannot read
+     * PHP. A test asserts the catalog matches these numbers, so the two cannot
+     * drift apart in silence.
+     */
+    public const STATION_GOLD_PER_DURABILITY = ['village' => 0.43, 'city' => 1.40];
+
+    public const SHOP_MATERIAL_MARKUP = 1.5;
+
+    /**
+     * §8.4 -- a bench takes time, and time is worth something.
+     *
+     * One gold a minute, flat, against the rarity's own craft clock
+     * (CRAFT_BASE_SECONDS above). It is the smallest term in the price and that
+     * is correct: it is not there to set the number, it is there to be the
+     * difference between two pieces made of the same parts at different
+     * benches, which material cost alone cannot express.
+     */
+    public const GOLD_PER_CRAFT_MINUTE = 1.0;
+
+    /**
+     * §8.2 -- what the trader gives back for a piece of shop gear, before wear.
+     *
+     * Half, and then scaled by what is left of the item, so a worn axe fetches
+     * a worn axe's price. Two things have to stay true of this number and both
+     * are §3.2's, not §8's:
+     *
+     * Buy-and-sell must LOSE money. At anything near 1.0 a player could stand at
+     * a trader turning gold into gold, which is a faucet with no work in it.
+     * Half is far enough under that the round trip is plainly a mistake.
+     *
+     * And it must stay under the repair line. Selling a battered tool and buying
+     * a fresh one has to cost more than repairing the one you have, or the
+     * repair sink (§11.1) quietly switches itself off.
+     */
+    public const RESALE_RATE = 0.5;
 
     // -------------------------------------------------------------- economy §2
 

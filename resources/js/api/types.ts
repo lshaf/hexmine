@@ -433,7 +433,10 @@ export interface GameApi {
 
   buyItem(itemKey: string): Promise<ActionResult<OwnedItem>>
   sellMaterial(material: MaterialKey, quantity: number): Promise<ActionResult<{ gold: number }>>
-  craftItem(itemKey: string): Promise<ActionResult<OwnedItem>>
+  /** §8.2 -- sell one piece of gear back, priced off its remaining durability. */
+  sellEquipment(ownedId: string): Promise<ActionResult<{ gold: number }>>
+  /** §8.4 -- returns the bench JOB, because there is no item yet. */
+  craftItem(itemKey: string): Promise<ActionResult<Job>>
 
   equipItem(ownedId: string): Promise<ActionResult<null>>
   unequipItem(ownedId: string): Promise<ActionResult<null>>
