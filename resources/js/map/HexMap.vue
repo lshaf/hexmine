@@ -24,9 +24,10 @@ import {
   screenToTile,
   tileToScreen,
 } from './hexGeometry'
-import { herdProp, packProp, tileProps } from './props'
+import { corpseProp, herdProp, packProp, tileProps } from './props'
 import { GOLD, VELLUM, depletedColor, shade, variantColor, waterColor } from '@/theme/palette'
 import type { Job, Tile, TravelState } from '@/game/types'
+import type { Carrier } from '@/api/types'
 
 const props = defineProps<{
   tiles: Tile[]
@@ -40,7 +41,22 @@ const props = defineProps<{
   jobs: Job[]
   travel: TravelState | null
   now: number
+  /**
+   * §9.5.7 -- every corpse on the map, sight or no sight.
+   *
+   * Passed whole rather than folded into the tiles, because a carrier is not a
+   * property of the ground: it is somebody's row, standing where they fell,
+   * and the hex underneath it is unchanged.
+   */
+  carriers: Carrier[]
 }>()
+
+const carrierAt = computed(() => {
+  const at = new Map<string, Carrier>()
+  for (const c of props.carriers) at.set(`${c.col},${c.row}`, c)
+
+  return at
+})
 
 const emit = defineEmits<{
   (e: 'select', col: number, row: number): void
@@ -179,6 +195,9 @@ interface RenderTile {
   herd: string
   /** §9.5.1 -- the pack standing here, drawn only inside sight. */
   pack: string
+  /** §9.5.7 -- the corpse standing here, drawn regardless of sight. */
+  corpse: string
+  corpseLabel: string | null
   depleted: boolean
   inSight: boolean
   onBoundary: boolean
@@ -240,6 +259,7 @@ const renderTiles = computed<RenderTile[]>(() =>
         : variantColor(tile.variant)
     const distance = hexDistance(props.characterCol, props.characterRow, tile.col, tile.row)
     const inSight = distance <= props.sight
+    const corpse = carrierAt.value.get(`${tile.col},${tile.row}`) ?? null
 
     // Unscouted is communicated with a darker SOLID fill, never opacity --
     // see the no-alpha rule above.
@@ -269,6 +289,11 @@ const renderTiles = computed<RenderTile[]>(() =>
       // else. Beyond the ring the map says what the ground is and who lives on
       // it, never what is happening there (§13.2).
       pack: inSight ? packProp(tile) : '',
+      // §9.5.7 -- and this one is drawn at ANY distance. The exception is the
+      // point: you may always see that a corpse is out there, which is what
+      // makes deciding to walk to it possible.
+      corpse: corpse ? corpseProp(corpse.mine) : '',
+      corpseLabel: corpse ? `${corpse.owner}'s corpse` : null,
       depleted,
       inSight,
       // No ring at all when sight is zero: on the road the boundary would be
@@ -377,6 +402,7 @@ const SLOT_PIP_Y = HEX_H / 2 - 4
         <g v-if="t.props" v-html="t.props" />
         <g v-if="t.herd" v-html="t.herd" />
         <g v-if="t.pack" v-html="t.pack" />
+        <g v-if="t.corpse" v-html="t.corpse" />
 
         <!-- Beyond sight: is anybody there. Nothing else is knowable. -->
         <path
@@ -435,6 +461,23 @@ const SLOT_PIP_Y = HEX_H / 2 - 4
           stroke-width="2.2"
           stroke-linejoin="round"
         />
+
+        <!-- §9.5.7 -- the corpse says whose it is, at any distance. It is the
+             one label on the map that is not a place. -->
+        <text
+          v-if="t.corpseLabel"
+          y="-34"
+          text-anchor="middle"
+          :fill="VELLUM"
+          font-size="8"
+          font-weight="700"
+          letter-spacing="0.3"
+          paint-order="stroke"
+          stroke="#141b18"
+          stroke-width="3"
+        >
+          {{ t.corpseLabel }}
+        </text>
 
         <text
           v-if="t.label"

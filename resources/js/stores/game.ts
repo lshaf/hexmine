@@ -15,6 +15,7 @@ import { computed, ref, shallowRef, watch } from 'vue'
 import { api } from '@/api/client'
 import { ApiError } from '@/api/types'
 import type {
+  BattleResult,
   CollectResult,
   MapMutations,
   PlayerState,
@@ -75,6 +76,14 @@ export const useGame = defineStore('game', () => {
    * whole map. Null when there is nothing to show.
    */
   const haul = ref<CollectResult | null>(null)
+
+  /**
+   * §9.5.5 -- the last fight, held until its receipt is dismissed.
+   *
+   * Same argument as the haul, and a stronger one: a fight can destroy
+   * something (§8.2), and a toast is not where a player should find that out.
+   */
+  const battle = ref<BattleResult | null>(null)
   const busy = ref(false)
   const booted = ref(false)
 
@@ -110,7 +119,15 @@ export const useGame = defineStore('game', () => {
    */
   const view = ref({ col: 0, row: 0, w: 900, h: 620 })
 
-  const mutations = ref<MapMutations>({ depleted: [], occupied: [], cleared: [] })
+  const mutations = ref<MapMutations>({ depleted: [], occupied: [], cleared: [], carriers: [] })
+
+  /**
+   * §9.5.7 -- every corpse on the map, whoever it belongs to.
+   *
+   * Not folded into the tiles: a carrier is not a property of the ground, and
+   * unlike everything else in the mutations payload it is not bounded by sight.
+   */
+  const carriers = computed(() => mutations.value.carriers ?? [])
 
   /**
    * Generated tiles for the current view. shallowRef because this is a few
@@ -609,6 +626,27 @@ export const useGame = defineStore('game', () => {
     haul.value = null
   }
 
+  /**
+   * §9.5.5 -- settle the pack on this hex.
+   *
+   * No coordinates: the only fight on offer is the one under your feet. The
+   * result is held for the modal rather than toasted, because a destroyed item
+   * (§8.2) has more to say than a status line holds -- and the pack is gone
+   * either way, so the map underneath has to be re-read.
+   */
+  async function fight(): Promise<void> {
+    const result = await act(() => api.fight())
+    if (result) battle.value = result
+
+    await refreshMutations()
+    if (selected.value) await select(selected.value.col, selected.value.row)
+  }
+
+  /** Dismiss the fight receipt. */
+  function clearBattle(): void {
+    battle.value = null
+  }
+
   async function abandon(jobId: string): Promise<void> {
     await act(() => api.abandonJob(jobId), 'bad')
     await refreshMutations()
@@ -709,7 +747,7 @@ export const useGame = defineStore('game', () => {
     // actions
     boot, setView, setViewport, centreOnCharacter, refreshMutations, refreshState,
     select, clearSelection,
-    haul, clearHaul,
+    haul, clearHaul, battle, fight, clearBattle, carriers,
     startMining, startGathering, startHunt, collect, abandon, travelTo, cancelTravel, startProcessing, buy,
     sell, sellItem, craft, equip, unequip, repair, discard, discardMaterial, drink, openPanel, closePanel,
     loadTree, buyNode,

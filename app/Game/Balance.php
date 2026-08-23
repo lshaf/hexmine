@@ -248,6 +248,33 @@ final class Balance
     public const WEAR_LOSS_MULTIPLIER = 1.5;
 
     /**
+     * §9.5.7 -- how far a death looks for a roof.
+     *
+     * Villages sit on an 8-hex lattice (§6.0) and cities on an 11, so anything
+     * short of the barren centre finds one well inside this. It is a search
+     * bound rather than a rule: past it there is genuinely nowhere to wake.
+     */
+    public const DEATH_WAKE_RADIUS = 24;
+
+    /**
+     * §9.5.7 -- how long a corpse stands with somebody's row on it.
+     *
+     * Twelve pack buckets, which is the point: the recovery is a journey you
+     * plan rather than a sprint you are forced into. Through scaled() like
+     * every other clock, so a fast test clock shortens the walk back too.
+     */
+    public const CARRIER_LIFETIME_MS = 24 * self::HOUR;
+
+    /**
+     * §9.5.8 -- what a win teaches the battle job that fought it.
+     *
+     * Paid per monster tier, so the centre's two are worth four times the
+     * treeline's. On a WIN only: half XP for losing sounds generous and is a
+     * trickle you can farm by dying on purpose (§9.5.3).
+     */
+    public const JOB_XP_PER_BATTLE_TIER = 25;
+
+    /**
      * No single fight may take more than this share of an item's maximum.
      *
      * Not optional now that zero is fatal (§8.2): without it one hopeless fight

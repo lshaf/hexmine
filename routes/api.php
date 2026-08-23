@@ -49,6 +49,7 @@ Route::middleware(ResolveCharacter::class)->group(function () {
     // §9.5.5 -- no coordinates: the only fight on offer is the one standing on
     // the hex under your feet, and asking about anyone else's would be a scanner.
     Route::get('/battle/preview', [BattleController::class, 'preview']);
+    Route::post('/battle', [BattleController::class, 'store']);
     Route::post('/jobs/{job}/collect', [MiningController::class, 'collect'])->whereNumber('job');
     Route::delete('/jobs/{job}', [MiningController::class, 'destroy'])->whereNumber('job');
 

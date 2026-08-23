@@ -1325,8 +1325,8 @@ strike = myAttack  - itsDefence
 hold   = myDefence - itsAttack
 margin = (strike + hold) / 2
 
-win    if margin + U(-10, +10) >= 0        // U seeded, server-side
-odds   = clamp(0.5 + margin / 20, 0.05, 0.95)
+odds   = clamp(0.5 + margin / 20, 0.05, 0.95)   // the band, as a chance
+win    if U(0, 1) < odds                        // U seeded, server-side
 ```
 
 **The band is what makes it a decision.** A straight comparison decides every
@@ -1334,6 +1334,12 @@ fight before it is tapped — scout the number and you either always win or neve
 engage — and there is nothing left to choose. A band turns it into a *known
 risk*, and the 5%/95% clamp means never certain and never hopeless, which is the
 same instinct as §7.3's floor.
+
+**The roll is against the odds, not against the margin**, and at the edges those
+are two different games. Adding U(−10, +10) to a margin of +15 wins every throw,
+while the number the player was shown says 95% — so the clamp would be a claim
+the die does not honour. The preview is a promise, which makes the number on it
+the one the fight has to be settled by.
 
 **The odds are shown before you commit**, off a preview like `previewGather`,
 alongside the monster's numbers and any warning about gear that will not survive
@@ -1395,6 +1401,24 @@ costs:
    clock is on the glyph.
 4. **You** kill it and the row comes home, on top of its ordinary drops.
 
+**A corpse stands, but it does not pin.** A pack owns the hex it is on for two
+hours (§9.5.3), which is a hazard; a corpse stands for twenty-four, and a hex
+fenced off for a day is exactly the griefing §9.5.1 keeps packs off settlements
+to prevent. So it is a **hook, not a fence** — a verb beside the others on a hex
+that otherwise works normally. It is also why a loss to a corpse leaves it
+standing rather than clearing it: it is a debt, not a spawn, and the *seed*
+therefore has to move with the clock. A fixed one would mean losing to it once is
+losing to it forever, which turns the walk back into a wall.
+
+**Only the bag is robbed.** Worn gear is not carried (§7.6), so what is on your
+belt is what you die in and what you wake up in — and an empty bag is taken at
+its word: nothing is stolen, no corpse is left, and the walk back is the whole
+bill. There is no way to owe more than you were carrying.
+
+**The strap is asked for before the recovery**, exactly as a bench claim asks
+(§8.4). A row that comes home to a full bag would be a row taken twice, and the
+refusal is one you can always act on from where you are standing.
+
 Flat gold loss was the alternative and it teaches nothing — a number evaporates
 and the day goes on. A carrier gives death a **hook**: a marked enemy, holding
 your thing, that you now have to kit up for. It is recoverable, so it is never a
@@ -1423,7 +1447,7 @@ makes a whole new faucet safe under §2.
 
 | Drop | Notes |
 |---|---|
-| **Gold**, always | fills §3.2's monster drops, and needs no bag row — which matters when the fight was not your idea |
+| **Gold**, on a win | fills §3.2's monster drops, and needs no bag row — which matters when the fight was not your idea. A loss pays nothing at all (§9.5.3) |
 | **Monster materials** | 2 families × 5 grades: a plate/hide line for the smith and armorer, an ichor/organ line for the consumable bench. Tier 1, biome-free, dropped by nothing else |
 | **Looted gear** | the kit the monster was using, at **5–50% durability**, rarity capped at **rare** |
 | **Battle job XP** | on a win only (§9.5.3) |

@@ -42,6 +42,7 @@ import type {
   SkillTree,
   StationState,
   BattlePreview,
+  BattleResult,
   TilePreview,
   TravelStop,
 } from './types'
@@ -122,6 +123,10 @@ export class HttpDriver implements GameApi {
 
   previewBattle(): Promise<BattlePreview> {
     return request<BattlePreview>('/battle/preview')
+  }
+
+  fight(): Promise<ActionResult<BattleResult>> {
+    return post<ActionResult<BattleResult>>('/battle')
   }
 
   startMining(col: number, row: number): Promise<ActionResult<Job>> {

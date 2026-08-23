@@ -29,6 +29,7 @@ import PanelOverlay from '@/shell/PanelOverlay.vue'
 import BenchView from '@/views/BenchView.vue'
 import Toasts from '@/shell/Toasts.vue'
 import HaulModal from '@/shell/HaulModal.vue'
+import BattleModal from '@/shell/BattleModal.vue'
 import TileCard from '@/components/TileCard.vue'
 import StationPanel from '@/components/StationPanel.vue'
 import BagView from '@/views/BagView.vue'
@@ -123,6 +124,7 @@ onMounted(() => {
         :selected="game.selected"
         :jobs="game.jobs"
         :travel="game.travel"
+        :carriers="game.carriers"
         :now="game.now"
         @select="game.select"
         @recenter="onRecenter"
@@ -227,6 +229,7 @@ onMounted(() => {
       <!-- §4 -- the receipt for a finished trip. Over everything, because it
            is the one moment in an idle game where something happened. -->
       <HaulModal v-if="game.haul" :haul="game.haul" @close="game.clearHaul()" />
+      <BattleModal v-if="game.battle" :battle="game.battle" @close="game.clearBattle()" />
 
       <!-- §12.1 -- a claim gets a receipt rather than a toast: there is more to
            say than a status line holds, and it is the thing the player came

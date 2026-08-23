@@ -261,6 +261,19 @@ final class Formulas
     }
 
     /**
+     * §9.5.5 -- the fight, settled. One roll, and the die is the odds.
+     *
+     * Rolled AGAINST the odds rather than by adding U(-10,+10) to the margin,
+     * and at the edges those are not the same thing: a margin of +15 wins every
+     * throw of the band, while the number the player was shown says 95%. The
+     * preview is a promise (§9.5.5), so the roll has to be the number on it.
+     */
+    public static function battleWin(int $attack, int $defence, array $monster, int $seed): bool
+    {
+        return Hash::rand01($seed) < self::battleOdds($attack, $defence, $monster);
+    }
+
+    /**
      * §9.5.6 -- what the weapon pays, on the gap to their defence.
      *
      * Hitting a wall chips the blade, which is why bringing the wrong class is

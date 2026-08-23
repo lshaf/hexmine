@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Game;
 
+use App\Models\Carrier;
 use App\Models\Character;
 use App\Models\CharacterBuff;
 use App\Models\CharacterConsumable;
@@ -1283,6 +1284,11 @@ class GameService
             'depleted' => $depleted,
             'occupied' => $occupied,
             'cleared' => Packs::clearedAmong($packs),
+            // §9.5.7 -- every corpse on the map, sight or no sight. It is the
+            // one thing in the game deliberately outside the fog: a marked
+            // enemy holding somebody's week of work has to be findable, or the
+            // recovery is not one.
+            'carriers' => $this->liveCarriers($character),
         ];
     }
 
@@ -1361,13 +1367,16 @@ class GameService
      */
     public function previewBattle(Character $character): array
     {
-        $pin = $this->packHere($character);
+        // §9.5.7 -- a corpse answers before a pack, the same way it is fought.
+        $carrier = $this->carrierHere($character);
+        $pin = $carrier === null ? $this->packHere($character) : null;
 
-        if ($pin === null) {
+        if ($carrier === null && $pin === null) {
             return ['canFight' => false, 'reason' => 'Nothing is standing here.'];
         }
 
-        $monster = $pin['monster'];
+        $key = $carrier?->monster_key ?? $pin['key'];
+        $monster = Monsters::ROSTER[$key];
         $items = $this->itemRows($character);
         $job = $this->battleJobLevel($character);
 
@@ -1405,12 +1414,44 @@ class GameService
             }
         }
 
+        // §9.5.7 -- the narrow rule that turns a loss into a death, said out
+        // loud before it can happen. An idle game may take something expensive
+        // from a player; it may never take it by surprise (§8.2).
+        $guards = array_filter(
+            $items,
+            static function (array $item): bool {
+                $def = Catalog::item($item['key']);
+
+                return $item['equipped']
+                    && $item['durability'] > 0
+                    && in_array($def['slot'] ?? null, ['armor', 'boots', 'gloves'], true);
+            },
+        );
+
+        if ($guards === []) {
+            $warnings[] = 'Nothing on you will take the hit. A loss here is a death.';
+        } elseif ($wear['armor'] > 0) {
+            foreach ($guards as $guard) {
+                if ($wear['armor'] >= $guard['durability']) {
+                    $warnings[] = 'If that piece takes the hit and goes with it, a loss here is a death.';
+                    break;
+                }
+            }
+        }
+
         return [
             'canFight' => true,
             'reason' => null,
-            'until' => $pin['until'],
+            'until' => $carrier?->expires_at ?? $pin['until'],
+            // §9.5.7 -- whose it is, what it holds, and what happens to that if
+            // you are not its owner. All three before a single tap.
+            'corpse' => $carrier === null ? null : [
+                'mine' => (int) $carrier->owner_character_id === (int) $character->id,
+                'label' => $carrier->label,
+                'owner' => $carrier->owner?->name ?? 'Someone',
+            ],
             'monster' => [
-                'key' => $pin['key'],
+                'key' => $key,
                 'name' => $monster['name'],
                 'tier' => $monster['tier'],
                 'profile' => $monster['profile'],
@@ -1426,6 +1467,507 @@ class GameService
             'wear' => $wear,
             'warnings' => $warnings,
         ];
+    }
+
+    /**
+     * §9.5.5 -- the fight, in one action.
+     *
+     * Everything that decides it was already on the preview, so this rolls
+     * rather than asks. What it does that the preview cannot is spend: the
+     * charge, the durability, and the pack itself.
+     *
+     * THE PACK IS CLEARED EITHER WAY (§9.5.1). That is the whole anti-farm
+     * argument and it needs no cooldown -- you cannot re-roll a pack, because
+     * after the roll there is no pack. It also makes a loss a legitimate way
+     * out of the pin (§9.5.3), which is what keeps a character who wandered in
+     * over their head from being parked on a hex.
+     *
+     * @return array<string,mixed>
+     */
+    public function fight(Character $character): array
+    {
+        return DB::transaction(function () use ($character) {
+            $now = $this->now();
+            $col = (int) $character->col;
+            $row = (int) $character->row;
+
+            // §9.5.7 -- a corpse is answered first. It is the thing you walked
+            // here for, it runs on its own 24h clock rather than the bucket's,
+            // and a pack standing on the same hex is still there afterwards.
+            $carrier = $this->carrierHere($character);
+            $pin = $carrier === null ? $this->packHere($character) : null;
+
+            if ($carrier === null && $pin === null) {
+                throw new GameException('Nothing is standing here.', 'no_pack');
+            }
+
+            $mine = $carrier !== null
+                && (int) $carrier->owner_character_id === (int) $character->id;
+
+            // §7.6 -- the strap is asked for BEFORE the fight, never after. A
+            // recovery with nowhere to land would take the row a second time,
+            // and the way out is always in reach from where you are standing.
+            if ($mine) {
+                $this->requireRoomForLoot($character, $carrier->loot);
+            }
+
+            $key = $carrier?->monster_key ?? $pin['key'];
+            $monster = Monsters::ROSTER[$key];
+
+            $job = $this->battleJobLevel($character);
+            $bonuses = $this->bonuses($character, 'battle');
+            $pair = Formulas::combatPair(
+                $this->itemRows($character),
+                $job['level'],
+                $bonuses['power'],
+                $bonuses['defence'],
+            );
+
+            $odds = Formulas::battleOdds($pair['attack'], $pair['defence'], $monster);
+
+            // Seeded server-side (§16). A pack's seed is fixed to its hex and
+            // bucket, which costs nothing because it is cleared below and the
+            // roll is unreachable a second time. A CORPSE is not cleared by a
+            // loss, so its seed folds in the clock: without that, losing to it
+            // once would mean losing to it forever, and the debt would be a
+            // wall rather than a walk.
+            $seed = $carrier !== null
+                ? Hash::hash2(
+                    $col * 71 + (int) $carrier->id,
+                    $row * 53 + intdiv($now, 1000),
+                    Balance::mapSeed() ^ 0x6a77,
+                )
+                : Hash::hash2(
+                    $col * 61 + $pin['bucket'],
+                    $row * 43 + (int) $character->id,
+                    Balance::mapSeed() ^ 0x6a77,
+                );
+
+            $won = Formulas::battleWin($pair['attack'], $pair['defence'], $monster, $seed);
+
+            // §9.5.6 -- two wear rolls, both on a gap. The weapon pays for the
+            // gap to their guard, one worn piece pays for the excess of their
+            // attack over its own.
+            $wear = [];
+            $weapon = null;
+            $worn = [];
+
+            foreach ($character->items as $item) {
+                if (! $item->equipped || $item->durability <= 0) {
+                    continue;
+                }
+
+                $def = Catalog::item($item->item_key);
+                $slot = $def['slot'] ?? null;
+
+                if ($slot === 'weapon') {
+                    $weapon = $item;
+                } elseif (in_array($slot, ['armor', 'boots', 'gloves'], true)) {
+                    $worn[] = $item;
+                }
+            }
+
+            if ($weapon !== null) {
+                $def = Catalog::item($weapon->item_key);
+                $wear[] = $this->wearInFight($weapon, Formulas::weaponWear(
+                    $pair['attack'],
+                    $monster,
+                    $won,
+                    (int) ($def['maxDurability'] ?? 1),
+                ));
+            }
+
+            // §9.5.6 -- random rather than spread, so the repair bills stagger
+            // instead of arriving together and a weak piece is eventually found
+            // out rather than never. An empty slot absorbs nothing, and it
+            // contributed nothing to the hold either.
+            $absorbed = null;
+
+            if ($worn !== []) {
+                $piece = $worn[Hash::randInt(
+                    Hash::hash2($col, $row, $seed ^ 0x1d0d),
+                    0,
+                    count($worn) - 1,
+                )];
+
+                $def = Catalog::item($piece->item_key);
+                $absorbed = $this->wearInFight($piece, Formulas::armorWear(
+                    (int) ($def['defence'] ?? 0),
+                    $monster,
+                    $won,
+                    (int) ($def['maxDurability'] ?? 1),
+                ));
+                $wear[] = $absorbed;
+            }
+
+            // §8.5 -- a battle draught was armed for exactly this, and the
+            // numbers above already carry it.
+            $this->spendBuffs($character, 'battle');
+
+            // §9.5.8 -- gold needs no bag row, which is what makes it the right
+            // thing to pay for a fight that was not your idea. A loss pays
+            // nothing at all (§9.5.3): losing is an exit, not a strategy.
+            $gold = 0;
+            $xp = 0;
+
+            if ($won) {
+                $gold = Hash::randInt(
+                    Hash::hash2($col, $row, $seed ^ 0x901d),
+                    (int) $monster['gold'][0],
+                    (int) $monster['gold'][1],
+                );
+                $character->gold += $gold;
+
+                if ($job['job'] !== null) {
+                    $xp = Balance::JOB_XP_PER_BATTLE_TIER * (int) $monster['tier'];
+                    $this->grantJobXp($character, $job['job'], $xp);
+                }
+            }
+
+            // §9.5.7 -- the rule that produces a death, and it is narrow: a
+            // loss becomes a death when NOTHING ABSORBED IT. No armor at all,
+            // or the piece that would have taken the hit went with it. Fighting
+            // bare-chested is not merely worse, it is how you die.
+            $died = ! $won && ($absorbed === null || $absorbed['destroyed']);
+
+            $recovered = null;
+            $burned = null;
+
+            if ($carrier !== null && $won) {
+                if ($mine) {
+                    // The row comes home, on top of the ordinary drops.
+                    $recovered = $this->restoreLoot($character, $carrier->loot);
+                } else {
+                    // §2 -- an item another wallet can pick up is a direct
+                    // player-to-player transfer, and "random row" is no defence
+                    // at all: empty the bag to the one thing worth moving, die
+                    // on purpose, and a partner walks over and collects it. So
+                    // the row BURNS unless its owner is the one standing over
+                    // it. Rivals can still race you for the recovery, which is
+                    // the sharper kind of interesting anyway.
+                    $burned = $carrier->label;
+                }
+
+                $carrier->delete();
+            }
+
+            if ($pin !== null) {
+                // Cleared win or lose (§9.5.1): after the roll there is no pack.
+                Packs::clear($col, $row, $pin['bucket'], (int) $pin['until'], $now);
+            }
+
+            $stolen = null;
+            $woke = null;
+
+            if ($died) {
+                $stolen = $this->takeRowForCarrier($character, $key, $seed, $now);
+
+                // The walk back is the first bill, and at ten minutes a hex it
+                // is a real one.
+                $woke = $this->wakeAtNearestSettlement($character);
+            }
+
+            $character->save();
+
+            return [
+                'won' => $won,
+                'odds' => round($odds, 3),
+                'monster' => [
+                    'key' => $key,
+                    'name' => $monster['name'],
+                    'tier' => $monster['tier'],
+                    'profile' => $monster['profile'],
+                    'attack' => $monster['attack'],
+                    'defence' => $monster['defence'],
+                ],
+                'attack' => $pair['attack'],
+                'defence' => $pair['defence'],
+                'gold' => $gold,
+                'job' => $job['job'],
+                'jobXp' => $xp,
+                'wear' => $wear,
+                'destroyed' => array_values(array_map(
+                    static fn (array $w) => $w['name'],
+                    array_filter($wear, static fn (array $w) => $w['destroyed']),
+                )),
+                // §9.5.7 -- what the corpse was, either way it went.
+                'corpse' => $carrier === null ? null : [
+                    'mine' => $mine,
+                    'label' => $carrier->label,
+                    'owner' => $carrier->owner?->name,
+                ],
+                'recovered' => $recovered,
+                'burned' => $burned,
+                'died' => $died,
+                'stolen' => $stolen,
+                'wokeAt' => $woke,
+            ];
+        });
+    }
+
+    /**
+     * §9.5.7 -- the corpse standing on this hex, if one is.
+     *
+     * Your own first: two can stand on one hex, and the one you walked here for
+     * is never the stranger's.
+     *
+     * A carrier does NOT pin (§9.5.3). A pack owns the ground for two hours,
+     * which is a hazard; a corpse stands for twenty-four, and a hex locked for
+     * a day would be the griefing the settlement rule exists to forbid. It is a
+     * hook, not a fence -- something you kit up for and come back to.
+     */
+    public function carrierHere(Character $character): ?Carrier
+    {
+        if ($this->isTravelling($character)) {
+            return null;
+        }
+
+        return Carrier::where('col', (int) $character->col)
+            ->where('row', (int) $character->row)
+            ->where('expires_at', '>', $this->now())
+            ->orderByRaw('CASE WHEN owner_character_id = ? THEN 0 ELSE 1 END', [$character->id])
+            ->orderBy('expires_at')
+            ->first();
+    }
+
+    /**
+     * §9.5.7 -- every corpse on the map, for everybody.
+     *
+     * Deliberately not bounded by sight: §13.2's rule is that you may always
+     * see THAT something is there and never what is happening there, and a
+     * marked enemy holding somebody's week of work is the sharpest case of it.
+     * A recovery you cannot find is not a recovery.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function liveCarriers(Character $character): array
+    {
+        return Carrier::where('expires_at', '>', $this->now())
+            ->orderBy('expires_at')
+            ->get()
+            ->map(fn (Carrier $c) => [
+                'col' => $c->col,
+                'row' => $c->row,
+                'monster' => $c->monster_key,
+                'label' => $c->label,
+                'until' => $c->expires_at,
+                'mine' => (int) $c->owner_character_id === (int) $character->id,
+                'owner' => $c->owner?->name ?? 'Someone',
+            ])
+            ->all();
+    }
+
+    /**
+     * §9.5.7 -- the pack takes one row from the bag, truly random.
+     *
+     * Every strap is a candidate and they are all equally likely: a material
+     * stack, a cellar of potions, a spare axe. Worn gear is not carried (§7.6),
+     * so what is on your belt is what you die in and what you wake up in.
+     *
+     * Flat gold loss was the alternative and it teaches nothing -- a number
+     * evaporates and the day goes on. A corpse gives death a hook.
+     *
+     * @return array{label:string,kind:string}|null
+     */
+    private function takeRowForCarrier(Character $character, string $monsterKey, int $seed, int $now): ?array
+    {
+        $rows = [];
+
+        foreach ($character->materials()->where('quantity', '>', 0)->get() as $stack) {
+            $rows[] = [
+                'kind' => 'material',
+                'key' => $stack->material_key,
+                'quantity' => (int) $stack->quantity,
+                'label' => (int) $stack->quantity.' × '
+                    .(Catalog::material($stack->material_key)['name'] ?? $stack->material_key),
+                'model' => $stack,
+            ];
+        }
+
+        foreach ($character->consumables()->where('quantity', '>', 0)->get() as $stack) {
+            $rows[] = [
+                'kind' => 'consumable',
+                'key' => $stack->item_key,
+                'quantity' => (int) $stack->quantity,
+                'label' => (int) $stack->quantity.' × '
+                    .(Catalog::item($stack->item_key)['name'] ?? $stack->item_key),
+                'model' => $stack,
+            ];
+        }
+
+        foreach ($character->items()->where('equipped', false)->get() as $item) {
+            $rows[] = [
+                'kind' => 'item',
+                'key' => $item->item_key,
+                'durability' => (int) $item->durability,
+                'options' => $item->options ?? [],
+                'label' => Catalog::item($item->item_key)['name'] ?? $item->item_key,
+                'model' => $item,
+            ];
+        }
+
+        // An empty bag has nothing to take, and nothing to stand over. The
+        // walk back is the whole bill in that case, which is the right answer:
+        // there is no way to owe more than you were carrying.
+        if ($rows === []) {
+            return null;
+        }
+
+        $taken = $rows[Hash::randInt(Hash::hash2($seed, count($rows), Balance::mapSeed() ^ 0x0dead), 0, count($rows) - 1)];
+        $model = $taken['model'];
+        unset($taken['model']);
+
+        $model->delete();
+
+        Carrier::create([
+            'col' => (int) $character->col,
+            'row' => (int) $character->row,
+            'monster_key' => $monsterKey,
+            'owner_character_id' => $character->id,
+            'loot' => $taken,
+            'label' => $taken['label'],
+            'expires_at' => $now + Balance::scaled(Balance::CARRIER_LIFETIME_MS),
+        ]);
+
+        return ['label' => $taken['label'], 'kind' => $taken['kind']];
+    }
+
+    /**
+     * §7.6 -- would the recovered row have a strap to land on?
+     *
+     * Asked before the fight rather than after it, for the same reason a craft
+     * is: the answer is a refusal you can act on from where you stand, and a
+     * row taken twice is not something an idle game may do.
+     *
+     * @param  array<string,mixed>  $loot
+     */
+    private function requireRoomForLoot(Character $character, array $loot): void
+    {
+        $joins = match ($loot['kind']) {
+            'material' => $this->held($character, (string) $loot['key']) > 0,
+            'consumable' => $this->heldConsumable($character, (string) $loot['key']) > 0,
+            default => false,
+        };
+
+        if (! $joins) {
+            $this->requireFreeRow($character, (string) $loot['label']);
+        }
+    }
+
+    /**
+     * §9.5.7 -- the row comes home, exactly as it left.
+     *
+     * An item keeps the durability and the rolled options it had: this is a
+     * recovery, not a reissue, and a repaired-by-dying exploit would be a hole
+     * in §11.1's largest sink.
+     *
+     * @param  array<string,mixed>  $loot
+     */
+    private function restoreLoot(Character $character, array $loot): string
+    {
+        match ($loot['kind']) {
+            'material' => $this->addMaterial($character, (string) $loot['key'], (int) $loot['quantity']),
+            'consumable' => CharacterConsumable::firstOrNew([
+                'character_id' => $character->id,
+                'item_key' => (string) $loot['key'],
+            ])->fill(['quantity' => $this->heldConsumable($character, (string) $loot['key']) + (int) $loot['quantity']])->save(),
+            default => CharacterItem::create([
+                'character_id' => $character->id,
+                'item_key' => (string) $loot['key'],
+                'durability' => (int) $loot['durability'],
+                'equipped' => false,
+                'options' => $loot['options'] ?? [],
+            ]),
+        };
+
+        return (string) $loot['label'];
+    }
+
+    /**
+     * §9.5.7 -- you wake at the nearest settlement.
+     *
+     * Nearest rather than your own or your last, because there is no such thing
+     * as either: settlements are shared world locations (§6), and the one that
+     * takes you in is simply the closest roof.
+     *
+     * @return array{name:string,col:int,row:int}|null
+     */
+    private function wakeAtNearestSettlement(Character $character): ?array
+    {
+        $col = (int) $character->col;
+        $row = (int) $character->row;
+        $best = null;
+        $bestDistance = PHP_INT_MAX;
+
+        for ($range = 0; $range <= Balance::DEATH_WAKE_RADIUS; $range++) {
+            for ($dc = -$range; $dc <= $range; $dc++) {
+                for ($dr = -$range; $dr <= $range; $dr++) {
+                    if (max(abs($dc), abs($dr)) !== $range) {
+                        continue;
+                    }
+
+                    $s = WorldGen::settlementAt($col + $dc, $row + $dr);
+                    if ($s === null) {
+                        continue;
+                    }
+
+                    $distance = HexGeometry::distance($col, $row, (int) $s['col'], (int) $s['row']);
+                    if ($distance < $bestDistance) {
+                        $best = $s;
+                        $bestDistance = $distance;
+                    }
+                }
+            }
+
+            // A whole shell further out cannot beat something already this
+            // close, so the first shell that finds anything settles it.
+            if ($best !== null && $bestDistance <= $range) {
+                break;
+            }
+        }
+
+        if ($best === null) {
+            return null;
+        }
+
+        $character->col = (int) $best['col'];
+        $character->row = (int) $best['row'];
+
+        return ['name' => (string) $best['name'], 'col' => (int) $best['col'], 'row' => (int) $best['row']];
+    }
+
+    /**
+     * §8.2 -- take the wear, and if it takes the last of it the thing is GONE.
+     *
+     * Not broken, not inactive: destruction is what moves the repair bill
+     * forward, and it is the largest sink in the game (§11.1). The row is
+     * deleted and named in the result that killed it, because an idle game may
+     * take something expensive from a player but never quietly.
+     *
+     * @return array{name:string,slot:?string,lost:int,left:int,destroyed:bool}
+     */
+    private function wearInFight(CharacterItem $item, int $amount): array
+    {
+        $def = Catalog::item($item->item_key);
+        $before = (int) $item->durability;
+        $left = max(0, $before - $amount);
+
+        $row = [
+            'name' => $def['name'] ?? $item->item_key,
+            'slot' => $def['slot'] ?? null,
+            'lost' => min($amount, $before),
+            'left' => $left,
+            'destroyed' => $left <= 0,
+        ];
+
+        if ($left <= 0) {
+            $item->delete();
+        } else {
+            $item->durability = $left;
+            $item->save();
+        }
+
+        return $row;
     }
 
     /**
@@ -1470,6 +2012,11 @@ class GameService
                 'scrap' => false,
                 'note' => null,
                 'unseen' => true,
+                // §9.5.3 -- unknown rather than false, strictly, but the pin is
+                // about the ground under your feet and this hex is not it. The
+                // key is here because every caller reads it, and a preview
+                // missing one of its own fields is worse than a flat answer.
+                'pinned' => false,
             ];
         }
 
@@ -2907,12 +3454,16 @@ class GameService
      * teaches the line that ran it, and a walk teaches the only job that learns
      * from walking (§7.5).
      *
-     * Two kinds are deliberately unreachable from here. Gathering jobs read
-     * their CharacterSkill level instead (§7.2), so writing a row for one would
-     * create a second opinion about a number that already exists. Battle jobs
-     * level by raiding (§9) and by nothing else; giving them a stand-in source
-     * would make combat optional, which is the whole reason the slot and the
-     * trees are dormant rather than absent.
+     * One kind is deliberately unreachable from here: gathering jobs read their
+     * CharacterSkill level instead (§7.2), so writing a row for one would
+     * create a second opinion about a number that already exists.
+     *
+     * Battle jobs used to sit beside them, because nothing in the game fought
+     * anything. §9.5 is what changed that -- they level on the road now, on a
+     * win and on nothing else (§9.5.3), and which of the three earns it is
+     * decided by the weapon family in the slot (§9.5.4). The rule they were
+     * fenced off for still holds: no gathering or bench work may ever reach
+     * them, or combat becomes optional.
      */
     private function grantJobXp(Character $character, string $jobKey, int $amount): void
     {
@@ -2920,7 +3471,7 @@ class GameService
         if ($def === null || $amount <= 0) {
             return;
         }
-        if ($def['kind'] === Jobs::GATHERING || $def['kind'] === Jobs::BATTLE) {
+        if ($def['kind'] === Jobs::GATHERING) {
             return;
         }
 

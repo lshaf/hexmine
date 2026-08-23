@@ -152,10 +152,24 @@ const packLeaves = computed(() => {
  */
 const battle = ref<BattlePreview | null>(null)
 
+/**
+ * §9.5.7 -- a corpse standing here, whoever it belongs to.
+ *
+ * Unlike a pack it does NOT pin: it stands for twenty-four hours, and a hex
+ * fenced off for a day would be exactly the griefing §9.5.1 keeps packs off
+ * settlements to prevent. So it is a verb beside the others rather than
+ * instead of them.
+ */
+const corpse = computed(() =>
+  game.carriers.find(
+    (c) => c.col === game.character?.col && c.row === game.character?.row,
+  ) ?? null,
+)
+
 watch(
-  [pinned, () => pack.value?.key],
+  [pinned, () => pack.value?.key, () => corpse.value?.label],
   async ([isPinned]) => {
-    battle.value = isPinned ? await api.previewBattle() : null
+    battle.value = isPinned || corpse.value ? await api.previewBattle() : null
   },
   { immediate: true },
 )
@@ -165,6 +179,15 @@ const packHint = computed(() => {
   if (!b?.canFight) return 'Nothing here will let you work'
 
   return `${Math.round((b.odds ?? 0) * 100)}% · you ${b.attack}/${b.defence} · it ${b.monster?.attack}/${b.monster?.defence}`
+})
+
+const corpseHint = computed(() => {
+  const c = corpse.value
+  if (!c) return ''
+
+  const odds = battle.value?.canFight ? `${Math.round((battle.value.odds ?? 0) * 100)}% · ` : ''
+
+  return c.mine ? `${odds}${c.label} comes home` : `${odds}${c.label} burns if you take it`
 })
 
 const huntHint = computed(() => {
@@ -283,6 +306,21 @@ function hunted(): void {
             </span>
             <span v-if="packLeaves" class="tiny muted">Moves on in {{ packLeaves }}</span>
           </div>
+
+          <!-- §9.5.3 -- one of the two exits, and the only one that is an
+               action. The other is the clock beside it, which needs no button.
+               Never greyed: a loss clears the pack as surely as a win does, so
+               fighting is always available even bare-handed -- that is what
+               keeps the pin from being a dead end (§5.6). -->
+          <HexAction
+            small
+            icon="battle"
+            label="Fight"
+            :primary="Boolean(battle?.canFight)"
+            :disabled="game.busy"
+            :hint="packHint"
+            @activate="game.fight()"
+          />
         </template>
 
         <template v-else>
@@ -315,6 +353,20 @@ function hunted(): void {
           <!-- §5.5 -- present only while a herd is. Beside the other two rather
                than instead of them: a hunt takes no tile slot, so all three
                verbs are genuinely available on the same hex at the same time. -->
+          <!-- §9.5.7 -- the hook. Somebody's row is standing on this hex, and
+               only its owner can take it back: anybody else killing it burns
+               the row rather than moving it (§2). -->
+          <HexAction
+            v-if="corpse"
+            small
+            icon="battle"
+            :label="corpse.mine ? 'Recover' : 'Corpse'"
+            :primary="corpse.mine"
+            :disabled="game.busy"
+            :hint="corpseHint"
+            @activate="game.fight()"
+          />
+
           <HexAction
             v-if="herd"
             small

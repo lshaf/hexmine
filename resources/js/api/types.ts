@@ -338,6 +338,28 @@ export interface MapMutations {
   occupied: Array<[number, number, number]>
   /** §9.5.1 -- packs in sight that somebody has already fought, win or lose. */
   cleared: Array<[number, number]>
+  /** §9.5.7 -- every corpse on the map, and deliberately not bounded by sight. */
+  carriers: Carrier[]
+}
+
+/**
+ * §9.5.7 -- a marked enemy holding somebody's row, standing where they fell.
+ *
+ * The one thing in the game outside the fog: drawn for everybody at any
+ * distance, because a recovery you cannot find is not a recovery. What it is
+ * holding is named; what it would cost to take is not, until you are there.
+ */
+export interface Carrier {
+  col: number
+  row: number
+  monster: string
+  /** What it took, in words: "9 × Wood", "Iron Pickaxe". */
+  label: string
+  /** Unix ms it crumbles, and the row with it. */
+  until: number
+  /** §2 -- only the owner may take it back. Anybody else kills the row. */
+  mine: boolean
+  owner: string
 }
 
 /**
@@ -372,6 +394,58 @@ export interface BattlePreview {
   wear?: { weapon: number; armor: number }
   /** §8.2 -- gear this fight could destroy outright, named before it happens. */
   warnings?: string[]
+  /** §9.5.7 -- set when the thing standing here is a corpse rather than a pack. */
+  corpse?: { mine: boolean; label: string; owner: string } | null
+}
+
+/**
+ * §9.5.5 -- how it went, and what it cost.
+ *
+ * The whole of a fight, because there is no health on either side and so
+ * nothing to watch tick down: one roll, two wear rolls, and a pack that is gone
+ * whichever way it landed. Everything here is the server's (§16) -- the client
+ * rolled nothing and may not re-derive any of it.
+ */
+export interface BattleResult {
+  won: boolean
+  /** What the preview promised, kept alongside the outcome it produced. */
+  odds: number
+  monster: {
+    key: string
+    name: string
+    tier: number
+    profile: 'brute' | 'carapace' | 'swift'
+    attack: number
+    defence: number
+  }
+  attack: number
+  defence: number
+  /** §9.5.8 -- gold needs no bag row, which is why a fight can always pay it. */
+  gold: number
+  job: string | null
+  jobXp: number
+  /** §9.5.6 -- the weapon, and the one worn piece that took the hit. */
+  wear: BattleWear[]
+  /** §8.2 -- named here because nothing may be destroyed quietly. */
+  destroyed: string[]
+  /** §9.5.7 -- what was standing here, when it was a corpse rather than a pack. */
+  corpse: { mine: boolean; label: string; owner: string | null } | null
+  /** The row that came home, when its owner was the one standing over it. */
+  recovered: string | null
+  /** §2 -- the row a stranger's kill destroyed instead of moving. */
+  burned: string | null
+  /** §9.5.7 -- a loss that nothing absorbed. */
+  died: boolean
+  stolen: { label: string; kind: string } | null
+  wokeAt: { name: string; col: number; row: number } | null
+}
+
+export interface BattleWear {
+  name: string
+  slot: string | null
+  lost: number
+  left: number
+  destroyed: boolean
 }
 
 /** Standard envelope: the result of the action plus the new authoritative state. */
@@ -416,6 +490,7 @@ export interface GameApi {
   previewTile(col: number, row: number): Promise<TilePreview>
   /** §9.5.5 -- no coordinates: the only fight on offer is the one under your feet. */
   previewBattle(): Promise<BattlePreview>
+  fight(): Promise<ActionResult<BattleResult>>
 
   startMining(col: number, row: number): Promise<ActionResult<Job>>
   /** §4.0 -- the same hex, by hand. Its own call because it is its own verb. */

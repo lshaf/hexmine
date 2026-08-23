@@ -832,4 +832,37 @@ export function packProp(tile: Tile): string {
   return tile.pack ? pack(0, 4) : ''
 }
 
+/**
+ * §9.5.7 -- a corpse, and whatever is standing over it.
+ *
+ * The one marker on the map deliberately outside the fog: it is drawn for
+ * everybody at any distance, because a recovery you cannot find is not one.
+ * That makes it the sharpest case of §13.2's rule -- you may always see THAT
+ * something is there, and never what is happening there.
+ *
+ * It reads as the pack's shape gone still: the same dark mass, no lit eyes, and
+ * a pale marker planted beside it. Eyes are the pack's whole tell, so taking
+ * them away is what says this one is not looking at you.
+ *
+ * `mine` puts the marker in ember, which is §13.3's colour for a state to deal
+ * with -- and a row of yours sitting on a hex four days out is exactly that.
+ * Somebody else's is bone, which is a fact rather than a task.
+ */
+function corpse(x: number, y: number, mine: boolean): string {
+  const hide = '#3b2429'
+  const bone = mine ? '#b8453f' : '#c9bd9e'
+
+  return (
+    `<path d="M${x - 8} ${y + 3} Q${x - 6} ${y - 3} ${x} ${y - 4}` +
+    ` Q${x + 6} ${y - 3} ${x + 8} ${y + 3} Z" fill="${hide}"/>` +
+    rect(x - 0.9, y - 12, 1.8, 9, bone) +
+    rect(x - 4, y - 10, 8, 1.8, bone) +
+    `<circle cx="${x}" cy="${y - 13.5}" r="2.1" fill="${bone}"/>`
+  )
+}
+
+export function corpseProp(mine: boolean): string {
+  return corpse(0, 4, mine)
+}
+
 export { dungeonProp }
