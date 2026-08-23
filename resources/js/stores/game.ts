@@ -363,8 +363,19 @@ export const useGame = defineStore('game', () => {
       .sort((a, b) => a.endsAt - b.endsAt),
   )
 
-  /** Finished, and you are standing where it is. The only ones you can take. */
+  /** Finished, wherever it is. This is the "your work is done" number. */
   const benchReady = computed(
+    () => benchJobs.value.filter((j) => j.endsAt <= now.value).length,
+  )
+
+  /**
+   * Finished AND under your feet, which is the only kind you can take (§8.4).
+   *
+   * Two numbers rather than one, because they say different things: the first
+   * is news, the second is a thing to tap. A cell that lit for work four days'
+   * walk away would be crying wolf every time.
+   */
+  const benchHere = computed(
     () =>
       benchJobs.value.filter(
         (j) =>
@@ -690,7 +701,7 @@ export const useGame = defineStore('game', () => {
     consumables, buffs,
     tree, skillPoints, jobLevels, ownedNodes,
     questDefs, quests, questsReady, questReward,
-    activeJobs, fieldJob, processingJob, benchJobs, benchReady, underfoot, selectedTile,
+    activeJobs, fieldJob, processingJob, benchJobs, benchReady, benchHere, underfoot, selectedTile,
     currentSettlement, shopStock, sight, travelPerHexMs, travelEta,
     travel, travelProgress, travelHexesWalked, travelRemainingMs,
     // helpers

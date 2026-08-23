@@ -10,6 +10,12 @@ use Illuminate\Http\Request;
 
 class CraftingController extends GameController
 {
+    /**
+     * §8.4 -- put a thing on the bench. It is not made until it is collected.
+     *
+     * The response is the job rather than the item, because there is no item
+     * yet: what comes back is where it is being made and when it will be done.
+     */
     public function store(Request $request): JsonResponse
     {
         $character = $this->character($request);
@@ -18,25 +24,13 @@ class CraftingController extends GameController
             'item' => ['required', 'string'],
         ]);
 
-        $made = $this->game->craftItem($character, $validated['item']);
-        $def = Catalog::item($made->item_key);
+        $job = $this->game->startCraft($character, $validated['item']);
+        $def = Catalog::item($validated['item']);
 
-        // §8.4 -- a potion comes back as a stack, not an object. It has no id
-        // worth handing out, no durability and no slot, so it reports a count.
-        if (! empty($def['consumable'])) {
-            return $this->respond(
-                $character,
-                ['key' => $made->item_key, 'quantity' => $made->quantity],
-                "Brewed {$def['name']}. You have {$made->quantity}.",
-            );
-        }
-
-        return $this->respond($character, [
-            'id' => (string) $made->id,
-            'key' => $made->item_key,
-            'durability' => $made->durability,
-            'equipped' => $made->equipped,
-            'options' => $made->options ?? [],
-        ], "Crafted {$def['name']}.");
+        return $this->respond(
+            $character,
+            $this->game->jobPayload($job),
+            "{$def['name']} is on the bench. Come back for it.",
+        );
     }
 }

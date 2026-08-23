@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useGame } from '@/stores/game'
-import { MATERIALS, SKILL_BY_KEY } from '@/game/catalog'
-import { formatDuration } from '@/game/formulas'
-import { materialIcon } from '@/icons/procedural'
+import { ITEM_BY_KEY, MATERIALS, SKILL_BY_KEY } from '@/game/catalog'
+import { formatDuration, placeLabel } from '@/game/formulas'
+import { itemIcon, materialIcon } from '@/icons/procedural'
 import SvgIcon from './SvgIcon.vue'
 import type { Job } from '@/game/types'
 
@@ -18,16 +18,68 @@ const progress = computed(() =>
   Math.min(100, Math.max(0, ((total.value - remaining.value) / total.value) * 100)),
 )
 
-const output = computed(() =>
-  props.job.kind === 'processing' ? props.job.output : props.job.material,
-)
-const def = computed(() => MATERIALS[output.value])
-const icon = computed(() => materialIcon(def.value, 26))
+/**
+ * §8.4 -- a craft makes an ITEM, so the card reads a different catalog for it.
+ * Everything else about a job is the same shape: a thing, a clock, a place.
+ */
+const crafting = computed(() => props.job.kind === 'craft')
 
-const where = computed(() =>
+const made = computed(() =>
+  props.job.kind === 'craft' ? ITEM_BY_KEY[props.job.output] : undefined,
+)
+
+const def = computed(() =>
   props.job.kind === 'processing'
-    ? 'Processing line'
-    : `Hex ${props.job.col}, ${props.job.row}`,
+    ? MATERIALS[props.job.output]
+    : props.job.kind === 'mining' || props.job.kind === 'hunting'
+      ? MATERIALS[props.job.material]
+      : undefined,
+)
+
+const name = computed(() => made.value?.name ?? def.value?.name ?? 'Work')
+
+const icon = computed(() =>
+  made.value
+    ? itemIcon({
+        slot: made.value.slot,
+        family: made.value.family,
+        rarity: made.value.rarity,
+        palette: made.value.palette,
+        size: 26,
+      })
+    : def.value
+      ? materialIcon(def.value, 26)
+      : '',
+)
+
+/**
+ * Where it is, and for a bench that is not decoration: §6 and §8.4 both hand
+ * the thing over at the building that holds it, so the name is the walk.
+ */
+const where = computed(() => {
+  const job = props.job
+
+  if (job.kind === 'processing' || job.kind === 'craft') {
+    return job.settlementName
+      ? placeLabel(job.settlementName, job.col, job.row)
+      : (job.kind === 'craft' ? 'A bench' : 'Processing line')
+  }
+
+  return `Hex ${job.col}, ${job.row}`
+})
+
+/** §6.2 -- only bench work has anybody to stand over. */
+const presence = computed(
+  () => (props.job.kind === 'processing' || props.job.kind === 'craft') && props.job.presence,
+)
+
+/**
+ * The line a bench job trains. A craft names one of the three bench jobs
+ * (§7.4) rather than a gathering line, and those have no entry here -- the
+ * card simply says less about it.
+ */
+const trains = computed(
+  () => (SKILL_BY_KEY as Record<string, { name: string } | undefined>)[props.job.skill]?.name ?? null,
 )
 </script>
 
@@ -37,14 +89,17 @@ const where = computed(() =>
 
     <div class="grow">
       <div class="row-between">
-        <strong class="title">{{ job.quantity }} {{ def.name }}</strong>
+        <strong class="title">
+          <template v-if="crafting">{{ name }}</template>
+          <template v-else>{{ job.quantity }} {{ name }}</template>
+        </strong>
         <span class="mono tiny" :class="ready ? 'gold' : 'muted'">
           {{ ready ? 'Ready' : formatDuration(remaining) }}
         </span>
       </div>
       <div class="tiny muted">
-        {{ where }} · trains {{ SKILL_BY_KEY[job.skill].name }}
-        <template v-if="job.kind === 'processing' && job.presence"> · presence bonus</template>
+        {{ where }}<template v-if="trains"> · trains {{ trains }}</template>
+        <template v-if="presence"> · presence bonus</template>
       </div>
       <div class="bar" :class="ready ? 'bar-gold' : ''" style="margin-top: 6px">
         <span :style="{ width: `${progress}%` }" />

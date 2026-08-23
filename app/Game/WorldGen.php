@@ -688,6 +688,10 @@ final class WorldGen
      */
     private static function packAt(int $col, int $row, string $ring, int $now): ?array
     {
+        if (! Balance::packsEnabled()) {
+            return null;
+        }
+
         $lifetime = Balance::scaled(Balance::PACK_LIFETIME_MS);
         $offset = Hash::randInt(
             Hash::hash2($col, $row, Balance::mapSeed() ^ 0x9ac1),

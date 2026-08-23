@@ -243,6 +243,26 @@ export const formatPercent = (value: number): string =>
  */
 const REDUCTION_STATS = new Set<StatKey>(['tripReduction'])
 
+/**
+ * A settlement said with its hex, §6.
+ *
+ * Names are generated from two word lists, so two villages a day's walk apart
+ * can share one -- and now that work is claimed at the bench that holds it
+ * (§8.4), "waiting at Redhollow" has to say WHICH Redhollow. The coordinates
+ * are also the thing a player types into the map, so they earn their place
+ * anywhere the name is a destination rather than a decoration.
+ */
+export const placeLabel = (
+  name: string | null | undefined,
+  col: number | null | undefined,
+  row: number | null | undefined,
+): string => {
+  if (!name) return 'somewhere'
+  if (col === null || col === undefined || row === null || row === undefined) return name
+
+  return `${name} (${col}, ${row})`
+}
+
 /** A stat's percentage with the sign it is read by, never the sign it is stored with. */
 export const formatStat = (stat: StatKey, value: number): string =>
   formatPercent(REDUCTION_STATS.has(stat) ? -value : value)

@@ -464,7 +464,7 @@ export interface Recipe {
 
 // ---------------------------------------------------------------- jobs
 
-export type JobKind = 'mining' | 'hunting' | 'processing'
+export type JobKind = 'mining' | 'hunting' | 'processing' | 'craft'
 export type JobStatus = 'active' | 'ready'
 
 /**
@@ -488,23 +488,49 @@ export interface FieldJob {
   skill: SkillKey
 }
 
-export interface ProcessingJob {
+/**
+ * Work left in a building, §6 and §8.4.
+ *
+ * Both kinds carry where they are, because a claim now needs you standing at
+ * the bench that holds it: "ready" on its own would be a cruel word for
+ * something waiting four days' walk away.
+ */
+export interface BenchJob {
   id: string
-  kind: 'processing'
   status: JobStatus
   settlementId: string
-  recipeKey: string
-  input: MaterialKey
-  output: MaterialKey
+  /** The bench's name and hex, so the ledger can say where to walk. */
+  settlementName: string | null
+  col: number | null
+  row: number | null
   quantity: number
   startedAt: number
   endsAt: number
   /** Presence bonus accrues only while the player is at the settlement, §6.2. */
   presence: boolean
+}
+
+export interface ProcessingJob extends BenchJob {
+  kind: 'processing'
+  recipeKey: string
+  input: MaterialKey
+  output: MaterialKey
   skill: SkillKey
 }
 
-export type Job = FieldJob | ProcessingJob
+/**
+ * §8.4 -- a thing on a bench. The output is an ITEM key rather than a material,
+ * and there is no input to name: the materials went in when the work started.
+ */
+export interface CraftJob extends BenchJob {
+  kind: 'craft'
+  /** The item key being made. */
+  output: string
+  /** The bench job it will teach when it comes off: smith, armorer, alchemist. */
+  skill: string
+}
+
+export type Job = FieldJob | ProcessingJob | CraftJob
 
 // --------------------------------------------------------------- travelling
 

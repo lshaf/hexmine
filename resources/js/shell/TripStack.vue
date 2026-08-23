@@ -14,17 +14,24 @@ import { formatDuration } from '@/game/formulas'
 import { materialIcon } from '@/icons/procedural'
 import { ACTION_PATHS } from '@/icons/actions'
 import SvgIcon from '@/components/SvgIcon.vue'
-import type { Job } from '@/game/types'
+import type { ProcessingJob } from '@/game/types'
 
 const game = useGame()
 
+/**
+ * §6 -- the processing stack, and only that. A craft is bench work too, but it
+ * is claimed somewhere you may be days from (§8.4), so it belongs in the ledger
+ * rather than in a stack that sits over the map you are looking at.
+ */
 const ordered = computed(() =>
-  game.jobs.filter((j) => j.kind === 'processing').sort((a, b) => a.endsAt - b.endsAt),
+  game.jobs
+    .filter((j): j is ProcessingJob => j.kind === 'processing')
+    .sort((a, b) => a.endsAt - b.endsAt),
 )
 
-const output = (job: Job) => (job.kind === 'processing' ? job.output : job.material)
+const output = (job: ProcessingJob) => job.output
 
-const ready = (job: Job) => job.endsAt <= game.now
+const ready = (job: ProcessingJob) => job.endsAt <= game.now
 
 /** Where a stop right now would leave you -- whole hexes only. */
 const walked = computed(() => game.travelHexesWalked)

@@ -22,8 +22,8 @@ import {
   stationReaches,
 } from '@/game/catalog'
 import type { Category } from '@/game/catalog'
-import { itemStatLine } from '@/game/formulas'
-import { EQUIPMENT } from '@/game/balance'
+import { formatDuration, itemStatLine, placeLabel } from '@/game/formulas'
+import { CRAFT, EQUIPMENT, PROCESSING } from '@/game/balance'
 import { itemIcon, materialIcon } from '@/icons/procedural'
 import SvgIcon from '@/components/SvgIcon.vue'
 import type { ItemDef, MaterialKey, Rarity } from '@/game/types'
@@ -120,6 +120,19 @@ function lifespan(item: ItemDef): string {
   }
   return `${item.maxDurability} durability`
 }
+
+/**
+ * §8.4 -- how long the bench keeps it, before the tier and the gloves are
+ * applied. Quoted from the rung's base rather than the exact figure the server
+ * will compute, because this is the number that decides whether to start it
+ * here at all; the exact one arrives with the job.
+ */
+function benchTime(item: ItemDef): string {
+  const tier = station.value?.tier ?? 'village'
+  const seconds = CRAFT.seconds[item.rarity] * PROCESSING.speed[tier]
+
+  return formatDuration((seconds / game.timeScale) * 1000)
+}
 </script>
 
 <template>
@@ -130,7 +143,8 @@ function lifespan(item: ItemDef): string {
           <span class="label">Workbench</span>
           <div class="tiny" style="margin-top: 3px">
             <template v-if="station">
-              {{ station.name }} <span class="muted">· {{ station.tier }}</span>
+              {{ placeLabel(station.name, station.col, station.row) }}
+              <span class="muted">· {{ station.tier }}</span>
             </template>
             <span v-else class="muted">You have left the settlement.</span>
           </div>
@@ -216,9 +230,11 @@ function lifespan(item: ItemDef): string {
         </div>
 
         <div class="row-between foot">
-          <!-- A potion has no durability to quote; what it has is a clock. -->
+          <!-- A potion has no durability to quote; what it has is a clock.
+               §8.4 -- and every craft now has a second one: how long the bench
+               holds it, which is the thing to know BEFORE pressing. -->
           <span class="tiny muted">
-            {{ blockedReason(item) ?? lifespan(item) }}
+            {{ blockedReason(item) ?? `${lifespan(item)} · ${benchTime(item)} on the bench` }}
           </span>
           <button
             class="btn btn-sm"

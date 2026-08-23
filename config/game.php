@@ -20,6 +20,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Map combat, §9.5
+    |--------------------------------------------------------------------------
+    |
+    | Whether packs stand on hexes at all. On by default; off makes the roads
+    | quiet, which is what a test measuring mining wants and what an operator
+    | might want on a debug server. Nothing else about combat changes: gear,
+    | benches and the battle jobs stay exactly where they are.
+    |
+    */
+    'packs' => (bool) env('GAME_PACKS', true),
+
+    /*
+    |--------------------------------------------------------------------------
     | Automatic character provisioning
     |--------------------------------------------------------------------------
     |

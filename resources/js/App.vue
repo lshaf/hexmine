@@ -24,7 +24,9 @@ import StatusCluster from '@/shell/StatusCluster.vue'
 import TripStack from '@/shell/TripStack.vue'
 import ActionDock from '@/shell/ActionDock.vue'
 import HexAction from '@/shell/HexAction.vue'
+import { placeLabel } from '@/game/formulas'
 import PanelOverlay from '@/shell/PanelOverlay.vue'
+import BenchView from '@/views/BenchView.vue'
 import Toasts from '@/shell/Toasts.vue'
 import HaulModal from '@/shell/HaulModal.vue'
 import TileCard from '@/components/TileCard.vue'
@@ -50,6 +52,8 @@ const PANELS = {
   skills: { title: 'Jobs', component: SkillsView, wide: false },
   // §12.1 -- what is owed and what has been paid. Two tabs, no third.
   quests: { title: 'Ledger', component: QuestView, wide: false },
+  // §8.4 -- what is on a bench somewhere, and how far away that bench is.
+  bench: { title: 'Benches', component: BenchView, wide: false },
 } as const
 
 const panel = computed(() => (game.panel ? PANELS[game.panel] : null))
@@ -159,6 +163,21 @@ onMounted(() => {
               : 'What is owed, and what has been paid'"
             @activate="game.openPanel('quests')"
           />
+          <!-- §8.4 -- a bench holds work somewhere on the map, and hands it
+               over only to somebody standing there. The cell counts what is
+               finished AND reachable from where you are, because a "ready" you
+               cannot take is worse than no number at all. -->
+          <HexAction
+            icon="craft"
+            label="Benches"
+            :good="game.benchHere > 0"
+            :hint="game.benchHere > 0
+              ? `${game.benchHere} finished here — take it off the bench`
+              : game.benchReady > 0
+                ? `${game.benchReady} finished, none of it here`
+                : 'Crafts and processing runs, and which bench holds them'"
+            @activate="game.openPanel('bench')"
+          />
           <!-- §7.6 -- the bag says when it is full, because nothing else does
                any more: no strap free means the next new kind is turned away. -->
           <HexAction
@@ -193,7 +212,7 @@ onMounted(() => {
       <Transition name="fade">
         <PanelOverlay
           v-if="station && !panel"
-          :title="station.settlement.name"
+          :title="placeLabel(station.settlement.name, station.settlement.col, station.settlement.row)"
           @close="game.closeStation()"
         >
           <StationPanel :settlement="station.settlement" />
@@ -265,17 +284,17 @@ onMounted(() => {
 
 .screens {
   /*
-   * A honeycomb block, three across and two down.
+   * A honeycomb flower: 2 - 3 - 2.
    *
-   * Six cells in a row would eat 350px of the top edge; six in a nested column
-   * gave the horizon back but reached a third of the way down the screen, which
-   * is worse on a phone than it was wide. Three by two is the squarest the
-   * lattice allows, and it puts every screen inside one thumb's reach of the
-   * corner.
+   * Seven cells is the first count that closes into a shape rather than a
+   * block. Three across and two down was square enough while there were six,
+   * but a seventh left a ragged corner cell hanging off it -- and a lattice
+   * with one cell out of place reads worse than a list would.
    *
-   * It nests exactly the way the map's own hexes do (§13.2): three quarters of
-   * a width between columns, and the middle column dropped half a height so the
-   * points interlock. That is the same lattice, read across instead of down.
+   * The columns hold 2, 3 and 2 because these are FLAT-TOP hexes and that is
+   * the way flat-top hexes nest (§13.2): three quarters of a width between
+   * columns, and the short columns dropped half a height so the points
+   * interlock. Read as rows it is the same flower, turned.
    *
    * The captions go with the block. They were never the thing being read at a
    * glance, and there is nowhere to put them between two nested cells; every
@@ -284,27 +303,33 @@ onMounted(() => {
   --cell-w: 58px;
   --cell-h: 50px;
   display: grid;
-  /* The first two columns are a step apart; the last is a whole cell, so the
-     block ends on its own right edge rather than overhanging the corner. */
+  /* Two steps and a whole cell, so the block ends on its own right edge rather
+     than overhanging the corner. */
   grid-template-columns: repeat(2, calc(var(--cell-w) * 0.75)) var(--cell-w);
-  grid-auto-rows: var(--cell-h);
+  /* Half-height rows: a cell spans two of them, which is what lets the short
+     columns sit half a cell lower than the tall one. */
+  grid-auto-rows: calc(var(--cell-h) / 2);
   justify-items: start;
-  /* Room for the dropped middle column, which would otherwise be clipped. */
-  padding-bottom: calc(var(--cell-h) / 2);
 }
+
+/*
+ * Explicit placement, because the shape is the point and flow order would
+ * rebuild the old block. Middle column first, top to bottom; the two short
+ * columns hang either side of it, half a cell down.
+ */
+.screens :deep(.cell:nth-child(1)) { grid-column: 2; grid-row: 1 / span 2; }
+.screens :deep(.cell:nth-child(2)) { grid-column: 1; grid-row: 2 / span 2; }
+.screens :deep(.cell:nth-child(3)) { grid-column: 3; grid-row: 2 / span 2; }
+.screens :deep(.cell:nth-child(4)) { grid-column: 2; grid-row: 3 / span 2; }
+.screens :deep(.cell:nth-child(5)) { grid-column: 1; grid-row: 4 / span 2; }
+.screens :deep(.cell:nth-child(6)) { grid-column: 3; grid-row: 4 / span 2; }
+.screens :deep(.cell:nth-child(7)) { grid-column: 2; grid-row: 5 / span 2; }
 
 /* Nested cells overlap at the tips, so hit-testing has to follow the hexagon
    rather than the box, or the pointed corner of one cell would swallow clicks
    meant for its neighbour. */
 .screens :deep(.cell) {
   clip-path: var(--hex-clip);
-}
-
-/* The middle column of each row drops half a height. Two straight columns and
-   one dropped between them is what makes six hexes a honeycomb rather than a
-   grid of six hexagons. */
-.screens :deep(.cell:nth-child(3n + 2)) {
-  transform: translateY(calc(var(--cell-h) / 2));
 }
 
 .screens :deep(.cell .name) {

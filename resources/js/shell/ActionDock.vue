@@ -19,7 +19,7 @@ import { MONSTERS } from '@/game/monsters'
 import { RECIPES, RING_LABEL, SKILL_BY_KEY } from '@/game/catalog'
 import { VARIANT_LABEL } from '@/game/variants'
 import { waterLabel } from '@/game/water'
-import { formatDuration } from '@/game/formulas'
+import { formatDuration, placeLabel } from '@/game/formulas'
 import { worldParams } from '@/game/worldgen'
 import HexAction from './HexAction.vue'
 import type { BattlePreview } from '@/api/types'
@@ -43,7 +43,9 @@ const standing = computed(() => {
  * that away.
  */
 const placeName = computed(() => {
-  if (here.value) return here.value.name
+  // §6 -- a settlement is said with its hex. Two villages can share a name, and
+  // the coordinates are what anybody types in to walk here.
+  if (here.value) return placeLabel(here.value.name, here.value.col, here.value.row)
 
   const tile = standing.value
   if (!tile) return 'Unsurveyed'
