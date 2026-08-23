@@ -1,37 +1,19 @@
 <script setup lang="ts">
 /**
- * Work running for you at a settlement, pinned under the instrument cluster.
+ * The road, pinned under the instrument cluster.
  *
- * Processing only. A mining trip is something you are doing on the hex you are
- * standing on, so it belongs to the dock; this is the job an NPC keeps running
- * whether you stay to help or walk away (§6.2), which is exactly why it needs a
- * readout that follows you.
+ * Travel and nothing else. A journey is the one piece of work with no place to
+ * be claimed -- it ends wherever you are standing, and stopping it is a decision
+ * you make while looking at the map. Everything a settlement is holding for you
+ * (§6, §8.4) is claimed at the building that holds it, so it lives in the
+ * Benches ledger rather than in a stack over the map.
  */
 import { computed } from 'vue'
 import { useGame } from '@/stores/game'
-import { MATERIALS } from '@/game/catalog'
 import { formatDuration } from '@/game/formulas'
-import { materialIcon } from '@/icons/procedural'
 import { ACTION_PATHS } from '@/icons/actions'
-import SvgIcon from '@/components/SvgIcon.vue'
-import type { ProcessingJob } from '@/game/types'
 
 const game = useGame()
-
-/**
- * §6 -- the processing stack, and only that. A craft is bench work too, but it
- * is claimed somewhere you may be days from (§8.4), so it belongs in the ledger
- * rather than in a stack that sits over the map you are looking at.
- */
-const ordered = computed(() =>
-  game.jobs
-    .filter((j): j is ProcessingJob => j.kind === 'processing')
-    .sort((a, b) => a.endsAt - b.endsAt),
-)
-
-const output = (job: ProcessingJob) => job.output
-
-const ready = (job: ProcessingJob) => job.endsAt <= game.now
 
 /** Where a stop right now would leave you -- whole hexes only. */
 const walked = computed(() => game.travelHexesWalked)
@@ -70,39 +52,6 @@ const heading = computed(() => {
       </div>
     </div>
   </div>
-
-  <TransitionGroup v-if="ordered.length" name="rise" tag="div" class="stack">
-    <div v-for="job in ordered" :key="job.id" class="trip plate" :class="{ ready: ready(job) }">
-      <div class="inner">
-        <SvgIcon :svg="materialIcon(MATERIALS[output(job)], 20)" />
-        <span class="grow body">
-          <span class="qty readout">{{ job.quantity }} {{ MATERIALS[output(job)].name }}</span>
-          <span class="label when">
-            {{ ready(job) ? 'Ready' : formatDuration(job.endsAt - game.now) }}
-          </span>
-        </span>
-        <button
-          v-if="ready(job)"
-          class="btn btn-primary btn-sm"
-          type="button"
-          :disabled="game.busy"
-          @click="game.collect(job.id)"
-        >
-          Collect
-        </button>
-        <button
-          v-else
-          class="btn btn-sm btn-danger"
-          type="button"
-          :disabled="game.busy"
-          title="Abandoning forfeits the partial reward"
-          @click="game.abandon(job.id)"
-        >
-          Drop
-        </button>
-      </div>
-    </div>
-  </TransitionGroup>
 </template>
 
 <style scoped>
@@ -146,10 +95,6 @@ const heading = computed(() => {
 
 .when {
   font-size: 8.5px;
-}
-
-.ready .when {
-  color: var(--gold);
 }
 
 @media (max-width: 560px) {
