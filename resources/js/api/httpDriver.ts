@@ -43,6 +43,10 @@ import type {
   StationState,
   BattlePreview,
   BattleResult,
+  GuildDetail,
+  GuildDirectory,
+  GuildDoor,
+  GuildRole,
   TilePreview,
   TravelStop,
 } from './types'
@@ -123,6 +127,68 @@ export class HttpDriver implements GameApi {
 
   previewBattle(): Promise<BattlePreview> {
     return request<BattlePreview>('/battle/preview')
+  }
+
+  // ---------------------------------------------------------------- §10 guilds
+
+  getGuilds(): Promise<GuildDirectory> {
+    return request<GuildDirectory>('/guilds')
+  }
+
+  foundGuild(identity: {
+    name: string
+    code: string
+    description: string
+    flag: string | null
+  }): Promise<ActionResult<GuildDetail>> {
+    return post<ActionResult<GuildDetail>>('/guilds', identity)
+  }
+
+  joinGuild(guildId: string): Promise<ActionResult<GuildDetail | null>> {
+    return post<ActionResult<GuildDetail | null>>(`/guilds/${guildId}/members`)
+  }
+
+  withdrawApplication(guildId: string): Promise<ActionResult<null>> {
+    return del<ActionResult<null>>(`/guilds/${guildId}/applications`)
+  }
+
+  decideApplication(characterId: string, admit: boolean) {
+    return post<ActionResult<GuildDetail | null>>(`/guilds/mine/applications/${characterId}`, {
+      admit,
+    })
+  }
+
+  leaveGuild(): Promise<ActionResult<null>> {
+    return del<ActionResult<null>>('/guilds/mine')
+  }
+
+  updateGuild(changes: {
+    description?: string
+    flag?: string | null
+    recruitment?: GuildDoor
+  }): Promise<ActionResult<GuildDetail>> {
+    return request<ActionResult<GuildDetail>>('/guilds/mine', {
+      method: 'PATCH',
+      body: JSON.stringify(changes),
+    })
+  }
+
+  removeGuildMember(characterId: string): Promise<ActionResult<GuildDetail | null>> {
+    return del<ActionResult<GuildDetail | null>>(`/guilds/mine/members/${characterId}`)
+  }
+
+  donateToGuild(gold: number): Promise<ActionResult<GuildDetail>> {
+    return post<ActionResult<GuildDetail>>('/guilds/mine/donations', { gold })
+  }
+
+  upgradeGuildFacility(facility: 'hall' | 'bench'): Promise<ActionResult<GuildDetail>> {
+    return post<ActionResult<GuildDetail>>('/guilds/mine/facilities', { facility })
+  }
+
+  setGuildRole(characterId: string, role: GuildRole): Promise<ActionResult<GuildDetail | null>> {
+    return post<ActionResult<GuildDetail | null>>(`/guilds/mine/members/${characterId}/role`, {
+      role,
+    })
   }
 
   fight(): Promise<ActionResult<Job>> {

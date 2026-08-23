@@ -15,6 +15,9 @@ use App\Models\CharacterNode;
 use App\Models\CharacterQuest;
 use App\Models\CharacterSkill;
 use App\Models\GameJob;
+use App\Models\Guild;
+use App\Models\GuildApplication;
+use App\Models\GuildMember;
 use App\Models\Player;
 use App\Models\TileState;
 use Illuminate\Database\Eloquent\Model;
@@ -2973,6 +2976,766 @@ class GameService
         $job->delete();
     }
 
+    // ------------------------------------------------------------- guilds §10
+
+    /** §10.0 -- the guild this character belongs to, or none. */
+    public function guildOf(Character $character): ?Guild
+    {
+        $row = GuildMember::where('character_id', $character->id)->first();
+
+        return $row?->guild;
+    }
+
+    /**
+     * §10.0 -- found one, at a city or a capital, for twenty thousand gold.
+     *
+     * The three refusals are the whole of the rule: a village is not somewhere
+     * a guild can stand (§6 -- a guild is a place before it is a roster), you
+     * cannot belong to two, and the gold has to actually be in your purse. Each
+     * is checked before anything is spent.
+     */
+    public function foundGuild(Character $character, array $identity): Guild
+    {
+        return DB::transaction(function () use ($character, $identity) {
+            if ($this->guildOf($character) !== null) {
+                throw new GameException('You are already in a guild. Leave it first.', 'in_guild');
+            }
+
+            // §10.0 -- a city or a capital. Never a village, never open country.
+            $settlement = $this->requireSettlement($character, 'found a guild', 'city');
+
+            if ((int) $character->gold < Balance::GUILD_FOUNDING_COST) {
+                $short = Balance::GUILD_FOUNDING_COST - (int) $character->gold;
+
+                throw new GameException(
+                    "A hall costs ".Balance::GUILD_FOUNDING_COST." gold. You are {$short} short.",
+                    'poor',
+                );
+            }
+
+            $name = $this->cleanGuildName($identity['name'] ?? '');
+            $code = $this->cleanGuildCode($identity['code'] ?? '');
+
+            // Checked here as well as by the unique index, because a collision
+            // should read as "that name is taken" rather than as a 500.
+            if (Guild::where('name', $name)->exists()) {
+                throw new GameException("There is already a guild called {$name}.", 'taken');
+            }
+            if (Guild::where('code', $code)->exists()) {
+                throw new GameException("The code {$code} is taken.", 'taken');
+            }
+
+            $character->gold -= Balance::GUILD_FOUNDING_COST;
+            $character->save();
+
+            $guild = Guild::create([
+                'name' => $name,
+                'code' => $code,
+                'description' => $this->cleanGuildDescription($identity['description'] ?? ''),
+                'flag' => $this->cleanGuildFlag($identity['flag'] ?? null),
+                'settlement_id' => $settlement['id'],
+                'col' => (int) $settlement['col'],
+                'row' => (int) $settlement['row'],
+                'founder_character_id' => $character->id,
+                'recruitment' => Guild::OPEN,
+            ]);
+
+            GuildMember::create([
+                'guild_id' => $guild->id,
+                'character_id' => $character->id,
+                'role' => GuildMember::OWNER,
+                'joined_at' => $this->now(),
+            ]);
+
+            return $guild;
+        });
+    }
+
+    /**
+     * §10.0.1 -- who is recruiting, which is the whole of the join flow.
+     *
+     * Closed guilds are not listed AT ALL rather than listed and refused: a
+     * roster you can see and cannot join is a queue with extra steps, and the
+     * flag exists precisely so there is no queue.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function recruitingGuilds(): array
+    {
+        return Guild::whereIn('recruitment', [Guild::OPEN, Guild::APPROVAL])
+            ->withCount('members')
+            ->orderBy('name')
+            ->get()
+            ->map(fn (Guild $g) => $this->guildPayload($g))
+            ->all();
+    }
+
+    /**
+     * §10.0.1 -- walk in. No application, no approval, no waiting.
+     *
+     * An approval flow needs a pending list, a decision and a way to tell
+     * somebody the answer, and its only output is a delay. A guild that does
+     * not want a prospector removes them in one tap, so the cost of a wrong
+     * join is one tap rather than a day.
+     */
+    public function joinGuild(Character $character, int $guildId): array
+    {
+        return DB::transaction(function () use ($character, $guildId) {
+            if ($this->guildOf($character) !== null) {
+                throw new GameException('You are already in a guild. Leave it first.', 'in_guild');
+            }
+
+            $guild = Guild::find($guildId);
+            if ($guild === null) {
+                throw new GameException('That guild no longer exists.', 'not_found');
+            }
+
+            if ($guild->recruitment === Guild::CLOSED) {
+                throw new GameException("{$guild->name} is not taking anybody on.", 'closed');
+            }
+
+            // §10.0.1 -- the third position of the door: listed, but the owner
+            // decides who comes through it.
+            if ($guild->recruitment === Guild::APPROVAL) {
+                if (GuildApplication::where('guild_id', $guild->id)
+                    ->where('character_id', $character->id)
+                    ->exists()) {
+                    throw new GameException("{$guild->name} already has your name down.", 'applied');
+                }
+
+                GuildApplication::create([
+                    'guild_id' => $guild->id,
+                    'character_id' => $character->id,
+                    'applied_at' => $this->now(),
+                ]);
+
+                return ['guild' => $guild, 'applied' => true];
+            }
+
+            $this->admitToGuild($character, $guild);
+
+            return ['guild' => $guild, 'applied' => false];
+        });
+    }
+
+    /**
+     * §10.0.1 -- let somebody in, and tear up every other name they put down.
+     *
+     * A prospector in a guild is in exactly one (§10.0), so applications
+     * elsewhere are answers to a question that is no longer being asked.
+     */
+    private function admitToGuild(Character $character, Guild $guild): void
+    {
+        // §10.5 -- the seats. Both doors arrive here, so this is the one place
+        // a full hall has to say so.
+        $this->requireSeat($guild);
+
+        GuildMember::create([
+            'guild_id' => $guild->id,
+            'character_id' => $character->id,
+            'role' => GuildMember::MEMBER,
+            'joined_at' => $this->now(),
+        ]);
+
+        GuildApplication::where('character_id', $character->id)->delete();
+    }
+
+    /**
+     * §10.5 -- the seats a hall has, and whether one is free.
+     *
+     * A flat base plus what the Hall facility has been built to. Enforced on
+     * the way IN rather than as a warning, and in both doors -- walking into an
+     * open guild and being let into an approval one are the same arrival.
+     */
+    public function guildRosterCap(Guild $guild): int
+    {
+        return Balance::guildRosterCap((int) $guild->hall_level);
+    }
+
+    private function requireSeat(Guild $guild): void
+    {
+        $cap = $this->guildRosterCap($guild);
+
+        if ($guild->members()->count() >= $cap) {
+            throw new GameException(
+                "{$guild->name} seats {$cap} and is full. The hall has to be built out first.",
+                'full',
+            );
+        }
+    }
+
+    /**
+     * §10.5 -- how far up §8.0's ladder this guild's own bench reaches.
+     *
+     * Measured from what the settlement underneath it already reaches, and
+     * climbing one rung a level. That is what stops the first levels being
+     * money thrown away: a hall in a city starts at uncommon and needs three
+     * levels to reach legendary, one in a capital starts at epic and needs one.
+     * The gap is the pull inward §5.2 puts on everything else.
+     */
+    public function guildBenchReach(Guild $guild): string
+    {
+        $tier = WorldGen::settlementById($guild->settlement_id)['tier'] ?? 'city';
+        $base = Balance::STATION_RARITY_CAP[$tier] ?? 'common';
+
+        $rank = Balance::rarityRank($base) + (int) $guild->bench_level;
+
+        return Balance::RARITIES[min($rank, Balance::rarityRank('legendary'))];
+    }
+
+    /** §10.5 -- the last Bench level worth buying, which is the one reaching legendary. */
+    public function guildBenchMaxLevel(Guild $guild): int
+    {
+        $tier = WorldGen::settlementById($guild->settlement_id)['tier'] ?? 'city';
+        $base = Balance::STATION_RARITY_CAP[$tier] ?? 'common';
+
+        return max(0, Balance::rarityRank('legendary') - Balance::rarityRank($base));
+    }
+
+    /** §10.5 -- what the next level of a facility costs, or null when it is finished. */
+    public function guildFacilityNextCost(Guild $guild, string $facility): ?int
+    {
+        $level = $this->guildFacilityLevel($guild, $facility);
+        $max = $facility === 'bench'
+            ? $this->guildBenchMaxLevel($guild)
+            : Balance::GUILD_HALL_MAX_LEVEL;
+
+        return $level >= $max ? null : Balance::guildFacilityCost($level + 1);
+    }
+
+    private function guildFacilityLevel(Guild $guild, string $facility): int
+    {
+        return match ($facility) {
+            'hall' => (int) $guild->hall_level,
+            'bench' => (int) $guild->bench_level,
+            default => throw new GameException('No such facility.', 'not_found'),
+        };
+    }
+
+    /**
+     * §10.5 -- put gold in the treasury. It does not come back out.
+     *
+     * Non-retractable, exactly as §10.4 requires of a bidding donation and for
+     * the same reason: a pot that can be emptied again is a pot whose size can
+     * be scouted, and a contribution you can take back is not a contribution.
+     * What it buys is a facility, and a facility is the whole roster's.
+     *
+     * Anybody in the guild may donate. It is the one guild action with no rank
+     * on it -- gold going the right way needs no permission.
+     */
+    public function donateToGuild(Character $character, int $gold): Guild
+    {
+        return DB::transaction(function () use ($character, $gold) {
+            if ($gold < 1) {
+                throw new GameException('Donate something.', 'invalid');
+            }
+
+            $member = GuildMember::where('character_id', $character->id)->first();
+            if ($member === null) {
+                throw new GameException('You are not in a guild.', 'no_guild');
+            }
+
+            $character->refresh();
+
+            if ((int) $character->gold < $gold) {
+                throw new GameException("You do not have {$gold} gold.", 'poor');
+            }
+
+            $character->gold -= $gold;
+            $character->save();
+
+            $member->donated += $gold;
+            $member->save();
+
+            $guild = $member->guild;
+            $guild->gold += $gold;
+            $guild->save();
+
+            return $guild;
+        });
+    }
+
+    /**
+     * §10.5 -- spend the treasury on a facility level.
+     *
+     * The owner alone, because §10.0.2 keeps everything irreversible with them
+     * and three hundred thousand gold is the most irreversible thing a guild
+     * can do. An officer opening a door wrong costs one tap to undo; an officer
+     * spending the roster's year of saving costs the year.
+     */
+    public function upgradeGuildFacility(Character $character, string $facility): Guild
+    {
+        return DB::transaction(function () use ($character, $facility) {
+            $actor = $this->requireGuildRank($character, [GuildMember::OWNER]);
+
+            $guild = Guild::lockForUpdate()->find($actor->guild_id);
+            if ($guild === null) {
+                throw new GameException('That guild no longer exists.', 'not_found');
+            }
+
+            $level = $this->guildFacilityLevel($guild, $facility);
+            $cost = $this->guildFacilityNextCost($guild, $facility);
+
+            if ($cost === null) {
+                throw new GameException(
+                    $facility === 'bench'
+                        ? 'The bench already reaches legendary. Nothing is above it.'
+                        : 'The hall is built out as far as it goes.',
+                    'maxed',
+                );
+            }
+
+            if ((int) $guild->gold < $cost) {
+                $short = $cost - (int) $guild->gold;
+
+                throw new GameException(
+                    "That costs {$cost} gold and the treasury is {$short} short.",
+                    'poor',
+                );
+            }
+
+            $guild->gold -= $cost;
+
+            if ($facility === 'bench') {
+                $guild->bench_level = $level + 1;
+            } else {
+                $guild->hall_level = $level + 1;
+            }
+
+            $guild->save();
+
+            return $guild;
+        });
+    }
+
+    /** §10.0.1 -- take a name off the list yourself. */
+    public function withdrawApplication(Character $character, int $guildId): void
+    {
+        GuildApplication::where('guild_id', $guildId)
+            ->where('character_id', $character->id)
+            ->delete();
+    }
+
+    /**
+     * §10.0.1 -- answer somebody. Owners and officers, like every other door
+     * duty: it is reversible in one action, which is what makes the rank safe.
+     */
+    public function decideApplication(Character $character, int $characterId, bool $admit): void
+    {
+        DB::transaction(function () use ($character, $characterId, $admit) {
+            $actor = $this->requireGuildRank($character, [GuildMember::OWNER, GuildMember::OFFICER]);
+
+            $application = GuildApplication::where('guild_id', $actor->guild_id)
+                ->where('character_id', $characterId)
+                ->first();
+
+            if ($application === null) {
+                throw new GameException('Nobody by that name has asked.', 'not_found');
+            }
+
+            if (! $admit) {
+                $application->delete();
+
+                return;
+            }
+
+            $applicant = Character::find($characterId);
+
+            // They may have joined somewhere else while the letter sat here.
+            if ($applicant === null || $this->guildOf($applicant) !== null) {
+                $application->delete();
+
+                throw new GameException('They have found a guild already.', 'gone');
+            }
+
+            $this->admitToGuild($applicant, $actor->guild);
+        });
+    }
+
+    /**
+     * §10.0.1 -- who has asked, and where this character has asked.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function guildApplications(Guild $guild): array
+    {
+        return $guild->applications()
+            ->with('character')
+            ->orderBy('applied_at')
+            ->get()
+            ->map(fn (GuildApplication $a) => [
+                'characterId' => (string) $a->character_id,
+                'name' => $a->character?->name ?? 'Prospector',
+                'level' => (int) ($a->character?->level ?? 1),
+                'appliedAt' => $a->applied_at,
+            ])
+            ->all();
+    }
+
+    /** @return list<string> guild ids this character is waiting on */
+    public function pendingApplicationsOf(Character $character): array
+    {
+        return GuildApplication::where('character_id', $character->id)
+            ->pluck('guild_id')
+            ->map(fn ($id) => (string) $id)
+            ->all();
+    }
+
+    /**
+     * §10.0.2 -- leave. The last owner may not, while anybody is still in.
+     *
+     * A guild whose owner has walked away is a guild nobody can close, and it
+     * would sit on its name and its code forever. Hand it over or disband it.
+     */
+    public function leaveGuild(Character $character): void
+    {
+        DB::transaction(function () use ($character) {
+            $row = GuildMember::where('character_id', $character->id)->first();
+            if ($row === null) {
+                throw new GameException('You are not in a guild.', 'no_guild');
+            }
+
+            if ($row->role === GuildMember::OWNER) {
+                $others = GuildMember::where('guild_id', $row->guild_id)
+                    ->where('character_id', '!=', $character->id)
+                    ->count();
+
+                if ($others > 0) {
+                    throw new GameException(
+                        'Hand the guild over before you go, or disband it.',
+                        'owner',
+                    );
+                }
+
+                // Last one out turns the lights off: an empty guild is not a
+                // guild, and leaving its name and code reserved would be.
+                $row->guild?->delete();
+
+                return;
+            }
+
+            $row->delete();
+        });
+    }
+
+    /**
+     * §10.0.2 -- remove somebody. Owners and officers, never a member.
+     *
+     * Everything an officer may do is reversible in one action, which is what
+     * makes the rank safe to hand out: the worst an officer can do is make
+     * somebody rejoin.
+     */
+    public function removeMember(Character $character, int $characterId): void
+    {
+        DB::transaction(function () use ($character, $characterId) {
+            $actor = $this->requireGuildRank($character, [GuildMember::OWNER, GuildMember::OFFICER]);
+
+            if ($characterId === (int) $character->id) {
+                throw new GameException('Use leave for that.', 'blocked');
+            }
+
+            $target = GuildMember::where('guild_id', $actor->guild_id)
+                ->where('character_id', $characterId)
+                ->first();
+
+            if ($target === null) {
+                throw new GameException('They are not in your guild.', 'not_found');
+            }
+
+            // An officer may not remove an owner, and may not remove a peer:
+            // two officers removing each other is a coin toss over a guild.
+            if ($actor->role !== GuildMember::OWNER && $target->role !== GuildMember::MEMBER) {
+                throw new GameException('Only the owner can remove an officer.', 'forbidden');
+            }
+
+            $target->delete();
+        });
+    }
+
+    /**
+     * §10.0.2 -- promote, demote, or hand the whole thing over.
+     *
+     * Only the owner, and handing over is one move rather than two: a guild
+     * with two owners for even one request is a guild either of them can
+     * disband.
+     */
+    public function setMemberRole(Character $character, int $characterId, string $role): void
+    {
+        DB::transaction(function () use ($character, $characterId, $role) {
+            $actor = $this->requireGuildRank($character, [GuildMember::OWNER]);
+
+            if (! in_array($role, [GuildMember::OWNER, GuildMember::OFFICER, GuildMember::MEMBER], true)) {
+                throw new GameException('No such rank.', 'blocked');
+            }
+
+            $target = GuildMember::where('guild_id', $actor->guild_id)
+                ->where('character_id', $characterId)
+                ->first();
+
+            if ($target === null) {
+                throw new GameException('They are not in your guild.', 'not_found');
+            }
+
+            if ($role === GuildMember::OWNER) {
+                $target->role = GuildMember::OWNER;
+                $target->save();
+
+                // Handing over, not sharing.
+                $actor->role = GuildMember::OFFICER;
+                $actor->save();
+
+                return;
+            }
+
+            if ($target->id === $actor->id) {
+                throw new GameException('Hand the guild to somebody else instead.', 'blocked');
+            }
+
+            $target->role = $role;
+            $target->save();
+        });
+    }
+
+    /**
+     * §10.0.3 -- the identity: description, flag, and whether the door is open.
+     *
+     * The NAME and the CODE are not here. They are how everybody else refers to
+     * this guild, and a thing that renames itself is a thing nobody can point
+     * at twice.
+     */
+    public function updateGuild(Character $character, array $changes): Guild
+    {
+        return DB::transaction(function () use ($character, $changes) {
+            $actor = $this->requireGuildRank($character, [GuildMember::OWNER, GuildMember::OFFICER]);
+            $guild = $actor->guild;
+
+            // §10.0.2 -- an officer holds the door; the owner owns the face.
+            // §10.0.1 -- one setting with three positions. An officer holds it
+            // for the same reason they hold everything else on the door: every
+            // move of it is reversible in one action.
+            if (array_key_exists('recruitment', $changes)) {
+                $door = (string) $changes['recruitment'];
+
+                if (! in_array($door, Guild::DOORS, true)) {
+                    throw new GameException('No such door.', 'invalid');
+                }
+
+                $guild->recruitment = $door;
+            }
+
+            if ($actor->role === GuildMember::OWNER) {
+                if (array_key_exists('description', $changes)) {
+                    $guild->description = $this->cleanGuildDescription((string) $changes['description']);
+                }
+                if (array_key_exists('flag', $changes)) {
+                    $guild->flag = $this->cleanGuildFlag($changes['flag']);
+                }
+            } elseif (array_key_exists('description', $changes) || array_key_exists('flag', $changes)) {
+                throw new GameException('Only the owner can change the guild itself.', 'forbidden');
+            }
+
+            $guild->save();
+
+            return $guild;
+        });
+    }
+
+    /** @param  list<string>  $allowed */
+    private function requireGuildRank(Character $character, array $allowed): GuildMember
+    {
+        $row = GuildMember::where('character_id', $character->id)->first();
+
+        if ($row === null) {
+            throw new GameException('You are not in a guild.', 'no_guild');
+        }
+
+        if (! in_array($row->role, $allowed, true)) {
+            throw new GameException('Your rank does not allow that.', 'forbidden');
+        }
+
+        return $row;
+    }
+
+    /**
+     * §8.0 -- is this character standing at their own guild's hall?
+     *
+     * The one question the legendary bench asks. Members only, at their own
+     * hall: a hall open to passers-by would be a public good rather than a
+     * reason to join, and a legendary bench that needed no guild would make
+     * §10 optional.
+     */
+    public function atOwnGuildHall(Character $character, ?Guild $guild = null): bool
+    {
+        // Handed in where the caller already has it: the player state asks both
+        // questions at once, and looking the membership up twice for one
+        // response is a query nobody needs.
+        $guild ??= $this->guildOf($character);
+
+        return $guild !== null
+            && ! $this->isTravelling($character)
+            && (int) $character->col === $guild->col
+            && (int) $character->row === $guild->row;
+    }
+
+    /**
+     * §10.0.2 -- the summary, plus the one number only your own guild may tell
+     * you: how many are waiting at the door. It rides the state so the corner
+     * cell can go green over it, and it is nil for anybody but an officer.
+     *
+     * @return array<string,mixed>
+     */
+    private function stateGuildPayload(Character $character, ?Guild $guild): ?array
+    {
+        $payload = $this->guildPayload($guild, false, true);
+        if ($payload === null) {
+            return null;
+        }
+
+        $role = GuildMember::where('guild_id', $guild->id)
+            ->where('character_id', $character->id)
+            ->value('role');
+
+        $officer = in_array($role, [GuildMember::OWNER, GuildMember::OFFICER], true);
+
+        return $payload + [
+            'pending' => $officer
+                ? GuildApplication::where('guild_id', $guild->id)->count()
+                : 0,
+        ];
+    }
+
+    /**
+     * @param  bool  $own  §10.4 -- the treasury and its prices, which are the
+     *                     guild's own business. A pot whose size a rival can
+     *                     read is a pot that can be outbid to the coin, which
+     *                     is the whole reason donations are non-retractable.
+     * @return array<string,mixed>
+     */
+    public function guildPayload(?Guild $guild, bool $withMembers = false, bool $own = false): ?array
+    {
+        if ($guild === null) {
+            return null;
+        }
+
+        $payload = [
+            'id' => (string) $guild->id,
+            'name' => $guild->name,
+            'code' => $guild->code,
+            'description' => $guild->description,
+            'flag' => $guild->flag,
+            'settlementId' => $guild->settlement_id,
+            'settlementName' => WorldGen::settlementById($guild->settlement_id)['name'] ?? null,
+            'col' => $guild->col,
+            'row' => $guild->row,
+            // §10.0.1 -- on the summary, because it is the difference between
+            // "Join" and "Ask" on a button nobody has pressed yet, and finding
+            // out afterwards is a worse answer.
+            'recruitment' => $guild->recruitment,
+            'members' => $guild->members_count ?? $guild->members()->count(),
+            // §10.5 -- the facilities are public, and meant to be: a bench that
+            // reaches legendary is the best recruiting line a guild has.
+            'hallLevel' => (int) $guild->hall_level,
+            'benchLevel' => (int) $guild->bench_level,
+            'benchReach' => $this->guildBenchReach($guild),
+            'rosterCap' => $this->guildRosterCap($guild),
+        ];
+
+        if ($own) {
+            $payload += [
+                'gold' => (int) $guild->gold,
+                'benchMaxLevel' => $this->guildBenchMaxLevel($guild),
+                'hallCost' => $this->guildFacilityNextCost($guild, 'hall'),
+                'benchCost' => $this->guildFacilityNextCost($guild, 'bench'),
+            ];
+        }
+
+        if (! $withMembers) {
+            return $payload;
+        }
+
+        return $payload + [
+            'applications' => $this->guildApplications($guild),
+            'roster' => $guild->members()
+                ->with('character')
+                ->get()
+                ->map(fn (GuildMember $m) => [
+                    'characterId' => (string) $m->character_id,
+                    'name' => $m->character?->name ?? 'Prospector',
+                    'level' => (int) ($m->character?->level ?? 1),
+                    'role' => $m->role,
+                    'joinedAt' => $m->joined_at,
+                    // §10.2 -- by contribution, never equal share. This is the
+                    // number that says who carried the hall.
+                    'donated' => (int) $m->donated,
+                ])
+                ->all(),
+        ];
+    }
+
+    private function cleanGuildName(string $name): string
+    {
+        $name = trim(preg_replace('/\s+/', ' ', $name) ?? '');
+        $length = mb_strlen($name);
+
+        if ($length < Balance::GUILD_NAME_MIN || $length > Balance::GUILD_NAME_MAX) {
+            throw new GameException(
+                'A guild name is between '.Balance::GUILD_NAME_MIN.' and '.Balance::GUILD_NAME_MAX.' characters.',
+                'invalid',
+            );
+        }
+
+        return $name;
+    }
+
+    private function cleanGuildCode(string $code): string
+    {
+        $code = strtoupper(trim($code));
+
+        if (preg_match('/^[A-Z0-9]{'.Balance::GUILD_CODE_MIN.','.Balance::GUILD_CODE_MAX.'}$/', $code) !== 1) {
+            throw new GameException(
+                'A code is '.Balance::GUILD_CODE_MIN.' to '.Balance::GUILD_CODE_MAX.' letters or digits.',
+                'invalid',
+            );
+        }
+
+        return $code;
+    }
+
+    private function cleanGuildDescription(string $text): string
+    {
+        return mb_substr(trim($text), 0, Balance::GUILD_DESCRIPTION_MAX);
+    }
+
+    /**
+     * §10.0.3 -- exactly 1024 colours, and the column can hold nothing else.
+     *
+     * base64 of 3072 raw RGB bytes. Not a data URI, not a file, not a URL: a
+     * flag is the one piece of player-drawn content this game carries, and what
+     * makes it safe to carry is that its shape is the only shape it can have.
+     */
+    private function cleanGuildFlag(mixed $flag): ?string
+    {
+        if ($flag === null || $flag === '') {
+            return null;
+        }
+
+        if (! is_string($flag)) {
+            throw new GameException('That is not a flag.', 'invalid');
+        }
+
+        $raw = base64_decode($flag, true);
+
+        if ($raw === false || strlen($raw) !== Balance::GUILD_FLAG_BYTES) {
+            $size = Balance::GUILD_FLAG_SIZE;
+
+            throw new GameException("A flag is {$size} by {$size} dots and nothing else.", 'invalid');
+        }
+
+        // Re-encoded rather than stored as sent, so whatever comes back out is
+        // canonical base64 of exactly those bytes.
+        return base64_encode($raw);
+    }
+
     // -------------------------------------------------------------- settlement
 
     public function settlement(string $settlementId): array
@@ -3610,20 +4373,59 @@ class GameService
 
             $here = $this->requireSettlement($character, 'craft');
 
-            // §8.0 -- the bench's reach, checked against rarity rather than the
-            // item's own `station`. Both gates agree today; rarity goes first
-            // because it can say *why*, and because it is the one that still
-            // holds when someone adds a recipe and forgets to set a station.
-            if (! Balance::stationReaches($here['tier'], $def['rarity'])) {
-                $needs = Balance::stationForRarity($def['rarity']);
-                $reason = $needs === null
-                    ? "{$def['name']} is never crafted. It only drops."
-                    : "A {$here['tier']} bench cannot make {$def['rarity']} work. That needs a {$needs}.";
-
-                throw new GameException($reason, 'station');
+            // §8.0 -- nothing makes a unique. Asked first because it is the one
+            // refusal that is about the item rather than about where you stand.
+            if (Balance::stationForRarity($def['rarity']) === null) {
+                throw new GameException(
+                    "{$def['name']} is never crafted. It only drops.",
+                    'station',
+                );
             }
 
-            if (isset($def['station'])) {
+            // §8.0 / §10.0 -- the guild hall is not a settlement tier, it is a
+            // building a guild put inside one. So it is asked first and asked
+            // differently: not "is this place big enough" but "is this YOUR
+            // hall". Members only, at their own -- a hall open to passers-by
+            // would be a public good rather than a reason to join.
+            $guild = $this->guildOf($character);
+            $atOwnHall = $this->atOwnGuildHall($character, $guild);
+
+            $needsHall = ($def['station'] ?? null) === 'guild'
+                || Balance::rarityRank($def['rarity']) >= Balance::rarityRank('legendary');
+
+            if ($needsHall && ! $atOwnHall) {
+                throw new GameException(
+                    $guild === null
+                        ? "{$def['name']} is guild work. You would need a guild, and a hall to make it in."
+                        : "{$def['name']} is made at {$guild->name}'s own hall.",
+                    'station',
+                );
+            }
+
+            // §10.5 -- and then the reach, which at your own hall is your own
+            // guild's rather than the settlement's. A hall is built out one rung
+            // at a time from whatever the ground underneath it already reached,
+            // so a guild in a city climbs three levels to legendary and one in a
+            // capital climbs one.
+            $reach = $atOwnHall && $guild !== null
+                ? $this->guildBenchReach($guild)
+                : (Balance::STATION_RARITY_CAP[$here['tier']] ?? 'common');
+
+            if (Balance::rarityRank($def['rarity']) > Balance::rarityRank($reach)) {
+                // §8.0 -- checked against rarity rather than the item's own
+                // `station`. Rarity goes first because it can say *why*, and
+                // because it still holds when somebody adds a recipe and forgets
+                // to set a station.
+                throw new GameException(
+                    $atOwnHall && $guild !== null
+                        ? "{$guild->name}'s bench reaches {$reach}. {$def['rarity']} work needs it built out further."
+                        : "A {$here['tier']} bench cannot make {$def['rarity']} work. That needs a "
+                            .Balance::stationForRarity($def['rarity']).'.',
+                    'station',
+                );
+            }
+
+            if (isset($def['station']) && $def['station'] !== 'guild') {
                 $this->requireSettlement($character, 'craft', $def['station']);
             }
 
@@ -4480,6 +5282,13 @@ class GameService
             // than on the quests endpoint because it moves with almost every
             // action, while the catalog behind it never moves at all.
             'quests' => $this->questPayload($character),
+            // §10 -- the guild this character belongs to, if any. On the state
+            // rather than fetched, because membership decides what a bench will
+            // make (§8.0's legendary rung) and the two must never disagree.
+            'guild' => $this->stateGuildPayload($character, $guild = $this->guildOf($character)),
+            // §10.0 -- and whether they are standing in their own hall, which
+            // is the one question the legendary bench asks.
+            'atGuildHall' => $this->atOwnGuildHall($character, $guild),
             // §9.5.7 -- your own corpses, through any fog and at any distance.
             // Here rather than on the map because the split is what makes the
             // two endpoints mean one thing each: this is what is YOURS and is

@@ -16,6 +16,7 @@ import type {
   Job,
   MaterialKey,
   OwnedItem,
+  Rarity,
   Settlement,
   SkillKey,
   StatKey,
@@ -95,6 +96,15 @@ export interface PlayerState {
   jobs: Job[]
   /** Settlement the player is currently present at, §6.2. */
   presenceAt: string | null
+  /**
+   * §10 -- the guild this character belongs to, or null.
+   *
+   * On the state rather than fetched, because membership decides what a bench
+   * will make (§8.0's legendary rung) and the two must never disagree.
+   */
+  guild: GuildStateSummary | null
+  /** §10.0 -- standing in your own hall, which is the one question the bench asks. */
+  atGuildHall: boolean
   /**
    * §9.5.7 -- YOUR corpses, at any distance and through any fog.
    *
@@ -501,6 +511,102 @@ export interface CollectResult {
   destroyed: string[]
 }
 
+/**
+ * §10 -- a guild, as everybody else sees it.
+ *
+ * A guild is a PLACE before it is a roster (§10.0), so the hall is on the
+ * summary rather than looked up: where it stands is most of what deciding to
+ * join one is about.
+ */
+export interface GuildSummary {
+  id: string
+  name: string
+  /** A short tag, shown wherever the name will not fit. */
+  code: string
+  description: string
+  /** §10.0.3 -- 1024 colours, base64 of 3072 raw RGB bytes. Null until drawn. */
+  flag: string | null
+  settlementId: string
+  settlementName: string | null
+  col: number
+  row: number
+  /**
+   * §10.0.1 -- the door, in one setting with three positions.
+   *
+   *   closed    not listed, nobody gets in
+   *   open      listed, and walking in is enough
+   *   approval  listed, and the owner decides
+   */
+  recruitment: GuildDoor
+  members: number
+  /** §10.5 -- seats bought over the flat base. */
+  hallLevel: number
+  /** §10.5 -- rungs bought over what the settlement underneath already reached. */
+  benchLevel: number
+  /** §10.5 -- how far up §8.0's ladder this guild's own bench reaches. */
+  benchReach: Rarity
+  /** §10.5 -- how many the hall seats, all in. */
+  rosterCap: number
+}
+
+/**
+ * §10.4 -- the treasury and its prices, which only your own guild tells you.
+ *
+ * A pot whose size a rival can read is a pot that can be outbid to the coin,
+ * and that is the same argument that makes a donation non-retractable.
+ */
+export interface GuildTreasury {
+  gold: number
+  /** The last Bench level worth buying — the one that reaches legendary. */
+  benchMaxLevel: number
+  /** Gold the next level costs, or null when the facility is finished. */
+  hallCost: number | null
+  benchCost: number | null
+}
+
+export type GuildRole = 'owner' | 'officer' | 'member'
+export type GuildDoor = 'closed' | 'open' | 'approval'
+
+/** §10.0.1 -- somebody who has asked to be let in. */
+export interface GuildApplicant {
+  characterId: string
+  name: string
+  level: number
+  appliedAt: number
+}
+
+export interface GuildMemberRow {
+  characterId: string
+  name: string
+  level: number
+  role: GuildRole
+  joinedAt: number
+  /** §10.2 -- by contribution, never equal share. Who carried the hall. */
+  donated: number
+}
+
+/** Your own guild carries its roster and its post; somebody else's never does. */
+export interface GuildStateSummary extends GuildSummary, GuildTreasury {
+  /** §10.0.2 -- how many are waiting at the door. Nil unless you are an officer. */
+  pending: number
+}
+
+export interface GuildDetail extends GuildSummary, GuildTreasury {
+  roster: GuildMemberRow[]
+  applications: GuildApplicant[]
+}
+
+export interface GuildDirectory {
+  /** §10.0.1 -- the recruiting ones, and only those. */
+  guilds: GuildSummary[]
+  mine: GuildDetail | null
+  /** §10.0.1 -- guild ids this character is already waiting on an answer from. */
+  applied: string[]
+  /** §10.0 -- what a hall costs, published rather than compiled in. */
+  cost: number
+  flagSize: number
+}
+
 export interface QueueSlot {
   index: number
   job: Job | null
@@ -525,6 +631,31 @@ export interface GameApi {
   previewTile(col: number, row: number): Promise<TilePreview>
   /** §9.5.5 -- no coordinates: the only fight on offer is the one under your feet. */
   previewBattle(): Promise<BattlePreview>
+
+  // ---------------------------------------------------------------- §10 guilds
+  getGuilds(): Promise<GuildDirectory>
+  foundGuild(identity: {
+    name: string
+    code: string
+    description: string
+    flag: string | null
+  }): Promise<ActionResult<GuildDetail>>
+  /** §10.0.1 -- joins, or leaves your name, depending on the door. */
+  joinGuild(guildId: string): Promise<ActionResult<GuildDetail | null>>
+  withdrawApplication(guildId: string): Promise<ActionResult<null>>
+  decideApplication(characterId: string, admit: boolean): Promise<ActionResult<GuildDetail | null>>
+  leaveGuild(): Promise<ActionResult<null>>
+  updateGuild(changes: {
+    description?: string
+    flag?: string | null
+    recruitment?: GuildDoor
+  }): Promise<ActionResult<GuildDetail>>
+  removeGuildMember(characterId: string): Promise<ActionResult<GuildDetail | null>>
+  setGuildRole(characterId: string, role: GuildRole): Promise<ActionResult<GuildDetail | null>>
+  /** §10.5 -- gold into the treasury. It does not come back out. */
+  donateToGuild(gold: number): Promise<ActionResult<GuildDetail>>
+  /** §10.5 -- spend it on a facility level. Owner only. */
+  upgradeGuildFacility(facility: 'hall' | 'bench'): Promise<ActionResult<GuildDetail>>
   /** §9.5.5 -- starts a fight and answers with the JOB; the report is on collect. */
   fight(): Promise<ActionResult<Job>>
 

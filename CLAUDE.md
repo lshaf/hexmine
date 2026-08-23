@@ -1551,6 +1551,118 @@ Battle draughts come off the ichor line and want a new **`battle` buff scope**
 Scoped to v1: **raid co-op + shared consumable pool + feature ownership.** Territory war,
 guild-vs-guild, and politics come later.
 
+### 10.0 Founding one — the hall, and what it costs
+
+A guild is founded **at a city or a capital**, never at a village and never in
+open country. That is the same argument §6 makes about every other bench: a
+guild is a *place* before it is a roster, and the place has to be somewhere
+people already walk to.
+
+| | Rule |
+|---|---|
+| **Cost** | **20,000 gold**, from the founder's own purse |
+| **Where** | Standing at a **city** or a **capital** |
+| **One each** | A character may belong to exactly one guild |
+| **Identity** | Name, **code**, description, and a 32×32 flag they draw |
+
+**20,000 gold is the point, not a price tag.** §11.2 lists capital bidding as
+the largest gold sink in the game; this is the second, and unlike bidding it is
+open to anybody with the patience to save. Gold has no bridge to NFT value
+(§3.2), so it may be inflated freely — which is exactly why it needs sinks this
+size for the number to keep meaning anything.
+
+**Many guilds may hold halls in one settlement.** A hall is not a claim on the
+place: §10.4 keeps capital *ownership* as its own separate, admin-triggered
+thing, and conflating the two would make founding a guild an act of conquest.
+
+#### The hall is the legendary bench
+
+§8.0 has always said legendary is made at a guild hall and nowhere else. Until
+now that was a rung nobody could reach — forty recipes with a station no
+building in the game had. A hall is what can eventually reach them, **for that
+guild's members, at that guild's hall**.
+
+**Founding opens the building, not the rung.** A new hall's bench reaches
+exactly what the settlement under it already reached, and every rung above that
+is bought a level at a time out of the treasury (§10.5). So 20,000 gold is the
+*entry* to the top rung rather than the price of it, which is the right shape:
+it is payable by anyone, and what comes after is payable only *together*. A hall
+open to passers-by would be a public good rather than a reason to join, and a
+legendary bench that needed no guild would make §10 optional.
+
+#### 10.0.1 The door — one setting, three positions
+
+| | What it means |
+|---|---|
+| **Closed** | not listed, and nobody gets in |
+| **Open** | listed, and walking in is enough |
+| **Approval** | listed, and the owner decides who comes through |
+
+**One setting rather than two flags.** "Recruiting" and "vets applicants" as
+separate booleans make four states out of three, and the fourth — *closed, but
+vetting* — means nothing at all. A door is in one position at a time.
+
+**Which position it is in is on the listing**, so the button says *Join* or
+*Ask* before it is pressed. Finding out which one it was afterwards is the worse
+answer.
+
+**A refusal is not a ban.** Turning somebody away takes their name off the list
+and nothing else; they may ask again. Bans are a different thing with different
+consequences, and they must not arrive by accident through a rejection button.
+
+**Joining tears up every other application.** One guild each (§10.0), so a name
+left on another list is an answer to a question no longer being asked.
+
+#### 10.0.4 Where each half of this lives
+
+**Every verb is at the settlement; the corner panel only reports.** That
+follows from §10.0's first line — a guild is a *place* before it is a roster, so
+the place is where it is dealt with.
+
+| | Where |
+|---|---|
+| **Found one · join one · roster · door · flag · leaving** | the dock, at a **city or a capital** |
+| **Who is in it, and where the hall stands** | the guild screen, from any hex |
+
+The corner panel is reachable from every hex on the map, which is exactly why
+nothing is *done* there. Offering *found a guild* everywhere and allowing it
+almost nowhere is the shape of a menu that wastes your time, and the same
+argument covers the rest of the roster once it is made: a door you can reset
+from the bottom of a mine is a setting, not a hall. At the dock the offer and
+the possibility are the same thing.
+
+What the panel keeps is what a player asks it from anywhere — **who is with me
+and where is home** — plus the distance back to it, which is the only number
+that makes the second half worth printing.
+
+#### 10.0.2 Three ranks, and the middle one exists to do the chores
+
+| Rank | May |
+|---|---|
+| **Owner** | everything, including disband and hand over |
+| **Officer** | remove members, open and close recruiting |
+| **Member** | leave |
+
+Officers exist because the owner is one person in a game where nobody is
+online at the same time as anybody else. Everything an officer may do is
+**reversible in one action**; everything that is not — disbanding, editing the
+identity, promoting — stays with the owner.
+
+**The last owner cannot leave a guild that still has members.** They hand it
+over or they disband it. A guild whose owner has walked away is a guild nobody
+can close, and it would sit on its name and its code forever.
+
+#### 10.0.3 The flag — 32×32, drawn in the app
+
+A guild draws its own flag on a 32×32 grid, a dot at a time, in **any colour**.
+It is stored as exactly 1024 colours and nothing else: no upload, no file, no
+URL. What can be in the column is bounded by the column's own shape, which is
+the only kind of user-supplied image this game is willing to carry.
+
+§13 says all visuals are procedural and no artist is required, and this is the
+one deliberate exception — because the thing being drawn is not *art direction*,
+it is **identity**. A guild that all look alike is a list of names.
+
 ### 10.1 Shared consumable pool — guardrails required
 The pool is technically a backdoor around the no-P2P-trade rule. It must be constrained:
 - **Consumables only** — never raw/refined/rare resources
@@ -1582,6 +1694,70 @@ leeching. A small alliance-bonus roll goes to the pool on top of individual loot
   dungeons and that proximity is the real prize.
 
 This is likely the single largest gold sink in the game.
+
+### 10.5 The treasury — what a guild's gold is actually for
+
+**A guild is founded with a hall and nothing in it.** The 20,000 buys the
+building and the place on the map; what the roster puts in afterwards is what
+turns it into somewhere worth walking to. Two facilities, both bought a level at
+a time out of a shared purse.
+
+| | What the level buys |
+|---|---|
+| **Hall** | seats. 10 flat, **+10 a level**, five levels, so a maxed hall holds sixty |
+| **Bench** | rungs. One **more** than the ground underneath it already reached, up to legendary |
+
+**Gold goes in and does not come out.** Non-retractable, exactly as §10.4
+requires of a bidding donation and for the same reason: a pot that can be
+emptied again is a pot whose size can be scouted. Anybody in the guild may
+donate — it is the one guild action with no rank on it, because gold going the
+right way needs no permission — and **the owner alone spends it**, since §10.0.2
+keeps the irreversible things with them and three hundred thousand gold is the
+most irreversible thing a guild can do. An officer opening a door wrong costs
+one tap to undo; an officer spending the roster's year of saving costs the year.
+
+What each member has put in is **kept on their row and shown on the roster**.
+§10.2 already says raid loot splits by contribution rather than equal share, and
+this is the same number asked a different way: who carried the hall.
+
+#### The price
+
+```
+cost(level) = round(25000 * level^1.6, to the nearest 100)
+              25,000 · 75,800 · 145,000 · 229,700 · 328,300
+```
+
+**The first level costs more than the hall did**, and that is the shape rather
+than an accident. Founding is what one patient prospector saves for; a facility
+is what a roster does together. Gold is the one currency the game may inflate
+freely (§3.2), which is exactly why it is the one that can carry a sink this
+size — a maxed Hall and a city Bench run to a million between them.
+
+#### The bench climbs from the ground it stands on
+
+This is the part that decides whether the early levels are worth anything. A
+Bench level is **one rung past what the settlement itself reaches** (§8.0), not
+one rung up from common:
+
+| Hall stands in | Starts at | Levels to legendary |
+|---|---|---|
+| City | uncommon | **3** — rare, epic, legendary |
+| Capital | epic | **1** |
+
+So no level is ever money thrown away, and a capital hall reaches the top for a
+fifth of what a city hall pays. That gap is the same pull inward §5.2 puts on
+everything else, said in gold: the contested ring is where the cheap route to
+legendary is.
+
+**Legendary still needs the hall as well as the bench.** The two questions are
+separate and both are asked — *is this your guild's hall* (§8.0: members only,
+at their own) and *has the bench been built that far*. A capital's own bench
+never reaches legendary no matter who is standing at it.
+
+**The seats are checked on the way in, not warned about.** Both doors (§10.0.1)
+arrive at the same admission, so that is the one place a full hall says so. A
+guild that wants to grow has to build for it, which is what makes the Hall
+facility worth buying at all.
 
 ---
 

@@ -286,6 +286,76 @@ final class Balance
      */
     public const CARRIER_LIFETIME_MS = 24 * self::HOUR;
 
+    // ------------------------------------------------------------- guilds §10
+
+    /**
+     * §10.0 -- what founding a guild costs its founder.
+     *
+     * The point rather than a price tag. §11.2 makes capital bidding the
+     * largest gold sink in the game; this is the second, and unlike bidding it
+     * is open to anybody with the patience to save. Gold has no bridge to NFT
+     * value (§3.2), which is exactly why it needs sinks this size for the
+     * number to keep meaning anything -- and it is the real gate on §8.0's top
+     * rung, since the hall is the only bench that reaches legendary.
+     */
+    public const GUILD_FOUNDING_COST = 20000;
+
+    /** §10.0.3 -- a flag is 32x32 and nothing else may be in the column. */
+    public const GUILD_FLAG_SIZE = 32;
+
+    /** Three raw bytes a dot, so the decoded flag is exactly this many bytes. */
+    public const GUILD_FLAG_BYTES = self::GUILD_FLAG_SIZE * self::GUILD_FLAG_SIZE * 3;
+
+    public const GUILD_NAME_MIN = 3;
+
+    public const GUILD_NAME_MAX = 32;
+
+    public const GUILD_CODE_MIN = 2;
+
+    public const GUILD_CODE_MAX = 5;
+
+    public const GUILD_DESCRIPTION_MAX = 500;
+
+    /**
+     * §10.5 -- what one facility level costs, in gold.
+     *
+     * `round(BASE * level ** EXPONENT)`, so the first level costs more than the
+     * hall itself did and the fifth costs an order more than that: 25k, 76k,
+     * 145k, 230k, 328k. That shape is the point -- founding is what one patient
+     * prospector can save for, and a facility is what a roster does together.
+     * Gold is the one currency the game may inflate freely (§3.2), so it is the
+     * one that can carry a sink this size.
+     */
+    public const GUILD_FACILITY_BASE_COST = 25000;
+
+    public const GUILD_FACILITY_EXPONENT = 1.6;
+
+    /** §10.5 -- seats a hall holds before a single Hall level is bought. */
+    public const GUILD_ROSTER_BASE = 10;
+
+    public const GUILD_ROSTER_PER_LEVEL = 10;
+
+    public const GUILD_HALL_MAX_LEVEL = 5;
+
+    /**
+     * §10.5 -- gold a facility level costs, at the level being bought.
+     *
+     * Rounded to the nearest hundred, because a price with two significant
+     * digits reads as a decision and one with six reads as a receipt.
+     */
+    public static function guildFacilityCost(int $level): int
+    {
+        $raw = self::GUILD_FACILITY_BASE_COST * ($level ** self::GUILD_FACILITY_EXPONENT);
+
+        return (int) (round($raw / 100) * 100);
+    }
+
+    /** §10.5 -- how many members a hall at this level seats. */
+    public static function guildRosterCap(int $hallLevel): int
+    {
+        return self::GUILD_ROSTER_BASE + $hallLevel * self::GUILD_ROSTER_PER_LEVEL;
+    }
+
     /**
      * §9.5.5 -- how long a fight takes.
      *

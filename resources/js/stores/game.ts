@@ -17,6 +17,9 @@ import { ApiError } from '@/api/types'
 import type {
   BattleResult,
   CollectResult,
+  GuildDirectory,
+  GuildDoor,
+  GuildRole,
   MapMutations,
   PlayerState,
   QuestDef,
@@ -50,6 +53,8 @@ export type PanelKey =
   | 'quests'
   // §8.4 -- what is on a bench somewhere, and which bench.
   | 'bench'
+  // §10 -- who you are with, and the hall that makes legendary reachable.
+  | 'guild'
 
 export interface LogEntry {
   id: number
@@ -667,6 +672,109 @@ export const useGame = defineStore('game', () => {
     battle.value = null
   }
 
+  // ---------------------------------------------------------------- §10 guilds
+
+  /**
+   * The recruiting list and your own guild, fetched together.
+   *
+   * Two halves of one question -- "am I in one, and if not who is taking
+   * people" -- so they ride one request. Your own guild is also on the player
+   * state (membership decides what a bench will make, §8.0), and this is the
+   * fuller copy with the roster on it.
+   */
+  const guilds = ref<GuildDirectory | null>(null)
+
+  async function loadGuilds(): Promise<void> {
+    guilds.value = await api.getGuilds()
+  }
+
+  /** §10.0 -- found one. A city or a capital, and the founder's own gold. */
+  async function foundGuild(identity: {
+    name: string
+    code: string
+    description: string
+    flag: string | null
+  }): Promise<boolean> {
+    const made = await act(() => api.foundGuild(identity))
+    if (made) await loadGuilds()
+
+    return Boolean(made)
+  }
+
+  /** §10.0.1 -- walk in. No application and no approval. */
+  async function joinGuild(guildId: string): Promise<void> {
+    await act(() => api.joinGuild(guildId))
+    await loadGuilds()
+  }
+
+  async function leaveGuild(): Promise<void> {
+    await act(() => api.leaveGuild(), 'bad')
+    await loadGuilds()
+  }
+
+  async function updateGuild(changes: {
+    description?: string
+    flag?: string | null
+    recruitment?: GuildDoor
+  }): Promise<void> {
+    await act(() => api.updateGuild(changes))
+    await loadGuilds()
+  }
+
+  async function removeGuildMember(characterId: string): Promise<void> {
+    await act(() => api.removeGuildMember(characterId), 'bad')
+    await loadGuilds()
+  }
+
+  async function withdrawApplication(guildId: string): Promise<void> {
+    await act(() => api.withdrawApplication(guildId), 'bad')
+    await loadGuilds()
+  }
+
+  async function decideApplication(characterId: string, admit: boolean): Promise<void> {
+    await act(() => api.decideApplication(characterId, admit))
+    await loadGuilds()
+  }
+
+  async function donateToGuild(gold: number): Promise<void> {
+    await act(() => api.donateToGuild(gold))
+    await loadGuilds()
+  }
+
+  async function upgradeGuildFacility(facility: 'hall' | 'bench'): Promise<void> {
+    await act(() => api.upgradeGuildFacility(facility))
+    await loadGuilds()
+  }
+
+  async function setGuildRole(characterId: string, role: GuildRole): Promise<void> {
+    await act(() => api.setGuildRole(characterId, role))
+    await loadGuilds()
+  }
+
+  /**
+   * §10.0 -- the halls overlay, opened from the dock at a city or a capital.
+   *
+   * Its own flag rather than a PanelKey, for the same reason the station has
+   * one: it belongs to WHERE YOU ARE. A corner panel is reachable from any hex
+   * and would offer founding everywhere and allow it almost nowhere.
+   */
+  const halls = ref(false)
+
+  async function openHalls(): Promise<void> {
+    halls.value = true
+    await loadGuilds()
+  }
+
+  function closeHalls(): void {
+    halls.value = false
+  }
+
+  /** §10 -- the guild on the player state, which every screen reads. */
+  const guild = computed(() => state.value?.guild ?? null)
+
+  /** §8.0 -- standing in your own hall, which is what opens the top rung. */
+  const atGuildHall = computed(() => Boolean(state.value?.atGuildHall))
+
   async function abandon(jobId: string): Promise<void> {
     await act(() => api.abandonJob(jobId), 'bad')
     await refreshMutations()
@@ -768,6 +876,10 @@ export const useGame = defineStore('game', () => {
     boot, setView, setViewport, centreOnCharacter, refreshMutations, refreshState,
     select, clearSelection,
     haul, clearHaul, battle, fight, clearBattle, carriers,
+    guilds, guild, atGuildHall, halls, openHalls, closeHalls,
+    loadGuilds, foundGuild, joinGuild, leaveGuild,
+    updateGuild, removeGuildMember, setGuildRole, withdrawApplication, decideApplication,
+    donateToGuild, upgradeGuildFacility,
     startMining, startGathering, startHunt, collect, abandon, travelTo, cancelTravel, startProcessing, buy,
     sell, sellItem, craft, equip, unequip, repair, discard, discardMaterial, drink, openPanel, closePanel,
     loadTree, buyNode,

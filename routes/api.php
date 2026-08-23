@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\BattleController;
 use App\Http\Controllers\Api\CraftingController;
 use App\Http\Controllers\Api\EquipmentController;
+use App\Http\Controllers\Api\GuildController;
 use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\MapController;
 use App\Http\Controllers\Api\MiningController;
@@ -50,6 +51,21 @@ Route::middleware(ResolveCharacter::class)->group(function () {
     // the hex under your feet, and asking about anyone else's would be a scanner.
     Route::get('/battle/preview', [BattleController::class, 'preview']);
     Route::post('/battle', [BattleController::class, 'store']);
+
+    // §10 -- guilds. The listing is only the recruiting ones (§10.0.1): a
+    // roster you can see and cannot join is a queue with extra steps.
+    Route::get('/guilds', [GuildController::class, 'index']);
+    Route::post('/guilds', [GuildController::class, 'store']);
+    Route::patch('/guilds/mine', [GuildController::class, 'update']);
+    Route::delete('/guilds/mine', [GuildController::class, 'leave']);
+    // §10.5 -- the treasury: anybody may fill it, the owner alone spends it.
+    Route::post('/guilds/mine/donations', [GuildController::class, 'donate']);
+    Route::post('/guilds/mine/facilities', [GuildController::class, 'upgrade']);
+    Route::post('/guilds/{guild}/members', [GuildController::class, 'join'])->whereNumber('guild');
+    Route::delete('/guilds/{guild}/applications', [GuildController::class, 'withdraw'])->whereNumber('guild');
+    Route::post('/guilds/mine/applications/{member}', [GuildController::class, 'decide'])->whereNumber('member');
+    Route::delete('/guilds/mine/members/{member}', [GuildController::class, 'removeMember'])->whereNumber('member');
+    Route::post('/guilds/mine/members/{member}/role', [GuildController::class, 'setRole'])->whereNumber('member');
     Route::post('/jobs/{job}/collect', [MiningController::class, 'collect'])->whereNumber('job');
     Route::delete('/jobs/{job}', [MiningController::class, 'destroy'])->whereNumber('job');
 

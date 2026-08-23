@@ -198,6 +198,22 @@ const packHint = computed(() => {
   return `${Math.round((b.odds ?? 0) * 100)}% · you ${b.attack}/${b.defence} · it ${b.monster?.attack}/${b.monster?.defence}${clock}`
 })
 
+/**
+ * §10.0 -- what the guild cell has to say at this settlement.
+ *
+ * Three states and each is a different errand: you have none and could found or
+ * join one, you have one and this is where you run it, or you are standing in
+ * your own hall and the top rung is open on top of that.
+ */
+const guildBusiness = computed(() => !game.guild || game.atGuildHall)
+
+const guildHint = computed(() => {
+  if (game.atGuildHall) return 'Your hall — the legendary bench is open here'
+  if (game.guild) return `${game.guild.name} · the roster, the door, the flag`
+
+  return 'Found a hall, or join one that is recruiting'
+})
+
 const corpseHint = computed(() => {
   const c = corpse.value
   if (!c) return ''
@@ -421,6 +437,18 @@ function hunted(): void {
             :disabled="!lines.length"
             :hint="processHint"
             @activate="game.openStation()"
+          />
+          <!-- §10.0 -- a guild is a place before it is a roster, so founding
+               one and joining one live where the halls are. Absent at a
+               village, because a hall cannot stand in one. -->
+          <HexAction
+            v-if="here.tier !== 'village'"
+            small
+            icon="guild"
+            label="Guild"
+            :good="guildBusiness"
+            :hint="guildHint"
+            @activate="game.openHalls()"
           />
         </template>
       </div>

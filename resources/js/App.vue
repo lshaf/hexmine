@@ -27,6 +27,8 @@ import HexAction from '@/shell/HexAction.vue'
 import { placeLabel } from '@/game/formulas'
 import PanelOverlay from '@/shell/PanelOverlay.vue'
 import BenchView from '@/views/BenchView.vue'
+import GuildView from '@/views/GuildView.vue'
+import HallsPanel from '@/components/HallsPanel.vue'
 import Toasts from '@/shell/Toasts.vue'
 import HaulModal from '@/shell/HaulModal.vue'
 import BattleModal from '@/shell/BattleModal.vue'
@@ -55,6 +57,8 @@ const PANELS = {
   quests: { title: 'Ledger', component: QuestView, wide: false },
   // §8.4 -- what is on a bench somewhere, and how far away that bench is.
   bench: { title: 'Benches', component: BenchView, wide: false },
+  // §10 -- who you are with, and the hall that makes legendary reachable.
+  guild: { title: 'Guild', component: GuildView, wide: false },
 } as const
 
 const panel = computed(() => (game.panel ? PANELS[game.panel] : null))
@@ -190,6 +194,21 @@ onMounted(() => {
             @activate="game.openPanel('bag')"
           />
           <HexAction icon="hero" label="Hero" @activate="game.openPanel('hero')" />
+          <!-- §10 -- who you are with. The cell says when you have none, since
+               a guild is the only thing standing between a prospector and
+               §8.0's top rung, and "you are not in one" is a decision to make
+               rather than a problem to fix. -->
+          <HexAction
+            icon="guild"
+            label="Guild"
+            :good="(game.guild?.pending ?? 0) > 0"
+            :hint="game.guild
+              ? (game.guild.pending
+                ? `${game.guild.pending} asking to join ${game.guild.name}`
+                : `${game.guild.name} · ${game.guild.members} in it`)
+              : 'Not in one — halls stand in cities and capitals'"
+            @activate="game.openPanel('guild')"
+          />
         </div>
       </div>
 
@@ -218,6 +237,17 @@ onMounted(() => {
           @close="game.closeStation()"
         >
           <StationPanel :settlement="station.settlement" />
+        </PanelOverlay>
+      </Transition>
+
+      <!-- §10.0.4 -- getting a guild and running one, both at the settlement. -->
+      <Transition name="fade">
+        <PanelOverlay
+          v-if="game.halls && !panel"
+          :title="game.guild?.name ?? 'Halls'"
+          @close="game.closeHalls()"
+        >
+          <HallsPanel />
         </PanelOverlay>
       </Transition>
 
@@ -327,6 +357,10 @@ onMounted(() => {
 .screens :deep(.cell:nth-child(5)) { grid-column: 1; grid-row: 4 / span 2; }
 .screens :deep(.cell:nth-child(6)) { grid-column: 3; grid-row: 4 / span 2; }
 .screens :deep(.cell:nth-child(7)) { grid-column: 2; grid-row: 5 / span 2; }
+/* §10 -- the eighth hangs off the left at the foot, where the lattice has a
+   seat waiting: the short columns are one cell shorter than the tall one, so
+   this fills the flower rather than growing a tail. */
+.screens :deep(.cell:nth-child(8)) { grid-column: 1; grid-row: 6 / span 2; }
 
 /* Nested cells overlap at the tips, so hit-testing has to follow the hexagon
    rather than the box, or the pointed corner of one cell would swallow clicks

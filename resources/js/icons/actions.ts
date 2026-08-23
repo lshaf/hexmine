@@ -28,6 +28,9 @@ export const ACTION_PATHS: Record<string, string> = {
   zoomOut: 'M6 12h12 M6 10.4v3.2 M18 10.4v3.2',
   locate: 'M7 12 9.5 7.7h5L17 12l-2.5 4.3h-5Z M12 2.6v2.8 M12 18.6v2.8 M2.6 12h2.8 M18.6 12h2.8',
   close: 'M6 6l12 12 M18 6 6 18',
+  /* §10 -- a pennant on a pole. The only glyph in the strip that is a piece of
+     cloth, because a guild is the one thing here you can put your own mark on. */
+  guild: 'M7 21V3 M7 4h11l-2.5 4L18 12H7',
   /* §9.5 -- crossed blade and guard. The only verb in the dock that is not
      work, and the only one whose glyph is two things meeting. */
   battle: 'M5 19.5 15.5 9 M12.5 6 18 4.5 16.5 10 M4.5 6 15 16.5 M18 15l1.5 4.5-4.5-1.5',
