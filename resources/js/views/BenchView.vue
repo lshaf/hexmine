@@ -35,6 +35,19 @@ const distance = (job: BenchJob) => {
   return hexDistance(game.character.col, game.character.row, job.col, job.row)
 }
 
+/**
+ * §5.6 -- and what those hexes cost in hours, which is the actual decision.
+ *
+ * "Nine hexes away" is a fact about the map; "an hour and a half" is a fact
+ * about your evening, and this page exists to plan a route rather than to
+ * admire distances.
+ */
+const walk = (job: BenchJob) => {
+  if (job.col === null || job.row === null) return null
+
+  return formatDuration(game.travelEta(job.col, job.row))
+}
+
 /** §6 vs §8.4 -- two different buildings, and the row should say which. */
 const kind = (job: BenchJob) => (job.kind === 'craft' ? 'Bench' : 'Processing line')
 </script>
@@ -67,7 +80,7 @@ const kind = (job: BenchJob) => (job.kind === 'craft' ? 'Bench' : 'Processing li
               <template v-else>
                 {{ kind(job) }} ·
                 {{ placeLabel(job.settlementName, job.col, job.row) }} ·
-                {{ distance(job) }} hexes away
+                {{ distance(job) }} hexes, {{ walk(job) }} away
               </template>
             </span>
 
@@ -107,7 +120,9 @@ const kind = (job: BenchJob) => (job.kind === 'craft' ? 'Bench' : 'Processing li
             <span class="tiny muted">
               {{ kind(job) }} ·
               {{ placeLabel(job.settlementName, job.col, job.row) }}
-              <template v-if="!here(job)"> · {{ distance(job) }} hexes away</template>
+              <template v-if="!here(job)">
+                · {{ distance(job) }} hexes, {{ walk(job) }} away
+              </template>
             </span>
             <span class="tiny mono muted">{{ formatDuration(job.endsAt - game.now) }} left</span>
           </div>

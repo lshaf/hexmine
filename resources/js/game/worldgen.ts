@@ -775,8 +775,10 @@ export function generateTile(
     settlement,
     dungeon,
     water,
-    // §5.5 -- a herd stands on ground. Nothing grazes a lake.
-    herdUntil: water ? undefined : herdUntil(col, row, biome, now),
+    // §5.5 -- a herd stands on open ground. Nothing grazes a lake, and nothing
+    // grazes a town: a settlement is worked ground (§6), and a deer in the
+    // market square is the same category error as a pack camped on a capital.
+    herdUntil: water || settlement || dungeon ? undefined : herdUntil(col, row, biome, now),
     // §9.5.1 -- nothing camps on water, a settlement or a dungeon mouth. The
     // second is the load-bearing one: a pack on a capital would lock a region
     // out of the only five-line bench it has.

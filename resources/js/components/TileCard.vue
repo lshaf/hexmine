@@ -247,7 +247,12 @@ watch(tile, () => {
               <span class="readout">{{ tile.slotsUsed }}/2</span>
             </span>
           </span>
-          <span v-else-if="unseen" class="stats">
+          <!-- §5.6 -- the walk, on any hex that is not the one underfoot.
+               Distance is the whole cost of going anywhere, so the card owes it
+               wherever it can be answered: a settlement two hexes off and one
+               four days away are the same tap and very different decisions,
+               and hours are what says which. -->
+          <span v-else-if="distance > 0" class="stats">
             <span class="stat">
               <span class="label">Walk</span>
               <span class="readout">{{ distance }} hex</span>

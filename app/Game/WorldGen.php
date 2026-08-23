@@ -813,8 +813,13 @@ final class WorldGen
             'settlement' => $settlement,
             'dungeon' => $dungeon ? ['key' => $dungeon['key'], 'name' => $dungeon['name']] : null,
             'water' => $water,
-            // §5.5 -- a herd stands on ground. Nothing grazes a lake.
-            'herdUntil' => $water === null ? self::herdUntil($col, $row, $biome, $now) : null,
+            // §5.5 -- a herd stands on open ground. Nothing grazes a lake, and
+            // nothing grazes a town: a settlement is worked ground (§6), and a
+            // deer in the market square is the same category error as a pack
+            // camped on the only five-line bench in the region (§9.5.1).
+            'herdUntil' => $water === null && $settlement === null && $dungeon === null
+                ? self::herdUntil($col, $row, $biome, $now)
+                : null,
             // §9.5.1 -- nothing camps on open water, and nothing camps on a
             // settlement or a dungeon mouth either: a pack parked on a capital
             // would lock a whole region out of the only five-line bench it has,
