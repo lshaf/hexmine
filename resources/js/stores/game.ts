@@ -122,10 +122,11 @@ export const useGame = defineStore('game', () => {
   const mutations = ref<MapMutations>({ depleted: [], occupied: [], cleared: [], carriers: [] })
 
   /**
-   * §9.5.7 -- every corpse on the map, whoever it belongs to.
+   * §9.5.7 -- the corpses this character can see.
    *
-   * Not folded into the tiles: a carrier is not a property of the ground, and
-   * unlike everything else in the mutations payload it is not bounded by sight.
+   * Not folded into the tiles: a carrier is not a property of the ground, it is
+   * somebody's row standing where they fell. Scoped server-side -- your own
+   * arrives from any distance, a stranger's only from inside sight.
    */
   const carriers = computed(() => mutations.value.carriers ?? [])
 
@@ -252,6 +253,58 @@ export const useGame = defineStore('game', () => {
 
   const tileAt = (col: number, row: number): Tile | undefined =>
     tiles.value.find((t) => t.col === col && t.row === row)
+
+  // ------------------------------------------------------------------- live
+
+  /**
+   * §16 -- the handful of facts that are somebody else's decision.
+   *
+   * Almost nothing needs a stream: terrain is generated locally, a pack is a
+   * hash, and every clock is a timestamp already in hand. What does is the
+   * ground moving because another player acted on it -- a pack settled
+   * (§9.5.1), a corpse raised or taken (§9.5.7).
+   *
+   * The stream carries NOTIFICATIONS, not state. An event says where something
+   * moved; this asks the server what that means, and gets back exactly the disc
+   * sight allows (§5.6). So the stream can never show more than a poll would --
+   * it only saves the polling.
+   *
+   * Best-effort throughout: a dropped connection, a missed event or no
+   * EventSource at all leaves the client one /api/map behind, which is where it
+   * was before any of this existed.
+   */
+  let stream: EventSource | null = null
+  let pending = 0
+
+  function watchLive(): void {
+    if (stream || typeof EventSource === 'undefined') return
+
+    stream = new EventSource('/api/live', { withCredentials: true })
+
+    // Coalesced: a busy hex can settle several packs in a second, and each one
+    // is the same one-line answer. One refresh a beat is the whole need.
+    const nudge = () => {
+      if (pending) return
+      pending = window.setTimeout(() => {
+        pending = 0
+        void refreshMutations()
+      }, 400)
+    }
+
+    for (const type of ['pack.cleared', 'carrier.raised', 'carrier.gone']) {
+      stream.addEventListener(type, nudge)
+    }
+  }
+
+  function unwatchLive(): void {
+    stream?.close()
+    stream = null
+
+    if (pending) {
+      clearTimeout(pending)
+      pending = 0
+    }
+  }
 
   // -------------------------------------------------------------- derived
 
@@ -526,6 +579,10 @@ export const useGame = defineStore('game', () => {
     centreOnCharacter()
     await refreshMutations()
 
+    // Opened after the first map read, so the cursor starts from a world the
+    // client has actually seen.
+    watchLive()
+
     booted.value = true
     setInterval(() => {
       tick.value++
@@ -747,7 +804,7 @@ export const useGame = defineStore('game', () => {
     // actions
     boot, setView, setViewport, centreOnCharacter, refreshMutations, refreshState,
     select, clearSelection,
-    haul, clearHaul, battle, fight, clearBattle, carriers,
+    haul, clearHaul, battle, fight, clearBattle, carriers, watchLive, unwatchLive,
     startMining, startGathering, startHunt, collect, abandon, travelTo, cancelTravel, startProcessing, buy,
     sell, sellItem, craft, equip, unequip, repair, discard, discardMaterial, drink, openPanel, closePanel,
     loadTree, buyNode,

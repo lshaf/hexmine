@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\BattleController;
 use App\Http\Controllers\Api\CraftingController;
 use App\Http\Controllers\Api\EquipmentController;
 use App\Http\Controllers\Api\InventoryController;
+use App\Http\Controllers\Api\LiveController;
 use App\Http\Controllers\Api\MapController;
 use App\Http\Controllers\Api\MiningController;
 use App\Http\Controllers\Api\SettlementController;
@@ -50,6 +51,11 @@ Route::middleware(ResolveCharacter::class)->group(function () {
     // the hex under your feet, and asking about anyone else's would be a scanner.
     Route::get('/battle/preview', [BattleController::class, 'preview']);
     Route::post('/battle', [BattleController::class, 'store']);
+
+    // §16 -- the one streaming route. It carries notifications that somebody
+    // else's decision moved the ground (§9.5.1, §9.5.7), never state: what a
+    // client may actually see is still whatever /api/map will tell it (§5.6).
+    Route::get('/live', [LiveController::class, 'stream']);
     Route::post('/jobs/{job}/collect', [MiningController::class, 'collect'])->whereNumber('job');
     Route::delete('/jobs/{job}', [MiningController::class, 'destroy'])->whereNumber('job');
 
