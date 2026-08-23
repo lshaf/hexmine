@@ -53,7 +53,8 @@ export function aggregateStat(
     const toolLine = def.slot ? skillForSlot(def.slot) : null
     if (toolLine !== null && toolLine !== line) continue
 
-    if (def.stat === stat) contributions.push({ def, value: def.value })
+    // §8 -- a tool has no percentage at all; its base is a solid attack.
+    if (def.stat === stat && def.value !== undefined) contributions.push({ def, value: def.value })
     for (const option of owned.options ?? []) {
       if (option.stat !== stat) continue
       // §8.0.1 -- a scoped line pays in full on the line it names and nothing
@@ -121,8 +122,12 @@ export function repairCost(def: ItemDef, missingDurability: number): Record<stri
 
 export interface TripBreakdown {
   base: number
-  skillReduction: number
-  equipReduction: number
+  /** §7.3 -- how much work the hex is. Base seconds at the bare-handed rate. */
+  durability: number
+  toolAttack: number
+  skillAttack: number
+  /** Work taken out of the hex per second, all in. */
+  rate: number
   /** After clamp. This is the number that actually runs. */
   total: number
   /** True when the clamp bound the result -- surfaced in the UI so the player
@@ -131,28 +136,57 @@ export interface TripBreakdown {
 }
 
 /**
- * §7.3
- *   trip_time = clamp(base - skill_reduction - equipment_reduction, 30min, 60min)
+ * §7.3 -- a hex is an amount of WORK, and a trip is how long you take over it.
+ *
+ *   durability = base_seconds * baseAttack
+ *   rate       = (base + tool + skill) * (1 + trip_reduction)
+ *   trip_time  = clamp(durability / rate, 15min, 60min)
  *
  * The floor clamp is mandatory and is in the formula from day one: without it
- * any future buff or equipment tier creates a sub-30-minute or zero-time
- * exploit. Do not remove it, and do not apply bonuses after it.
+ * any future buff or equipment tier creates a sub-floor or zero-time exploit.
+ * Do not remove it, and do not apply bonuses after it.
  */
 export function tripTime(
   baseSeconds: number,
   skillLevel: number,
   equipTripReduction: number,
+  toolAttack = 0,
 ): TripBreakdown {
+  const durability = tileDurability(baseSeconds)
+
   const skillProgress = Math.min(1, skillLevel / SKILLS.maxLevel)
-  const skillReduction = Math.round(MINING.maxSkillReductionSeconds * skillProgress)
+  const skillAttack = MINING.skillAttack * skillProgress
 
-  const equipProgress = Math.min(1, equipTripReduction / EQUIPMENT.statCeiling)
-  const equipReduction = Math.round(MINING.maxEquipReductionSeconds * equipProgress)
+  const rate = (MINING.baseAttack + toolAttack + skillAttack) * (1 + Math.max(0, equipTripReduction))
 
-  const raw = baseSeconds - skillReduction - equipReduction
+  const raw = Math.round(durability / Math.max(1, rate))
   const total = Math.min(MINING.ceilingSeconds, Math.max(MINING.floorSeconds, raw))
 
-  return { base: baseSeconds, skillReduction, equipReduction, total, clamped: total !== raw }
+  return {
+    base: baseSeconds,
+    durability,
+    toolAttack,
+    skillAttack: Math.round(skillAttack),
+    rate: Math.round(rate * 100) / 100,
+    total,
+    clamped: total !== raw,
+  }
+}
+
+/** §7.3 -- how much work a hex is, which is what a trip actually spends. */
+export function tileDurability(baseSeconds: number): number {
+  return baseSeconds * MINING.baseAttack
+}
+
+/**
+ * §8 -- what a gathering tool takes out of a hex each second.
+ *
+ * A tool's BASE stat, and the only one it has. It used to lead with a yield
+ * percentage: attack is how fast you work through a hex (§7.3) and yield is how
+ * big the haul is, which are different questions and now different numbers.
+ */
+export function toolAttack(def: Pick<ItemDef, 'attack'>): number {
+  return def.attack ?? 0
 }
 
 /** Yield for one trip. Skill and equipment both add; ring adds the risk premium. */
@@ -287,14 +321,91 @@ export function statLine(
   return `${formatStat(stat, value)} ${words}`
 }
 
-/** What an item is for, §8. A gathering tool names its line; worn gear has none. */
-export const itemStatLine = (def: ItemDef): string =>
-  statLine(def.stat, def.value, def.slot ? skillForSlot(def.slot) : null)
+/**
+ * §8.0.1 -- a rolled line, which may name a line of its own or take its item's.
+ *
+ * Two kinds, and they are printed differently because they ARE different: a
+ * percentage climbs toward §8.1's ceiling, and a solid number just adds. On a
+ * gathering tool a flat `attack` is mining attack (§7.3), so it says so.
+ */
+export function optionStatLine(option: ItemOption, def: ItemDef): string {
+  if (option.kind === 'flat') {
+    const line = def.slot ? skillForSlot(def.slot) : null
+    const what = line ? 'mining attack' : FLAT_LABEL[option.stat] ?? option.stat
 
-/** §8.0.1 -- a rolled line, which may name a line of its own or take its item's. */
-export const optionStatLine = (option: ItemOption, def: ItemDef): string =>
-  statLine(
+    return `+${option.value} ${what}`
+  }
+
+  return statLine(
     option.stat,
     option.value,
     option.scope ?? (def.slot ? skillForSlot(def.slot) : null),
   )
+}
+
+/**
+ * §9.5.4 -- one item's stats, as chips, in the order they should be read.
+ *
+ * One function so every screen that shows a piece shows the same thing in the
+ * same order: the trader, the bench, the almanac, the bag and the gear list.
+ *
+ * Three rules, and each closes a way the old single line misled:
+ *
+ * 1. **`power` and `defense` are never printed as percentages.** They are the
+ *    percentage twins of the flat pair (§9.5.4), and on a common weapon +3%
+ *    power moves 5 attack to 5 — a number that does nothing, sitting where the
+ *    number that does everything should be. The pair below IS that stat, said
+ *    in the units it is actually felt in.
+ * 2. **A zero half is not shown.** "0 attack" is not information; it is a slot
+ *    the piece does not fill, and printing it makes every travel cloak look
+ *    like it lost a fight.
+ * 3. **A gathering tool's attack is its own** (§7.3) — the same word, a
+ *    different ladder, and it is never in the pair because it is never in a
+ *    fight (§8 rule 5).
+ */
+const FLAT_LABEL: Partial<Record<string, string>> = {
+  attack: 'attack',
+  defense: 'defense',
+}
+
+export interface StatChip {
+  /** Short uppercase word, or null for a work stat that says its own name. */
+  label: string | null
+  value: string
+}
+
+const PAIR_STATS = new Set<StatKey>(['power', 'defense'])
+
+export function statChips(def: ItemDef, options: ItemOption[] = []): StatChip[] {
+  const chips: StatChip[] = []
+  const line = def.slot ? skillForSlot(def.slot) : null
+
+  // The work stat, when the piece has one worth saying. A tool has none at all
+  // (its base is the attack below), and a weapon's `power` is not one worth
+  // saying either: the pair is what that stat means.
+  if (def.stat !== undefined && def.value !== undefined && !PAIR_STATS.has(def.stat)) {
+    chips.push({ label: null, value: statLine(def.stat, def.value, line) })
+  }
+
+  if (line !== null) {
+    const bite = toolAttack(def) + flatOption(options, 'attack')
+    if (bite > 0) chips.push({ label: 'atk', value: String(bite) })
+
+    return chips
+  }
+
+  const attack = (def.attack ?? 0) + flatOption(options, 'attack')
+  const defense = (def.defense ?? 0) + flatOption(options, 'defense')
+
+  if (attack > 0) chips.push({ label: 'atk', value: String(attack) })
+  if (defense > 0) chips.push({ label: 'def', value: String(defense) })
+
+  return chips
+}
+
+/** §8.0.1 -- what an item's flat rolled lines add to one solid number. */
+export function flatOption(options: ItemOption[], stat: string): number {
+  return options
+    .filter((o) => o.kind === 'flat' && o.stat === stat)
+    .reduce((sum, o) => sum + o.value, 0)
+}

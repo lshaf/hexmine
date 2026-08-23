@@ -33,7 +33,7 @@ Route::middleware(ResolveCharacter::class)->group(function () {
 
     Route::get('/world', [MapController::class, 'world']);
     Route::get('/map', [MapController::class, 'index']);
-    // §5 -- the world is a disc centred on the origin, so most of the map has
+    // §5 -- the world is a disc centerd on the origin, so most of the map has
     // negative coordinates. whereNumber() is `[0-9]+` and would 404 all of it.
     Route::get('/tiles/{col}/{row}/preview', [MapController::class, 'preview'])
         ->where(['col' => '-?\d+', 'row' => '-?\d+']);

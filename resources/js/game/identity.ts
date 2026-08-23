@@ -8,7 +8,7 @@
  * API -- the server sends the player their own full address.
  */
 
-/** `0x71c9…3f8a`. Enough of both ends to recognise, short enough to sit in a HUD. */
+/** `0x71c9…3f8a`. Enough of both ends to recognize, short enough to sit in a HUD. */
 export function shortWallet(wallet: string): string {
   return wallet.length <= 13 ? wallet : `${wallet.slice(0, 6)}…${wallet.slice(-4)}`
 }

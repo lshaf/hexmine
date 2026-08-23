@@ -201,7 +201,7 @@ final class GameLoopTest extends TestCase
             $this->game->travelTo($this->character, $col + 1, $row);
             $this->fail('set a second course while already walking');
         } catch (\App\Game\GameException $e) {
-            $this->assertSame('travelling', $e->errorCode);
+            $this->assertSame('traveling', $e->errorCode);
         }
     }
 
@@ -450,7 +450,7 @@ final class GameLoopTest extends TestCase
                     'woodcutting', 'mining', 'hunting', 'quarrying', 'harvesting',
                     'travel', 'processing',
                     // §9.5 -- the one scope that is not work, and the only place
-                    // `power` and `defence` are worth drinking for.
+                    // `power` and `defense` are worth drinking for.
                     'battle',
                 ],
                 "{$key} names an action nothing does",
@@ -471,7 +471,7 @@ final class GameLoopTest extends TestCase
     /**
      * A recipe never wants MORE different materials as it climbs.
      *
-     * A common draught is a muddle of four cheap things; a legendary philtre is
+     * A common draft is a muddle of four cheap things; a legendary philtre is
      * two perfect ones. Every consumable wants at least two, so nothing is a
      * one-ingredient shortcut.
      */
@@ -804,7 +804,7 @@ final class GameLoopTest extends TestCase
      * §5.1 -- the world is measured from the middle out, and (0,0) is the middle.
      *
      * A radius of 200 is every column from -200 to 200, so both ends are on the
-     * map and the count is the odd number 401. The origin being the centre is
+     * map and the count is the odd number 401. The origin being the center is
      * the part everything else leans on: the rings are a distance from it, the
      * dungeon mouths are placed around it, and the atlas draws its circles on it.
      */
@@ -822,13 +822,13 @@ final class GameLoopTest extends TestCase
             $this->assertFalse(\App\Game\WorldGen::inBounds($col, $row), "{$col},{$row} should be off the map");
         }
 
-        // The origin is the dead centre, and the corners are the rim.
+        // The origin is the dead center, and the corners are the rim.
         $this->assertSame('center', \App\Game\WorldGen::ringOf(0, 0));
         $this->assertSame('outer', \App\Game\WorldGen::ringOf($radius, $radius));
         $this->assertSame('outer', \App\Game\WorldGen::ringOf(-$radius, -$radius));
 
         // Opposite corners are the same distance out, which is only true if the
-        // centre really is the origin rather than somewhere along a signed axis.
+        // center really is the origin rather than somewhere along a signed axis.
         $this->assertEqualsWithDelta(
             \App\Game\WorldGen::radiusOf($radius, $radius),
             \App\Game\WorldGen::radiusOf(-$radius, -$radius),
@@ -1191,24 +1191,24 @@ final class GameLoopTest extends TestCase
      */
     public function test_a_scoped_buff_only_counts_on_its_own_action(): void
     {
-        // Forest Draught: +3% yield, woodcutting only.
-        $this->game->useConsumable($this->giveDrink('forest_draught'), 'forest_draught');
+        // Forest Draft: +3% yield, woodcutting only.
+        $this->game->useConsumable($this->giveDrink('forest_draft'), 'forest_draft');
 
         $wood = $this->game->bonuses($this->character->fresh(), 'woodcutting');
         $iron = $this->game->bonuses($this->character->fresh(), 'mining');
 
-        $this->assertEqualsWithDelta(0.03, $wood['yield'], 0.0001, 'the draught did nothing for its own line');
-        $this->assertEqualsWithDelta(0.0, $iron['yield'], 0.0001, 'a woodcutting draught helped a mining trip');
+        $this->assertEqualsWithDelta(0.03, $wood['yield'], 0.0001, 'the draft did nothing for its own line');
+        $this->assertEqualsWithDelta(0.0, $iron['yield'], 0.0001, 'a woodcutting draft helped a mining trip');
     }
 
     /**
      * Same stat, different actions: both are held. Same stat, same action: one
-     * charge, and the better draught is the one that counts.
+     * charge, and the better draft is the one that counts.
      */
     public function test_two_actions_can_be_charged_at_once_but_one_action_cannot_stack(): void
     {
-        $this->game->useConsumable($this->giveDrink('forest_draught'), 'forest_draught');
-        $this->game->useConsumable($this->giveDrink('deepseam_draught'), 'deepseam_draught');
+        $this->game->useConsumable($this->giveDrink('forest_draft'), 'forest_draft');
+        $this->game->useConsumable($this->giveDrink('deepseam_draft'), 'deepseam_draft');
 
         $this->assertSame(2, $this->character->fresh()->buffs()->count(), 'two actions did not both take');
         $this->assertEqualsWithDelta(0.03, $this->game->bonuses($this->character->fresh(), 'woodcutting')['yield'], 0.0001);
@@ -1223,7 +1223,7 @@ final class GameLoopTest extends TestCase
             Catalog::item('forest_tonic')['value'],
             $this->game->bonuses($this->character->fresh(), 'woodcutting')['yield'],
             0.0001,
-            'two draughts on one action added up',
+            'two drafts on one action added up',
         );
     }
 
@@ -1236,7 +1236,7 @@ final class GameLoopTest extends TestCase
     public function test_stacking_scoped_potions_on_one_action_still_stops_at_the_ceiling(): void
     {
         // Every rung of the woodcutting-yield ladder at once.
-        foreach (['forest_draught', 'forest_tonic', 'forest_flask', 'forest_elixir', 'forest_philtre'] as $key) {
+        foreach (['forest_draft', 'forest_tonic', 'forest_flask', 'forest_elixir', 'forest_philtre'] as $key) {
             $character = $this->giveDrink($key);
             \App\Models\CharacterBuff::updateOrCreate(
                 ['character_id' => $character->id, 'stat' => 'yield', 'scope' => 'woodcutting'],
@@ -1795,7 +1795,7 @@ final class GameLoopTest extends TestCase
         $this->craftNow('work_gloves');
 
         // Settlements sit on worked ground, so step off it before digging.
-        $open = $this->openNeighbour($this->character->col, $this->character->row);
+        $open = $this->openNeighbor($this->character->col, $this->character->row);
         $this->character->update($open);
         $this->character->refresh();
 
@@ -1823,9 +1823,11 @@ final class GameLoopTest extends TestCase
         $this->character->level = Balance::MAX_LEVEL;
         $this->character->save();
 
-        // Every node in the two trees that carry `yield`, bought outright.
+        // Every node in the tree that carries `yield` on this line, bought
+        // outright. §7.4 locks a stat node to its own class, so the tree that
+        // pays out on a woodcutting trip is Woodcutting's and no other.
         $keys = [];
-        foreach (['smith', 'alchemist'] as $job) {
+        foreach (['woodcutting'] as $job) {
             foreach (array_keys(\App\Game\Jobs::nodesFor($job)) as $key) {
                 $keys[] = $key;
             }
@@ -1841,7 +1843,7 @@ final class GameLoopTest extends TestCase
             'options' => [['stat' => 'yield', 'value' => 0.03]],
         ]);
         $this->character->buffs()->create([
-            'item_key' => 'forest_draught',
+            'item_key' => 'forest_draft',
             'stat' => 'yield',
             'scope' => 'woodcutting',
             'value' => 0.03,
@@ -2088,7 +2090,7 @@ final class GameLoopTest extends TestCase
         $this->equipToolForHere();
         $now = $this->game->now();
 
-        // A workable neighbour: close enough to walk to, not where we stand.
+        // A workable neighbor: close enough to walk to, not where we stand.
         $target = null;
         foreach ([[1, 0], [0, 1], [-1, 0], [0, -1], [1, 1], [-1, -1]] as [$dc, $dr]) {
             $col = $this->character->col + $dc;
@@ -2098,7 +2100,7 @@ final class GameLoopTest extends TestCase
                 break;
             }
         }
-        $this->assertNotNull($target, 'spawn has no workable neighbour to test against');
+        $this->assertNotNull($target, 'spawn has no workable neighbor to test against');
         [$col, $row] = $target;
 
         $preview = $this->game->previewTile($this->character, $col, $row);
@@ -2145,39 +2147,91 @@ final class GameLoopTest extends TestCase
     /** §7.3 -- the floor clamp is mandatory and must bind. */
     public function test_trip_time_never_drops_below_the_floor(): void
     {
-        // Maxed skill and best-in-slot gear: 30 minutes of reduction against a
-        // 60 minute tile lands exactly on the floor, and never under it.
-        $trip = \App\Game\Formulas::tripTime(3600, Balance::SKILL_MAX_LEVEL, Balance::STAT_CEILING);
-        $this->assertSame(Balance::MINING_FLOOR_SECONDS, $trip['total']);
+        // Best tool in the game, maxed skill, best-in-slot gear on the hardest
+        // hex: still over the floor, so the ladder has somewhere left to go.
+        $best = \App\Game\Formulas::toolAttack(\App\Game\Catalog::item('mythril_pickaxe'));
+        $trip = \App\Game\Formulas::tripTime(
+            3600,
+            Balance::SKILL_MAX_LEVEL,
+            Balance::STAT_CEILING,
+            $best,
+        );
+        $this->assertGreaterThan(Balance::MINING_FLOOR_SECONDS, $trip['total']);
+        $this->assertFalse($trip['clamped'], 'the top of the tool ladder is wasted');
 
         // Even absurd inputs cannot breach it.
-        $absurd = \App\Game\Formulas::tripTime(1800, 9999, 99.0);
+        $absurd = \App\Game\Formulas::tripTime(1800, 9999, 99.0, 9999);
         $this->assertSame(Balance::MINING_FLOOR_SECONDS, $absurd['total']);
         $this->assertTrue($absurd['clamped']);
     }
 
-    /** §8.1 -- stacking diminishes and the per-tier cap binds. */
+    /**
+     * §7.3 -- a hex is an amount of work, and the tool ladder is how fast you
+     * get through it. Every rung has to be felt on the clock.
+     */
+    public function test_a_better_tool_works_a_hex_faster(): void
+    {
+        // The shop uncommon and the crafted uncommon carry the same ladder
+        // stat, so they take the same bite -- what separates them is how long
+        // they last. Distinct rungs only.
+        $ladder = ['stone_axe', 'hewn_axe', 'iron_hatchet', 'ironwood_axe'];
+        $last = \App\Game\Formulas::tripTime(3600, 0, 0.0)['total'];
+
+        // Bare hands take exactly what the tile was rolled for: a hex's
+        // durability IS its base seconds at the bare-handed rate.
+        $this->assertSame(3600, $last);
+
+        foreach ($ladder as $key) {
+            $def = \App\Game\Catalog::item($key);
+            $this->assertNotNull($def, "{$key} is not in the catalog");
+
+            $attack = \App\Game\Formulas::toolAttack($def);
+            $this->assertGreaterThan(0, $attack, "{$key} has no bite");
+
+            $total = \App\Game\Formulas::tripTime(3600, 0, 0.0, $attack)['total'];
+            $this->assertLessThan($last, $total, "{$key} was no faster than the rung below");
+            $last = $total;
+        }
+    }
+
+    /**
+     * §8.1 -- stacking diminishes and the per-tier cap binds.
+     *
+     * Read off worn gear rather than a tool: §8 gives a gathering tool a solid
+     * attack and no percentage at all, so there is nothing on one for the
+     * falloff to apply to.
+     */
     public function test_stacking_the_same_item_gives_less_each_time_and_is_capped(): void
     {
         $one = \App\Game\Formulas::aggregateStat(
-            [['key' => 'iron_pickaxe', 'durability' => 10, 'equipped' => true]],
-            'yield',
-            'mining',
+            [['key' => 'leather_armor', 'durability' => 10, 'equipped' => true]],
+            'tripReduction',
         );
         $three = \App\Game\Formulas::aggregateStat(
-            array_fill(0, 3, ['key' => 'iron_pickaxe', 'durability' => 10, 'equipped' => true]),
-            'yield',
-            'mining',
+            array_fill(0, 3, ['key' => 'leather_armor', 'durability' => 10, 'equipped' => true]),
+            'tripReduction',
         );
 
+        $this->assertGreaterThan(0.0, $one);
         $this->assertLessThan($one * 3, $three, 'three identical items scaled linearly');
-        $this->assertLessThanOrEqual(Balance::STAT_CAP['rare'], $three);
+        $this->assertLessThanOrEqual(Balance::STAT_CEILING, $three);
     }
 
-    /** §8 -- a tool pays out on its own line and on no other. */
+    /**
+     * §8 -- a tool pays out on its own line and on no other.
+     *
+     * Read off a ROLLED line, because a tool's base is now a solid attack and
+     * carries no percentage of its own. The lock is what matters and it is
+     * unchanged: whatever percentage a tool ends up with is its line's.
+     */
     public function test_a_gathering_tool_only_counts_on_its_own_line(): void
     {
-        $kit = [['key' => 'iron_pickaxe', 'durability' => 10, 'equipped' => true]];
+        $kit = [[
+            'key' => 'iron_pickaxe',
+            'durability' => 10,
+            'equipped' => true,
+            'options' => [['stat' => 'yield', 'value' => 0.03]],
+        ]];
 
         $this->assertGreaterThan(
             0,
@@ -2232,12 +2286,18 @@ final class GameLoopTest extends TestCase
             $this->assertSame(2, $rarities['uncommon'] ?? 0, "{$line} is missing an uncommon tool");
             $this->assertSame(1, $rarities['epic'] ?? 0, "{$line} is missing its epic tool");
 
-            $ceilings[$line] = max(array_column($tools, 'value'));
-            $this->assertLessThanOrEqual(
-                Balance::STAT_CEILING,
-                $ceilings[$line],
-                "{$line} tops out above the hard ceiling",
-            );
+            // §8 -- the ladder is measured in ATTACK now: a tool's base is
+            // solid (§7.3) and it has no percentage to compare.
+            $ceilings[$line] = max(array_column($tools, 'attack'));
+            $this->assertGreaterThan(0, $ceilings[$line], "{$line} has a tool with no bite");
+
+            foreach ($tools as $key => $def) {
+                $this->assertArrayNotHasKey(
+                    'stat',
+                    $def,
+                    "{$key} still leads with a percentage instead of its attack",
+                );
+            }
         }
 
         $this->assertCount(1, array_unique($ceilings), 'one line reaches higher than the rest');
@@ -2266,6 +2326,13 @@ final class GameLoopTest extends TestCase
 
         foreach (\App\Game\Catalog::items() as $key => $def) {
             $this->assertContains($def['rarity'], Balance::RARITIES, "{$key} has no rarity");
+
+            // §8 -- a gathering tool has no percentage to out-climb anything
+            // with. Its base is a solid attack, which no ceiling applies to.
+            if (! isset($def['stat'])) {
+                continue;
+            }
+
             $this->assertLessThanOrEqual(
                 Balance::STAT_CAP[$def['rarity']],
                 $def['value'],
@@ -2311,7 +2378,7 @@ final class GameLoopTest extends TestCase
             'key' => 'mythril_pickaxe',
             'durability' => 10,
             'equipped' => true,
-            'options' => array_fill(0, 3, ['stat' => 'yield', 'value' => Balance::OPTION_MAX]),
+            'options' => array_fill(0, 3, ['stat' => 'yield', 'value' => Balance::OPTION_VALUE['legendary'][1] * Balance::OPTION_SCOPED_MULTIPLIER]),
         ]);
 
         $total = \App\Game\Formulas::aggregateStat($fat, 'yield', 'mining');
@@ -2356,10 +2423,31 @@ final class GameLoopTest extends TestCase
             foreach (\App\Game\Formulas::rollOptions($def, $seed) as $option) {
                 $scope = $option['scope'] ?? null;
 
+                $tiers = \App\Game\Formulas::optionTiersFor($def['rarity']);
+
+                // §8.0.1 -- a line is either a percentage or a solid number,
+                // and the two are read off different tables.
+                if (($option['kind'] ?? 'percent') === 'flat') {
+                    $this->assertGreaterThanOrEqual(
+                        Balance::OPTION_FLAT_VALUE[$tiers[0]][0],
+                        $option['value'],
+                    );
+                    $this->assertLessThanOrEqual(
+                        Balance::OPTION_FLAT_VALUE[end($tiers)][1],
+                        $option['value'],
+                    );
+                    $this->assertArrayNotHasKey('scope', $option, 'a flat line was scoped');
+
+                    continue;
+                }
+
+                $floor = Balance::OPTION_VALUE[$tiers[0]][0];
+                $ceiling = Balance::OPTION_VALUE[end($tiers)][1];
+
                 if ($scope === null) {
                     $flat++;
-                    $this->assertGreaterThanOrEqual(Balance::OPTION_MIN, $option['value']);
-                    $this->assertLessThanOrEqual(Balance::OPTION_MAX, $option['value']);
+                    $this->assertGreaterThanOrEqual($floor, $option['value']);
+                    $this->assertLessThanOrEqual($ceiling, $option['value']);
 
                     continue;
                 }
@@ -2367,14 +2455,20 @@ final class GameLoopTest extends TestCase
                 $scoped++;
                 $this->assertContains($scope, \App\Game\Catalog::SKILLS);
                 $this->assertContains($option['stat'], \App\Game\Catalog::OPTION_SCOPED_STATS);
-                $this->assertGreaterThanOrEqual(Balance::OPTION_SCOPED_MIN, $option['value']);
-                $this->assertLessThanOrEqual(Balance::OPTION_SCOPED_MAX, $option['value']);
+                $this->assertGreaterThanOrEqual(
+                    $floor * Balance::OPTION_SCOPED_MULTIPLIER,
+                    $option['value'],
+                );
+                $this->assertLessThanOrEqual(
+                    $ceiling * Balance::OPTION_SCOPED_MULTIPLIER,
+                    $option['value'],
+                );
             }
         }
 
         $this->assertGreaterThan(0, $scoped, 'worn gear never rolled a scoped line');
         $this->assertGreaterThan(0, $flat, 'worn gear never rolled a flat line');
-        $this->assertGreaterThan(Balance::OPTION_MAX, Balance::OPTION_SCOPED_MAX);
+        $this->assertGreaterThan(1.0, Balance::OPTION_SCOPED_MULTIPLIER);
     }
 
     /** §8.0.1 -- a rolled line can reach a stat the item was never built for. */
@@ -2393,47 +2487,214 @@ final class GameLoopTest extends TestCase
         $this->assertSame(0.0, \App\Game\Formulas::aggregateStat($kit, 'tripReduction', 'woodcutting'));
     }
 
-    /** §8.0.1 -- how many lines each rung rolls, and commons roll none. */
-    public function test_option_counts_follow_the_rarity_ladder(): void
+    /**
+     * §8.0.1 -- the count is a CEILING, not a quota.
+     *
+     * A crafted piece rolls anywhere between nothing and its rung's maximum, so
+     * two of the same recipe are never the same object. Commons roll nothing
+     * because their ceiling is nothing.
+     */
+    public function test_option_counts_never_pass_the_rarity_ceiling(): void
     {
-        foreach (['common' => 'stone_axe', 'rare' => null, 'epic' => 'mythril_pickaxe'] as $rarity => $key) {
-            if ($key === null) {
-                continue;
-            }
-
+        foreach (['common' => 'stone_axe', 'epic' => 'mythril_pickaxe'] as $rarity => $key) {
             $def = \App\Game\Catalog::item($key);
-            $rolled = \App\Game\Formulas::rollOptions($def, 12345);
+            $seen = [];
 
-            $this->assertCount(
-                Balance::OPTION_ROLLS[$rarity],
-                $rolled,
-                "{$key} rolled the wrong number of lines",
-            );
+            for ($seed = 1; $seed <= 200; $seed++) {
+                $rolled = \App\Game\Formulas::rollOptions($def, $seed);
+                $seen[count($rolled)] = true;
 
-            foreach ($rolled as $option) {
-                $this->assertGreaterThanOrEqual(Balance::OPTION_MIN, $option['value']);
-                $this->assertLessThanOrEqual(Balance::OPTION_MAX, $option['value']);
-                $this->assertContains($option['stat'], \App\Game\Catalog::optionStatsFor($def['slot']));
+                $this->assertLessThanOrEqual(
+                    Balance::OPTION_ROLLS[$rarity],
+                    count($rolled),
+                    "{$key} rolled past its ceiling",
+                );
+
+                $tiers = \App\Game\Formulas::optionTiersFor($rarity);
+
+                foreach ($rolled as $option) {
+                    $table = ($option['kind'] ?? 'percent') === 'flat'
+                        ? Balance::OPTION_FLAT_VALUE
+                        : Balance::OPTION_VALUE;
+                    $top = ($option['kind'] ?? 'percent') === 'flat'
+                        ? 1.0
+                        : Balance::OPTION_SCOPED_MULTIPLIER;
+
+                    $this->assertGreaterThanOrEqual($table[$tiers[0]][0], $option['value']);
+                    $this->assertLessThanOrEqual($table[end($tiers)][1] * $top, $option['value']);
+                    $this->assertContains($option['stat'], \App\Game\Catalog::optionStatsFor($def['slot']));
+                }
+
+                // One line per (stat, scope): two "+2% mining yield" rows on one
+                // item reads as a bug, and a tool has no scope to tell them apart.
+                $lines = array_map(
+                    static fn (array $o) => $o['stat'].'|'.($o['scope'] ?? ''),
+                    $rolled,
+                );
+                $this->assertSame($lines, array_unique($lines), "{$key} rolled a line twice");
+
+                // A tool is line-locked by its slot (§8 rule 1), so a scope on
+                // it would be a second copy of a fact that is already true.
+                foreach ($rolled as $option) {
+                    $this->assertArrayNotHasKey('scope', $option, "{$key} scoped a tool line");
+                }
             }
 
-            // One line per (stat, scope): two "+2% mining yield" rows on one
-            // item reads as a bug, and a tool has no scope to tell them apart.
-            $lines = array_map(
-                static fn (array $o) => $o['stat'].'|'.($o['scope'] ?? ''),
-                $rolled,
+            // A common has one outcome and an epic has three, which is the
+            // whole of "an option is a bonus, not part of the item".
+            $this->assertCount(
+                Balance::OPTION_ROLLS[$rarity] + 1,
+                $seen,
+                "{$key} never rolled every count it should",
             );
-            $this->assertSame($lines, array_unique($lines), "{$key} rolled a line twice");
+        }
+    }
 
-            // A tool is line-locked by its slot (§8 rule 1), so a scope on it
-            // would be a second copy of a fact that is already true.
-            foreach ($rolled as $option) {
-                $this->assertArrayNotHasKey('scope', $option, "{$key} scoped a tool line");
+    /**
+     * §8.0.1 -- every line rolls its own tier, drawn at or below the item's
+     * rarity, so a legendary regularly carries a common-grade line.
+     */
+    public function test_a_line_may_be_drawn_from_any_tier_at_or_below_the_item(): void
+    {
+        $this->assertSame(['common'], \App\Game\Formulas::optionTiersFor('common'));
+        $this->assertSame(
+            ['common', 'uncommon', 'rare', 'epic'],
+            \App\Game\Formulas::optionTiersFor('epic'),
+        );
+
+        $def = \App\Game\Catalog::item('mythril_pickaxe');
+        $low = 0;
+        $high = 0;
+
+        for ($seed = 1; $seed <= 400; $seed++) {
+            foreach (\App\Game\Formulas::rollOptions($def, $seed) as $option) {
+                if ($option['value'] <= Balance::OPTION_VALUE['common'][1]) {
+                    $low++;
+                }
+                if ($option['value'] >= Balance::OPTION_VALUE['epic'][0]) {
+                    $high++;
+                }
             }
         }
 
-        // The capital bazaar is the one way a common ever carries a line.
-        $bazaar = \App\Game\Formulas::rollOptions(\App\Game\Catalog::item('stone_axe'), 999, 1);
-        $this->assertCount(1, $bazaar);
+        $this->assertGreaterThan(0, $low, 'an epic never rolled a low-tier line');
+        $this->assertGreaterThan(0, $high, 'an epic never rolled its own tier');
+    }
+
+    /**
+     * §9.5.4 -- attack and defense are SOLID numbers, so a rolled line may be
+     * one too. It adds; it does not climb toward §8.1's percentage ceiling.
+     */
+    public function test_a_flat_line_adds_to_the_pair_and_not_to_the_percentages(): void
+    {
+        $kit = [[
+            'id' => 1,
+            'key' => 'soldiers_sword',
+            'durability' => 50,
+            'equipped' => true,
+            'options' => [
+                ['stat' => 'attack', 'value' => 4, 'kind' => 'flat'],
+                ['stat' => 'defense', 'value' => 3, 'kind' => 'flat'],
+            ],
+        ]];
+
+        $def = \App\Game\Catalog::item('soldiers_sword');
+        $pair = \App\Game\Formulas::combatPair($kit);
+
+        $this->assertSame((int) $def['attack'] + 4, $pair['attack']);
+        $this->assertSame((int) $def['defense'] + 3, $pair['defense']);
+
+        // And it is nowhere near the percentage aggregate, which is a different
+        // number with a ceiling on it.
+        $this->assertSame(0.0, \App\Game\Formulas::aggregateStat($kit, 'defense'));
+        $this->assertSame(0.0, \App\Game\Formulas::aggregateStat($kit, 'attack'));
+    }
+
+    /**
+     * §8 rule 5 -- a flat line on a gathering tool is MINING attack (§7.3). It
+     * bites harder into a hex and is worth nothing whatsoever in a fight.
+     */
+    public function test_a_flat_line_on_a_tool_is_mining_attack_and_never_reaches_a_fight(): void
+    {
+        $axe = \App\Models\CharacterItem::create([
+            'character_id' => $this->character->id,
+            'item_key' => 'ironwood_axe',
+            'durability' => 100,
+            'equipped' => true,
+            'options' => [['stat' => 'attack', 'value' => 5, 'kind' => 'flat']],
+        ]);
+
+        $def = \App\Game\Catalog::item('ironwood_axe');
+        $bare = \App\Game\Formulas::toolAttack($def);
+
+        $this->assertSame(
+            $bare + 5,
+            $this->game->lineToolAttack($this->character->fresh(), 'woodcutting'),
+            'a rolled line did not sharpen the axe',
+        );
+
+        // A faster hex, and the same fight.
+        $this->assertLessThan(
+            \App\Game\Formulas::tripTime(3600, 0, 0.0, $bare)['total'],
+            \App\Game\Formulas::tripTime(3600, 0, 0.0, $bare + 5)['total'],
+        );
+
+        $pair = \App\Game\Formulas::combatPair(
+            $this->character->fresh()->items->map(fn ($i) => [
+                'id' => $i->id,
+                'key' => $i->item_key,
+                'durability' => $i->durability,
+                'equipped' => $i->equipped,
+                'options' => $i->options ?? [],
+            ])->all(),
+        );
+
+        $this->assertSame(0, $pair['attack'], 'an axe swung in a fight');
+        $this->assertSame(0, $pair['defense']);
+        $this->assertSame($axe->id, $axe->fresh()->id);
+    }
+
+    /**
+     * §8.0.1 -- both kinds actually come out of the roller, and a flat one
+     * never carries a scope.
+     */
+    public function test_a_roll_produces_both_flat_and_percentage_lines(): void
+    {
+        $def = \App\Game\Catalog::item('keepers_carapace');
+        $flat = 0;
+        $percent = 0;
+
+        for ($seed = 1; $seed <= 300; $seed++) {
+            foreach (\App\Game\Formulas::rollOptions($def, $seed) as $option) {
+                if (($option['kind'] ?? 'percent') === 'flat') {
+                    $flat++;
+                    $this->assertContains($option['stat'], ['attack', 'defense']);
+                    $this->assertIsInt($option['value']);
+                    $this->assertArrayNotHasKey('scope', $option);
+
+                    continue;
+                }
+
+                $percent++;
+                $this->assertIsFloat($option['value']);
+            }
+        }
+
+        $this->assertGreaterThan(0, $flat, 'no flat line ever rolled');
+        $this->assertGreaterThan(0, $percent, 'no percentage line ever rolled');
+    }
+
+    /** §8.0.1 -- gold buys a plain item. An option is what a bench puts on one. */
+    public function test_a_shop_item_never_carries_an_option(): void
+    {
+        $this->standAtWoodcuttingVillage();
+        $this->character->gold = 100000;
+        $this->character->save();
+
+        for ($i = 0; $i < 8; $i++) {
+            $item = $this->game->buyItem($this->character->fresh(), 'stone_axe');
+            $this->assertSame([], $item->options ?? [], 'a shop sold a rolled item');
+        }
     }
 
     /**
@@ -2442,14 +2703,14 @@ final class GameLoopTest extends TestCase
      */
     public function test_drinking_arms_a_charge_that_the_action_spends(): void
     {
-        $this->character->consumables()->create(['item_key' => 'forest_draught', 'quantity' => 2]);
+        $this->character->consumables()->create(['item_key' => 'forest_draft', 'quantity' => 2]);
 
         $before = $this->game->bonuses($this->character->fresh(), 'woodcutting')['yield'];
-        $buff = $this->game->useConsumable($this->character->fresh(), 'forest_draught');
+        $buff = $this->game->useConsumable($this->character->fresh(), 'forest_draft');
 
         $this->assertSame('yield', $buff['stat']);
         $this->assertSame('woodcutting', $buff['scope']);
-        $this->assertSame(1, $this->game->heldConsumable($this->character->fresh(), 'forest_draught'));
+        $this->assertSame(1, $this->game->heldConsumable($this->character->fresh(), 'forest_draft'));
 
         $during = $this->game->bonuses($this->character->fresh(), 'woodcutting')['yield'];
         $this->assertGreaterThan($before, $during, 'drinking did nothing');
@@ -2463,12 +2724,12 @@ final class GameLoopTest extends TestCase
     }
 
     /**
-     * §8.5 -- the charge waits. A draught drunk in the mountains is still there
+     * §8.5 -- the charge waits. A draft drunk in the mountains is still there
      * when the forest is, which is the whole reason it stopped being a clock.
      */
     public function test_a_charge_is_not_spent_by_another_action(): void
     {
-        $this->game->useConsumable($this->giveDrink('forest_draught'), 'forest_draught');
+        $this->game->useConsumable($this->giveDrink('forest_draft'), 'forest_draft');
 
         $this->game->spendBuffs($this->character->fresh(), 'mining');
         $this->assertCount(1, $this->game->armedBuffs($this->character->fresh()), 'mining burned a forest charge');
@@ -2479,40 +2740,40 @@ final class GameLoopTest extends TestCase
 
     /**
      * §8.5 -- a second of the same kind is the same effect twice, so the better
-     * draught wins and the weaker one is refused before the flask is opened.
+     * draft wins and the weaker one is refused before the flask is opened.
      */
-    public function test_the_stronger_draught_wins_and_the_weaker_is_refused(): void
+    public function test_the_stronger_draft_wins_and_the_weaker_is_refused(): void
     {
-        $this->character->consumables()->create(['item_key' => 'forest_draught', 'quantity' => 2]);
+        $this->character->consumables()->create(['item_key' => 'forest_draft', 'quantity' => 2]);
         $this->character->consumables()->create(['item_key' => 'forest_tonic', 'quantity' => 1]);
 
-        $weak = Catalog::item('forest_draught')['value'];
+        $weak = Catalog::item('forest_draft')['value'];
         $strong = Catalog::item('forest_tonic')['value'];
         $this->assertGreaterThan($weak, $strong, 'the rungs are not what this test assumes');
 
-        $this->game->useConsumable($this->character->fresh(), 'forest_draught');
+        $this->game->useConsumable($this->character->fresh(), 'forest_draft');
         $once = $this->game->bonuses($this->character->fresh(), 'woodcutting')['yield'];
 
         // Up a rung: the stronger charge takes the place of the weaker one.
         $this->game->useConsumable($this->character->fresh(), 'forest_tonic');
         $upgraded = $this->game->bonuses($this->character->fresh(), 'woodcutting')['yield'];
 
-        $this->assertGreaterThan($once, $upgraded, 'the better draught did not take');
+        $this->assertGreaterThan($once, $upgraded, 'the better draft did not take');
         $this->assertCount(1, $this->game->armedBuffs($this->character->fresh()), 'two charges on one action');
         $this->assertSame($once + ($strong - $weak), round($upgraded, 10), 'the two potions stacked');
 
         // Back down a rung: refused, and the flask stays in the bag.
         try {
-            $this->game->useConsumable($this->character->fresh(), 'forest_draught');
-            $this->fail('a weaker draught was poured on top of a stronger one');
+            $this->game->useConsumable($this->character->fresh(), 'forest_draft');
+            $this->fail('a weaker draft was poured on top of a stronger one');
         } catch (GameException $e) {
             $this->assertSame('weaker_charge', $e->errorCode);
         }
 
         $this->assertSame(
             1,
-            $this->game->heldConsumable($this->character->fresh(), 'forest_draught'),
-            'the refused draught was drunk anyway',
+            $this->game->heldConsumable($this->character->fresh(), 'forest_draft'),
+            'the refused draft was drunk anyway',
         );
         $this->assertSame(
             $upgraded,
@@ -2527,8 +2788,8 @@ final class GameLoopTest extends TestCase
      */
     public function test_several_different_charges_are_held_at_once(): void
     {
-        $this->game->useConsumable($this->giveDrink('forest_draught'), 'forest_draught');
-        $this->game->useConsumable($this->giveDrink('deepseam_draught'), 'deepseam_draught');
+        $this->game->useConsumable($this->giveDrink('forest_draft'), 'forest_draft');
+        $this->game->useConsumable($this->giveDrink('deepseam_draft'), 'deepseam_draft');
         $this->game->useConsumable($this->giveDrink('road_tonic'), 'road_tonic');
 
         $this->assertCount(3, $this->game->armedBuffs($this->character->fresh()));
@@ -2543,7 +2804,7 @@ final class GameLoopTest extends TestCase
             'item_key' => 'mythril_pickaxe',
             'durability' => 100,
             'equipped' => true,
-            'options' => [['stat' => 'yield', 'value' => Balance::OPTION_MAX]],
+            'options' => [['stat' => 'yield', 'value' => Balance::OPTION_VALUE['legendary'][1] * Balance::OPTION_SCOPED_MULTIPLIER]],
         ]);
         $this->character->consumables()->create(['item_key' => 'prospectors_flask', 'quantity' => 1]);
         $this->game->useConsumable($this->character->fresh(), 'prospectors_flask');
@@ -2973,7 +3234,7 @@ final class GameLoopTest extends TestCase
      * query has nothing to scan, so a journey of two hundred hexes costs the
      * same two requests as a journey of one.
      */
-    public function test_sight_closes_to_nothing_while_travelling(): void
+    public function test_sight_closes_to_nothing_while_traveling(): void
     {
         // Somebody working the hex right next to you -- plainly in sight.
         $near = $this->game->createCharacter(Player::create(['wallet' => '0xnear']));
@@ -3530,7 +3791,7 @@ final class GameLoopTest extends TestCase
 
     /** Walk the character to the village the spawn rule guarantees is in range. */
     /** @return array{col:int,row:int} */
-    private function openNeighbour(int $col, int $row): array
+    private function openNeighbor(int $col, int $row): array
     {
         foreach ([[1, 0], [0, 1], [-1, 0], [0, -1], [1, 1], [-1, -1]] as [$dc, $dr]) {
             if (\App\Game\WorldGen::settlementAt($col + $dc, $row + $dr) === null) {
@@ -3591,7 +3852,7 @@ final class GameLoopTest extends TestCase
     }
 
     /** A trip pins you to the hex you are working. */
-    public function test_a_trip_stops_you_travelling(): void
+    public function test_a_trip_stops_you_traveling(): void
     {
         $this->equipToolForHere();
         $col = $this->character->col;
@@ -3600,7 +3861,7 @@ final class GameLoopTest extends TestCase
 
         try {
             $this->game->travelTo($this->character, $col + 1, $row);
-            $this->fail('travelled away from a running trip');
+            $this->fail('traveled away from a running trip');
         } catch (\App\Game\GameException $e) {
             $this->assertSame('working', $e->errorCode);
         }
@@ -3636,7 +3897,7 @@ final class GameLoopTest extends TestCase
     public function test_walking_away_gives_back_the_presence_bonus(): void
     {
         $settlement = $this->standAtWoodcuttingVillage();
-        $away = $this->openNeighbour($settlement['col'], $settlement['row']);
+        $away = $this->openNeighbor($settlement['col'], $settlement['row']);
 
         // Arrive properly: presence is picked up by landing, not by existing.
         $this->character->update(['col' => $away['col'], 'row' => $away['row']]);
@@ -4119,7 +4380,7 @@ final class GameLoopTest extends TestCase
     {
         $item = $this->boughtItem();
 
-        $open = $this->openNeighbour($this->character->col, $this->character->row);
+        $open = $this->openNeighbor($this->character->col, $this->character->row);
         $this->character->update($open);
 
         try {
@@ -4137,7 +4398,7 @@ final class GameLoopTest extends TestCase
     {
         $this->assertSame(0, $this->questProgress('bare_hands'));
 
-        $open = $this->openNeighbour($this->character->col, $this->character->row);
+        $open = $this->openNeighbor($this->character->col, $this->character->row);
         $this->character->update($open);
 
         $job = $this->game->startMining($this->character->fresh(), $open['col'], $open['row'], \App\Game\Drops::GATHERING);
@@ -4379,7 +4640,7 @@ final class GameLoopTest extends TestCase
      */
     public function test_collecting_carries_no_message_for_a_toast(): void
     {
-        $open = $this->openNeighbour($this->character->col, $this->character->row);
+        $open = $this->openNeighbor($this->character->col, $this->character->row);
         $this->character->update($open);
 
         // Bare-handed, so the trip needs no tool on the belt. §4.0 pays scrap

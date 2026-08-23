@@ -9,9 +9,10 @@
 import { computed, ref } from 'vue'
 import { useGame } from '@/stores/game'
 import { ITEM_BY_KEY, MATERIALS, shopItems } from '@/game/catalog'
-import { itemStatLine, resaleValue } from '@/game/formulas'
+import { resaleValue } from '@/game/formulas'
 import { itemIcon, materialIcon } from '@/icons/procedural'
 import SvgIcon from '@/components/SvgIcon.vue'
+import StatChips from '@/components/StatChips.vue'
 import type { Material, MaterialKey } from '@/game/types'
 
 const game = useGame()
@@ -31,7 +32,7 @@ const sellable = computed(() => {
 /** Only what this settlement stocks, §3.2 -- the server decides, we render it. */
 const catalog = computed(() => shopItems().filter((i) => game.shopStock.includes(i.key)))
 
-/** Stocked elsewhere: shown greyed so the ladder is visible, not hidden. */
+/** Stocked elsewhere: shown grayed so the ladder is visible, not hidden. */
 const elsewhere = computed(() => shopItems().filter((i) => !game.shopStock.includes(i.key)))
 
 const atSettlement = computed(() => game.currentSettlement !== null)
@@ -183,7 +184,10 @@ const owned = (key: string) => game.equipment.filter((e) => e.key === key).lengt
             </div>
             <div class="tiny muted">{{ item.description }}</div>
             <div class="row tiny" style="gap: 6px; margin-top: 4px">
-              <span class="chip tiny">{{ itemStatLine(item) }}</span>
+              <!-- §9.5.4 -- one row of chips, the same everywhere. A shopper
+                   choosing between a shield and a wand is choosing on the pair,
+                   so the pair is on the shelf. -->
+              <StatChips :def="item" />
               <span class="chip tiny">{{ item.maxDurability }} dur</span>
               <span v-if="owned(item.key)" class="tiny muted">owned ×{{ owned(item.key) }}</span>
             </div>
@@ -213,8 +217,9 @@ const owned = (key: string) => game.equipment.filter((e) => e.key === key).lengt
                 <strong class="tiny">{{ item.name }}</strong>
                 <span class="chip tiny">needs a {{ item.station }}</span>
               </div>
-              <div class="tiny muted">
-                {{ itemStatLine(item) }} · {{ item.goldPrice }}g
+              <div class="row tiny" style="gap: 6px">
+                <StatChips :def="item" />
+                <span class="chip tiny">{{ item.goldPrice }}g</span>
               </div>
             </div>
           </div>

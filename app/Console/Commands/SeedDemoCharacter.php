@@ -89,7 +89,7 @@ class SeedDemoCharacter extends Command
      * @var array<string,int>
      */
     private const CONSUMABLES = [
-        'forest_draught' => 4,
+        'forest_draft' => 4,
         'road_tonic' => 2,
         'quarry_salts' => 3,
     ];
@@ -221,12 +221,12 @@ class SeedDemoCharacter extends Command
         }
 
         // One already armed, so the HUD's charge strip has something to show.
-        $draught = Catalog::item('forest_draught');
+        $draft = Catalog::item('forest_draft');
         $character->buffs()->create([
-            'item_key' => 'forest_draught',
-            'stat' => $draught['stat'],
-            'scope' => $draught['scope'] ?? 'global',
-            'value' => $draught['value'],
+            'item_key' => 'forest_draft',
+            'stat' => $draft['stat'],
+            'scope' => $draft['scope'] ?? 'global',
+            'value' => $draft['value'],
         ]);
 
         $materials = self::MATERIALS;

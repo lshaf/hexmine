@@ -15,7 +15,7 @@
  * store, no request, and correct with no character at all.
  *
  * The structural device is the provenance rail: every entry carries the same
- * two labelled lines, FROM and FEEDS, colour-coded by which of the five roads
+ * two labeled lines, FROM and FEEDS, color-coded by which of the five roads
  * (§4/§6/§8/§9) applies. It is not decoration -- five roads in and one road out
  * is the actual shape of the economy, and an entry with nothing downstream is
  * saying something true about scrap.
@@ -43,7 +43,7 @@ import {
   materialUses,
 } from '@/game/sources'
 import type { SourceLine } from '@/game/sources'
-import { formatPercent, itemStatLine, resaleValue } from '@/game/formulas'
+import { formatPercent, resaleValue } from '@/game/formulas'
 import { EQUIPMENT, ECONOMY, PROCESSING, BAG } from '@/game/balance'
 import { ACTION_PATHS } from '@/icons/actions'
 import { BIOME_LABEL } from '@/theme/palette'
@@ -57,6 +57,7 @@ import { itemIcon, materialIcon } from '@/icons/procedural'
 import { variantSpecimen, waterSpecimen } from '@/map/props'
 import { waterLabel } from '@/game/water'
 import SvgIcon from '@/components/SvgIcon.vue'
+import StatChips from '@/components/StatChips.vue'
 import type {
   Biome,
   WaterKind,
@@ -115,7 +116,7 @@ const matches = (haystack: string) =>
  * argument about what a missing tool costs you only applies to the first.
  * Tier 1 holds three: the ground's own grades, and the two bench stocks. One
  * paragraph cannot be true of all of them, and thirty-five cards in a single
- * unlabelled run is a wall rather than a list.
+ * unlabeled run is a wall rather than a list.
  */
 interface Band {
   key: string
@@ -167,7 +168,7 @@ const BANDS: Band[] = [
     key: 'spoil',
     tier: 1,
     name: 'Off a monster',
-    note: 'The only Tier 1 with no ground under it: two families of five, cut off a pack rather than out of a hex (§9.5). The plate line feeds the smith and the armorer, the ichor line feeds the consumable bench, and the grade you get is the tier of the thing that was carrying it — which is why the best of them are only found in the barren centre. Combat feeds combat; none of this reaches the mining economy.',
+    note: 'The only Tier 1 with no ground under it: two families of five, cut off a pack rather than out of a hex (§9.5). The plate line feeds the smith and the armorer, the ichor line feeds the consumable bench, and the grade you get is the tier of the thing that was carrying it — which is why the best of them are only found in the barren center. Combat feeds combat; none of this reaches the mining economy.',
     holds: (mat) => rawRole(mat.key) === 'spoil',
   },
   {
@@ -358,7 +359,7 @@ const tileCount = computed(
  * Grouped by slot rather than by rarity, because the slot *is* the ladder: §8.0
  * gives every gathering line the same five rungs on purpose, and stacking them
  * in one column is the only view that shows a line is not quietly weaker than
- * its neighbours.
+ * its neighbors.
  */
 const SLOT_ORDER: EquipSlot[] = [
   'axe',
@@ -407,7 +408,8 @@ const describe = (item: ItemDef): ItemEntry => {
 }
 
 const byRung = (a: ItemEntry, b: ItemEntry) =>
-  RARITY_RANK[a.item.rarity] - RARITY_RANK[b.item.rarity] || a.item.value - b.item.value
+  RARITY_RANK[a.item.rarity] - RARITY_RANK[b.item.rarity] ||
+  (a.item.value ?? 0) - (b.item.value ?? 0)
 
 const groups = computed<Group[]>(() => {
   const built: Group[] = SLOT_ORDER.map((slot) => {
@@ -647,10 +649,12 @@ function nature(item: ItemDef): string {
                     {{ entry.item.name }}
                   </strong>
                 </div>
-                <span class="chip tiny" :class="entry.item.tradeable ? 'chip-nft' : ''">
-                  {{ itemStatLine(entry.item) }}
-                </span>
+                <span v-if="entry.item.tradeable" class="chip tiny chip-nft">NFT</span>
               </div>
+
+              <!-- §9.5.4 -- the almanac is where a piece is read before it is
+                   owned, so it has to say every half of what it is. -->
+              <div class="row tiny stats"><StatChips :def="entry.item" /></div>
 
               <p class="tiny muted desc">{{ entry.item.description }}</p>
               <p class="tiny meta">{{ nature(entry.item) }}</p>
@@ -811,6 +815,11 @@ function nature(item: ItemDef): string {
 </template>
 
 <style scoped>
+.stats {
+  gap: 4px;
+  margin-top: 4px;
+}
+
 /* The page hands over the height left under its title strip, and nothing else:
    scrolling and padding belong here, because the bar has to stay put while the
    entries move under it. */
@@ -1073,7 +1082,7 @@ section + section {
 }
 
 /*
- * The signature. A hairline in the road's colour, the road's name in caps, and
+ * The signature. A hairline in the road's color, the road's name in caps, and
  * the destination beside it -- the same two-part shape whether the thing was
  * dug up, smelted, bought, forged or dropped.
  */
@@ -1113,7 +1122,7 @@ section + section {
 }
 
 /* Buy-back is the lesser of the two numbers and reads as the lesser: same
-   family, no colour. Two golds side by side would make them look equal. */
+   family, no color. Two golds side by side would make them look equal. */
 .price.back {
   color: var(--vellum);
 }
@@ -1153,7 +1162,7 @@ section + section {
   margin-top: 5px;
 }
 
-/* Left uncoloured on purpose: an item pip is tinted by its rarity, and a rule
+/* Left uncolored on purpose: an item pip is tinted by its rarity, and a rule
    here would outrank the global `.rarity-*` classes and flatten the ladder. */
 .pip {
   display: inline-flex;
@@ -1197,7 +1206,7 @@ section + section {
   }
 
   /* 62px of gutter is a third of a phone's width. Stack instead, and let the
-     colour rail carry the grouping that the column alignment was doing. */
+     color rail carry the grouping that the column alignment was doing. */
   .rail {
     grid-template-columns: 1fr;
     gap: 2px;

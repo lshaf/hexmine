@@ -36,7 +36,7 @@ final class PackSpawnTest extends TestCase
     }
 
     /**
-     * §9.5.1 -- the outer ring is nearly safe and the centre is the worst of
+     * §9.5.1 -- the outer ring is nearly safe and the center is the worst of
      * it. That gradient is the whole reason the road inward means anything.
      */
     public function test_pack_density_climbs_ring_by_ring(): void
@@ -159,7 +159,7 @@ final class PackSpawnTest extends TestCase
         }
 
         $this->assertCount(2, $seen['outer'] ?? [], 'the outer ring should hold exactly two');
-        $this->assertCount(4, $seen['center'] ?? [], 'the centre should hold four');
+        $this->assertCount(4, $seen['center'] ?? [], 'the center should hold four');
     }
 
     /**

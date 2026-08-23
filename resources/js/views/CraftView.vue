@@ -22,10 +22,11 @@ import {
   stationReaches,
 } from '@/game/catalog'
 import type { Category } from '@/game/catalog'
-import { formatDuration, itemStatLine, placeLabel } from '@/game/formulas'
+import { formatDuration, placeLabel } from '@/game/formulas'
 import { CRAFT, EQUIPMENT, PROCESSING } from '@/game/balance'
 import { itemIcon, materialIcon } from '@/icons/procedural'
 import SvgIcon from '@/components/SvgIcon.vue'
+import StatChips from '@/components/StatChips.vue'
 import type { ItemDef, MaterialKey, Rarity } from '@/game/types'
 
 const game = useGame()
@@ -43,7 +44,7 @@ const RARITY_NOTE: Record<Rarity, string> = {
 /**
  * Only what this workbench can actually make.
  *
- * A recipe you cannot reach here is hidden outright rather than greyed: a
+ * A recipe you cannot reach here is hidden outright rather than grayed: a
  * village will never craft an epic, so listing it is a permanent row of noise on
  * the screen a player uses most. Missing *materials* is a different thing and
  * stays visible — that is the shopping list, and hiding it would remove the only
@@ -208,9 +209,12 @@ function benchTime(item: ItemDef): string {
           <div class="grow">
             <div class="row-between">
               <strong class="tiny" :class="`rarity-${item.rarity}`">{{ item.name }}</strong>
-              <span class="chip tiny" :class="item.tradeable ? 'chip-nft' : ''">
-                {{ itemStatLine(item) }}
-              </span>
+              <span v-if="item.tradeable" class="chip tiny chip-nft">NFT</span>
+            </div>
+            <!-- §9.5.4 -- a bench is where a shield and a wand are actually
+                 chosen between, and the chips are the choice. -->
+            <div class="row tiny" style="gap: 4px; margin-top: 3px">
+              <StatChips :def="item" />
             </div>
             <div class="tiny muted">{{ item.description }}</div>
           </div>

@@ -102,6 +102,18 @@ export interface PlayerState {
    * On the state rather than fetched, because membership decides what a bench
    * will make (§8.0's legendary rung) and the two must never disagree.
    */
+  /**
+   * §9.5.4 -- the flat pair, and the durability pool that is the health bar.
+   *
+   * Solid numbers, not the `power`/`defense` percentages on `bonuses`.
+   */
+  combat: {
+    attack: number
+    defense: number
+    pool: number
+    job: string | null
+    jobLevel: number
+  }
   guild: GuildStateSummary | null
   /** §10.0 -- standing in your own hall, which is the one question the bench asks. */
   atGuildHall: boolean
@@ -269,8 +281,11 @@ export interface WorkPreview {
   reason?: string
   seconds: number
   baseSeconds: number
-  skillReduction: number
-  equipReduction: number
+  /** §7.3 -- how much work the hex is, and how fast you get through it. */
+  durability: number
+  toolAttack: number
+  skillAttack: number
+  rate: number
   clamped: boolean
   yield: number
   /** The line this hex belongs to, even when the haul comes back as scrap. */
@@ -408,18 +423,31 @@ export interface BattlePreview {
     tier: number
     profile: 'brute' | 'carapace' | 'swift'
     attack: number
-    defence: number
+    defense: number
+    /** §9.5.5 -- what it has to be worked through. Its half of the exchange. */
+    hp: number
     description: string
   }
   /** Your flat pair, gear plus battle job, §9.5.4. */
   attack?: number
-  defence?: number
+  defense?: number
+  /** §9.5.5 -- your HP, which is the durability of the kit you are wearing. */
+  pool?: number
+  /** §9.5.5 -- the exchange with the swing taken out. A promise, not a guess. */
+  expected?: {
+    won: boolean
+    rounds: number
+    damageTaken: number
+    damageDealt: number
+    left: number
+    foeLeft: number
+  }
   odds?: number
   /** §9.5.4 -- the battle job the equipped weapon levels, and where it stands. */
   job?: string | null
   jobLevel?: number
-  /** §9.5.6 -- worst-case durability cost, weapon and worn piece. */
-  wear?: { weapon: number; armor: number }
+  /** §9.5.6 -- what the exchange would take off the kit, and off the blade. */
+  wear?: { pool: number; taken: number; weapon: number }
   /** §8.2 -- gear this fight could destroy outright, named before it happens. */
   warnings?: string[]
   /** §9.5.7 -- set when the thing standing here is a corpse rather than a pack. */
@@ -444,10 +472,16 @@ export interface BattleResult {
     tier: number
     profile: 'brute' | 'carapace' | 'swift'
     attack: number
-    defence: number
+    defense: number
+    hp: number
   }
   attack: number
-  defence: number
+  defense: number
+  /** §9.5.5 -- the exchange, as it actually went. */
+  rounds: number
+  pool: number
+  damageTaken: number
+  damageDealt: number
   /** §9.5.8 -- gold needs no bag row, which is why a fight can always pay it. */
   gold: number
   job: string | null
@@ -524,7 +558,7 @@ export interface GuildSummary {
   /** A short tag, shown wherever the name will not fit. */
   code: string
   description: string
-  /** §10.0.3 -- 1024 colours, base64 of 3072 raw RGB bytes. Null until drawn. */
+  /** §10.0.3 -- 1024 colors, base64 of 3072 raw RGB bytes. Null until drawn. */
   flag: string | null
   settlementId: string
   settlementName: string | null

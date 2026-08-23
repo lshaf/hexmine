@@ -8,8 +8,8 @@
  * else: 25 tools came out of it.
  *
  *   slot     -> base silhouette
- *   tier     -> fill treatment (flat grey / solid / gradient + glow)
- *   material -> accent colour
+ *   tier     -> fill treatment (flat gray / solid / gradient + glow)
+ *   material -> accent color
  *   rarity   -> hex frame, ornamentation grows per tier -- on a material as
  *               much as on a piece of gear
  */
@@ -46,7 +46,7 @@ const nextId = () => `g${++gradientSeq}`
 
 /*
  * The five gathering tools have to be told apart at 26px in a shop list, so each
- * one owns a different read: crescent off a centre line (axe), wide symmetric
+ * one owns a different read: crescent off a center line (axe), wide symmetric
  * points (pickaxe), open arc (bow), solid block (hammer), diagonal hook
  * (sickle). Within that, one convention holds the family together -- the haft is
  * always drawn in `edge`, the working head in `fill`, so the material accent
@@ -203,12 +203,12 @@ export interface IconOptions {
 /**
  * Full SVG markup for an equipment icon.
  *
- * Two colours are doing two different jobs and must not be confused: the
- * **material accent** says what the thing is made of, the **rarity colour** says
+ * Two colors are doing two different jobs and must not be confused: the
+ * **material accent** says what the thing is made of, the **rarity color** says
  * how good it is. Rarity owns the frame and the glow, because that is what a
  * player scans a list for; the material keeps the body.
  *
- * `common` is the exception -- it takes the rarity grey for its body too, so the
+ * `common` is the exception -- it takes the rarity gray for its body too, so the
  * cheapest gear looks like what it is no matter what it is made of.
  */
 export function itemIcon({ slot, family, rarity, palette, size = 40 }: IconOptions): string {
@@ -260,10 +260,10 @@ export function itemIcon({ slot, family, rarity, palette, size = 40 }: IconOptio
  * palette. Same principle -- generated, never drawn.
  */
 /**
- * The one colour a material answers to, §13.1.
+ * The one color a material answers to, §13.1.
  *
  * Exported because the icon is not the only thing that has to say "this is
- * wood": anything drawing a material as a bare colour -- a share of a bar, a
+ * wood": anything drawing a material as a bare color -- a share of a bar, a
  * pip, a legend -- has to arrive at the same answer, and a second copy of the
  * herb/critter rule would eventually disagree with this one.
  */
@@ -293,7 +293,7 @@ export function materialIcon(mat: Material, size = 32): string {
   const { color, ornate } = RARITY_TREATMENT[materialRarity(mat)]
 
   // Drawn to the edges of the box, so the specimen is pulled in to sit inside
-  // the frame rather than through it. Centred: 20 * 0.86 + 2.8 lands back on 20.
+  // the frame rather than through it. Centerd: 20 * 0.86 + 2.8 lands back on 20.
   const specimen = formShape(form, ink, keySeed(mat.key), gradeRank(mat.key))
 
   return `<svg viewBox="0 0 40 40" width="${size}" height="${size}" role="img" aria-hidden="true">

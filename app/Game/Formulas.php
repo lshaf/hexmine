@@ -61,11 +61,22 @@ final class Formulas
             // inherit the line-lock from their item, which is what stops five
             // equipped tools stacking five copies of the same bonus.
             $contributions = [];
-            if ($def['stat'] === $stat) {
+            // §8 -- a gathering tool has no percentage at all now; its base is
+            // a solid attack. Absent rather than zero, so nothing has to know
+            // which stat a tool would have had.
+            if (($def['stat'] ?? null) === $stat) {
                 $contributions[] = $def['value'];
             }
             foreach ($item['options'] ?? [] as $option) {
                 if (($option['stat'] ?? null) !== $stat) {
+                    continue;
+                }
+
+                // §8.0.1 -- a flat line is a solid number, not a percentage.
+                // It is added by whoever reads the solid number; this is the
+                // aggregate with the falloff and the ceiling on it, and putting
+                // "+3 attack" through that would be nonsense twice over.
+                if (($option['kind'] ?? 'percent') === 'flat') {
                     continue;
                 }
 
@@ -110,39 +121,49 @@ final class Formulas
     }
 
     /**
-     * §8.0.1 -- roll an item's bonus lines.
+     * §8.0.1 -- roll a crafted item's bonus lines.
      *
-     * Seeded rather than random so an outcome can be reproduced from its inputs,
-     * the same way §16 treats every other roll in the game. `$extra` is the
-     * capital bazaar's bonus slot, which is the one way a common item ever
-     * carries a line.
+     * Seeded rather than random so an outcome can be reproduced from its
+     * inputs, the same way §16 treats every other roll in the game.
+     *
+     * Three things are random and that is the point: HOW MANY lines come out
+     * (nothing up to the rung's ceiling), WHICH tier each line is drawn from
+     * (any at or below the item's own rarity, so a legendary often carries a
+     * common-grade line), and what it is worth inside that tier. Two of the
+     * same recipe are never the same object.
      *
      * A worn line may come out pointed at one gathering line -- "+4% mining
-     * yield" -- and is worth more when it does, because it is worth nothing on
-     * the other four (Balance::OPTION_SCOPED_MIN). `scope` is absent on a flat
-     * line rather than null, so every row already stored keeps its shape.
+     * yield" -- and is worth OPTION_SCOPED_MULTIPLIER more when it does,
+     * because it is worth nothing on the other four. `scope` is absent on a
+     * flat line rather than null, so every row already stored keeps its shape.
+     *
+     * `$extra` widens the ceiling: a Smith's tree node, or the extra slot a
+     * hard pack's loot rolls (§9.5.8). Nothing BOUGHT ever comes here -- gold
+     * buys a plain item and always has.
      *
      * @return array<int,array{stat:string,value:float,scope?:string}>
      */
     public static function rollOptions(array $def, int $seed, int $extra = 0): array
     {
-        $slots = (Balance::OPTION_ROLLS[$def['rarity']] ?? 0) + $extra;
-        if ($slots <= 0) {
+        $ceiling = (Balance::OPTION_ROLLS[$def['rarity']] ?? 0) + $extra;
+        if ($ceiling <= 0) {
             return [];
         }
 
         $pool = Catalog::optionRollsFor($def['slot'] ?? '');
+        if ($pool === []) {
+            return [];
+        }
+
+        // Nothing up to the ceiling. An item with no lines is a plain item, not
+        // a broken one.
+        $slots = Hash::randInt(Hash::hash2($seed, 890, Balance::mapSeed()), 0, $ceiling);
+
+        $tiers = self::optionTiersFor($def['rarity']);
         $out = [];
         $used = [];
 
         for ($i = 0; $i < $slots; $i++) {
-            // Uncommon may come up empty; everything above it always fills.
-            if ($def['rarity'] === 'uncommon' && $i < Balance::OPTION_ROLLS['uncommon']) {
-                if (Hash::rand01(Hash::hash2($seed, 900 + $i, Balance::mapSeed())) >= Balance::OPTION_CHANCE_UNCOMMON) {
-                    continue;
-                }
-            }
-
             // One line per (stat, scope): two "+2% mining yield" rows on one
             // item reads as a bug, while mining yield beside hunting yield is
             // two things the same piece of armor is genuinely good at.
@@ -157,18 +178,45 @@ final class Formulas
             $pick = $choices[Hash::randInt(Hash::hash2($seed, 910 + $i, Balance::mapSeed()), 0, count($choices) - 1)];
             $used[] = self::optionKey($pick);
 
-            $scoped = $pick['scope'] !== null;
-            $min = $scoped ? Balance::OPTION_SCOPED_MIN : Balance::OPTION_MIN;
-            $max = $scoped ? Balance::OPTION_SCOPED_MAX : Balance::OPTION_MAX;
+            $tier = $tiers[Hash::randInt(
+                Hash::hash2($seed, 930 + $i, Balance::mapSeed()),
+                0,
+                count($tiers) - 1,
+            )];
 
-            $steps = (int) round(($max - $min) * 100);
-            $roll = Hash::randInt(Hash::hash2($seed, 920 + $i, Balance::mapSeed()), 0, $steps);
+            $flat = ($pick['kind'] ?? 'percent') === 'flat';
+            $valueSeed = Hash::hash2($seed, 920 + $i, Balance::mapSeed());
+
+            if ($flat) {
+                // §9.5.4 -- attack and defense are solid numbers, so the line
+                // is one too. No scope: a flat pair has no gathering line to
+                // belong to, and on a tool the slot already names it.
+                [$min, $max] = Balance::OPTION_FLAT_VALUE[$tier];
+
+                $out[] = [
+                    'stat' => $pick['stat'],
+                    'value' => Hash::randInt($valueSeed, (int) $min, (int) $max),
+                    'kind' => 'flat',
+                ];
+
+                continue;
+            }
+
+            [$min, $max] = Balance::OPTION_VALUE[$tier];
+
+            if ($pick['scope'] !== null) {
+                $min *= Balance::OPTION_SCOPED_MULTIPLIER;
+                $max *= Balance::OPTION_SCOPED_MULTIPLIER;
+            }
+
+            $steps = max(1, (int) round(($max - $min) * 100));
+            $roll = Hash::randInt($valueSeed, 0, $steps);
 
             $line = [
                 'stat' => $pick['stat'],
                 'value' => round($min + $roll / 100, 2),
             ];
-            if ($scoped) {
+            if ($pick['scope'] !== null) {
                 $line['scope'] = $pick['scope'];
             }
 
@@ -178,10 +226,63 @@ final class Formulas
         return $out;
     }
 
-    /** @param array{stat:string,scope:?string} $entry */
+    /**
+     * §8.0.1 -- the option tiers an item of this rarity may draw a line from.
+     *
+     * Everything at or below its own rung. A higher rarity does not roll a
+     * better line every time; it rolls from a deeper bag, which is a different
+     * and more interesting thing.
+     *
+     * @return list<string>
+     */
+    public static function optionTiersFor(string $rarity): array
+    {
+        $tiers = [];
+
+        foreach (array_keys(Balance::OPTION_VALUE) as $tier) {
+            $tiers[] = $tier;
+
+            if ($tier === $rarity) {
+                break;
+            }
+        }
+
+        return $tiers;
+    }
+
+    /** @param array{stat:string,scope:?string,kind?:string} $entry */
     private static function optionKey(array $entry): string
     {
-        return $entry['stat'].'|'.($entry['scope'] ?? '');
+        // Kind is part of the identity: "+2 defense" and "+2% defense" are two
+        // different lines that happen to share a name (§9.5.4).
+        return ($entry['kind'] ?? 'percent').'|'.$entry['stat'].'|'.($entry['scope'] ?? '');
+    }
+
+    /**
+     * §8.0.1 -- what an item's flat rolled lines add to one solid number.
+     *
+     * Percentage lines are aggregated somewhere else entirely (aggregateStat),
+     * under the falloff and the ceiling; these are not percentages and neither
+     * applies to them. They add.
+     *
+     * @param  array<int,array<string,mixed>>  $options
+     */
+    public static function flatOption(array $options, string $stat): int
+    {
+        $total = 0;
+
+        foreach ($options as $option) {
+            if (($option['kind'] ?? 'percent') !== 'flat') {
+                continue;
+            }
+            if (($option['stat'] ?? null) !== $stat) {
+                continue;
+            }
+
+            $total += (int) $option['value'];
+        }
+
+        return $total;
     }
 
     // ------------------------------------------------------------ combat §9.5
@@ -191,8 +292,8 @@ final class Formulas
      *
      * Flat numbers off the gear, because §8.1's ceiling is +15% and a fight
      * cannot be decided by a swing that small. The percentages are still here:
-     * `power` and `defence` MULTIPLY the gear half, so everything that feeds the
-     * ordinary aggregate -- rolled options, tree nodes, a battle draught --
+     * `power` and `defense` MULTIPLY the gear half, so everything that feeds the
+     * ordinary aggregate -- rolled options, tree nodes, a battle draft --
      * lands somewhere real without a second ceiling being invented for it.
      *
      * The battle job is added flat afterwards, in both halves. It is the proof
@@ -200,16 +301,16 @@ final class Formulas
      * being swung at.
      *
      * @param  array<int,array{key:string,durability:int,equipped:bool}>  $items
-     * @return array{attack:int,defence:int}
+     * @return array{attack:int,defense:int}
      */
     public static function combatPair(
         array $items,
         int $jobLevel = 0,
         float $power = 0.0,
-        float $defence = 0.0,
+        float $defense = 0.0,
     ): array {
         $gearAttack = 0;
-        $gearDefence = 0;
+        $gearDefense = 0;
 
         foreach ($items as $item) {
             if (! $item['equipped'] || $item['durability'] <= 0) {
@@ -221,15 +322,24 @@ final class Formulas
                 continue;
             }
 
-            $gearAttack += (int) ($def['attack'] ?? 0);
-            $gearDefence += (int) ($def['defence'] ?? 0);
+            // §8 rule 5 -- combat slots only. A gathering tool's attack is
+            // MINING attack (§7.3) and so is a flat line rolled onto one, so
+            // neither reaches a fight.
+            if (! in_array($def['slot'] ?? '', Balance::COMBAT_SLOTS, true)) {
+                continue;
+            }
+
+            $gearAttack += (int) ($def['attack'] ?? 0)
+                + self::flatOption($item['options'] ?? [], 'attack');
+            $gearDefense += (int) ($def['defense'] ?? 0)
+                + self::flatOption($item['options'] ?? [], 'defense');
         }
 
         $might = intdiv($jobLevel, Balance::BATTLE_JOB_DIVISOR);
 
         return [
             'attack' => (int) round($gearAttack * (1 + $power)) + $might,
-            'defence' => (int) round($gearDefence * (1 + $defence)) + $might,
+            'defense' => (int) round($gearDefense * (1 + $defense)) + $might,
         ];
     }
 
@@ -241,18 +351,18 @@ final class Formulas
      * matter: a brute loses to armor, a carapace loses to reach, and the same
      * kit is not the answer to both.
      */
-    public static function battleMargin(int $attack, int $defence, array $monster): float
+    public static function battleMargin(int $attack, int $defense, array $monster): float
     {
-        $strike = $attack - (int) $monster['defence'];
-        $hold = $defence - (int) $monster['attack'];
+        $strike = $attack - (int) $monster['defense'];
+        $hold = $defense - (int) $monster['attack'];
 
         return ($strike + $hold) / 2;
     }
 
-    /** §9.5.5 -- the margin as a chance, and never certain in either direction. */
-    public static function battleOdds(int $attack, int $defence, array $monster): float
+    /** §9.5.5 -- the margin as a chance, kept for the preview's shorthand. */
+    public static function battleOdds(int $attack, int $defense, array $monster): float
     {
-        $margin = self::battleMargin($attack, $defence, $monster);
+        $margin = self::battleMargin($attack, $defense, $monster);
 
         return max(
             Balance::BATTLE_ODDS_MIN,
@@ -261,53 +371,193 @@ final class Formulas
     }
 
     /**
-     * §9.5.5 -- the fight, settled. One roll, and the die is the odds.
+     * §9.5.5 -- what a character brings to a fight as HP.
      *
-     * Rolled AGAINST the odds rather than by adding U(-10,+10) to the margin,
-     * and at the edges those are not the same thing: a margin of +15 wins every
-     * throw of the band, while the number the player was shown says 95%. The
-     * preview is a promise (§9.5.5), so the roll has to be the number on it.
+     * Durability IS the health bar. There is no second pool to invent and no
+     * second thing to lose: the gear that is holding you up is the gear the
+     * fight is spending, which is why a beating and a repair bill are the same
+     * event rather than two.
+     *
+     * Combat slots only (§9.5.4). A tool belt is not armor.
+     *
+     * @param  array<int,array{key:string,durability:int,equipped:bool}>  $items
      */
-    public static function battleWin(int $attack, int $defence, array $monster, int $seed): bool
+    public static function battlePool(array $items): int
     {
-        return Hash::rand01($seed) < self::battleOdds($attack, $defence, $monster);
+        $pool = 0;
+
+        foreach ($items as $item) {
+            if (! $item['equipped'] || $item['durability'] <= 0) {
+                continue;
+            }
+
+            $def = Catalog::item($item['key']);
+            if ($def === null || ! in_array($def['slot'] ?? '', Balance::COMBAT_SLOTS, true)) {
+                continue;
+            }
+
+            $pool += (int) $item['durability'];
+        }
+
+        return $pool;
     }
 
     /**
-     * §9.5.6 -- what the weapon pays, on the gap to their defence.
+     * §9.5.5 -- the fight, as an exchange rather than a coin.
      *
-     * Hitting a wall chips the blade, which is why bringing the wrong class is
-     * expensive EVEN WHEN YOU WIN. A swift monster blunts harder than its
-     * numbers suggest, and that is its whole `wearBias`.
+     * Each round you strike first and it strikes back if it is still standing.
+     * A strike is the gap between one side's attack and the other's defense,
+     * never less than a chip, and it wanders by BATTLE_SWING so that two runs
+     * at the same pack are not the same fight.
+     *
+     * You close the distance, so you swing first. It is a small edge and it is
+     * the right one: engaging is a decision you made and being engaged is not.
+     *
+     * The bell (BATTLE_MAX_ROUNDS) exists for the chip-against-chip case, where
+     * two walls would otherwise stand there all day. Whoever has more of their
+     * pool left when it rings takes it, and a dead heat goes against the one
+     * who picked the fight.
+     *
+     * @return array{won:bool,rounds:int,damageTaken:int,damageDealt:int,left:int,foeLeft:int}
      */
-    public static function weaponWear(int $attack, array $monster, bool $won, int $maxDurability): int
-    {
-        $gap = max(0, (int) $monster['defence'] - $attack);
+    public static function resolveBattle(
+        int $attack,
+        int $defense,
+        int $pool,
+        array $monster,
+        int $seed,
+    ): array {
+        $hp = max(0, $pool);
+        $foe = max(1, (int) ($monster['hp'] ?? 1));
+        $taken = 0;
+        $dealt = 0;
+        $round = 0;
 
-        $wear = (Balance::WEAR_BASE + $gap * Balance::WEAR_PER_GAP)
-            * ($monster['wearBias'] ?? 1.0)
-            * ($won ? 1.0 : Balance::WEAR_LOSS_MULTIPLIER);
+        while ($hp > 0 && $foe > 0 && $round < Balance::BATTLE_MAX_ROUNDS) {
+            $round++;
 
-        return self::cappedWear($wear, $maxDurability);
+            $hit = self::strike($attack, (int) $monster['defense'], $seed, $round, 0);
+            $foe -= $hit;
+            $dealt += $hit;
+
+            if ($foe <= 0) {
+                break;
+            }
+
+            $back = self::strike((int) $monster['attack'], $defense, $seed, $round, 1);
+            $hp -= $back;
+            $taken += $back;
+        }
+
+        // The bell is a loss. Anything else and a big enough pool grinds down
+        // a wall it has no business touching.
+        $won = $foe <= 0;
+
+        return [
+            'won' => $won,
+            'rounds' => $round,
+            'damageTaken' => min($taken, max(0, $pool)),
+            'damageDealt' => $dealt,
+            'left' => max(0, $hp),
+            'foeLeft' => max(0, $foe),
+        ];
     }
 
-    /** §9.5.6 -- what one worn piece pays, on the excess of their attack over its guard. */
-    public static function armorWear(int $pieceDefence, array $monster, bool $won, int $maxDurability): int
+    /** §9.5.5 -- one blow, floored at a chip and wandering by the swing. */
+    private static function strike(int $attack, int $guard, int $seed, int $round, int $side): int
     {
-        $excess = max(0, (int) $monster['attack'] - $pieceDefence);
+        $roll = Hash::rand01(Hash::hash2($seed, $round * 2 + $side, Balance::mapSeed()));
+        $swing = 1 + (($roll * 2) - 1) * Balance::BATTLE_SWING;
 
-        $wear = (Balance::WEAR_BASE + $excess * Balance::WEAR_PER_EXCESS)
-            * ($won ? 1.0 : Balance::WEAR_LOSS_MULTIPLIER);
-
-        return self::cappedWear($wear, $maxDurability);
+        return max(
+            self::strikeFloor($attack),
+            (int) round(max(0, $attack - $guard) * $swing),
+        );
     }
 
-    /** No fight takes more than §9.5.6's share of an item, now that zero is fatal. */
-    private static function cappedWear(float $wear, int $maxDurability): int
+    /**
+     * §9.5.5 -- what gets through however good the guard is.
+     *
+     * A fraction of the attack rather than a flat point, so a heavy hitter
+     * still hurts a wall and a light one still cannot. That slope is what makes
+     * the difference between a rare kit and an epic one against the same
+     * carapace, where straight subtraction made both of them chip for one.
+     */
+    public static function strikeFloor(int $attack): int
     {
-        $cap = max(1, (int) floor($maxDurability * Balance::WEAR_CAP_FRACTION));
+        return max(Balance::BATTLE_CHIP, (int) ceil($attack * Balance::BATTLE_CHIP_FRACTION));
+    }
 
-        return min($cap, max(1, (int) ceil($wear)));
+    /**
+     * §9.5.5 -- the same exchange with the swing taken out, for the preview.
+     *
+     * A promise rather than a guess: the numbers on the plate are what the
+     * arithmetic says, and the fight then wanders by ten per cent either way.
+     *
+     * @return array{won:bool,rounds:int,damageTaken:int,damageDealt:int,left:int,foeLeft:int}
+     */
+    public static function expectedBattle(int $attack, int $defense, int $pool, array $monster): array
+    {
+        $foe = max(1, (int) ($monster['hp'] ?? 1));
+
+        $mine = max(self::strikeFloor($attack), $attack - (int) $monster['defense']);
+        $theirs = max(
+            self::strikeFloor((int) $monster['attack']),
+            (int) $monster['attack'] - $defense,
+        );
+
+        $roundsToKill = (int) ceil($foe / $mine);
+        $roundsToFall = (int) ceil(max(0, $pool) / $theirs);
+
+        // The bell is a loss, so running out of rounds counts against you the
+        // same way running out of pool does.
+        $won = $roundsToKill <= $roundsToFall && $roundsToKill <= Balance::BATTLE_MAX_ROUNDS;
+        $rounds = min($roundsToKill, $roundsToFall, Balance::BATTLE_MAX_ROUNDS);
+
+        return [
+            'won' => $won,
+            'rounds' => $rounds,
+            'damageTaken' => min($pool, ($won ? $rounds - 1 : $rounds) * $theirs),
+            'damageDealt' => min($foe, $rounds * $mine),
+            'left' => max(0, $pool - ($won ? $rounds - 1 : $rounds) * $theirs),
+            'foeLeft' => max(0, $foe - $rounds * $mine),
+        ];
+    }
+
+    /**
+     * §9.5.6 -- what the blade pays, and it pays for what it was swung AT.
+     *
+     * Enemy armor is what blunts a weapon, so the bill is the monster's defense
+     * spread over the rounds it took. Hitting a wall chips the edge, which is
+     * why bringing the wrong class is expensive even when it wins -- and a
+     * swift monster blunts harder than its numbers suggest, which is its whole
+     * `wearBias`.
+     */
+    public static function weaponWear(array $monster, int $rounds, int $maxDurability): int
+    {
+        $perRound = max(
+            1,
+            (int) ceil((int) $monster['defense'] / Balance::WEAPON_WEAR_DIVISOR),
+        );
+
+        $wear = $perRound * max(1, $rounds) * ($monster['wearBias'] ?? 1.0);
+
+        return min(max(1, $maxDurability), max(1, (int) round($wear)));
+    }
+
+    /**
+     * §9.5.6 -- how much of a beating one fight may actually take off the kit.
+     *
+     * The exchange is settled on the full pool; this caps the bill. Without it
+     * one hopeless swing in the center strips a legendary set in a single go,
+     * and §8.2's warning would be the only thing between a player and a week of
+     * work. The fight is still lost either way -- the cap is on the cost.
+     */
+    public static function cappedBattleWear(int $damageTaken, int $pool): int
+    {
+        $cap = (int) floor($pool * Balance::BATTLE_POOL_WEAR_CAP);
+
+        return max(0, min($damageTaken, $cap));
     }
 
     /** Salvage returned when an item is discarded, §8.2. */
@@ -368,32 +618,80 @@ final class Formulas
     // ------------------------------------------------------------- mining §7.3
 
     /**
-     *   trip_time = clamp(base - skill_reduction - equipment_reduction, 30m, 60m)
+     * §7.3 -- a hex is an amount of WORK, and a trip is how long you take over it.
+     *
+     *   durability = base_seconds * MINING_BASE_ATTACK
+     *   rate       = (base + tool + skill) * (1 + trip_reduction)
+     *   trip_time  = clamp(durability / rate, 15m, 60m)
+     *
+     * The old formula subtracted flat minutes for skill and for gear, which
+     * made a good tool worth exactly as much on a rich hex as on a poor one. A
+     * rate does the thing the ladder is for: a better tool takes a bigger bite
+     * out of whatever is in front of it, so the hardest ground is where it pays
+     * most.
      *
      * The floor clamp is mandatory and has been in the formula from day one:
-     * without it any future buff or equipment tier creates a sub-30-minute or
+     * without it any future buff or equipment tier creates a sub-floor or
      * zero-time exploit. Do not remove it, and do not apply bonuses after it.
      *
-     * @return array{base:int,skillReduction:int,equipReduction:int,total:int,clamped:bool}
+     * @return array{base:int,durability:int,toolAttack:int,skillAttack:int,rate:float,total:int,clamped:bool}
      */
-    public static function tripTime(int $baseSeconds, int $skillLevel, float $equipTripReduction): array
-    {
+    public static function tripTime(
+        int $baseSeconds,
+        int $skillLevel,
+        float $equipTripReduction,
+        int $toolAttack = 0,
+    ): array {
+        $durability = self::tileDurability($baseSeconds);
+
         $skillProgress = min(1.0, $skillLevel / Balance::SKILL_MAX_LEVEL);
-        $skillReduction = (int) round(Balance::MINING_MAX_SKILL_REDUCTION * $skillProgress);
+        $skillAttack = Balance::MINING_SKILL_ATTACK * $skillProgress;
 
-        $equipProgress = min(1.0, $equipTripReduction / Balance::STAT_CEILING);
-        $equipReduction = (int) round(Balance::MINING_MAX_EQUIP_REDUCTION * $equipProgress);
+        $rate = (Balance::MINING_BASE_ATTACK + $toolAttack + $skillAttack)
+            * (1 + max(0.0, $equipTripReduction));
 
-        $raw = $baseSeconds - $skillReduction - $equipReduction;
+        $raw = (int) round($durability / max(1.0, $rate));
         $total = min(Balance::MINING_CEILING_SECONDS, max(Balance::MINING_FLOOR_SECONDS, $raw));
 
         return [
             'base' => $baseSeconds,
-            'skillReduction' => $skillReduction,
-            'equipReduction' => $equipReduction,
+            'durability' => $durability,
+            'toolAttack' => $toolAttack,
+            'skillAttack' => (int) round($skillAttack),
+            'rate' => round($rate, 2),
             'total' => $total,
             'clamped' => $total !== $raw,
         ];
+    }
+
+    /**
+     * §7.3 -- how much work a hex is, which is what a trip actually spends.
+     *
+     * Derived from the base seconds the world already rolls for the tile rather
+     * than stored beside them: they are the same fact said twice, and at
+     * MINING_BASE_ATTACK a bare-handed trip therefore takes exactly the seconds
+     * the tile was rolled for.
+     */
+    public static function tileDurability(int $baseSeconds): int
+    {
+        return $baseSeconds * Balance::MINING_BASE_ATTACK;
+    }
+
+    /**
+     * §8 -- what a gathering tool takes out of a hex each second.
+     *
+     * A tool's BASE stat, and the only one it has. It used to lead with a yield
+     * percentage and have its attack derived from that, which conflated the two
+     * halves of a trip: attack is how fast you work through a hex (§7.3) and
+     * yield is how big the haul is. They are different questions, so they are
+     * different numbers, and a tool answers the first one.
+     *
+     * Mining attack only. A tool is worth nothing in a fight (§8 rule 5), which
+     * is why combatPair skips every non-combat slot rather than reading this.
+     */
+    public static function toolAttack(?array $def): int
+    {
+        return (int) ($def['attack'] ?? 0);
     }
 
     /** Yield for one trip. Skill and gear add; ring adds the risk premium. */

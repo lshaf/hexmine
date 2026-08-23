@@ -5,23 +5,23 @@
  * and carries two in from the ring outside it, so every ring is legible and
  * dangerous at the same time.
  *
- * `attack` and `defence` are FLAT, and they are not the percentage stats of the
+ * `attack` and `defense` are FLAT, and they are not the percentage stats of the
  * same name: §8.1's ceiling is +15%, and a fight cannot be decided by a swing that
  * small. The profile is what a player reads -- a brute is high attack and low
- * defence, a carapace the reverse, a swift one is middling in both and wears a
+ * defense, a carapace the reverse, a swift one is middling in both and wears a
  * weapon harder for it.
  */
 import type { Monster, Ring } from './types'
 
 export const MONSTERS: Record<string, Monster> = {
-  moss_hound: { key: 'moss_hound', name: 'Moss Hound', tier: 1, profile: 'brute', attack: 12, defence: 5, wearBias: 1.0, gold: [4, 9], plate: 'cracked_carapace', ichor: 'thin_ichor', rareSpoil: 'bone_plate', description: 'Runs the treeline in threes and takes the slowest thing on the road.' },
-  ditch_crawler: { key: 'ditch_crawler', name: 'Ditch Crawler', tier: 1, profile: 'carapace', attack: 6, defence: 11, wearBias: 1.0, gold: [5, 11], plate: 'cracked_carapace', ichor: 'thin_ichor', rareSpoil: 'bone_plate', description: 'Sits in the wheel rut with its back plated over and waits to be stepped on.' },
-  slag_ogre: { key: 'slag_ogre', name: 'Slag Ogre', tier: 2, profile: 'brute', attack: 27, defence: 12, wearBias: 1.0, gold: [14, 26], plate: 'bone_plate', ichor: 'black_blood', rareSpoil: 'scaled_hide', description: 'Came down off a spoil heap and has been swinging the same girder since.' },
-  thornback: { key: 'thornback', name: 'Thornback', tier: 2, profile: 'carapace', attack: 13, defence: 26, wearBias: 1.0, gold: [16, 30], plate: 'bone_plate', ichor: 'black_blood', rareSpoil: 'scaled_hide', description: 'Every quill points out. Hitting it costs you more than missing does.' },
-  ridge_wyrm: { key: 'ridge_wyrm', name: 'Ridge Wyrm', tier: 3, profile: 'swift', attack: 30, defence: 23, wearBias: 1.5, gold: [30, 52], plate: 'scaled_hide', ichor: 'bile_sac', rareSpoil: 'warped_barb', description: 'Fast over broken ground and faster over you. It blunts whatever it is hit with.' },
-  iron_shrike: { key: 'iron_shrike', name: 'Iron Shrike', tier: 3, profile: 'brute', attack: 36, defence: 17, wearBias: 1.0, gold: [33, 58], plate: 'scaled_hide', ichor: 'bile_sac', rareSpoil: 'warped_barb', description: 'Drops out of the sun onto the one thing in the party carrying metal.' },
-  barrow_knight: { key: 'barrow_knight', name: 'Barrow Knight', tier: 4, profile: 'carapace', attack: 32, defence: 58, wearBias: 1.0, gold: [60, 105], plate: 'warped_barb', ichor: 'ember_gland', rareSpoil: 'revenant_plate', description: 'Whatever it was buried in, it is still wearing. Nothing gets through the front.' },
-  ash_revenant: { key: 'ash_revenant', name: 'Ash Revenant', tier: 4, profile: 'brute', attack: 60, defence: 30, wearBias: 1.0, gold: [66, 115], plate: 'warped_barb', ichor: 'ember_gland', rareSpoil: 'revenant_plate', description: 'Walked out of the centre with the fire still on it and has not stopped since.' },
+  moss_hound: { key: 'moss_hound', name: 'Moss Hound', tier: 1, profile: 'brute', attack: 12, defense: 5, hp: 52, wearBias: 1.0, gold: [4, 9], plate: 'cracked_carapace', ichor: 'thin_ichor', rareSpoil: 'bone_plate', description: 'Runs the treeline in threes and takes the slowest thing on the road.' },
+  ditch_crawler: { key: 'ditch_crawler', name: 'Ditch Crawler', tier: 1, profile: 'carapace', attack: 6, defense: 11, hp: 40, wearBias: 1.0, gold: [5, 11], plate: 'cracked_carapace', ichor: 'thin_ichor', rareSpoil: 'bone_plate', description: 'Sits in the wheel rut with its back plated over and waits to be stepped on.' },
+  slag_ogre: { key: 'slag_ogre', name: 'Slag Ogre', tier: 2, profile: 'brute', attack: 27, defense: 12, hp: 121, wearBias: 1.0, gold: [14, 26], plate: 'bone_plate', ichor: 'black_blood', rareSpoil: 'scaled_hide', description: 'Came down off a spoil heap and has been swinging the same girder since.' },
+  thornback: { key: 'thornback', name: 'Thornback', tier: 2, profile: 'carapace', attack: 13, defense: 26, hp: 94, wearBias: 1.0, gold: [16, 30], plate: 'bone_plate', ichor: 'black_blood', rareSpoil: 'scaled_hide', description: 'Every quill points out. Hitting it costs you more than missing does.' },
+  ridge_wyrm: { key: 'ridge_wyrm', name: 'Ridge Wyrm', tier: 3, profile: 'swift', attack: 30, defense: 23, hp: 160, wearBias: 1.5, gold: [30, 52], plate: 'scaled_hide', ichor: 'bile_sac', rareSpoil: 'warped_barb', description: 'Fast over broken ground and faster over you. It blunts whatever it is hit with.' },
+  iron_shrike: { key: 'iron_shrike', name: 'Iron Shrike', tier: 3, profile: 'brute', attack: 36, defense: 17, hp: 184, wearBias: 1.0, gold: [33, 58], plate: 'scaled_hide', ichor: 'bile_sac', rareSpoil: 'warped_barb', description: 'Drops out of the sun onto the one thing in the party carrying metal.' },
+  barrow_knight: { key: 'barrow_knight', name: 'Barrow Knight', tier: 4, profile: 'carapace', attack: 32, defense: 58, hp: 216, wearBias: 1.0, gold: [60, 105], plate: 'warped_barb', ichor: 'ember_gland', rareSpoil: 'revenant_plate', description: 'Whatever it was buried in, it is still wearing. Nothing gets through the front.' },
+  ash_revenant: { key: 'ash_revenant', name: 'Ash Revenant', tier: 4, profile: 'brute', attack: 60, defense: 30, hp: 276, wearBias: 1.0, gold: [66, 115], plate: 'warped_barb', ichor: 'ember_gland', rareSpoil: 'revenant_plate', description: 'Walked out of the center with the fire still on it and has not stopped since.' },
 }
 
 export const MONSTERS_BY_RING: Record<Ring, string[]> = {

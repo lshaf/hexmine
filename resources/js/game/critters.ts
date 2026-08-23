@@ -10,7 +10,7 @@ import type { Biome, Material } from './types'
 export const CRITTERS: Material[] = [
   { key: 'glimmermoth', name: 'Glimmermoth', tier: 1, biome: 'forest', palette: 'wood', critter: true, npcPrice: 5, description: 'Comes to a lamp in numbers and leaves dust on everything. The dust is the part that works.' },
   { key: 'rockmite', name: 'Rockmite', tier: 1, biome: 'mountain', palette: 'iron', critter: true, npcPrice: 5, description: 'Chews galleries through solid seam and is never seen doing it.' },
-  { key: 'dustleveret', name: 'Dustleveret', tier: 1, biome: 'plains', palette: 'pelt', critter: true, npcPrice: 4, description: 'A hare the colour of the ground, and no slower for it.' },
+  { key: 'dustleveret', name: 'Dustleveret', tier: 1, biome: 'plains', palette: 'pelt', critter: true, npcPrice: 4, description: 'A hare the color of the ground, and no slower for it.' },
   { key: 'ashnewt', name: 'Ashnewt', tier: 1, biome: 'badlands', palette: 'stone', critter: true, npcPrice: 6, description: 'Sits out a vent that would cook anything else. Cold to hold, every time.' },
   { key: 'fenlark', name: 'Fenlark', tier: 1, biome: 'grassland', palette: 'fiber', critter: true, npcPrice: 4, description: 'Sings from inside the crop and never once from the top of it.' },
 ]

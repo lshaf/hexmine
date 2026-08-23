@@ -199,7 +199,7 @@ class EconomyTelemetry extends Command
                 ->map(fn ($n) => (int) $n)
                 ->all(),
             'carriers' => Carrier::where('expires_at', '>', now()->getTimestampMs())->count(),
-            'travelling' => Character::whereNotNull('travel_ends_at')->count(),
+            'traveling' => Character::whereNotNull('travel_ends_at')->count(),
         ];
     }
 
@@ -244,7 +244,7 @@ class EconomyTelemetry extends Command
 
         $this->newLine();
         $this->info('World');
-        $this->line("  {$report['world']['carriers']} corpses standing · {$report['world']['travelling']} on the road");
+        $this->line("  {$report['world']['carriers']} corpses standing · {$report['world']['traveling']} on the road");
         foreach ($report['world']['jobs'] as $kind => $total) {
             $this->line("  {$total} × {$kind}");
         }

@@ -14,7 +14,7 @@ rarity one:
     high    more again, plus what is rare for THAT rung
 
 The rung still sets the percentage stat and the bench that reaches it (§8.0).
-What the three grades move is the flat attack/defence pair, +-15% around the
+What the three grades move is the flat attack/defense pair, +-15% around the
 rung's middle -- which is why a high common overlaps a low uncommon. The ladder
 is meant to be continuous: there is always something better to build, and it is
 always a question of what you are willing to carry to the bench.
@@ -91,7 +91,7 @@ def shop_price(station, rarity, durability, inputs):
     Rounded half AWAY from zero, not Python's half-to-even: PHP is the authority
     on what a thing costs, and its round() breaks ties the other way. 52.5 is 53
     on the server, so it has to be 53 here -- a one-gold disagreement is still a
-    client quoting a price the server will not honour.
+    client quoting a price the server will not honor.
     """
     parts = sum(NPC_PRICE[k] * q for k, q in inputs.items() if k in NPC_PRICE)
     labour = CRAFT_MINUTES[rarity] * GOLD_PER_CRAFT_MINUTE
@@ -113,7 +113,9 @@ RARE_EXTRA = [
 GROUPS = {
     'sword': {
         'slot': 'weapon', 'family': 'sword', 'stat': 'power', 'palette': 'iron',
-        'pairs': [(8, 4), (11, 6), (15, 8), (19, 10), (23, 12)],
+        # §9.5.4 -- the balanced one, and balanced means an even split rather
+        # than "a bit of both". Half the rung's budget each way.
+        'pairs': [(6, 6), (9, 8), (12, 11), (15, 14), (18, 17)],
         'dur': [60, 90, 150, 200, 240],
         'rare_mat': 'mythril_ore', 'component': 'flux_salt',
         'refined': ['ingots', 'ingots', 'steel_ingots', 'steel_ingots', 'skysteel'],
@@ -135,8 +137,13 @@ GROUPS = {
                   'The smith kept the best of the bar for this one.'],
     },
     'shield': {
-        'slot': 'weapon', 'family': 'shield', 'stat': 'defence', 'palette': 'stone',
-        'pairs': [(5, 8), (7, 11), (9, 15), (12, 19), (14, 23)],
+        'slot': 'weapon', 'family': 'shield', 'stat': 'defense', 'palette': 'stone',
+        # §9.5.4 -- high guard, small arm: about a third attack to two thirds
+        # defense. It carries a larger budget than the other two because a
+        # shieldbearer has no offense anywhere else in the kit, and §9.5.5 makes
+        # a fight a race -- a build that survives everything in the center and
+        # puts none of it down is a stalemate rather than a defensive build.
+        'pairs': [(5, 10), (7, 14), (9, 20), (12, 25), (14, 31)],
         'dur': [60, 90, 150, 200, 240],
         'rare_mat': 'obsidian_shard', 'component': 'whetgrit',
         'refined': ['cut_stone', 'cut_stone', 'dressed_basalt', 'dressed_basalt', 'polished_granite'],
@@ -159,7 +166,10 @@ GROUPS = {
     },
     'focus': {
         'slot': 'weapon', 'family': 'focus', 'stat': 'power', 'palette': 'fiber',
-        'pairs': [(11, 2), (15, 3), (20, 4), (25, 5), (30, 6)],
+        # §9.5.4 -- high arm, small guard: four fifths attack. Not zero guard --
+        # a wand still keeps something off you, it is simply the least of the
+        # three at it. The glass cannon is the point.
+        'pairs': [(10, 2), (14, 3), (18, 4), (22, 6), (27, 7)],
         'dur': [60, 90, 150, 200, 240],
         'rare_mat': 'silkweave_fiber', 'component': 'quench_reed',
         'refined': ['cloth', 'cloth', 'linen', 'linen', 'canvas'],
@@ -181,7 +191,7 @@ GROUPS = {
                   'Every winding is the best the rung will take.'],
     },
     'armor': {
-        'slot': 'armor', 'stat': 'defence', 'palette': 'pelt',
+        'slot': 'armor', 'stat': 'defense', 'palette': 'pelt',
         'pairs': [(0, 4), (0, 7), (1, 12), (1, 16), (2, 21)],
         'dur': [70, 110, 170, 210, 250],
         'rare_mat': 'obsidian_shard', 'component': 'slate_scale',
@@ -204,7 +214,7 @@ GROUPS = {
                   'Faced with the rarest plate the rung allows.'],
     },
     'boots': {
-        'slot': 'boots', 'stat': 'defence', 'palette': 'stone',
+        'slot': 'boots', 'stat': 'defense', 'palette': 'stone',
         'pairs': [(0, 2), (0, 3), (0, 5), (0, 7), (0, 10)],
         'dur': [70, 110, 170, 210, 250],
         'rare_mat': 'obsidian_shard', 'component': 'tar_seep',
@@ -313,7 +323,7 @@ def items():
                     'stat': group['stat'],
                     'value': VALUE[i],
                     'attack': scale(atk, PAIR_SCALE[grade]),
-                    'defence': scale(dfn, PAIR_SCALE[grade]),
+                    'defense': scale(dfn, PAIR_SCALE[grade]),
                     'palette': group['palette'],
                     'goldPrice': gold,
                     'maxDurability': durability,
@@ -334,10 +344,10 @@ The three are a MATERIALS ladder inside the rung, not a rarity one: `low` is the
 cheapest way in, `medium` wants more of the same plus the group's component,
 `high` wants more again plus whatever is rare for THAT rung -- a spoil one grade
 up at the bottom, a capped Tier 3 at the top (§2). What moves is the flat
-attack/defence pair, +-15% around the middle; the rung still owns the percentage
+attack/defense pair, +-15% around the middle; the rung still owns the percentage
 stat and the bench that reaches it.
 
-`attack` and `defence` are FLAT and are not the percentage stats of the same
+`attack` and `defense` are FLAT and are not the percentage stats of the same
 name. §8.1's ceiling is +15%, and a fight cannot be decided by a swing that
 small."""
 
@@ -371,7 +381,7 @@ def emit_php():
             f"'rarity' => '{it['rarity']}'",
             f"'tradeable' => {'true' if it['tradeable'] else 'false'}",
             f"'stat' => '{it['stat']}'", f"'value' => {it['value']}",
-            f"'attack' => {it['attack']}", f"'defence' => {it['defence']}",
+            f"'attack' => {it['attack']}", f"'defense' => {it['defense']}",
             f"'palette' => '{it['palette']}'",
         ]
         if it['goldPrice']:
@@ -398,7 +408,7 @@ def emit_ts():
             f"rarity: '{it['rarity']}'",
             f"tradeable: {'true' if it['tradeable'] else 'false'}",
             f"stat: '{it['stat']}'", f"value: {it['value']}",
-            f"attack: {it['attack']}", f"defence: {it['defence']}",
+            f"attack: {it['attack']}", f"defense: {it['defense']}",
             f"palette: '{it['palette']}'",
         ]
         if it['goldPrice']:

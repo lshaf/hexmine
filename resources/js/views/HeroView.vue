@@ -63,7 +63,7 @@ const stowed = computed(() => game.equipment.filter((e) => !e.equipped))
  * §8 -- one row per gathering line, in one place.
  *
  * `yield` is the server's aggregate for that line, already capped and already
- * carrying the tool, the tree and any draught. The tool's own printed value is
+ * carrying the tool, the tree and any draft. The tool's own printed value is
  * left off on purpose: two numbers for one thing is exactly what this page is
  * being cured of.
  */
@@ -98,7 +98,7 @@ const lines = computed(() =>
  * §8.1 rule 1 -- the load-bearing number on this page.
  *
  * Not a bare percentage but a percentage *of a ceiling*, because the ceiling is
- * the rule: gear, a bought tree and a draught are three roads to the same +15%
+ * the rule: gear, a bought tree and a draft are three roads to the same +15%
  * and none of them passes it. A meter says how much of that road is walked far
  * better than a figure a player has to hold 0.15 in their head to read.
  *
@@ -106,6 +106,11 @@ const lines = computed(() =>
  * and it is on the lines below.
  */
 const CEILING = EQUIPMENT.statCeiling
+
+/** §9.5.4 -- the flat pair and the pool, off the state rather than a preview. */
+const combat = computed(
+  () => game.state?.combat ?? { attack: 0, defense: 0, pool: 0, job: null, jobLevel: 0 },
+)
 
 const ceilings = computed(() =>
   (['tripReduction', 'travelSpeed', 'processingSpeed'] as StatKey[]).map((key) => {
@@ -148,10 +153,46 @@ const ceilings = computed(() =>
       </div>
 
       <p class="tiny muted note">
-        Gear, a skill tree and a draught all feed this one sum and stop at the
+        Gear, a skill tree and a draft all feed this one sum and stop at the
         same roof. A second item of the same kind is worth
         ×{{ EQUIPMENT.stackFalloff }} the first — buying three of a thing does
         not make you three times better.
+      </p>
+    </section>
+
+    <!-- ------------------------------------------------------- the fight -->
+    <!-- §9.5.4 -- solid numbers, and they get their own block for exactly that
+         reason: they are not percentages and they do not climb toward the roof
+         above. §9.5.5 makes the pool the health bar, so it belongs beside them
+         rather than buried on an item. -->
+    <section class="inset">
+      <div class="row-between" style="margin-bottom: 10px">
+        <h3 class="head">In a fight</h3>
+        <span v-if="combat.job" class="tiny mono muted">
+          {{ combat.job }} {{ combat.jobLevel }}
+        </span>
+      </div>
+
+      <div class="pairs">
+        <div class="pair">
+          <span class="label">Attack</span>
+          <strong class="mono reading">{{ combat.attack }}</strong>
+        </div>
+        <div class="pair">
+          <span class="label">Defense</span>
+          <strong class="mono reading">{{ combat.defense }}</strong>
+        </div>
+        <div class="pair">
+          <span class="label">Pool</span>
+          <strong class="mono reading" :class="{ maxed: combat.pool > 0 }">{{ combat.pool }}</strong>
+        </div>
+      </div>
+
+      <p class="tiny muted note">
+        Solid numbers, not percentages — a ±{{ formatPercent(CEILING) }} swing
+        cannot decide a fight, so these are the base it is decided on. The pool
+        is the durability of the weapon and the worn set, and it is your health:
+        what a fight takes off it comes off the gear.
       </p>
     </section>
 
@@ -325,6 +366,20 @@ const ceilings = computed(() =>
 
 /* One meter per stat. Stacked rather than side by side: the bar is the reading,
    and a bar too short to see is no reading at all. */
+.pairs {
+  display: flex;
+  gap: 8px;
+}
+
+.pair {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 7px 9px;
+  background: rgba(0, 0, 0, 0.28);
+}
+
 .meters {
   display: flex;
   flex-direction: column;

@@ -14,7 +14,8 @@
  */
 import { computed } from 'vue'
 import { ITEM_BY_KEY } from '@/game/catalog'
-import { itemStatLine, optionStatLine } from '@/game/formulas'
+import { optionStatLine } from '@/game/formulas'
+import StatChips from '@/components/StatChips.vue'
 import { itemIcon } from '@/icons/procedural'
 import SvgIcon from '@/components/SvgIcon.vue'
 import type { OwnedItem } from '@/game/types'
@@ -46,11 +47,17 @@ const percent = computed(
     <!-- What it is for, on its own line rather than as a chip beside the name.
          At panel width the two competed and the chip wrapped, which turned every
          row into two. -->
-    <div class="tiny muted stat">{{ itemStatLine(def) }}</div>
+    <!-- §9.5.4 -- everything the piece is, in one row. A tool's attack is what
+         it takes out of a hex (§7.3); a worn piece's is what it is worth in a
+         fight, and a zero half is not printed at all. -->
+    <div class="stat"><StatChips :def="def" :options="item.options ?? []" /></div>
 
-    <!-- §8.0.1 -- rolled lines. Listed under the base stat because that is what
-         they are: extra, on top of what the item is for. -->
+    <!-- §8.0.1 -- rolled lines, and they say so. Listed under the base stat
+         because that is what they are: extra, on top of what the item is for.
+         The word matters -- nothing off a shelf ever has one, so a line that
+         does not say "rolled" is the item itself. -->
     <div v-if="item.options?.length" class="rolled">
+      <span class="tiny muted rolled-label">rolled</span>
       <span v-for="(option, i) in item.options" :key="i" class="tiny mono roll">
         {{ optionStatLine(option, def) }}
       </span>
@@ -75,9 +82,17 @@ const percent = computed(
   margin-top: 2px;
 }
 
+.rolled-label {
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-size: 8.5px;
+  align-self: center;
+}
+
 .rolled {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 4px;
   margin-top: 5px;
 }

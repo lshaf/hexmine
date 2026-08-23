@@ -2,14 +2,14 @@
  * Material silhouettes, §13.1 — the specimen plate.
  *
  * Until now every material of a tier shared one shape, so Wood, Hardwood,
- * Heartoak, Toadstool and Heartknot were the same lump in five colours. That
+ * Heartoak, Toadstool and Heartknot were the same lump in five colors. That
  * works while a tier holds five things. It stopped working at seventy-four.
  *
  * The set is drawn as a WOODCUT SPECIMEN PLATE, which is the vernacular the
  * page is already named after: heavy outline, one flat fill, one lighter facet,
  * and no gradient anywhere below tier 3. The lit treatment is reserved for the
  * rare and raid tiers, so "this one glows" separates the top of the ladder from
- * sixty matte neighbours; the exact rung is on the hex frame round the specimen,
+ * sixty matte neighbors; the exact rung is on the hex frame round the specimen,
  * the same one a piece of equipment wears (§13.1).
  *
  * A form is DERIVED, never stored — the same argument §8.4 makes about craft

@@ -22,7 +22,7 @@ PALETTE = {
 CRITTERS = [
     ('glimmermoth', 'Glimmermoth', 'forest',    5, 'Comes to a lamp in numbers and leaves dust on everything. The dust is the part that works.'),
     ('rockmite',    'Rockmite',    'mountain',  5, 'Chews galleries through solid seam and is never seen doing it.'),
-    ('dustleveret', 'Dustleveret', 'plains',    4, 'A hare the colour of the ground, and no slower for it.'),
+    ('dustleveret', 'Dustleveret', 'plains',    4, 'A hare the color of the ground, and no slower for it.'),
     ('ashnewt',     'Ashnewt',     'badlands',  6, 'Sits out a vent that would cook anything else. Cold to hold, every time.'),
     ('fenlark',     'Fenlark',     'grassland', 4, 'Sings from inside the crop and never once from the top of it.'),
 ]

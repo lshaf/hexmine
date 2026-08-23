@@ -31,7 +31,8 @@ import {
   SCOPE_LABEL,
   SLOT_LABEL,
 } from '@/game/catalog'
-import { itemStatLine, statLine } from '@/game/formulas'
+import { statLine } from '@/game/formulas'
+import StatChips from '@/components/StatChips.vue'
 import { itemIcon, materialIcon } from '@/icons/procedural'
 import SvgIcon from '@/components/SvgIcon.vue'
 import type { ItemDef, MaterialKey, OwnedItem } from '@/game/types'
@@ -130,7 +131,7 @@ const cells = computed<Array<Slot | null>>(() => [
  * full height, and every other column dropped half a height. The only thing
  * that differs from the map is that the count is not fixed -- the comb takes as
  * many columns as the panel gives it and then steps down, so a wide panel reads
- * as a seam running across it rather than a plaque centred in it.
+ * as a seam running across it rather than a plaque centerd in it.
  *
  * The column count has to be measured rather than assumed: the stagger is a
  * property of the *column*, and CSS can only count children. With an odd number
@@ -185,7 +186,7 @@ const dropped = (index: number) => (index % columns.value) % 2 === 1
  * cell -- measured on a real bag, 10.7px on one and 13.2px on the next.
  *
  * getBBox() reports the ink in user units. The viewBox is re-pointed at the
- * **square around it**, centred, with its side the longer of the two: every
+ * **square around it**, centerd, with its side the longer of the two: every
  * icon's longest axis then lands at exactly the same length, which is the
  * consistency the stretch was after, and its proportions survive. A shortbow is
  * three parts wide to four tall and used to be drawn wider than it is high.
@@ -260,21 +261,21 @@ async function drink(key: string): Promise<void> {
  * again reads as replacing it rather than adding to it.
  *
  * §8.5 -- matching on the stat alone was right when a buff applied everywhere.
- * Now it would call a Forest Draught armed while a Deepseam Draught is, because
+ * Now it would call a Forest Draft armed while a Deepseam Draft is, because
  * both are yield: two different things you are better at, not one thing twice.
  */
 const armedOn = (def: ItemDef) =>
   game.buffs.find((b) => b.stat === def.stat && b.scope === (def.scope ?? 'global')) ?? null
 
 /**
- * §8.5 -- what is already waiting is the better draught, so this one would be
+ * §8.5 -- what is already waiting is the better draft, so this one would be
  * paid for and never felt. Said here rather than after the fact: the server
  * refuses it either way, and a button that opens a flask for nothing is worse
  * than one that explains why it will not.
  */
 const outclassed = (def: ItemDef) => {
   const armed = armedOn(def)
-  return armed !== null && armed.value >= def.value
+  return armed !== null && armed.value >= (def.value ?? 0)
 }
 
 /** The same sentence the server would refuse with, said before the tap. */
@@ -282,7 +283,7 @@ const standingNote = (def: ItemDef) => {
   const armed = armedOn(def)
   if (!armed) return ''
 
-  const held = ITEM_BY_KEY[armed.key]?.name ?? 'A draught'
+  const held = ITEM_BY_KEY[armed.key]?.name ?? 'A draft'
 
   if (!outclassed(def)) {
     return `${held} is already waiting on the same work, and this one is stronger.`
@@ -403,7 +404,7 @@ async function scrap(item: OwnedItem): Promise<void> {
                     Tier {{ material.tier }} · {{ picked.qty }} carried
                   </template>
                   <template v-else-if="picked.kind === 'potion' && def">
-                    {{ RARITY_LABEL[def.rarity] }} draught · {{ picked.qty }} on the shelf
+                    {{ RARITY_LABEL[def.rarity] }} draft · {{ picked.qty }} on the shelf
                   </template>
                   <template v-else-if="def">
                     {{ def.slot ? SLOT_LABEL[def.slot] : '' }} · {{ RARITY_LABEL[def.rarity] }}
@@ -449,7 +450,7 @@ async function scrap(item: OwnedItem): Promise<void> {
             <!-- Potion: drinking it is both the use and the way to free a strap. -->
             <template v-else-if="picked.kind === 'potion' && def">
               <p class="tiny fact">
-                {{ statLine(def.stat, def.value) }}
+                {{ statLine(def.stat!, def.value ?? 0) }}
                 <strong>{{ SCOPE_LABEL[def.scope ?? 'global'] }}</strong>
                 · spent by one {{ SCOPE_ACTION[def.scope ?? 'global'] }}
               </p>
@@ -476,10 +477,10 @@ async function scrap(item: OwnedItem): Promise<void> {
 
             <!-- Gear: equipping is the tidiest way to free a strap, so it leads. -->
             <template v-else-if="picked.kind === 'gear' && def">
-              <p class="tiny fact">
-                {{ picked.item.durability }}/{{ def.maxDurability }} durability ·
-                {{ itemStatLine(def) }}
-              </p>
+              <div class="fact row tiny">
+                <span class="grow">{{ picked.item.durability }}/{{ def.maxDurability }} durability</span>
+                <StatChips :def="def" :options="picked.item.options ?? []" />
+              </div>
               <div class="acts">
                 <button
                   class="btn btn-sm"
@@ -581,7 +582,7 @@ async function scrap(item: OwnedItem): Promise<void> {
   transform: translateY(calc(var(--slot-h) / 2));
 }
 
-/* The hairline hexagon from app.css: outer element is the border colour, inner
+/* The hairline hexagon from app.css: outer element is the border color, inner
    one is the fill. A clip-path eats an inset shadow's diagonals, so a drawn
    ring is the only version of this that keeps all six edges. */
 .hex {
@@ -754,6 +755,14 @@ async function scrap(item: OwnedItem): Promise<void> {
   margin: 9px 0 11px;
   line-height: 1.45;
   color: var(--vellum-dim);
+}
+
+/* The gear line is durability on the left and the chips on the right: one row
+   rather than two stacked blocks with a hole between them. */
+.fact.row {
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 /* Copper for the refusal, gold for the upgrade -- the same reading the dock

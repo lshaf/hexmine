@@ -1,6 +1,6 @@
 /**
- * Palette, §13.3. Solid colours only -- §13.2 is explicit that alpha anywhere on
- * the map causes ghost-hex artefacts through neighbours, so every shade a tile
+ * Palette, §13.3. Solid colors only -- §13.2 is explicit that alpha anywhere on
+ * the map causes ghost-hex artefacts through neighbors, so every shade a tile
  * needs is precomputed to an opaque hex string here.
  */
 import { VARIANT_TINT } from '@/game/variants'
@@ -33,7 +33,7 @@ export const BIOME_LABEL: Record<Biome, string> = {
   grassland: 'Grassland',
 }
 
-// ------------------------------------------------------------ colour helpers
+// ------------------------------------------------------------ color helpers
 
 function hexToRgb(hex: string): [number, number, number] {
   const value = parseInt(hex.slice(1), 16)
@@ -56,15 +56,15 @@ export function shade(hex: string, amount: number): string {
 /** Pull saturation out by mixing toward the channel average. */
 export function desaturate(hex: string, amount: number): string {
   const [r, g, b] = hexToRgb(hex)
-  const grey = r * 0.299 + g * 0.587 + b * 0.114
+  const gray = r * 0.299 + g * 0.587 + b * 0.114
   return rgbToHex(
-    r + (grey - r) * amount,
-    g + (grey - g) * amount,
-    b + (grey - b) * amount,
+    r + (gray - r) * amount,
+    g + (gray - g) * amount,
+    b + (gray - b) * amount,
   )
 }
 
-/** Blend two colours. Always opaque -- §13.2 allows no alpha on the map. */
+/** Blend two colors. Always opaque -- §13.2 allows no alpha on the map. */
 export function mix(a: string, b: string, amount: number): string {
   const [r1, g1, b1] = hexToRgb(a)
   const [r2, g2, b2] = hexToRgb(b)
@@ -76,9 +76,9 @@ export function mix(a: string, b: string, amount: number): string {
  *
  * One blue everywhere would cut the map into blue and not-blue and read as a
  * layer laid over the terrain rather than part of it. A fifth of the biome's
- * own colour mixed in is enough that a river stays recognisably a river while
+ * own color mixed in is enough that a river stays recognisably a river while
  * still belonging to the badlands or the forest it runs through -- and that is
- * the same argument §13.3 makes for depleted ground keeping its biome colour.
+ * the same argument §13.3 makes for depleted ground keeping its biome color.
  *
  * A waterway is lighter than a lake because it is shallower. That is the only
  * thing separating the two fills; the shape does the rest.
@@ -101,12 +101,12 @@ export const variantColor = (variant: VariantKey): string =>
 
 /**
  * §13.3 -- a depleted tile uses a darker, desaturated variant of its OWN
- * colour, never grey. The land is drained, not dead, and it will regrow.
+ * color, never gray. The land is drained, not dead, and it will regrow.
  */
 export const depletedColor = (variant: VariantKey): string =>
   shade(desaturate(variantColor(variant), 0.45), -0.28)
 
-/** Material accent colours for the procedural icon system, §13.1. */
+/** Material accent colors for the procedural icon system, §13.1. */
 export const MATERIAL_PALETTE = {
   wood: '#8a5a34',
   iron: '#8d9aa5',
@@ -148,10 +148,10 @@ export const ICHOR_ACCENT = '#8d4a58'
 /**
  * §8.1 -- rarity treatment for equipment icons. Rarity is the one thing a player
  * reads at a glance across the shop, the bag and the hero sheet, so it gets a
- * colour of its own rather than a shade of the material accent.
+ * color of its own rather than a shade of the material accent.
  *
  * The ramp is drawn from the §13.3 palette so it never fights the map: stone
- * grey, forest green, mountain slate, violet, gold, ember. Ordered weakest to
+ * gray, forest green, mountain slate, violet, gold, ember. Ordered weakest to
  * strongest, and `ornate` is what earns the second hex frame on the icon.
  */
 export const RARITY_TREATMENT = {

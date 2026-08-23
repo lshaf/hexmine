@@ -40,7 +40,7 @@ class InventoryController extends GameController
     /**
      * §8.5 -- drink one.
      *
-     * It arms the action the draught names and waits there; taking that action
+     * It arms the action the draft names and waits there; taking that action
      * spends it, which is the sink (§11.1). Drinking a second of the same kind
      * replaces the charge rather than stacking.
      */

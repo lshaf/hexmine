@@ -6,9 +6,9 @@
  * to corners, so nothing steals area from the thing the game is actually about.
  *
  *   top-left      instrument cluster (AP / level) + village work
- *   top-right     recentre and the location-independent screens, nested into
+ *   top-right     recenter and the location-independent screens, nested into
  *                 one honeycomb strip
- *   bottom-centre what you are pointing at, and what you can do here
+ *   bottom-center what you are pointing at, and what you can do here
  *
  * The camera pans freely and costs nothing, so it needs a way back -- but sight
  * does not pan with it. Beyond the character's travel range the map shows the
@@ -150,9 +150,9 @@ onMounted(() => {
                its own. -->
           <HexAction
             icon="recenter"
-            label="Recentre"
-            hint="Centre the map on your prospector"
-            @activate="game.centreOnCharacter()"
+            label="Recenter"
+            hint="Center the map on your prospector"
+            @activate="game.centerOnCharacter()"
           />
           <HexAction icon="atlas" label="Atlas" @activate="game.openPanel('atlas')" />
           <HexAction icon="skills" label="Jobs" @activate="game.openPanel('skills')" />
@@ -212,8 +212,8 @@ onMounted(() => {
         </div>
       </div>
 
-      <!-- -------------------------------------------------- bottom centre -->
-      <div ref="bottomStack" class="corner bottom-centre">
+      <!-- -------------------------------------------------- bottom center -->
+      <div ref="bottomStack" class="corner bottom-center">
         <TileCard />
         <ActionDock />
       </div>
@@ -364,7 +364,7 @@ onMounted(() => {
 
 /* Nested cells overlap at the tips, so hit-testing has to follow the hexagon
    rather than the box, or the pointed corner of one cell would swallow clicks
-   meant for its neighbour. */
+   meant for its neighbor. */
 .screens :deep(.cell) {
   clip-path: var(--hex-clip);
 }
@@ -379,7 +379,7 @@ onMounted(() => {
   transform: none;
 }
 
-.bottom-centre {
+.bottom-center {
   left: 50%;
   bottom: 12px;
   transform: translateX(-50%);
@@ -434,7 +434,7 @@ onMounted(() => {
     right: calc(6px + env(safe-area-inset-right, 0px));
   }
 
-  .bottom-centre {
+  .bottom-center {
     bottom: calc(6px + env(safe-area-inset-bottom, 0px));
     left: calc(6px + env(safe-area-inset-left, 0px));
     right: calc(6px + env(safe-area-inset-right, 0px));

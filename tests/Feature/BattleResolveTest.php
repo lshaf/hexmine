@@ -360,11 +360,10 @@ final class BattleResolveTest extends TestCase
     }
 
     /**
-     * §9.5.6 -- two wear rolls: the weapon on the gap to their guard, and one
-     * worn piece on the excess of their attack over its own. An empty slot
-     * absorbs nothing, so a bare-handed fight costs nothing to wear out.
+     * §9.5.6 -- durability IS the health bar, so a beating lands on the kit
+     * that took it. The blade pays separately, for what it was swung AT.
      */
-    public function test_a_fight_wears_the_weapon_and_exactly_one_worn_piece(): void
+    public function test_a_fight_spends_the_kit_that_took_it(): void
     {
         $this->equip('the_last_argument');
         $this->equip('longwatch_carapace');
@@ -375,26 +374,59 @@ final class BattleResolveTest extends TestCase
 
         $result = $this->resolveFight($this->character);
 
-        $this->assertCount(2, $result['wear'], 'a fight wore something other than two things');
-
         $slots = array_column($result['wear'], 'slot');
-        $this->assertContains('weapon', $slots);
 
-        $worn = array_values(array_diff($slots, ['weapon']));
-        $this->assertCount(1, $worn);
-        $this->assertContains($worn[0], ['armor', 'boots', 'gloves']);
+        // The weapon always pays: enemy armor blunts it whatever else happens.
+        $this->assertContains('weapon', $slots, 'the blade came out of a fight unmarked');
 
         foreach ($result['wear'] as $row) {
             $this->assertGreaterThan(0, $row['lost'], "{$row['name']} wore nothing");
+            $this->assertContains($row['slot'], Balance::COMBAT_SLOTS);
         }
 
-        // Three of the four are untouched, and the fourth is down by what the
-        // result says it is down by.
-        $intact = $this->character->fresh()->items
-            ->filter(fn (CharacterItem $i) => $i->durability === \App\Game\Catalog::item($i->item_key)['maxDurability'])
-            ->count();
+        // A tool belt is not armor (§8 rule 2): nothing outside the combat
+        // slots is ever in the exchange.
+        $this->assertSame($slots, array_values(array_intersect($slots, Balance::COMBAT_SLOTS)));
+    }
 
-        $this->assertSame(2, $intact, 'the wear did not land on exactly two pieces');
+    /**
+     * §9.5.6 -- the bill is capped at half the pool, so one hopeless swing in
+     * the center cannot strip a whole kit in a single go. The fight is still
+     * lost; the cap is on the cost.
+     */
+    public function test_one_fight_never_takes_more_than_half_the_kit(): void
+    {
+        $pieces = ['notched_sword', 'padded_jack', 'studded_boots', 'knuckle_wraps'];
+        foreach ($pieces as $key) {
+            $this->equip($key);
+        }
+
+        $pool = \App\Game\Formulas::battlePool(
+            $this->character->fresh()->items->map(fn (CharacterItem $i) => [
+                'id' => $i->id,
+                'key' => $i->item_key,
+                'durability' => $i->durability,
+                'equipped' => $i->equipped,
+                'options' => [],
+            ])->all(),
+        );
+        $this->assertGreaterThan(0, $pool);
+
+        $this->standOnALivePack();
+        $result = $this->resolveFight($this->character);
+
+        $lost = array_sum(array_column($result['wear'], 'lost'));
+
+        // Half the pool, plus whatever the blade paid for enemy armor -- that
+        // stream is its own and is capped per item rather than by the pool.
+        $weapon = collect($result['wear'])->firstWhere('slot', 'weapon');
+        $blade = $weapon === null ? 0 : $weapon['lost'];
+
+        $this->assertLessThanOrEqual(
+            (int) floor($pool * Balance::BATTLE_POOL_WEAR_CAP) + $blade,
+            $lost,
+            'one fight took more than the cap allows',
+        );
     }
 
     /**
@@ -487,7 +519,7 @@ final class BattleResolveTest extends TestCase
 
     /**
      * §9.5.7 -- and armor does not change that. It decides whether you LOSE,
-     * because defence feeds the hold and the hold is half the margin; it does
+     * because defense feeds the hold and the hold is half the margin; it does
      * not decide what losing costs.
      *
      * It used to: a loss was only a death when nothing absorbed it. That made
@@ -619,7 +651,7 @@ final class BattleResolveTest extends TestCase
      * §2 -- and anybody else killing it BURNS the row.
      *
      * An item another wallet can pick up is a direct player-to-player transfer,
-     * which the threat model closes outright -- and "random row" is no defence:
+     * which the threat model closes outright -- and "random row" is no defense:
      * empty the bag to the one thing worth moving, fight naked, die on purpose,
      * and a partner walks over and collects it.
      */

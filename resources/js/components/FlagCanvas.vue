@@ -23,11 +23,11 @@ const props = withDefaults(
     flag: string | null
     size?: number
     editable?: boolean
-    colour?: string
+    color?: string
     /** Paint whole regions rather than dots. */
     fill?: boolean
   }>(),
-  { size: 128, editable: false, colour: '#c1793f', fill: false },
+  { size: 128, editable: false, color: '#c1793f', fill: false },
 )
 
 const emit = defineEmits<{ (e: 'update:flag', value: string): void }>()
@@ -40,7 +40,7 @@ const canvas = ref<HTMLCanvasElement | null>(null)
 /** The working copy. Bytes rather than a string: a stroke touches one dot. */
 const pixels = ref<Uint8Array>(new Uint8Array(BYTES))
 
-/** An unpainted flag is not empty, it is the panel colour. */
+/** An unpainted flag is not empty, it is the panel color. */
 const BLANK: [number, number, number] = [0x1d, 0x26, 0x22]
 
 function decode(flag: string | null): Uint8Array {
@@ -108,7 +108,7 @@ onMounted(() => {
 })
 
 const rgb = computed<[number, number, number]>(() => {
-  const hex = props.colour.replace('#', '')
+  const hex = props.color.replace('#', '')
 
   return [
     parseInt(hex.slice(0, 2), 16) || 0,
@@ -130,36 +130,36 @@ function dotAt(event: PointerEvent): number | null {
   return row * GRID + col
 }
 
-function same(dot: number, colour: [number, number, number]): boolean {
+function same(dot: number, color: [number, number, number]): boolean {
   return (
-    pixels.value[dot * 3] === colour[0]
-    && pixels.value[dot * 3 + 1] === colour[1]
-    && pixels.value[dot * 3 + 2] === colour[2]
+    pixels.value[dot * 3] === color[0]
+    && pixels.value[dot * 3 + 1] === color[1]
+    && pixels.value[dot * 3 + 2] === color[2]
   )
 }
 
-function set(dot: number, colour: [number, number, number]): void {
-  pixels.value[dot * 3] = colour[0]
-  pixels.value[dot * 3 + 1] = colour[1]
-  pixels.value[dot * 3 + 2] = colour[2]
+function set(dot: number, color: [number, number, number]): void {
+  pixels.value[dot * 3] = color[0]
+  pixels.value[dot * 3 + 1] = color[1]
+  pixels.value[dot * 3 + 2] = color[2]
 }
 
 /** Flood fill, four-connected. Iterative: a recursive one blows the stack. */
-function flood(from: number, colour: [number, number, number]): void {
+function flood(from: number, color: [number, number, number]): void {
   const target: [number, number, number] = [
     pixels.value[from * 3]!,
     pixels.value[from * 3 + 1]!,
     pixels.value[from * 3 + 2]!,
   ]
 
-  if (target[0] === colour[0] && target[1] === colour[1] && target[2] === colour[2]) return
+  if (target[0] === color[0] && target[1] === color[1] && target[2] === color[2]) return
 
   const queue = [from]
   while (queue.length) {
     const dot = queue.pop()!
     if (!same(dot, target)) continue
 
-    set(dot, colour)
+    set(dot, color)
 
     const col = dot % GRID
     const row = (dot - col) / GRID
@@ -205,7 +205,7 @@ function up(event: PointerEvent): void {
   canvas.value?.releasePointerCapture?.(event.pointerId)
 }
 
-/** Repaint the whole flag one colour. The only destructive control here. */
+/** Repaint the whole flag one color. The only destructive control here. */
 function clear(): void {
   for (let dot = 0; dot < GRID * GRID; dot++) set(dot, rgb.value)
   paint()

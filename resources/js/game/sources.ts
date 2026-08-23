@@ -52,7 +52,7 @@ export const SOURCE_LABEL: Record<SourceKind, string> = {
 }
 
 /**
- * One colour per road, from §13.3. Mining is the primary act so it takes the
+ * One color per road, from §13.3. Mining is the primary act so it takes the
  * primary accent; the two settlement roads sit in the same vellum family
  * because they are the same kind of act; gold and violet are the two ways value
  * arrives from outside the mining loop.
@@ -113,13 +113,13 @@ const COMPONENT_KEYS = new Set<string>(COMPONENTS.map((m) => m.key))
 const CRITTER_KEYS = new Set<string>(CRITTERS.map((m) => m.key))
 const SPOIL_KEYS = new Set<string>(SPOILS.map((m) => m.key))
 
-/** §9.5.2 -- the ring a grade's monster is new on. Grade 5 is the centre's rare drop. */
+/** §9.5.2 -- the ring a grade's monster is new on. Grade 5 is the center's rare drop. */
 const SPOIL_RING: Record<number, string> = {
   1: 'outer ring and inward',
   2: 'middle ring and inward',
   3: 'contested ring and inward',
-  4: 'the barren centre',
-  5: 'the barren centre, rarely',
+  4: 'the barren center',
+  5: 'the barren center, rarely',
 }
 
 export function rawRole(key: MaterialKey): RawRole {

@@ -2,15 +2,16 @@
 /**
  * How the fight went, §9.5.5.
  *
- * There is no health on either side and nothing ticks, so a fight is one
- * moment: it is decided, paid and over between two taps. That makes the
- * receipt the entire combat UI -- what the odds were, which way they fell,
+ * The health bar is the durability of what you are wearing (§9.5.5), so there
+ * is nothing on screen to watch tick down: the exchange runs when you close and
+ * is over by the time you look at it. That makes the
+ * receipt the entire combat UI -- how the exchange went, which way it fell,
  * what it cost the kit.
  *
  * It gets a plate rather than a toast for the reason §8.2 gives: a fight can
  * DESTROY something, and a status line sliding past the corner is not where a
  * player should learn that a legendary is gone. The destroyed list is the one
- * thing here drawn in ember, because ember is the colour of a state to deal
+ * thing here drawn in ember, because ember is the color of a state to deal
  * with (§13.3) and an empty slot is exactly that.
  *
  * Dismissed by any click and by Escape, with no button: the roll happened
@@ -30,7 +31,6 @@ const emit = defineEmits<{ (e: 'close'): void }>()
 
 const won = computed(() => props.battle.won)
 
-const chance = computed(() => Math.round(props.battle.odds * 100))
 
 /** §7.4 -- the job keys are the words; there is no table to look them up in. */
 const jobName = computed(() => {
@@ -96,12 +96,16 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
           </strong>
         </p>
 
-        <!-- §9.5.5 -- the odds are kept beside the outcome they produced. A
-             fight taken at 30% that went your way is a different story from one
-             taken at 95%, and the number is what tells them apart. -->
+        <!-- §9.5.5 -- the exchange, kept beside the outcome it produced. There
+             is no health bar to watch, so this is where a fight is read: how
+             long it took, and how close it was. -->
         <p class="tiny muted odds">
-          Taken at {{ chance }}% · you {{ battle.attack }}/{{ battle.defence }} ·
-          it {{ battle.monster.attack }}/{{ battle.monster.defence }}
+          {{ battle.rounds }} rounds · you {{ battle.attack }}/{{ battle.defense }} ·
+          it {{ battle.monster.attack }}/{{ battle.monster.defense }}
+        </p>
+        <p class="tiny muted odds">
+          You dealt {{ battle.damageDealt }} of its {{ battle.monster.hp }} ·
+          it took {{ battle.damageTaken }} of your {{ battle.pool }}
         </p>
 
         <!-- §9.5.8 -- gold always, and never a bag row. A loss pays nothing at

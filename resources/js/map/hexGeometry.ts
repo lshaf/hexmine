@@ -21,7 +21,7 @@ export const COL_STEP = HEX_W * 0.75 // 43.5
 export const ROW_STEP = HEX_H // 34
 export const ODD_COL_OFFSET = HEX_H / 2 // 17
 
-/** Screen position of a tile's centre, before camera translation. */
+/** Screen position of a tile's center, before camera translation. */
 export function tileToScreen(col: number, row: number): { x: number; y: number } {
   return {
     x: col * COL_STEP,
@@ -41,7 +41,7 @@ const HALF_W = HEX_W / 2
 const QUARTER_W = HEX_W / 4
 const HALF_H = HEX_H / 2
 
-/** Six corners of a flat-top hex, centred on the origin. */
+/** Six corners of a flat-top hex, centerd on the origin. */
 export const HEX_CORNERS: ReadonlyArray<readonly [number, number]> = [
   [-HALF_W, 0],
   [-QUARTER_W, -HALF_H],
@@ -119,7 +119,7 @@ export function hexDistance(aCol: number, aRow: number, bCol: number, bRow: numb
 
 /**
  * Vertical squash factor: how much shorter our tilted hex is than a true
- * flat-top hex of the same width. Undoing it makes nearest-centre hit-testing
+ * flat-top hex of the same width. Undoing it makes nearest-center hit-testing
  * exact, because the Voronoi cells of a regular hex grid ARE its hexes.
  */
 const SQUASH = HEX_H / ((HEX_W * Math.sqrt(3)) / 2)
@@ -129,7 +129,7 @@ const SQUASH = HEX_H / ((HEX_W * Math.sqrt(3)) / 2)
  *
  * screenToTile() alone is not enough: flat-top columns overlap by a quarter
  * width, so a naive round picks the wrong hex in the slanted corner regions.
- * Checking the 3x3 neighbourhood and taking the nearest centre (in un-squashed
+ * Checking the 3x3 neighborhood and taking the nearest center (in un-squashed
  * space) is exact.
  */
 export function pickTile(x: number, y: number): { col: number; row: number } {

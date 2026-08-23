@@ -14,13 +14,13 @@ withDefaults(defineProps<{ size?: number }>(), { size: 160 })
 
 const flag = defineModel<string | null>({ required: true })
 
-const colour = ref('#c1793f')
+const color = ref('#c1793f')
 const fill = ref(false)
 const canvas = ref<InstanceType<typeof FlagCanvas> | null>(null)
 
 /**
  * §13.3 -- the game's own palette first, because a flag drawn out of it belongs
- * to this world. The picker underneath is any colour at all: identity is the
+ * to this world. The picker underneath is any color at all: identity is the
  * one place §13's "no artist required" rule is deliberately set aside.
  */
 const SWATCHES = [
@@ -38,7 +38,7 @@ const SWATCHES = [
       v-model:flag="flag"
       :size="size"
       editable
-      :colour="colour"
+      :color="color"
       :fill="fill"
     />
     <div class="tools">
@@ -48,15 +48,15 @@ const SWATCHES = [
           :key="swatch"
           type="button"
           class="swatch"
-          :class="{ on: colour === swatch }"
+          :class="{ on: color === swatch }"
           :style="{ background: swatch }"
           :aria-label="swatch"
-          @click="colour = swatch"
+          @click="color = swatch"
         />
       </div>
       <label class="tiny muted picker">
-        Any colour
-        <input v-model="colour" type="color" />
+        Any color
+        <input v-model="color" type="color" />
       </label>
       <label class="tiny muted picker">
         <input v-model="fill" type="checkbox" />

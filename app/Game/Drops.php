@@ -322,7 +322,7 @@ final class Drops
      *
      * Split across the two lines by a coin flip, so the effective rate for any
      * ONE material is half this. The top of each ladder is deliberately a
-     * project -- four Revenant Plate is about forty centre kills -- but the
+     * project -- four Revenant Plate is about forty center kills -- but the
      * ichor line feeds potions, which are drunk and gone, so it cannot be so
      * thin that a legendary philtre is a season's work.
      */
@@ -333,7 +333,7 @@ final class Drops
      *
      * Epic is where gear becomes mintable (§8.0), so a monster that drops one
      * is precisely the grind->NFT faucet the threat model exists to close.
-     * RARE IS THE CEILING, whatever the tier: a centre-ring kill answers with
+     * RARE IS THE CEILING, whatever the tier: a center-ring kill answers with
      * better OPTION ROLLS instead (§8.0.1), which is the same mechanism the
      * capital bazaar already uses.
      *

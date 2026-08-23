@@ -9,7 +9,7 @@
  * It is pointer-transparent throughout; nothing here is ever clickable.
  *
  * The marker is a draining hexagon, the same perimeter-as-progress idea the
- * gauges use (§13.1). It carries two things at once: colour says how the news
+ * gauges use (§13.1). It carries two things at once: color says how the news
  * landed, and the drain says how long it will stay -- so a message that vanishes
  * mid-read was visibly on its way out.
  *
@@ -26,7 +26,7 @@ const LIFETIME = 4200
 const POINTS = '0,43.3 25,0 75,0 100,43.3 75,86.6 25,86.6'
 const PERIMETER = 300
 
-/** The same hexagon shrunk about its centre, sitting inside the draining ring. */
+/** The same hexagon shrunk about its center, sitting inside the draining ring. */
 const CORE = POINTS.split(' ')
   .map((pair) => {
     const [x, y] = pair.split(',').map(Number)

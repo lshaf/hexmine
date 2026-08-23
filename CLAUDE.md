@@ -208,11 +208,11 @@ cross-map travel — same design pressure as biome-locked mining.
 The two opposing pulls (outward for resources, inward for processing + dungeons)
 force constant traffic through the contested middle ring. This is intentional.
 
-**Capitals stand in the contested ring, not the dead centre**, and that is the
+**Capitals stand in the contested ring, not the dead center**, and that is the
 sharpest version of the same pull: the best bench in the game, the only one that
 runs all five lines and reaches epic, sits on ground other prospectors are
 working. You cannot process at the top tier without walking into the PvP band.
-The centre stays reserved for dungeon mouths, so the last step inward is a raid,
+The center stays reserved for dungeon mouths, so the last step inward is a raid,
 never an errand.
 
 ### 5.3 Biomes
@@ -253,11 +253,11 @@ map worth walking.
 | | Rule |
 |---|---|
 | **Sight** | **1 hex.** Base `Balance::SIGHT_RADIUS`, up to 3 through the Explorer tree (§7.5). |
-| **Sight while travelling** | **0.** You are between hexes, watching your feet. |
+| **Sight while traveling** | **0.** You are between hexes, watching your feet. |
 | **Travel range** | **None.** Any hex on the map is walkable from any other. |
 
 **Travel has no reach limit and must not grow one.** Distance already costs the
-one currency an idle game cannot inflate — hours, at ten minutes a hex — so a
+one currency an idle game cannot inflate — hours, at five minutes a hex — so a
 level gate on top of it would be a second answer to a question the clock has
 already answered.
 
@@ -277,7 +277,7 @@ whole of the difference between scouted ground and the rest.
 Three consequences, all deliberate:
 
 1. **The live-state query is a disc of seven tiles** — the hex underfoot and
-   its six neighbours — rather than the several hundred that reach-as-sight
+   its six neighbors — rather than the several hundred that reach-as-sight
    scanned, and thirty-seven at the very most. Sight is the one number in the
    game no amount of play widens past `SIGHT_RADIUS + SKILL_SIGHT_CAP`, and
    that ceiling is a query budget rather than a balance one — cost goes as the
@@ -323,7 +323,7 @@ Two settlements of the same tier are **never closer than**:
 
 This is guaranteed **by construction, not by chance**. Sites sit on a lattice of
 one candidate per cell, and the window a site may occupy inside its cell is
-narrower than the cell and centred in it — so two neighbouring sites cannot
+narrower than the cell and centerd in it — so two neighboring sites cannot
 close on each other past the leftover margin. A site free to roam its whole cell
 can sit against the shared edge of two cells, which is what previously put
 villages on touching hexes.
@@ -411,18 +411,62 @@ Each line also has its **own tool slot** (§8.0) — axe, pickaxe, bow, hammer, 
 Tools are not the specialisation lever: all five can be equipped at once and every line
 offers the same ladder. The skill point cap is the lever, and it is the only one.
 
-### 7.3 Mining time formula
-```
-trip_time = clamp(base_tile_time - skill_reduction - equipment_reduction, 30min, 60min)
-```
-- `base_tile_time`: 30–60 min depending on tile
-- `skill_reduction`: max **20 min** at maxed relevant skill
-- `equipment_reduction`: max **10 min** at best-in-slot
+### 7.3 Mining time — a hex has durability, and a trip works through it
 
-Max total reduction = 30 min, so a 60-min tile at BiS lands exactly on the 30-min floor.
+```
+tile_durability = base_tile_time * MINING_BASE_ATTACK
+rate            = (MINING_BASE_ATTACK + tool_attack + skill_attack) * (1 + tripReduction)
+trip_time       = clamp(tile_durability / rate, 15min, 60min)
+```
 
-**The floor clamp is mandatory and must be in the formula from day one.** Without it, any
-future buff/equipment tier creates a sub-30 or zero-time exploit.
+- `base_tile_time`: 30–60 min depending on tile, exactly as before
+- `MINING_BASE_ATTACK`: **10** — what bare hands take out of a hex per second
+- `tool_attack`: the gathering tool's **base stat, and its only one**
+- `skill_attack`: up to **10** more at maxed line skill
+
+**A tile's durability is its base seconds at the bare-handed rate**, so an
+ungeared unskilled trip takes exactly what a trip always took. Nothing about the
+world generator changed; what changed is what gear does to it.
+
+*(It used to subtract flat minutes — twenty for skill, ten for best-in-slot.
+That made a good tool worth exactly as much on a poor hex as on a rich one,
+which is backwards: the ladder should pay most where the ground is hardest. A
+rate does that for free, and it is what lets a tool have an **attack** at all
+rather than a second schedule invented for mining.)*
+
+The measured ladder on the hardest hex in the game, unskilled:
+
+| Rung | Attack | 60-min hex |
+|---|---|---|
+| Bare hands | 0 | 60m |
+| Village | 3 | 46m |
+| Crafted starter | 4 | 43m |
+| City | 6 | 38m |
+| Crafted uncommon | 8 | 33m |
+| Rare | 10 | 30m |
+| Epic (NFT) | 14 | 25m |
+| Legendary | 17 | 22m |
+| Unique | 19 | 21m |
+
+**A gathering tool has no percentage at all.** Its base *is* the attack. It used
+to lead with "+2% woodcutting yield" and have its attack derived from that, and
+the two were never the same question: **attack is how fast you work through a
+hex, yield is how big the haul is.** One number each, and a tool answers the
+first.
+
+Yield is still reachable on a tool — through a rolled option (§8.0.1), which is
+where a *bonus* belongs. What a tool is *for* is speed.
+
+**The floor is 15 minutes and the clamp is mandatory**, from day one and for the
+same reason it always was: without it any future buff or tier creates a
+sub-floor or zero-time exploit. Best tool, maxed skill and best-in-slot gear on
+a 60-minute hex lands a shade over it — deliberately, so the top of the ladder is
+still worth climbing.
+
+**A tool's attack is mining attack and nothing else.** §8 rule 5 keeps the two
+ladders apart in both directions: a pickaxe is worth nothing in a fight, which
+is why combat reads the explicit `attack` on the weapon and the worn pieces and
+never this.
 
 ### 7.4 Jobs and their skill trees
 
@@ -448,9 +492,9 @@ assuming a rule here covers all of them.
 | Smith | craft | weapon bench (§8.4) | forging a tool or weapon |
 | Armorer | craft | armor bench | making armor, boots or gloves |
 | Alchemist | craft | consumable bench | brewing a potion |
-| Shieldbearer | battle | defence | fighting with a shield (§9.5) |
+| Shieldbearer | battle | defense | fighting with a shield (§9.5) |
 | Swordhand | battle | balance | fighting with a sword (§9.5) |
-| Runecaster | battle | offence | fighting with a focus (§9.5) |
+| Runecaster | battle | offense | fighting with a focus (§9.5) |
 
 **Processing is not crafting, and the split is the input.** A craft bench spends
 refined stock on an object; a processing line makes the stock. So the five
@@ -478,18 +522,49 @@ exist rather than waiting on a new grind.
 That makes gathering the one kind whose level *does* grant power. It always did;
 §7.4.1 below is about the levels this system introduces.
 
-**Gathering and processing `stat` nodes are line-locked**, exactly as tools are
-(§8 rule 1): a Woodcutting node counts in a forest and nowhere else, and a
-Sawyer's speed counts at a saw pit and nowhere else. Without that, taking three
-gathering trees would stack yield on every trip at once, which is the shortcut
-the line-locked tool ladder exists to close. Craft and battle nodes are not
-line-locked; they have no line.
+**EVERY `stat` node is locked to its own class. There is no global one.** A
+tree makes you better at the work its job is about and at nothing else — without
+that, a character takes three trees and stacks all of them on one trip, which is
+the shortcut the line-locked tool ladder (§8 rule 1) exists to close, arrived at
+through the skill panel instead.
+
+| Kind | Locked to | Which means |
+|---|---|---|
+| gathering | its **line** | a Woodcutting node counts in a forest and nowhere else |
+| processing | its **line's bench** | a Sawyer's speed counts at a saw pit and nowhere else |
+| craft | its **bench category** | a Smith is faster at the weapon bench, not at the tannery |
+| battle | its **weapon family** | a Swordhand's nodes are worth nothing with a shield on the arm |
 
 **A forest and a saw pit are two different pieces of work on the same word**, so
 the lock is on the pair rather than the line: a Woodcutting node pays out on a
 felling trip and a Sawyer node at the pit, and neither reaches the other. This
 is the one place where the *action* being costed and the *material line* under
 it are two things rather than one.
+
+**A battle tree is locked to the family, not to the job's role word.** §9.5.4
+already makes the family in the slot your class; anything less would let a tree
+bought for one weapon pay out through another.
+
+*(Two whole classes of node were paying out off-class before this. Craft trees
+handed out yield, trip time and travel speed, so an Armorer's tree made somebody
+faster at **mining** — a craft job improving work it has nothing to do with. And
+every gathering tree carried `travelSpeed` nodes that were dead weight twice
+over: filed under a line, they only counted on that line's work, and walking is
+not woodcutting, so they could never pay out at all.)*
+
+**What each kind may move, after that:**
+
+| Kind | Stat |
+|---|---|
+| gathering | `yield`, `tripReduction` — the two things a trip has |
+| processing · craft | `processingSpeed` — the one thing a bench clock reads (§8.4) |
+| battle | `power`, `defense` |
+| wayfaring | nothing at all (§7.5) |
+
+A craft tree's four biggest nodes are **unlocks** rather than speed, for two
+reasons: thirteen speed nodes came to 17% against a 15% ceiling, which left gear
+nothing to add, and a bench grows by learning what it can make rather than by
+shaving another percent off the clock.
 
 **The three battle jobs level on the road** (§9.5), and on nothing else. Which
 of them earns the XP is decided by the **weapon family** in the `weapon` slot —
@@ -537,7 +612,7 @@ what §7.2's cap exists to prevent.
 #### 7.4.3 What a node may do — and the ceiling, again
 
 This is the part that can break the game, so the rule is mechanical rather than
-a matter of judgement. A node's effect must be one of these, and nothing else:
+a matter of judgment. A node's effect must be one of these, and nothing else:
 
 | Effect | What it does | Cap |
 |---|---|---|
@@ -705,7 +780,7 @@ Everything a character owns and is not wearing is in one bag, and the bag has
 | | Limit | Constant |
 |---|---|---|
 | **Units** | **120.** Every unit of every material, every potion, and every unworn item. | `Balance::BAG_UNITS` |
-| **Rows** | **30.** How many *distinct* things that is: a stack is one row whether it holds 1 or 100, and two axes are two rows because gear does not stack. Roomy against a catalogue of 29 materials and 5 draughts, on purpose — see below. | `Balance::BAG_ROWS` |
+| **Rows** | **30.** How many *distinct* things that is: a stack is one row whether it holds 1 or 100, and two axes are two rows because gear does not stack. Roomy against a catalog of 29 materials and 5 drafts, on purpose — see below. | `Balance::BAG_ROWS` |
 
 Both are **flat, and level does not move them** (§7.1). The only thing that
 widens either is the Explorer tree (§7.5), to **200 and 50** — fifteen nodes of
@@ -779,7 +854,7 @@ what you are *holding*.
 Equipment has **two axes that are not the same thing**, and conflating them is the
 easiest way to break the economy:
 
-- **Rarity** — six rungs, sets the power ceiling, the colour, and where the thing
+- **Rarity** — six rungs, sets the power ceiling, the color, and where the thing
   can be made.
 - **Mintable** — whether it may be converted into an NFT and withdrawn from the
   game (§3.3). Not implied by rarity, and not a property the item has while it
@@ -788,14 +863,17 @@ easiest way to break the economy:
 
 ### 8.0 The rarity ladder
 
-| Rarity | Colour | Stat ceiling | Option rolls | Bench | Shop | Mintable |
+| Rarity | Color | Stat ceiling | Option rolls | Bench | Shop | Mintable |
 |---|---|---|---|---|---|---|
-| Common | grey | +3% | 0 | village | village+ | no |
+| Common | gray | +3% | 0 | village | village+ | no |
 | Uncommon | green | +5% | 0–1 | city | city+ | no |
-| Rare | blue | +8% | 1 | capital | never | no |
-| Epic | violet | +11% | 2 | capital | never | **yes** |
-| Legendary | gold | +14% | 3 | guild hall | never | **yes** |
-| Unique | ember | +15% | 3 + fixed perk | never | never | no — soulbound |
+| Rare | blue | +8% | 0–1 | capital | never | no |
+| Epic | violet | +11% | 0–2 | capital | never | **yes** |
+| Legendary | gold | +14% | 0–3 | guild hall | never | **yes** |
+| Unique | ember | +15% | 0–3 + fixed perk | never | never | no — soulbound |
+
+**The option column is a ceiling, never a quota**, and only a **crafted** piece
+rolls against it at all (§8.0.1). Anything off a shelf is plain.
 
 **Mintable** is the right word and *tradeable* was the wrong one: the column
 says this rung may be **converted into an NFT and withdrawn** (§3.3), not that
@@ -819,28 +897,75 @@ Minting stops at legendary. Unique is prestige, not liquidity.
 
 ### 8.0.1 Options — rolled bonus lines
 
-Higher rarities roll extra stat lines when made or bought, so two of the same item
-are never identical. Counts are in the table above.
+An option is a **bonus**, not part of the item: something a bench sometimes puts
+on a thing it made. Two of the same recipe are therefore never the same object,
+and one of them carrying nothing at all is a normal outcome rather than a
+broken one.
+
+**Gold buys a plain item, at every shelf including a capital's.** Nothing bought
+has ever rolled and nothing bought ever will — that is the whole difference
+between a piece somebody made and a piece somebody stocked, and a shop selling
+rolled goods would make crafting the slower way to buy one.
+
+*(The capital bazaar used to stock pre-rolled stock, which was the one way a
+common item could carry a line. Taking it away is what gives the benches
+something a shelf cannot have.)*
+
+**Three things are random, and all three are the point:**
+
+| | |
+|---|---|
+| **How many** | nothing up to the rung's ceiling in §8.0's table — so an uncommon may roll one or none, and a legendary anywhere from none to three |
+| **Which tier** | each line is drawn from any tier **at or below** the item's own rarity, so a legendary regularly carries a common-grade line |
+| **What it is worth** | inside that tier's band |
+
+| Option tier | Percentage | Scoped | **Solid** |
+|---|---|---|---|
+| common | +1–2% | +2–4% | +1–2 |
+| uncommon | +1–3% | +2–6% | +1–3 |
+| rare | +2–4% | +4–8% | +2–4 |
+| epic | +3–5% | +6–10% | +3–6 |
+| legendary | +4–6% | +8–12% | +4–8 |
+
+**A line may be a percentage or a solid number, and both are real options.**
+`attack` and `defense` are not percentages (§9.5.4) — a fight is an exchange and
+a ±15% swing cannot decide one — so a rolled line that lands on them is a solid
+number that simply **adds**. It never enters the percentage aggregate, never
+meets §8.1's ceiling, and never carries a scope: a flat pair has no gathering
+line to belong to.
+
+The line carries a `kind` for exactly that reason. Without it *+2 defense* and
+*+2% defense* would be the same row saying two different things, since the flat
+pair and two of the `StatKey`s share their names.
+
+**On a gathering tool a solid `attack` is MINING attack** (§7.3): it bites
+deeper into a hex and is worth nothing at all in a fight, exactly as the tool's
+own attack is. A tool never rolls `defense` — there is nothing for it to mean.
+
+**A higher rarity does not roll a better line every time; it rolls from a deeper
+bag.** That is a different and more interesting thing: the ceiling climbs the
+ladder and the floor does not, so a good roll is *found* rather than issued, and
+an unlucky legendary really can come out under a lucky rare.
 
 - Rolled **server-side** from a seed, like every other outcome.
-- Small values (+1–3%), drawn from the same `StatKey` pool.
 - **Options are inside the ceiling, not on top of it.** They feed the same
   aggregate and clamp as the base stat. An option that breached the cap would
-  reintroduce pay-to-win through the back door.
-- The capital shop sometimes stocks pre-rolled goods. Villages and cities never do.
+  reintroduce pay-to-win through the back door — which is also why the bands
+  above may look generous and are not: `STAT_CEILING` is still +15%, and every
+  line on every piece is climbing toward that one number.
 
 **A worn line may name one gathering line, and is worth more for it.** Armor,
 boots and gloves work all five lines at once, so a flat *+2% yield* on them is
 five bonuses in a coat. A roll may instead come out **scoped** — *+4% mining
-yield*, *+3% off woodcutting time* — worth **+2–5%** on the line it names and
-**nothing on the other four**. Same ceiling, same clamp, same aggregate: what a
-narrower line buys is a steeper climb to +15%, never a higher one.
+yield*, *+3% off woodcutting time* — worth **twice** as much on the line it names
+and **nothing on the other four**. Same ceiling, same clamp, same aggregate:
+what a narrower line buys is a steeper climb to +15%, never a higher one.
 
-The gap between the two ranges is the whole rule. Without it a scoped roll would
+The gap between the two is the whole rule. Without it a scoped roll would
 be strictly the worse outcome and the pool would read as a bad-luck table; with
 it, *+2% everywhere* against *+4% mining* is a real choice for a prospector who
 knows which line they actually work. It is the same argument §8.5 makes for
-scoping potions — seventy flat draughts would be a power ladder you can drink.
+scoping potions — seventy flat drafts would be a power ladder you can drink.
 
 **Only the two trip stats scope**, `yield` and `tripReduction`: `travelSpeed`
 has no line to belong to, and processing is scoped by the recipe already.
@@ -881,7 +1006,7 @@ Rules, all mandatory:
 5. **`Weapon` is combat only and never gathers.** Combat gear must not be able to
    stand in for a gathering tool, or fighting becomes a shortcut around the mining ladder.
    One slot holds **three families** — shield, sword and focus — and the family decides
-   which battle job levels (§9.5.4). It carries flat `attack` and `defence`, which are
+   which battle job levels (§9.5.4). It carries flat `attack` and `defense`, which are
    not the percentage stats of the same name and are not subject to their ceiling.
 
 ### 8.1 Anti-imbalance rules (all mandatory)
@@ -960,9 +1085,10 @@ Ironwood Armor    = 3 Ironwood + 2 Silkweave + 1 Shard         → +12% trip    
 Beastfang Boots   = 2 Beastfang + 1 Obsidian + 1 Relic         → +15% travel  [NFT]
 ```
 
-Gathering tools, §8.0 — one ladder, repeated per line. Yield only, and only on
-that line. The crafted starter is single-line on purpose: it is what a player can
-build straight off the opening arc's first processing run (§12 step 6).
+Gathering tools, §8.0 — one ladder, repeated per line. **Attack only**, and
+worked on that line alone (§7.3). The crafted starter is single-line on purpose:
+it is what a player can build straight off the opening arc's first processing
+run (§12 step 6).
 
 **The shop shelf is priced by one rule, and the rule is two valuations of the
 same object.** The price is the higher of them:
@@ -990,13 +1116,17 @@ different ladder), then the combat rung fell under its own materials. Derived in
 `gen_battlegear.py` and pinned by a test that recomputes every shelf price from
 `Balance`, so a changed recipe reprices the item and a drifted one fails.
 
-| Line | Village +3% | City +5% | Starter +4% | Crafted +6% | NFT +12% |
+| Line | Village atk 3 | Starter atk 4 | City atk 6 | Crafted atk 8 | NFT atk 14 |
 |---|---|---|---|---|---|
-| Woodcutting | Stone Axe | Iron Hatchet | Hewn Axe | Ironbound Axe | Ironwood Axe |
-| Mining | Chipped Pick | Miner's Pick | Wood Pickaxe | Iron Pickaxe | Mythril Pickaxe |
-| Hunting | Crude Bow | Recurve Bow | Shortbow | Sinew Longbow | Beastfang Bow |
-| Quarrying | Stone Mallet | Iron Sledge | Stone Maul | Banded Sledge | Obsidian Sledge |
-| Harvesting | Bent Sickle | Steel Sickle | Reed Sickle | Toothed Sickle | Silkweave Sickle |
+| Woodcutting | Stone Axe | Hewn Axe | Iron Hatchet | Ironbound Axe | Ironwood Axe |
+| Mining | Chipped Pick | Wood Pickaxe | Miner's Pick | Iron Pickaxe | Mythril Pickaxe |
+| Hunting | Crude Bow | Shortbow | Recurve Bow | Sinew Longbow | Beastfang Bow |
+| Quarrying | Stone Mallet | Stone Maul | Iron Sledge | Banded Sledge | Obsidian Sledge |
+| Harvesting | Bent Sickle | Reed Sickle | Steel Sickle | Toothed Sickle | Silkweave Sickle |
+
+Rare is **10**, legendary **17**, unique **19**. The crafted uncommon finally
+sits above the shop uncommon rather than tying with it — the old percentages had
+both at +5%, which made the bench rung pointless.
 
 ```
 Hewn Axe          = 4 Planks
@@ -1076,12 +1206,12 @@ the three benches are their own building and queue against nobody.
 - Using one spends it and **arms one action** with a **charge** on one stat. A
   potion is not a flat stat increase; it is bought for a specific thing you do.
   The actions are the five §7.2 gathering lines plus `travel`, `processing` and
-  `battle` (§9.5.8) — the last of them the only place `power` and `defence` are
+  `battle` (§9.5.8) — the last of them the only place `power` and `defense` are
   worth drinking for.
 - **A charge waits, and taking the action spends it** — the first woodcutting
-  trip after the draught, whenever that is. It does not run on a clock.
+  trip after the draft, whenever that is. It does not run on a clock.
 
-  *(It used to. A 30-minute window meant a woodcutting draught drunk in the
+  *(It used to. A 30-minute window meant a woodcutting draft drunk in the
   mountains was simply thrown away, which made scoping a trap rather than a
   choice: the potion you had bought for one line could only be drunk while
   already standing on it. Waiting is what turns the scope back into a decision.)*
@@ -1089,29 +1219,29 @@ the three benches are their own building and queue against nobody.
   permanent effect only accumulates, which the north star forbids. A charge is
   not permanent: it survives until it pays out exactly once.
 - **As many different effects at once as you like; the same effect never twice.**
-  A woodcutting draught and a mining draught are *different things you are better
-  at*, so both may be held, and so may a road tonic on top. Two draughts on the
+  A woodcutting draft and a mining draft are *different things you are better
+  at*, so both may be held, and so may a road tonic on top. Two drafts on the
   same stat and the same action are one thing twice.
 - **When they are the same thing twice, the stronger wins.** Charges on a stat
   contribute their **highest** value, never their sum — so no combination of
-  potions is a way of buying the ceiling in instalments, and a `global` charge
+  potions is a way of buying the ceiling in installments, and a `global` charge
   cannot quietly double up with a line-scoped one on the same trip.
-- **A weaker draught is refused before the flask is opened.** Pouring a common
-  draught on top of a legendary philtre would be paid for and never felt, and an
+- **A weaker draft is refused before the flask is opened.** Pouring a common
+  draft on top of a legendary philtre would be paid for and never felt, and an
   idle game must not take something away for nothing. The refusal reads as *you
   already have better*, and the flask stays in the bag.
 - One charge per (stat, action) is still enforced by a unique index rather than
   by code, and that index is also the cap on hoarding: a cellar of seventy
-  draughts is still four stats across eight actions once drunk. The ceiling on
+  drafts is still four stats across eight actions once drunk. The ceiling on
   any one action is exactly what it was, because the clamp applies to that
   action's aggregate alone.
 - **Seventy of them, fourteen a rung**, across the five rungs a bench can
   reach: yield and trip time on each of the five lines, plus the road, the
-  bench, and the fight — `power` and `defence` scoped to `battle` (§9.5.8).
+  bench, and the fight — `power` and `defense` scoped to `battle` (§9.5.8).
   Scoping is what makes that many potions safe; seventy flat stat boosts would
   be a power ladder you can drink.
 - **Recipes get shorter as they climb.** The number of *different* materials a
-  potion wants never rises with rarity: a common draught is a muddle of four
+  potion wants never rises with rarity: a common draft is a muddle of four
   cheap things, a legendary philtre is two perfect ones. Every one wants at
   least two, so nothing is a one-ingredient shortcut.
 - **Epic and legendary are mintable (§8.0), and §2 gates them with a cap, not a
@@ -1127,7 +1257,7 @@ the three benches are their own building and queue against nobody.
   larger haul — and never by a read. **Costing a hex you are only looking at
   must never burn what you are carrying.**
 - **On screen** the charges sit in the top-left instrument cluster, one hexagon
-  each: the glyph is the *action* it is waiting on, the colour is the *stat* it
+  each: the glyph is the *action* it is waiting on, the color is the *stat* it
   moves — the same two channels §13.1 splits rarity and material across. It is
   the one thing on that plate that is not a number, and tapping it says what
   each charge is and what will spend it. Nothing there may drain or pulse like a
@@ -1144,7 +1274,7 @@ only loot-table tuning.
 
 It happens in two places. **Dungeons** (§9.1–§9.4) are the deliberate trip: you
 kit up, spend a charge, and go. **The road** (§9.5) is the other one, and it
-comes to you — packs stand on hexes and stop travellers. Dungeons are the ladder
+comes to you — packs stand on hexes and stop travelers. Dungeons are the ladder
 the map points inward at; the road is what teaches you to climb it.
 
 ### 9.1 Five dungeons, one per biome, sited in the barren capital ring
@@ -1174,22 +1304,23 @@ the map points inward at; the road is what teaches you to climb it.
 Each step introduces exactly **one** new mechanic (a fight, then charges, then parties).
 
 The pack is what makes the step from hunting to a dungeon floor survivable: it
-is the only place a player learns what attack, defence and durability wear cost
+is the only place a player learns what attack, defense and durability wear cost
 them, and it costs a walk rather than a crafted charge to find out.
 
-### 9.5 Map combat — a pack, a pin, and one roll
+### 9.5 Map combat — a pack, a pin, and an exchange
 
-Monsters stand on hexes. They stop travellers, they block the ground they are
-standing on, and they are settled in **one action** with **no health bar on
-either side**.
+Monsters stand on hexes. They stop travelers, they block the ground they are
+standing on, and they are settled in **one action** — an exchange run to a
+conclusion the moment you close, with **no health bar to watch**, because the
+health bar is your gear's durability and it is already on the item (§9.5.5).
 
 This is the section that wakes four things that have been defined and dead since
 the start: the empty **`weapon` slot** (§8.0 rule 5), the three **battle jobs**
-(§7.4), the **`power` and `defence`** stats, and §3.2's listed **monster gold**,
+(§7.4), the **`power` and `defense`** stats, and §3.2's listed **monster gold**,
 which nothing currently produces.
 
 **There is no elemental cycle in v1.** Eight monsters with explicit attack and
-defence already make "am I built for this one" a real question, and a matchup
+defense already make "am I built for this one" a real question, and a matchup
 table on top would be a second system answering it. §14 keeps it as a later
 layer, where it can tie into Shard types.
 
@@ -1205,7 +1336,7 @@ two hours.
 | Outer (villages) | 0.02 — the road is nearly safe | 2 |
 | Mid (cities) | 0.10 | 4 |
 | Inner (capitals) | 0.18 | 4 |
-| Centre (dungeon mouths) | 0.22 | 4 |
+| Center (dungeon mouths) | 0.22 | 4 |
 
 Lifetime is **2h**, through `Balance::scaled()` like every other clock — the
 fast clock is a testing tool, so it shortens the pin too. Job XP is not scaled
@@ -1233,15 +1364,15 @@ hexes and hours, not by patience.
 | Outer | 2 | 2 | — |
 | Mid | 4 | 2 | outer |
 | Inner | 4 | 2 | mid |
-| Centre | 4 | 2 | inner |
+| Center | 4 | 2 | inner |
 
 Eight in total, and the overlap is the design: walking inward you meet two you
 know how to fight and two you do not, so every ring is **legible and dangerous
-at the same time**. It also gives §5.2's barren centre something to be, on the
+at the same time**. It also gives §5.2's barren center something to be, on the
 walk to a dungeon mouth.
 
-Each carries its own `attack`, `defence` and a profile — a brute is high attack
-and low defence, a carapace the reverse, a fast one is middling in both and
+Each carries its own `attack`, `defense` and a profile — a brute is high attack
+and low defense, a carapace the reverse, a fast one is middling in both and
 wears a weapon harder. The profile is what a player reads, not a level number.
 
 #### 9.5.3 The pin — the road stops, and so does everything else
@@ -1270,7 +1401,7 @@ Which is why **a loss grants no XP at all.** Half XP for losing sounds generous
 and is a trickle you can farm by dying on purpose. Losing is an exit, not a
 strategy.
 
-#### 9.5.4 Attack and defence — flat numbers, not the percentage stats
+#### 9.5.4 Attack and defense — flat numbers, not the percentage stats
 
 Combat needs a base, and §8.1's ceiling makes percentages useless as one: a
 ±15% swing cannot decide a fight on its own. So gear carries **two flat values**
@@ -1280,17 +1411,76 @@ alongside its work stat.
 |---|---|
 | **Weapon** | the `weapon` slot, by rarity rung, split by family |
 | **Armor · boots · gloves** | a smaller pair each, beside their work stat |
+| **A rolled solid line** | §8.0.1 — an option may be a solid number instead of a percentage, and it simply adds |
 | **Battle job level** | added directly — the proof you have fought |
-| **`power` / `defence`** | percentages **multiplying** the gear total, inside the same +15% ceiling |
+| **`power` / `defense`** | percentages **multiplying** the gear total, inside the same +15% ceiling |
+
+**`attack` and `defense` are solid numbers and the `power`/`defense` StatKeys
+are percentages, and the two must never be confused.** They share a name in one
+case, which is why anything that can be either — a rolled line — carries a
+`kind` saying which.
+
+**On screen the percentage twins are never printed on the item.** A weapon's
+`power` and a battle piece's `defense` are the percentage forms of the pair, and
+printing both put an inert number where the deciding one should be: +3% power
+moves a common sword from 5 attack to 5. The chips show the pair instead, which
+is the same stat said in the units it is felt in. The percentage is still real
+and still applies — it is visible where it is *felt*, in the totals on the Hero
+screen, rather than on a shelf tag where it reads as a second opinion.
+
+**A zero half is not shown at all.** "0 attack" is not information; it is a slot
+the piece does not fill, and printing it made every travel cloak look like it
+had lost a fight.
+
+**One component draws all of it** — trader, bench, almanac, bag and gear list —
+so a piece reads the same wherever it is met. The pair is told apart by its
+label, never by color: §13.3 spends ember on a state to deal with and sap on one
+worth crossing the screen for, and a stat is neither. An attack drawn in ember
+would read as a warning about the sword. They share a name in one
+case, which is why anything that can be either — a rolled line — carries a
+`kind` saying which.
+
+**Both are on the player state, not only on a fight preview.** What your kit is
+worth is a thing to know while shopping, not something to discover by finding a
+pack standing on your hex — so the pair and the pool (§9.5.5) ride the state,
+and the Hero screen prints them in their own block. Solid numbers get a block
+rather than a meter, because a meter implies a roof and these have none.
+
+**Defense belongs to armor, to the shield, and to the sword.** Those are the
+three things whose job is to be between you and something: the worn set, the
+thing built to stop a blow, and the one weapon family that is meant to be the
+balanced answer. **A focus has none at all** — a focus that also held a little
+of it would be the balanced one twice, and the glass cannon is the point. It is
+paid for in attack.
+
+**The five gathering tools carry an attack too, and it is not this one.** A
+tool's attack is what it takes out of a *hex* per second (§7.3); it is worth
+nothing in a fight, and combat never reads it. §8 rule 5 has always kept the two
+ladders apart, and this is the direction it had not needed to say out loud
+before there was a number on both sides.
 
 **One weapon slot, three families**, and the family is your class — the three
 §7.4 already names:
 
-| Family | Job | Profile |
-|---|---|---|
-| Shield | Shieldbearer | defence-heavy |
-| Sword | Swordhand | balanced |
-| Focus | Runecaster | attack-heavy |
+| Family | Job | Split | Legendary pair |
+|---|---|---|---|
+| Shield | Shieldbearer | **⅓ attack, ⅔ defense** | 14 / 31 |
+| Sword | Swordhand | **half and half** | 18 / 17 |
+| Focus (wand) | Runecaster | **⅘ attack** | 27 / 7 |
+
+**Balanced means an even split, not "a bit of both".** The sword is the one
+family whose two numbers are the same, and that is what makes it the reference
+the other two are read against.
+
+**A wand keeps a little off you, and a shield lands a little.** Neither may be
+zero. A wand at zero guard would make the sword the balanced one twice over; a
+shield that cannot land is not a defensive build but a stalemate, because
+§9.5.5 makes a fight a **race** — surviving everything in the center and putting
+none of it down loses on the bell.
+
+**The shield carries a larger budget than the other two**, and that is not a
+thumb on the scale: a shieldbearer has no offense anywhere else in the kit,
+while the other two spend the same total on a shape that kills faster.
 
 One slot rather than three, because you fight with one thing. The five
 **gathering** tools are all equipped at once precisely because they never
@@ -1300,7 +1490,7 @@ job levels by fighting with a shield, a sword or a focus, and this is what
 finally gives that sentence something to count.
 
 **Armor is one set with two axes, not a second wardrobe.** Every armor, boots
-and gloves item gains attack and defence next to its work stat, and
+and gloves item gains attack and defense next to its work stat, and
 combat-leaning pieces sit beside work-leaning ones at every rung. Forcing a
 change of clothes before every fight would be friction, not a decision (§8 rule
 3) — the decision belongs at the bench.
@@ -1334,13 +1524,32 @@ where you are allowed to stand.
 a cheap epic with nothing capped underneath it would be the grind→NFT path the
 threat model exists to close.
 
-**Work gear reaches the contested ring; the centre asks for battle gear.** A
-full legendary *work* set handles a tier-3 pack comfortably — around 80% — and
-is a coin flip at best against the centre's two, around a third, while a
-legendary battle set clears them at roughly three in four. That is the intended
-shape of the last step inward: it is a kit decision rather than a level one, and
-it is the first time in the game that giving up trip time and travel speed is
-the right call.
+**Work gear stops at the treeline; anything past it asks for battle gear.** The
+measured ladder, against the eight of §9.5.2:
+
+| Kit | Beats |
+|---|---|
+| No weapon at all | the tier-1 carapace, and nothing else |
+| Common battle | tier 1 |
+| Rare, any family | tiers 1–3, and **neither** of the center's two |
+| Epic sword | + the Barrow Knight. Driven off by the Ash Revenant |
+| Epic wand | + the Barrow Knight, and the Ash Revenant **about 3 times in 5** |
+| Epic shield | tiers 1–3 only. It survives a carapace and cannot put one down |
+| Legendary, any family | everything |
+| Full legendary *work* set | tier 1 and the tier-2 carapace |
+
+**The wand is the only kit in the game with a genuinely uncertain fight**, and
+that falls out of the model rather than being arranged: an epic wand and an Ash
+Revenant race each other closely enough that §9.5.5's ±15% swing decides it.
+
+**The shield is always the most expensive win.** A slow kill is more rounds, and
+more rounds is more of both wear streams (§9.5.6) — a legendary shield pays 235
+durability in the center where a legendary wand pays 145. Survivability is not
+free; it is paid at the repair bench instead of on the odds.
+
+That is the intended shape of the walk inward: it is a kit decision rather than
+a level one, and giving up trip time and travel speed is not optional past the
+mid ring — it is the only way through.
 
 **Every worn piece carries the pair, at every rung including the top two.** The
 legendary and unique work pieces were written before §9.5.4 and had none, which
@@ -1348,49 +1557,69 @@ made a Wardencoat worth less in a fight than a common travel cloak. They are far
 under the battle piece of the same rarity — 1/9 against 2/18 for armor — and
 that gap *is* the trade above, rather than an accident of tuning.
 
-#### 9.5.5 One roll, and it is a margin
+#### 9.5.5 An exchange, and durability is the health bar
 
 ```
-strike = myAttack  - itsDefence
-hold   = myDefence - itsAttack
-margin = (strike + hold) / 2
+myHp   = total durability of the equipped weapon, armor, boots and gloves
+itsHp  = the monster's own `hp`
 
-odds   = clamp(0.5 + margin / (2 * BAND), 0.05, 0.95)   // BAND = 20
-win    if U(0, 1) < odds                                // U seeded, server-side
+each round, you strike first and it strikes back if it is still standing:
+  hit = max(strikeFloor(attacker), attacker.attack - defender.defense) * swing
+  strikeFloor(a) = max(1, ceil(a * BATTLE_CHIP_FRACTION))     // 10%
+  swing = U(1 - BATTLE_SWING, 1 + BATTLE_SWING)               // ±15%, seeded
+
+you win  if its pool empties first
+you lose if yours does, or if it is still standing at round BATTLE_MAX_ROUNDS
 ```
 
-**The band is what makes it a decision.** A straight comparison decides every
-fight before it is tapped — scout the number and you either always win or never
-engage — and there is nothing left to choose. A band turns it into a *known
-risk*, and the 5%/95% clamp means never certain and never hopeless, which is the
-same instinct as §7.3's floor.
+**There is no second pool to invent.** The gear holding you up is the gear the
+fight is spending, so a beating and a repair bill are one event rather than two,
+and §11.1's largest sink is fed by the thing that already decides whether you
+should have engaged.
 
-**`BATTLE_BAND` is the one number that decides whether any of that is true.** It
-started at 10 and had to be 20. Monster stats are twenty to forty points apart
-(§9.5.2), so at 10 every matchup saturated on a clamp and the band collapsed
-back into the straight comparison it exists to replace: 95% or 5%, with almost
-nothing between. At 20 a rung beats its own tier around 60–80%, is a real risk
-one tier up at 30–50%, and is properly outmatched two tiers up. Widen it further
-and the ladder flattens the other way — at 40 a common kit is a third of the way
-to killing a centre monster, which makes the ladder decorative.
+*(It used to be a single roll against a margin, with a band to keep it from
+being decided before it was tapped. An exchange gets that for free and gets
+something the coin never had: a **cost**. The interesting question stops being
+"will I win" — which a preview answers anyway — and becomes "is this worth what
+it takes off my kit".)*
 
-**The roll is against the odds, not against the margin**, and at the edges those
-are two different games. Adding U(−10, +10) to a margin of +15 wins every throw,
-while the number the player was shown says 95% — so the clamp would be a claim
-the die does not honour. The preview is a promise, which makes the number on it
-the one the fight has to be settled by.
+**Combat slots only.** The five gathering tools are not in the pool and never
+wear in a fight: §8 rule 2 says only the tool that did the work wears and the
+others idle, so counting an axe toward it would quietly turn a full tool belt
+into armor.
 
-**A fight takes time, and you are held on that hex while it runs.** It used to
-be instant, which made a pack a button rather than an engagement: tap, read the
-plate, walk on. The clock is short — three minutes plus two a tier, so five at
-the treeline and eleven in the centre, well under the cheapest bench run (§8.4)
-because the pin (§9.5.3) is already holding you and a long clock on top would
-make one pack a lost afternoon.
+Four numbers hold the shape, and each of them had to be what it is:
+
+- **`BATTLE_CHIP_FRACTION` = 10%.** Straight subtraction makes armor an on/off
+  switch — one point either side of an attack turns routine into impossible,
+  which is exactly how every matchup came out 0% or 100%. A striker always gets
+  a tenth of its attack through, so a heavy hitter still hurts a wall and a
+  light one still cannot. That slope is the whole difference between a rare kit
+  and an epic one against the same Barrow Knight.
+- **`BATTLE_MAX_ROUNDS` = 60, and the bell is a LOSS.** Pools are far larger
+  than anything a pack carries, so a long enough fight is won by whoever brought
+  more durability — a wall could be ground down by a kit with no business
+  touching it. Failing to put something down is being driven off. Sixty rather
+  than forty because at forty the bell decided nearly every losing fight, which
+  made defense worthless: you won if your attack cleared the HP in time and
+  armor only moved the bill. At sixty most losses are the pool running out, so
+  the guard is back in the outcome.
+- **`BATTLE_SWING` = ±15%.** Otherwise a fight is a calculator. It is enough
+  that two runs at one pack are not the same fight, and enough to decide a
+  genuinely close one; in a lopsided matchup it only moves the cost, which is
+  correct — being outclassed should not be a lottery.
+- **You strike first.** A small edge, and the right one: engaging is a decision
+  you made and being engaged is not.
+
+**A fight takes time, and you are held on that hex while it runs.** Three
+minutes plus two a tier, so five at the treeline and eleven in the center — well
+under the cheapest bench run (§8.4), because the pin (§9.5.3) is already holding
+you and a long clock on top would make one pack a lost afternoon.
 
 Three things follow, and all three are the same rule the rest of the game runs
 on:
 
-- **The roll happens when you close, and is stored.** Exactly as a trip records
+- **The exchange is run when you close, and stored.** Exactly as a trip records
   the material its tool could reach: the kit that took the fight is the kit that
   fought it, and swapping to a better sword while the timer runs buys nothing.
 - **The pack is spent on engagement, not on resolution.** While you are swinging
@@ -1399,51 +1628,58 @@ on:
   and once the first is chosen there is no third — dropping it would be a way to
   duck a loss, and a loss is a death (§9.5.7).
 
-**The odds are shown before you commit**, off a preview like `previewGather`,
-alongside the monster's numbers and any warning about gear that will not survive
-(§8.2). Server-computed and server-seeded, like every other outcome (§16).
+**The preview is a promise, not a guess.** It runs the same exchange with the
+swing taken out and prints what the arithmetic says: whether you take it, in how
+many rounds, and what it costs. The fight then wanders by fifteen per cent
+either way. Server-computed and server-seeded, like every other outcome (§16).
 
-**What a loss costs is printed beside them, every time.** Not as a condition
-that sometimes applies — losing is dying (§9.5.7), so it is the terms of the
-fight rather than a hazard to check for. The odds are half the decision; what
-they are odds *of* is the other half.
+**What a loss costs is printed beside it, every time.** Not as a condition that
+sometimes applies — losing is dying (§9.5.7), so it is the terms of the fight
+rather than a hazard to check for.
 
 #### 9.5.6 Durability wear *is* the combat system
 
-There is no health, so the fight's cost lands on the gear, and it scales with
-how badly matched you were. Two wear rolls per fight, both driven by a gap.
+The pool that held you up **is** the gear, so what the exchange took off the
+pool comes off the pieces. There is nothing to convert and no second schedule to
+invent: the health bar and the repair bill are the same number read twice.
 
-**The weapon wears on the gap to their defence.**
-
-```
-gap  = itsDefence - myAttack                       // positive: outclassed
-wear = (WEAR_BASE + max(0, gap) * WEAR_PER_GAP) * (won ? 1.0 : 1.5)
-       capped at 15% of maxDurability
-```
-
-`WEAR_BASE` 2, `WEAR_PER_GAP` **0.4**. A matched weapon costs 2 a fight; the
-same weapon ten points under a carapace costs 6, and 9 if it loses. Hitting a
-wall chips the blade — which means **bringing the wrong class is expensive even
-when you win**, and that is the entire reason the profiles in §9.5.2 matter.
-
-The 15% cap is not optional now that zero is fatal (§8.2): without it one
-hopeless fight snaps a legendary outright, and the warning in §9.5.5 would be
-the only thing standing between a player and losing a week of work to a mistap.
-
-**One random worn piece takes the hit.**
+**The beating lands on what was built to soak it.**
 
 ```
-piece  = seededPick([armor, boots, gloves])        // an empty slot protects nothing
-excess = itsAttack - piece.defence
-wear   = WEAR_BASE + max(0, excess) * WEAR_PER_EXCESS
+bill   = min(damageTaken, pool * BATTLE_POOL_WEAR_CAP)    // half the pool
+share  = bill spread across the combat pieces, weighted by maxDurability
 ```
 
-Random rather than spread, for two reasons: the repair bills **stagger** instead
-of arriving together, and a weak piece is eventually **found out** rather than
-never. An empty slot takes no wear — and contributed nothing to `hold`, so going
-without is cheap and loses.
+Weighted by what a piece was built to take rather than by what is left of it, so
+a big coat takes the brunt and a nearly-broken piece is **found out** rather
+than quietly protected. Whatever a piece cannot absorb spills to the others,
+which is what lets a fight empty a pool without any of the arithmetic going
+missing.
 
-#### 9.5.7 Death — when nothing was left to take the hit
+**The cap is on the bill, not on the outcome.** Now that the pool is the gear,
+an uncapped exchange in the center would strip a whole legendary set in one go —
+and §8.2's warning would be the only thing between a player and a week of work.
+The fight is still lost either way; it costs at most half.
+
+**The blade pays separately, and it pays for what it was swung AT.**
+
+```
+perRound = max(1, ceil(itsDefense / WEAPON_WEAR_DIVISOR))    // divisor 8
+wear     = perRound * rounds * itsWearBias
+```
+
+Enemy armor is what blunts a weapon, so a round against a 58-defense Barrow
+Knight costs seven and one against a Moss Hound costs one. **Bringing the wrong
+class is expensive even when it wins**, which is the entire reason the profiles
+in §9.5.2 matter — and a swift monster blunts harder than its numbers suggest,
+which is its whole `wearBias`.
+
+Two streams rather than one, because they answer two different questions: what
+*hit you* is on the armor, and what *you hit* is on the blade. A long grind
+against a wall you can barely scratch is cheap in the first and ruinous in the
+second, which is exactly right.
+
+#### 9.5.7 Death — what losing is
 
 Death is not a third outcome. It is what losing *is*:
 
@@ -1452,14 +1688,15 @@ Death is not a third outcome. It is what losing *is*:
 *(It used to be narrow — a loss only killed you when nothing absorbed it, no
 armor at all or the piece that would have taken the hit going with it. That made
 the interesting question "am I wearing anything" rather than "should I take this
-fight", and the second one is what the odds exist to be read for. **Armor still
-decides whether you lose** — defence feeds the hold and the hold is half the
-margin — it simply no longer decides what losing costs.)*
+fight", and the second one is what the preview exists to be read for. **Armor
+still decides whether you lose** — defense is what a strike is subtracted from,
+and the pool it protects is the one that empties — it simply no longer decides
+what losing costs.)*
 
 What it costs:
 
 1. You wake at the **nearest settlement**. The walk back is the first bill, and
-   at ten minutes a hex it is a real one.
+   at five minutes a hex it is a real one.
 2. The pack takes **one row from your bag** — truly random, gear or material.
 3. **The pack does not despawn.** It becomes a **carrier**, named for what it
    took, drawn as a `XXX's corpse` glyph. It lives **24h**, and the clock is on
@@ -1508,7 +1745,7 @@ and durability.
 
 That second half is not flavour, it is §2. An item another wallet can pick up is
 a **direct player-to-player transfer**, which the threat model closes outright,
-and "random row" is no defence at all:
+and "random row" is no defense at all:
 
 > Empty the bag down to the one thing you want to move. Fight naked. Die. The
 > carrier now holds exactly that, marked on the map. Partner walks over, kills
@@ -1538,11 +1775,11 @@ grind→NFT faucet the threat model exists to close.
 
 **Harder packs roll better options, not better rarity.** A tougher monster
 grants **extra option slots** (§8.0.1) on what it drops — the same mechanism the
-capital bazaar already uses — so a centre-ring kill can hand you a rare carrying
+capital bazaar already uses — so a center-ring kill can hand you a rare carrying
 three lines, and never an epic.
 
-Battle draughts come off the ichor line and want a new **`battle` buff scope**
-(§8.5) moving `power` and `defence`: twelve more on the shelf, two a rung.
+Battle drafts come off the ichor line and want a new **`battle` buff scope**
+(§8.5) moving `power` and `defense`: twelve more on the shelf, two a rung.
 
 ---
 
@@ -1654,8 +1891,8 @@ can close, and it would sit on its name and its code forever.
 
 #### 10.0.3 The flag — 32×32, drawn in the app
 
-A guild draws its own flag on a 32×32 grid, a dot at a time, in **any colour**.
-It is stored as exactly 1024 colours and nothing else: no upload, no file, no
+A guild draws its own flag on a 32×32 grid, a dot at a time, in **any color**.
+It is stored as exactly 1024 colors and nothing else: no upload, no file, no
 URL. What can be in the column is bounded by the column's own shape, which is
 the only kind of user-supplied image this game is willing to carry.
 
@@ -1885,13 +2122,13 @@ extension point; adding a quest is a row in `Quests::DEFS` and nothing else.
 
 **On screen** it is a ledger in the top-right screens block, and its cell goes
 **green** when something is payable. That is the same idea as the bag's ember
-(§7.6) pointed the other way, and the colour is the whole distinction: ember is
+(§7.6) pointed the other way, and the color is the whole distinction: ember is
 what a *problem* looks like — a full bag, a broken tool — and a reward wearing it
 reads as an alarm going off over good news.
 
 Gold is taken too, and deliberately not reused for this: gold is the currency,
 it is already on every reward figure in the panel, and spending it on status as
-well would make "20g" and "done" the same colour saying two different things.
+well would make "20g" and "done" the same color saying two different things.
 
 Two tabs and no third: **pending** is everything still owed you, in progress or
 finished-and-waiting, sorted so the payable rows come first; **completed** is
@@ -1918,8 +2155,8 @@ nothing else.
 | Axis | Encoding |
 |---|---|
 | Equipment slot | One base silhouette (axe, pickaxe, bow, hammer, sickle, armor, boots, gloves, weapon) |
-| Rarity | Six colours: grey → green → blue → violet → gold → ember. Owns the hex frame and the glow; ornamentation starts at rare. |
-| Material | Accent stays on the body, so "what it is made of" and "how good it is" never compete for the same colour |
+| Rarity | Six colors: gray → green → blue → violet → gold → ember. Owns the hex frame and the glow; ornamentation starts at rare. |
+| Material | Accent stays on the body, so "what it is made of" and "how good it is" never compete for the same color |
 
 ### 13.2 Map rendering (critical implementation notes)
 
@@ -1945,7 +2182,7 @@ The working approach, after several failed attempts:
   scouting report stops, and it vanishes entirely on the road, where sight is
   zero. Every hex outside it is still walkable — the map must never imply
   otherwise.
-- **Beyond sight a tile gets its terrain colour and, if anybody lives there, a
+- **Beyond sight a tile gets its terrain color and, if anybody lives there, a
   settlement glyph — tier only, no name.** Nothing else: no props, no slot pips,
   no labels. The glyph is what makes deciding to walk somewhere possible; the
   absence of everything else is what makes arriving worth something.
@@ -1966,7 +2203,7 @@ sap        #8fbf7f
 forest     #5f8058   mountain  #6d8399   plains  #b08a5a
 badlands   #96604c   grassland #a8a05c
 ```
-Depleted tiles use a darker/desaturated variant of their **own biome color**, never grey —
+Depleted tiles use a darker/desaturated variant of their **own biome color**, never gray —
 the land is drained, not dead, and it will regrow.
 
 **Ember and sap are a pair, and neither may do the other's job.** Ember marks a

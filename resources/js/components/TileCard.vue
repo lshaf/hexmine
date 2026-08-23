@@ -16,6 +16,7 @@ import { computed, ref, watch } from 'vue'
 import { useGame } from '@/stores/game'
 import { MATERIALS, RING_LABEL, SKILL_BY_KEY, skillForMaterial } from '@/game/catalog'
 import { formatDuration, formatSpan } from '@/game/formulas'
+import { MINING } from '@/game/balance'
 import { waterLabel } from '@/game/water'
 import { VARIANT_LABEL } from '@/game/variants'
 import { hexDistance } from '@/map/hexGeometry'
@@ -25,6 +26,8 @@ import SvgIcon from './SvgIcon.vue'
 import type { MaterialKey } from '@/game/types'
 
 const game = useGame()
+
+const floorMinutes = Math.round(MINING.floorSeconds / 60)
 
 const tile = computed(() => game.selectedTile)
 const preview = computed(() => game.preview)
@@ -152,7 +155,7 @@ const overloaded = computed(() => Boolean(game.character?.bag.over))
  *
  * §7.6's overloaded bag is deliberately NOT here. It is the one refusal the
  * player can undo from where they are standing, so it must be *said* rather
- * than greyed out: the button stays live, the server refuses the walk, and its
+ * than grayed out: the button stays live, the server refuses the walk, and its
  * own message -- which names the limit and how much to shed -- arrives as a
  * toast. A dead button explains nothing and reads as a bug.
  */
@@ -320,16 +323,24 @@ watch(tile, () => {
 
           <div v-if="trip" class="inset breakdown tiny">
             <div class="row-between">
-              <span class="muted">Base tile time</span>
-              <span class="readout">{{ formatSpan(gameTime(trip.baseSeconds)) }}</span>
+              <span class="muted">Ground to work through</span>
+              <span class="readout">{{ trip.durability }}</span>
             </div>
             <div class="row-between">
-              <span class="muted">Skill reduction</span>
-              <span class="readout good">−{{ formatSpan(gameTime(trip.skillReduction)) }}</span>
+              <span class="muted">Tool</span>
+              <span class="readout" :class="{ good: trip.toolAttack > 0 }">
+                +{{ trip.toolAttack }}/s
+              </span>
             </div>
             <div class="row-between">
-              <span class="muted">Equipment reduction</span>
-              <span class="readout good">−{{ formatSpan(gameTime(trip.equipReduction)) }}</span>
+              <span class="muted">Skill</span>
+              <span class="readout" :class="{ good: trip.skillAttack > 0 }">
+                +{{ trip.skillAttack }}/s
+              </span>
+            </div>
+            <div class="row-between">
+              <span class="muted">Your rate</span>
+              <span class="readout good">{{ trip.rate }}/s</span>
             </div>
             <hr class="divider" />
             <div class="row-between">
@@ -337,7 +348,8 @@ watch(tile, () => {
               <span class="readout">{{ formatSpan(gameTime(trip.seconds)) }}</span>
             </div>
             <p v-if="trip.clamped" class="note clamp">
-              Clamped to the 30-minute floor. More reduction is wasted on this hex.
+              Clamped to the {{ floorMinutes }}-minute floor. A faster rate is
+              wasted on this hex.
             </p>
             <p v-if="compressed" class="note">
               Development clock ×{{ game.timeScale }} — it finishes in

@@ -4,13 +4,13 @@
  *
  * "Here" is literal. This reads the hex under the character's feet, never the
  * one that happens to be selected -- aiming at a hex is the tile card's job, and
- * so is travelling to it. The dock is only ever about the ground you stand on.
+ * so is traveling to it. The dock is only ever about the ground you stand on.
  *
  * Mining is one trip at a time and it pins you in place until you deal with it,
  * so Mine and Claim are a single slot at two moments of the same trip rather
  * than two buttons competing for attention. Trading, crafting and processing
  * appear only at a settlement (§6) -- there is no trader in the middle of a
- * forest, and greying one out would imply there could be.
+ * forest, and graying one out would imply there could be.
  */
 import { computed, ref, watch } from 'vue'
 import { useGame } from '@/stores/game'
@@ -62,7 +62,7 @@ const placeName = computed(() => {
 const trip = computed(() => game.fieldJob)
 const ready = computed(() => Boolean(trip.value && trip.value.endsAt <= game.now))
 
-/** Ground worth working. Settlement tiles and the barren centre have neither. */
+/** Ground worth working. Settlement tiles and the barren center have neither. */
 const seam = computed(() => Boolean(underfoot.value?.material))
 
 /**
@@ -76,7 +76,7 @@ const seam = computed(() => Boolean(underfoot.value?.material))
 const gather = computed(() => underfoot.value?.gather)
 
 /**
- * Nothing here is greyed out for want of a tool, and that is the rule.
+ * Nothing here is grayed out for want of a tool, and that is the rule.
  *
  * A dead cell has to explain itself in a tooltip nobody opens on a phone, so
  * the cells stay live and the server answers -- once, in a toast, in the same
@@ -140,7 +140,7 @@ const herdGoing = computed(() => {
  * work here and no road out.
  *
  * The dock says the two exits out loud, because a refusal that names neither
- * reads as a bug: fight it, or wait for its clock. Nothing is greyed out to
+ * reads as a bug: fight it, or wait for its clock. Nothing is grayed out to
  * explain the pin -- the verbs are simply not what this hex is offering.
  */
 const pinned = computed(() => Boolean(underfoot.value?.pinned))
@@ -191,11 +191,14 @@ const packHint = computed(() => {
   if (!b) return 'Nothing here will let you work'
   if (b.reason) return b.reason
 
-  // §9.5.5 -- the odds, both pairs, and how long the swing takes. What a loss
-  // costs is on the warning line underneath, because it is not a number.
+  // §9.5.5 -- what the exchange says, and what it costs. The fight is not a
+  // coin any more, so the plate says WIN or DRIVEN OFF rather than a
+  // percentage. What a loss costs is on the warning line underneath.
   const clock = b.seconds ? ` · ${formatDuration(b.seconds * 1000)}` : ''
+  const call = b.expected?.won ? 'You take it' : 'It drives you off'
+  const bill = b.wear ? ` · −${b.wear.taken + b.wear.weapon} durability` : ''
 
-  return `${Math.round((b.odds ?? 0) * 100)}% · you ${b.attack}/${b.defence} · it ${b.monster?.attack}/${b.monster?.defence}${clock}`
+  return `${call} in ${b.expected?.rounds ?? 0} · you ${b.attack}/${b.defense}/${b.pool}hp · it ${b.monster?.attack}/${b.monster?.defense}/${b.monster?.hp}hp${bill}${clock}`
 })
 
 /**
@@ -218,9 +221,11 @@ const corpseHint = computed(() => {
   const c = corpse.value
   if (!c) return ''
 
-  const odds = battle.value?.canFight ? `${Math.round((battle.value.odds ?? 0) * 100)}% · ` : ''
+  const call = battle.value?.canFight
+    ? `${battle.value.expected?.won ? 'You take it' : 'It drives you off'} · `
+    : ''
 
-  return c.mine ? `${odds}${c.label} comes home` : `${odds}${c.label} burns if you take it`
+  return c.mine ? `${call}${c.label} comes home` : `${call}${c.label} burns if you take it`
 })
 
 const huntHint = computed(() => {
@@ -354,7 +359,7 @@ function hunted(): void {
 
           <!-- §9.5.3 -- one of the two exits, and the only one that is an
                action. The other is the clock beside it, which needs no button.
-               Never greyed: a loss clears the pack as surely as a win does, so
+               Never grayed: a loss clears the pack as surely as a win does, so
                fighting is always available even bare-handed -- that is what
                keeps the pin from being a dead end (§5.6). -->
           <HexAction
@@ -371,7 +376,7 @@ function hunted(): void {
         <template v-else>
           <!-- Both verbs, always, on any hex that has a seam at all. Which one
                is lit says which one the belt is ready for; neither is closed,
-               because §4.0 is about the ground being open and a greyed cell
+               because §4.0 is about the ground being open and a grayed cell
                says the opposite. -->
           <HexAction
             v-if="seam"
@@ -424,7 +429,7 @@ function hunted(): void {
           />
         </template>
 
-        <!-- Settlement-only. Absent in the field rather than greyed: the point
+        <!-- Settlement-only. Absent in the field rather than grayed: the point
              is that these people are not out here. -->
         <template v-if="here">
           <span v-if="trip || seam || herd" class="rule" aria-hidden="true" />

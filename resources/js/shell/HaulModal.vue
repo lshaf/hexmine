@@ -26,7 +26,7 @@
  * back, each share in that material's own accent. It says the *shape* of the
  * haul before a single figure is read, which is the difference between a payoff
  * and an inventory diff, and it is drawn from the game's own material palette
- * rather than from a chart library's idea of a colour.
+ * rather than from a chart library's idea of a color.
  *
  * Everything here is from the server's own response. The client never decides
  * what dropped, only how to show it (§16).
@@ -323,7 +323,7 @@ onBeforeUnmount(() => {
   font-size: 13px;
 }
 
-/* The count takes the material's own colour, so the list and the bar above it
+/* The count takes the material's own color, so the list and the bar above it
    are plainly the same reading twice. */
 .qty {
   font-size: 13px;

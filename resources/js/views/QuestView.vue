@@ -314,11 +314,11 @@ const earned = computed(() => completed.value.reduce((n, r) => n + r.gold, 0))
 /*
  * Finished reads GREEN, not gold and not ember.
  *
- * Ember is the colour of something wrong -- a full bag, a broken tool -- and a
+ * Ember is the color of something wrong -- a full bag, a broken tool -- and a
  * payout wearing it reads as an alarm going off over good news. Gold is taken
  * too: it is the currency itself, and it is on every reward figure on this
  * screen, so spending it on status as well would make "20g" and "done" the same
- * colour saying two different things.
+ * color saying two different things.
  */
 .tally.ready {
   background: var(--sap);

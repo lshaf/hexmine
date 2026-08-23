@@ -63,7 +63,7 @@ const wrap = ref<HTMLDivElement | null>(null)
 const canvas = ref<HTMLCanvasElement | null>(null)
 
 const zoom = ref(2)
-const centre = ref({ col: 0, row: 0 })
+const center = ref({ col: 0, row: 0 })
 const picked = ref<SettlementMark | null>(null)
 const size = ref({ w: 0, h: 0 })
 
@@ -91,8 +91,8 @@ const tiersShown = computed<SettlementTier[]>(() => {
   return ['capital']
 })
 
-/** Villages are never labelled -- there are too many. Tap one to name it. */
-const labelledTiers = computed<Set<SettlementTier>>(() => {
+/** Villages are never labeled -- there are too many. Tap one to name it. */
+const labeledTiers = computed<Set<SettlementTier>>(() => {
   const set = new Set<SettlementTier>(['capital'])
   if (pxPerCol.value >= 1.2) set.add('city')
   return set
@@ -101,7 +101,7 @@ const labelledTiers = computed<Set<SettlementTier>>(() => {
 // ------------------------------------------------------------------- raster
 
 const raster = document.createElement('canvas')
-let rasterCentre = { col: 0, row: 0 }
+let rasterCenter = { col: 0, row: 0 }
 let rasterZoom = -1
 let rasterMarks: SettlementMark[] = []
 
@@ -113,8 +113,8 @@ function ensureRaster(): void {
   const rw = w + RASTER_MARGIN * 2
   const rh = h + RASTER_MARGIN * 2
 
-  const movedX = Math.abs(centre.value.col - rasterCentre.col) * pxPerCol.value
-  const movedY = Math.abs(centre.value.row - rasterCentre.row) * pxPerRow.value
+  const movedX = Math.abs(center.value.col - rasterCenter.col) * pxPerCol.value
+  const movedY = Math.abs(center.value.row - rasterCenter.row) * pxPerRow.value
   const fits =
     rasterZoom === zoom.value &&
     raster.width === rw &&
@@ -126,7 +126,7 @@ function ensureRaster(): void {
 
   raster.width = rw
   raster.height = rh
-  rasterCentre = { ...centre.value }
+  rasterCenter = { ...center.value }
   rasterZoom = zoom.value
 
   const ctx = raster.getContext('2d')
@@ -143,8 +143,8 @@ function ensureRaster(): void {
   const blockW = Math.ceil(stepCol * px) + 1
   const blockH = Math.ceil(stepRow * py) + 1
 
-  const leftCol = rasterCentre.col - rw / 2 / px
-  const topRow = rasterCentre.row - rh / 2 / py
+  const leftCol = rasterCenter.col - rw / 2 / px
+  const topRow = rasterCenter.row - rh / 2 / py
   const rightCol = leftCol + rw / px
   const bottomRow = topRow + rh / py
 
@@ -195,8 +195,8 @@ const overlaps = (a: Box, b: Box) =>
 
 function toCanvas(col: number, row: number): { x: number; y: number } {
   return {
-    x: size.value.w / 2 + (col - centre.value.col) * pxPerCol.value,
-    y: size.value.h / 2 + (row - centre.value.row) * pxPerRow.value,
+    x: size.value.w / 2 + (col - center.value.col) * pxPerCol.value,
+    y: size.value.h / 2 + (row - center.value.row) * pxPerRow.value,
   }
 }
 
@@ -217,8 +217,8 @@ function draw(): void {
   ctx.clearRect(0, 0, w, h)
 
   // The cached terrain, shifted by however far the view has drifted from it.
-  const offsetX = w / 2 - (centre.value.col - rasterCentre.col) * pxPerCol.value - raster.width / 2
-  const offsetY = h / 2 - (centre.value.row - rasterCentre.row) * pxPerRow.value - raster.height / 2
+  const offsetX = w / 2 - (center.value.col - rasterCenter.col) * pxPerCol.value - raster.width / 2
+  const offsetY = h / 2 - (center.value.row - rasterCenter.row) * pxPerRow.value - raster.height / 2
   ctx.imageSmoothingEnabled = false
   ctx.drawImage(raster, offsetX, offsetY)
 
@@ -246,7 +246,7 @@ function draw(): void {
   }
   ctx.restore()
 
-  // Dungeons: five fixed sites in the barren centre, §9.1.
+  // Dungeons: five fixed sites in the barren center, §9.1.
   for (const site of cfg.dungeonSites) {
     const { x, y } = toCanvas(site.col, site.row)
     ctx.fillStyle = '#7d5fa8'
@@ -291,7 +291,7 @@ function draw(): void {
    */
   const placed: Box[] = []
   const byRank = onScreen
-    .filter((s) => labelledTiers.value.has(s.mark.tier))
+    .filter((s) => labeledTiers.value.has(s.mark.tier))
     .sort((a, b) => DOT[b.mark.tier].rank - DOT[a.mark.tier].rank)
 
   for (const { mark, x, y } of byRank) {
@@ -341,7 +341,7 @@ function schedule(): void {
   })
 }
 
-watch([zoom, centre, size], schedule, { deep: true })
+watch([zoom, center, size], schedule, { deep: true })
 
 // --------------------------------------------------------------- interaction
 
@@ -363,24 +363,24 @@ function onPointerMove(event: PointerEvent) {
   last = { x: event.clientX, y: event.clientY }
   moved += Math.hypot(dx, dy)
 
-  centre.value = clampCentre(
-    centre.value.col - dx / pxPerCol.value,
-    centre.value.row - dy / pxPerRow.value,
+  center.value = clampCenter(
+    center.value.col - dx / pxPerCol.value,
+    center.value.row - dy / pxPerRow.value,
   )
 }
 
 /**
  * Keep the sheet full of world. Panning stops at the edges, and once the whole
- * map fits the canvas it simply sits centred -- a chart framed against a void is
+ * map fits the canvas it simply sits centerd -- a chart framed against a void is
  * a chart you have to fight to read.
  */
-function clampCentre(col: number, row: number): { col: number; row: number } {
+function clampCenter(col: number, row: number): { col: number; row: number } {
   const cfg = worldParams()
   const halfCols = size.value.w / 2 / pxPerCol.value
   const halfRows = size.value.h / 2 / pxPerRow.value
 
   // §5.1 -- the map runs -radius..radius, so the far edge is negative on two
-  // sides. When the chart is wider than the world the centre is the origin.
+  // sides. When the chart is wider than the world the center is the origin.
   return {
     col: halfCols * 2 >= cfg.size ? 0 : clamp(col, halfCols - cfg.radius, cfg.radius - halfCols),
     row: halfRows * 2 >= cfg.size ? 0 : clamp(row, halfRows - cfg.radius, cfg.radius - halfRows),
@@ -425,7 +425,7 @@ function onWheel(event: WheelEvent) {
  *
  * The wheel anchors on the cursor: the hex you are pointing at stays under the
  * pointer, so zooming reads as moving through the sheet rather than jumping to
- * a different one. The buttons anchor on the centre, because pressing a button
+ * a different one. The buttons anchor on the center, because pressing a button
  * implies no position.
  *
  * Clamping can still pull the view in at the edges of the world -- there is
@@ -440,18 +440,18 @@ function setZoom(next: number, anchor?: { x: number; y: number }): void {
   const offsetY = anchor ? anchor.y - size.value.h / 2 : 0
 
   // Where the anchor is in the world, at the scale we are leaving.
-  const col = centre.value.col + offsetX / pxPerCol.value
-  const row = centre.value.row + offsetY / pxPerRow.value
+  const col = center.value.col + offsetX / pxPerCol.value
+  const row = center.value.row + offsetY / pxPerRow.value
 
   zoom.value = clamped
 
   // Put it back under the anchor at the scale we are arriving at.
-  centre.value = clampCentre(col - offsetX / pxPerCol.value, row - offsetY / pxPerRow.value)
+  center.value = clampCenter(col - offsetX / pxPerCol.value, row - offsetY / pxPerRow.value)
 }
 
-function centreOnCharacter(): void {
+function centerOnCharacter(): void {
   const char = game.character
-  if (char) centre.value = clampCentre(char.col, char.row)
+  if (char) center.value = clampCenter(char.col, char.row)
 }
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v))
@@ -480,11 +480,11 @@ function measure(): void {
   if (!rect.width || !rect.height) return
   if (Math.abs(rect.width - size.value.w) < 0.5 && Math.abs(rect.height - size.value.h) < 0.5) return
   size.value = { w: rect.width, h: rect.height }
-  centre.value = clampCentre(centre.value.col, centre.value.row)
+  center.value = clampCenter(center.value.col, center.value.row)
 }
 
 onMounted(() => {
-  centreOnCharacter()
+  centerOnCharacter()
   measure()
   if (wrap.value) {
     observer = new ResizeObserver(measure)
@@ -559,9 +559,9 @@ onBeforeUnmount(() => {
       <button
         type="button"
         class="home"
-        title="Centre on your prospector"
-        aria-label="Centre on your prospector"
-        @click="centreOnCharacter"
+        title="Center on your prospector"
+        aria-label="Center on your prospector"
+        @click="centerOnCharacter"
       >
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
              stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">

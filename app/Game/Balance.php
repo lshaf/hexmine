@@ -30,7 +30,7 @@ final class Balance
      * 200 means every column and every row from -200 to 200 inclusive, so the
      * grid is 401 a side. Signed coordinates are what make the ring maths honest:
      * a ring is a distance from the origin rather than from an arbitrary point
-     * halfway along an unsigned axis, and the dead centre of the world is the
+     * halfway along an unsigned axis, and the dead center of the world is the
      * one coordinate you never have to look up.
      *
      * Read from config/game.php, so the size and the seed of the world are
@@ -107,11 +107,24 @@ final class Balance
     public const MINING_BASE_MAX_SECONDS = 60 * 60;
 
     /** clamp() bounds. The floor is mandatory -- see Formulas::tripTime(). */
-    public const MINING_FLOOR_SECONDS = 30 * 60;
+    public const MINING_FLOOR_SECONDS = 15 * 60;
     public const MINING_CEILING_SECONDS = 60 * 60;
 
-    public const MINING_MAX_SKILL_REDUCTION = 20 * 60;
-    public const MINING_MAX_EQUIP_REDUCTION = 10 * 60;
+    /**
+     * §7.3 -- a hex has DURABILITY, and a trip is how long it takes to work
+     * through it. This is the rate bare hands manage, per second.
+     *
+     * It is what makes the tool ladder felt without a second schedule for it: a
+     * hex is a fixed amount of work, and every point of tool attack is another
+     * point a second taken out of it. `MINING_BASE_MIN/MAX_SECONDS` are still
+     * the range, because a tile's durability is exactly its base seconds at
+     * this rate -- ungeared and unskilled, a trip takes what it always took.
+     */
+    public const MINING_BASE_ATTACK = 10;
+
+    /** §7.3 -- what a maxed line skill adds to that rate, on its own line. */
+    public const MINING_SKILL_ATTACK = 10;
+
 
     /** Exactly two mining slots per hex, §5.1. */
     public const SLOTS_PER_TILE = 2;
@@ -148,7 +161,7 @@ final class Balance
     /**
      * Half the channel, in hexes.
      *
-     * Under 1 on purpose: the band is measured between one column's centre and
+     * Under 1 on purpose: the band is measured between one column's center and
      * the next, so a steep reach widens on its own and a slack one stays a
      * single hex across. A fixed width would either break into stepping stones
      * on the bends or run four hexes wide on the straights.
@@ -209,7 +222,7 @@ final class Balance
      *
      * The outer ring is nearly safe on purpose: a new character has to be able
      * to walk to a village without a fight it cannot win. Inward the road stops
-     * being a formality, and the barren centre is the worst of it -- which is
+     * being a formality, and the barren center is the worst of it -- which is
      * what makes the last step toward a dungeon mouth a decision.
      */
     /**
@@ -233,6 +246,80 @@ final class Balance
      */
     public const BATTLE_BAND = 20;
 
+    /**
+     * §9.5.5 -- the smallest a strike can ever be.
+     *
+     * Never hopeless and never certain, which is the same instinct as §7.3's
+     * floor. A wall you cannot scratch would be a locked hex, and §9.5.3 says
+     * fighting is always one of the two ways out.
+     */
+    public const BATTLE_CHIP = 1;
+
+    /**
+     * §9.5.5 -- and the floor scales with what is swinging, not just with the
+     * subtraction.
+     *
+     * Straight subtraction makes armor an on/off switch: one point of defense
+     * either side of an attack turns a fight from routine into impossible,
+     * which is how every matchup ended up 0% or 100%. A striker always gets
+     * this fraction of its attack through, so a heavy hitter still hurts a wall
+     * and a light one still cannot -- the difference stays a slope instead of a
+     * cliff, and it is what separates a rare kit from an epic one against the
+     * same Barrow Knight.
+     */
+    public const BATTLE_CHIP_FRACTION = 0.10;
+
+    /**
+     * §9.5.5 -- how far one strike wanders from its arithmetic.
+     *
+     * The exchange is otherwise deterministic, and a fight you can compute to
+     * the point is a fight with nothing left to find out. Ten per cent is
+     * enough that two runs at the same pack are not the same fight, and small
+     * enough that the preview stays a promise rather than a guess.
+     */
+    public const BATTLE_SWING = 0.10;
+
+    /**
+     * §9.5.5 -- how long you get, and the bell is a LOSS.
+     *
+     * Not a technicality: the pools are far bigger than anything a pack is
+     * carrying, so a long enough fight is always won by whoever brought more
+     * durability, and a wall could be ground down by a kit with no business
+     * touching it. Failing to put something down inside forty rounds is being
+     * driven off, and §9.5.3's two exits are both still there.
+     */
+    public const BATTLE_MAX_ROUNDS = 60;
+
+    /**
+     * §9.5.6 -- most of the pool one fight may take, however badly it went.
+     *
+     * Now that the pool IS the gear, an uncapped exchange would let a single
+     * hopeless swing at a center-ring monster strip a whole legendary kit in
+     * one go. The fight is still lost -- the cap is on the bill, not on the
+     * outcome, so a beating stays a beating and §8.2's warning still has
+     * something to warn about.
+     */
+    public const BATTLE_POOL_WEAR_CAP = 0.5;
+
+    /**
+     * §9.5.6 -- how hard a monster's armor is on the blade that hits it.
+     *
+     * A blade pays for what it is swung AT rather than for what it takes: a
+     * round against a 58-defense Barrow Knight costs seven, one against a Moss
+     * Hound costs one. Bringing the wrong thing is expensive even when it wins.
+     */
+    public const WEAPON_WEAR_DIVISOR = 8;
+
+    /**
+     * §9.5.4 -- the slots that are in a fight at all.
+     *
+     * The five gathering tools are not. §8 rule 2 says only the tool that did
+     * the work wears and the others idle, so counting an axe toward the pool
+     * would make a full tool belt into armor -- and §8 rule 5 exists precisely
+     * to keep the two ladders apart.
+     */
+    public const COMBAT_SLOTS = ['weapon', 'armor', 'boots', 'gloves'];
+
     public const BATTLE_ODDS_MIN = 0.05;
 
     public const BATTLE_ODDS_MAX = 0.95;
@@ -245,7 +332,7 @@ final class Balance
      *
      * There is no health, so the cost of a fight lands on the gear and scales
      * with how badly matched you were: a weapon wears on the gap to their
-     * defence, one random worn piece wears on the excess of their attack over
+     * defense, one random worn piece wears on the excess of their attack over
      * its own. Matched, both cost `WEAR_BASE` and nothing more.
      */
     public const WEAR_BASE = 2;
@@ -272,7 +359,7 @@ final class Balance
      * §9.5.7 -- how far a death looks for a roof.
      *
      * Villages sit on an 8-hex lattice (§6.0) and cities on an 11, so anything
-     * short of the barren centre finds one well inside this. It is a search
+     * short of the barren center finds one well inside this. It is a search
      * bound rather than a rule: past it there is genuinely nowhere to wake.
      */
     public const DEATH_WAKE_RADIUS = 24;
@@ -364,7 +451,7 @@ final class Balance
      * already holds you in place while it runs and a long clock on top would
      * make one pack a lost afternoon.
      *
-     * Scaled by tier, so the centre's two cost more of the day than the
+     * Scaled by tier, so the center's two cost more of the day than the
      * treeline's -- and through scaled() like every clock in the game.
      */
     public const BATTLE_BASE_SECONDS = 3 * self::MINUTE;
@@ -374,7 +461,7 @@ final class Balance
     /**
      * §9.5.8 -- what a win teaches the battle job that fought it.
      *
-     * Paid per monster tier, so the centre's two are worth four times the
+     * Paid per monster tier, so the center's two are worth four times the
      * treeline's. On a WIN only: half XP for losing sounds generous and is a
      * trickle you can farm by dying on purpose (§9.5.3).
      */
@@ -464,8 +551,8 @@ final class Balance
      * is a row whether it holds one or a hundred; an unworn tool is a row of
      * its own, because two axes do not stack.
      *
-     * Thirty is deliberately roomy against a catalogue of twenty-nine materials
-     * and five draughts: the straps are not meant to be the thing that bites on
+     * Thirty is deliberately roomy against a catalog of twenty-nine materials
+     * and five drafts: the straps are not meant to be the thing that bites on
      * an ordinary trip. They are the ceiling on carrying *one of everything* --
      * a prospector who never chooses a line still runs out of places to put
      * things -- while `BAG_UNITS` is what actually decides when a haul has to be
@@ -621,9 +708,12 @@ final class Balance
     // -------------------------------------------------------------- options §8.0.1
 
     /**
-     * How many bonus lines each rung rolls. Uncommon is the only one that may
-     * roll nothing, which is what makes an uncommon with a line feel found
-     * rather than issued.
+     * §8.0.1 -- the MOST bonus lines a rung may roll. Not how many it will.
+     *
+     * A crafted piece rolls somewhere between nothing and this, so two of the
+     * same recipe are never the same object and a lucky uncommon can carry what
+     * an unlucky rare did not. An option is a bonus rather than part of the
+     * item, which is exactly what makes rolling none of them acceptable.
      */
     public const OPTION_ROLLS = [
         'common' => 0,
@@ -634,46 +724,61 @@ final class Balance
         'unique' => 3,
     ];
 
-    /** Chance each of an uncommon's slots actually fills. Higher rungs always do. */
-    public const OPTION_CHANCE_UNCOMMON = 0.5;
-
     /**
-     * A rolled line is worth 1-3%. Small on purpose: options are variety, not a
-     * second power ladder, and they are clamped by STAT_CEILING like everything
-     * else (§8.1 rule 1).
+     * §8.0.1 -- what a line off each tier of the pool is worth.
+     *
+     * Every line rolls its OWN tier, drawn from the tiers at or below the
+     * item's rarity, so a legendary can come out carrying a common-grade line
+     * and often does. That is what makes a good roll a good roll: the ceiling
+     * is higher up the ladder, not the floor.
+     *
+     * Small on purpose all the way up. Options are variety, not a second power
+     * ladder, and they feed the same aggregate and the same STAT_CEILING as
+     * everything else (§8.1 rule 1).
      */
-    public const OPTION_MIN = 0.01;
-
-    public const OPTION_MAX = 0.03;
+    public const OPTION_VALUE = [
+        'common' => [0.01, 0.02],
+        'uncommon' => [0.01, 0.03],
+        'rare' => [0.02, 0.04],
+        'epic' => [0.03, 0.05],
+        'legendary' => [0.04, 0.06],
+    ];
 
     /**
-     * §8.0.1 -- a line pointed at ONE gathering line is worth more than a flat
-     * one, because it is worth nothing on the other four.
+     * §8.0.1 -- a line pointed at ONE gathering line is worth this much more
+     * than a flat one, because it is worth nothing on the other four.
      *
      * Without the gap a scoped roll would be strictly the worse outcome and the
-     * whole pool would read as a bad-luck table. With it, the choice between
-     * "+2% yield everywhere" and "+4% mining yield" is a real one for a
-     * prospector who knows which line they actually work. It is still clamped
-     * by STAT_CEILING like everything else -- narrower buys a steeper climb to
-     * the same ceiling, never a higher one (§8.1 rule 1).
+     * whole pool would read as a bad-luck table. With it, "+2% yield
+     * everywhere" against "+4% mining yield" is a real choice for a prospector
+     * who knows which line they actually work. Still clamped by STAT_CEILING:
+     * narrower buys a steeper climb to the same ceiling, never a higher one.
      */
-    public const OPTION_SCOPED_MIN = 0.02;
-
-    public const OPTION_SCOPED_MAX = 0.05;
+    public const OPTION_SCOPED_MULTIPLIER = 2.0;
 
     /**
-     * The capital bazaar, §8.0.1. A capital stocks the same common and uncommon
-     * goods as a city -- its edge is that some of that stock comes pre-rolled,
-     * even at common, which is the one place a common item can carry a line.
+     * §8.0.1 -- what a FLAT line off each tier is worth.
+     *
+     * Solid numbers, because that is what `attack` and `defense` are (§9.5.4).
+     * Sized against the pairs on the gear itself -- a common weapon is 7-12
+     * attack and a legendary 22-34 -- so a rolled line is a real find at the
+     * bottom of the ladder and a nice extra at the top, which is the same shape
+     * the percentage bands have.
      */
-    public const CAPITAL_SHOP_OPTION_CHANCE = 0.5;
+    public const OPTION_FLAT_VALUE = [
+        'common' => [1, 2],
+        'uncommon' => [1, 3],
+        'rare' => [2, 4],
+        'epic' => [3, 6],
+        'legendary' => [4, 8],
+    ];
 
     // --------------------------------------------------------- consumables §8.5
 
     /**
      * How many of one potion a character may hold. Stops hoarding a stat.
      *
-     * There is no buff duration to tune any more: a draught arms the action it
+     * There is no buff duration to tune any more: a draft arms the action it
      * names and is spent by taking it (§8.5). Being *spent* is the sink -- a
      * consumable whose effect were permanent would only accumulate, which the
      * design's north star forbids outright.
@@ -786,7 +891,7 @@ final class Balance
      * the one currency an idle game cannot inflate -- hours. A gate on top of
      * that would be a second answer to a question distance already answers.
      */
-    public const TRAVEL_MS_PER_HEX = 10 * self::MINUTE;
+    public const TRAVEL_MS_PER_HEX = 5 * self::MINUTE;
 
     // ------------------------------------------------------------------- sight
 
@@ -796,7 +901,7 @@ final class Balance
      *
      * Sight used to be reach, which made it wide enough that the live-state
      * query behind it was a scan of a couple of hundred hexes on every move.
-     * One is a disc of seven -- the hex underfoot and its six neighbours. The
+     * One is a disc of seven -- the hex underfoot and its six neighbors. The
      * map beyond it is not blank -- terrain is derived from the seed and
      * settlement glyphs are drawn everywhere (§13.2) -- it is merely
      * *unscouted*: no depletion, no miners, no haul figures. That is what makes
@@ -811,7 +916,7 @@ final class Balance
      * Zero is also what makes the whole journey free of queries: a moving
      * character asks the server nothing until it stops.
      */
-    public const SIGHT_TRAVELLING = 0;
+    public const SIGHT_TRAVELING = 0;
 
     /**
      * §5.4 + §12 -- how far a fresh spawn may be from the village whose

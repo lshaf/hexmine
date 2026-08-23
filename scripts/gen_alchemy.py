@@ -40,7 +40,7 @@ REAGENTS = [
     ('stonewort',   'Stonewort',   'mountain',  4, 'Grows out of bare rock on nothing at all. Bitter, and it keeps.'),
     ('bitterroot',  'Bitterroot',  'plains',    3, 'Dug where the herds will not graze. They know why.'),
     ('yarrow',      'Yarrow',      'plains',    4, 'Flat white heads over the whole range. Every field surgeon carries it.'),
-    ('ashcap',      'Ashcap',      'badlands',  3, 'Comes up grey on burnt ground, a season after the fire.'),
+    ('ashcap',      'Ashcap',      'badlands',  3, 'Comes up gray on burnt ground, a season after the fire.'),
     ('sagebrush',   'Sagebrush',   'badlands',  4, 'Silver-leaved and shin-high. Burns sweet and steeps sweeter.'),
     ('blue_nettle', 'Blue Nettle', 'grassland', 2, 'Stings through leather. Worth the hands it costs.'),
     ('clover',      'Clover',      'grassland', 2, 'Common as dirt, and half the shelf starts here.'),
@@ -62,7 +62,7 @@ JUNK = [
 # equipment does and stops where §8.1 rule 1 stops everything.
 #
 # `mats` is how many DIFFERENT materials the recipe wants, and it never rises
-# with rank: a common draught is a muddle of four cheap things, a legendary
+# with rank: a common draft is a muddle of four cheap things, a legendary
 # philtre is two perfect ones.
 #
 # Nothing here is tradeable. §2 lets an item be an NFT only when a per-wallet
@@ -80,7 +80,7 @@ RANKS = [
 ]
 
 VESSEL = {
-    'common': 'Draught', 'uncommon': 'Tonic', 'rare': 'Flask',
+    'common': 'Draft', 'uncommon': 'Tonic', 'rare': 'Flask',
     'epic': 'Elixir', 'legendary': 'Philtre',
 }
 
@@ -105,9 +105,9 @@ SCOPE_BIOME = dict(
     **{'travel': 'grassland', 'processing': 'plains', 'battle': 'plains'},
 )
 
-# §9.5.8 -- the ichor grade each rung is brewed from. A battle draught is the
+# §9.5.8 -- the ichor grade each rung is brewed from. A battle draft is the
 # one thing on the shelf that cannot be gathered: every rung waits on a fight,
-# and the top two wait on a fight in the barren centre.
+# and the top two wait on a fight in the barren center.
 BATTLE_ICHOR = {
     'common': 'thin_ichor', 'uncommon': 'black_blood', 'rare': 'bile_sac',
     'epic': 'ember_gland', 'legendary': 'grave_heart',
@@ -117,7 +117,7 @@ BATTLE_ICHOR = {
 # and the almanac. Pinned to the slot they naturally fall in so nothing that
 # points at them breaks.
 PINNED = {
-    ('common', 'yield', 'woodcutting'): ('forest_draught', 'Forest Draught',
+    ('common', 'yield', 'woodcutting'): ('forest_draft', 'Forest Draft',
         'Bitter, resinous, and it keeps your arms swinging through the next stand of trees.'),
     ('common', 'travelSpeed', 'travel'): ('road_tonic', 'Road Tonic',
         'Drunk at the gate, not on the road. Your legs stop asking questions.'),
@@ -166,7 +166,7 @@ def consumables():
         # §9.5 -- the two dormant stats, and the only scope that is not work.
         effects.append(('power', 'battle', 'Warcry',
                         'You hit first, and you hit like you meant it.'))
-        effects.append(('defence', 'battle', 'Ironhide',
+        effects.append(('defense', 'battle', 'Ironhide',
                         'Whatever lands, lands somewhere else.'))
 
         for stat, scope, word, flavour in effects:
@@ -203,7 +203,7 @@ def inputs_for(rarity, scope, mats):
     a four-hour clock. So the cheap end of the shelf is something you can always
     top up and the dear end waits on an animal turning up.
 
-    Rank is carried by depth instead of by breadth. A common draught is a
+    Rank is carried by depth instead of by breadth. A common draft is a
     muddle of four cheap things pulled off two kinds of ground; a legendary
     philtre is the local pair, in quantity, and nothing else.
 
@@ -211,9 +211,9 @@ def inputs_for(rarity, scope, mats):
     cap that §8.5 used to gate the two tradeable rungs is not behind them any
     more. Their inputs are uncapped.
     """
-    # §9.5.8 -- a battle draught is brewed off a monster, not off a hex. The
+    # §9.5.8 -- a battle draft is brewed off a monster, not off a hex. The
     # herbs are still in it, but the ichor is what makes the rung: the top two
-    # cannot be brewed at all without a kill in the barren centre.
+    # cannot be brewed at all without a kill in the barren center.
     if scope == 'battle':
         ichor = BATTLE_ICHOR[rarity]
         if rarity == 'common':
@@ -243,7 +243,7 @@ def inputs_for(rarity, scope, mats):
     return {r[0]: 8, critter: 5}
 
 
-# The neighbouring biome a common recipe reaches into, so the cheapest tier is
+# The neighboring biome a common recipe reaches into, so the cheapest tier is
 # the one that makes you travel and the dear ones are local.
 # Biome -> the animal that lives on it, §4. Mirrors gen_critters.py.
 CRITTER = {

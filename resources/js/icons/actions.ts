@@ -59,7 +59,7 @@ export const ACTION_PATHS: Record<string, string> = {
   dungeon: 'M4 21V11a8 8 0 0 1 16 0v10 M9 21v-8a3 3 0 0 1 6 0v8',
   /* A specimen plate: one hex sample, its annotation lines, and the rules of
      the entry below it. Built from the map's own shape rather than a book,
-     because what this catalogues is hexes and what comes off them. */
+     because what this catalogs is hexes and what comes off them. */
   // §12.1 -- a rolled writ with a seal on it. A ledger of work owed reads as a
   // document, not as an exclamation mark: nothing on this HUD shouts.
   quest: 'M6 3.5h9l3.5 3.5v10.5H6Z M15 3.5V7h3.5 M9 11h6 M9 14.5h6 M8.5 20.5a2 2 0 1 0 0-4 2 2 0 0 0 0 4',

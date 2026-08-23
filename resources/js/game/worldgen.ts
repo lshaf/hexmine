@@ -97,7 +97,7 @@ export function inBounds(col: number, row: number): boolean {
   return Math.abs(col) <= c.radius && Math.abs(row) <= c.radius
 }
 
-/** Normalised distance from map centre, 0 at the capital ring, 1 at the rim. */
+/** Normalised distance from map center, 0 at the capital ring, 1 at the rim. */
 export function radiusOf(col: number, row: number): number {
   const c = cfg()
   const maxRadius = c.radius
@@ -106,7 +106,7 @@ export function radiusOf(col: number, row: number): number {
   return Math.sqrt(dc * dc + dr * dr)
 }
 
-/** §5.2 -- concentric rings drive generation, not just colour. */
+/** §5.2 -- concentric rings drive generation, not just color. */
 export function ringOf(col: number, row: number): Ring {
   const { rings } = cfg()
   const r = radiusOf(col, row)
@@ -120,7 +120,7 @@ export function ringOf(col: number, row: number): Ring {
 
 /**
  * §5.3 -- clustered regions, deliberately NOT noise. A jittered lattice (one
- * seed per cell, 5x5 neighbourhood search) rather than scattered seed points:
+ * seed per cell, 5x5 neighborhood search) rather than scattered seed points:
  * scattered seeds produced ~186-tile regions, far beyond a low-level
  * character's travel range, stranding players in a single biome.
  */
@@ -275,7 +275,7 @@ const riverAmplitude = () => Math.max(4, Math.round(cfg().radius * RIVER_AMPLITU
  * Where a waterway's channel sits at one step along its length: value noise,
  * one hashed offset every RIVER_SEGMENT hexes, smoothstepped between.
  */
-function riverCentre(index: number, t: number): number {
+function riverCenter(index: number, t: number): number {
   const c = cfg()
   const cell = Math.floor(t / RIVER_SEGMENT)
   const f = (t - cell * RIVER_SEGMENT) / RIVER_SEGMENT
@@ -291,7 +291,7 @@ function riverCentre(index: number, t: number): number {
 }
 
 /**
- * A hex is in the channel if it lies between this step's centre and the next
+ * A hex is in the channel if it lies between this step's center and the next
  * one's. Consecutive bands share an endpoint, so the water is continuous by
  * construction rather than by guessing a width that covers every slope.
  */
@@ -301,8 +301,8 @@ function riverAt(col: number, row: number): boolean {
     const along = axis === 0 ? col : row
     const across = axis === 0 ? row : col
 
-    const here = riverCentre(index, along)
-    const next = riverCentre(index, along + 1)
+    const here = riverCenter(index, along)
+    const next = riverCenter(index, along + 1)
 
     if (
       across >= Math.min(here, next) - RIVER_HALF_WIDTH &&
@@ -396,8 +396,8 @@ const LATTICE: Record<
 /**
  * Where inside its cell a site sits, on one axis.
  *
- * The window a site may choose from is narrower than the cell and centred in
- * it, leaving a margin at each edge. Two sites in neighbouring cells are then
+ * The window a site may choose from is narrower than the cell and centerd in
+ * it, leaving a margin at each edge. Two sites in neighboring cells are then
  * at least `cell - window + 1` apart on that axis -- which is `minGap` -- and
  * hex distance is never less than the larger axial difference, so the floor
  * holds diagonally too.
@@ -413,8 +413,8 @@ function siteOffset(cell: number, minGap: number, h: number): number {
 /**
  * §5.2 -- which tier, if any, each concentric ring carries.
  *
- * Capitals sit in the contested ring, not the dead centre: the walk to a capital
- * bench is meant to cross ground other prospectors are working, and the centre
+ * Capitals sit in the contested ring, not the dead center: the walk to a capital
+ * bench is meant to cross ground other prospectors are working, and the center
  * is reserved for dungeon mouths alone. Both of those rings are PvP ground.
  */
 const TIER_FOR_RING: Record<Ring, SettlementTier | null> = {
@@ -453,7 +453,7 @@ function cellFills(tier: SettlementTier, cellCol: number, cellRow: number): bool
  * The settlement of this tier standing in this cell, or null.
  *
  * Everything a site has to pass except the crowding test, which is deliberately
- * left out: this is what `crowdedByBetter` asks about its *neighbours*, and
+ * left out: this is what `crowdedByBetter` asks about its *neighbors*, and
  * putting it here would recurse.
  */
 function settledSite(

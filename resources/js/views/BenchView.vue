@@ -135,7 +135,7 @@ const kind = (job: BenchJob) => (job.kind === 'craft' ? 'Bench' : 'Processing li
 <style scoped>
 /*
  * Finished reads GREEN here too, for the reason §12's ledger gives: ember is
- * the colour of something wrong, and gold is the currency itself. A thing
+ * the color of something wrong, and gold is the currency itself. A thing
  * waiting on a bench is neither a problem nor a payout figure.
  */
 .done {

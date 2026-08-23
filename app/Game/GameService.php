@@ -215,7 +215,7 @@ class GameService
         return (int) ($character->materials()->where('material_key', $key)->value('quantity') ?? 0);
     }
 
-    /** Grant materials, honouring the §2 per-wallet cap. Returns units granted. */
+    /** Grant materials, honoring the §2 per-wallet cap. Returns units granted. */
     private function addMaterial(Character $character, string $key, int $quantity): int
     {
         $row = CharacterMaterial::firstOrNew([
@@ -422,11 +422,90 @@ class GameService
     private function itemRows(Character $character): array
     {
         return $character->items->map(fn (CharacterItem $i) => [
+            'id' => $i->id,
             'key' => $i->item_key,
             'durability' => $i->durability,
             'equipped' => $i->equipped,
             'options' => $i->options ?? [],
         ])->all();
+    }
+
+    /**
+     * §9.5.6 -- how a beating is spread across the kit that took it.
+     *
+     * By how much each piece was built to soak rather than by how much is left
+     * of it, so a big coat takes the brunt and a nearly-broken piece is found
+     * out rather than quietly protected. What a piece cannot absorb spills to
+     * the others, which is what lets a fight empty the pool without any of the
+     * arithmetic going missing.
+     *
+     * @param  array<int,array<string,mixed>>  $items
+     * @return array<int,int> item id -> durability lost
+     */
+    private function wearShares(array $items, int $damage): array
+    {
+        $combat = array_values(array_filter($items, static function (array $item): bool {
+            if (! $item['equipped'] || $item['durability'] <= 0) {
+                return false;
+            }
+
+            $def = Catalog::item($item['key']);
+
+            return $def !== null && in_array($def['slot'] ?? '', Balance::COMBAT_SLOTS, true);
+        }));
+
+        if ($combat === [] || $damage <= 0) {
+            return [];
+        }
+
+        $weights = [];
+        foreach ($combat as $item) {
+            $weights[$item['id']] = max(1, (int) (Catalog::item($item['key'])['maxDurability'] ?? 1));
+        }
+
+        $out = [];
+        $left = $damage;
+
+        // Two passes: the share each piece was built for, then whatever could
+        // not land because a piece ran out before the arithmetic did.
+        while ($left > 0 && $weights !== []) {
+            $total = array_sum($weights);
+            $spent = 0;
+
+            foreach ($weights as $id => $weight) {
+                $room = 0;
+                foreach ($combat as $item) {
+                    if ($item['id'] === $id) {
+                        $room = (int) $item['durability'] - ($out[$id] ?? 0);
+                        break;
+                    }
+                }
+
+                $want = max(1, (int) round($left * $weight / $total));
+                $take = min($want, $room, $left - $spent);
+
+                if ($take <= 0) {
+                    unset($weights[$id]);
+
+                    continue;
+                }
+
+                $out[$id] = ($out[$id] ?? 0) + $take;
+                $spent += $take;
+
+                if ($spent >= $left) {
+                    break;
+                }
+            }
+
+            if ($spent === 0) {
+                break;
+            }
+
+            $left -= $spent;
+        }
+
+        return $out;
     }
 
     /**
@@ -452,9 +531,9 @@ class GameService
     /**
      * §8.0.1 -- turn a chance into a count of extra option rolls.
      *
-     * Server-rolled from a seed like every other outcome, and shared by the
-     * bazaar and by a Smith's bench so the two cannot drift into different
-     * ideas of what "sometimes" means.
+     * Server-rolled from a seed like every other outcome. A Smith's tree node
+     * widens the ceiling by one; it does not guarantee the slot fills, because
+     * the count itself is a roll (§8.0.1).
      */
     private function extraRoll(Character $character, float $chance, int $salt): int
     {
@@ -471,26 +550,6 @@ class GameService
         return $roll < $chance ? 1 : 0;
     }
 
-    /**
-     * §8.0.1 -- the capital bazaar's extra slot. A capital stocks nothing a city
-     * does not; what it sometimes adds is a line on top, and it is the only
-     * place a common item ever carries one.
-     */
-    private function bazaarBonus(Character $character): int
-    {
-        $here = $this->currentSettlement($character);
-        if ($here === null || $here['tier'] !== 'capital') {
-            return 0;
-        }
-
-        $roll = Hash::rand01(Hash::hash2(
-            (int) $character->id,
-            $this->now() % 100000,
-            Balance::mapSeed() ^ 0xba2a,
-        ));
-
-        return $roll < Balance::CAPITAL_SHOP_OPTION_CHANCE ? 1 : 0;
-    }
 
     /**
      * Aggregated equipment bonuses.
@@ -525,11 +584,11 @@ class GameService
         //
         // §8.5 -- and potions take the HIGHEST rather than the sum. A player may
         // hold as many different effects as they like, but two charges on the
-        // same stat are the same effect twice: the better draught wins and the
+        // same stat are the same effect twice: the better draft wins and the
         // other is simply not felt. Summing would let a `global` charge and a
         // line-scoped one quietly double up on one trip, which is the stack the
         // rung ladder exists to prevent -- twelve potions a rung would otherwise
-        // be a way of buying the ceiling in instalments.
+        // be a way of buying the ceiling in installments.
         $buffs = [];
         foreach ($this->armedBuffs($character) as $buff) {
             $scope = $buff->scope ?? 'global';
@@ -561,7 +620,7 @@ class GameService
         }
 
         $out = [];
-        foreach (['yield', 'tripReduction', 'travelSpeed', 'processingSpeed', 'power', 'defence'] as $stat) {
+        foreach (['yield', 'tripReduction', 'travelSpeed', 'processingSpeed', 'power', 'defense'] as $stat) {
             // Gear is scoped by the action, not the line: an axe is a forest
             // tool, and standing at a saw pit is not swinging it (§8 rule 1).
             $gear = Formulas::aggregateStat($items, $stat, $action);
@@ -586,7 +645,7 @@ class GameService
      * Charges waiting on an action, §8.5.
      *
      * Every row here is armed: there is no clock to compare against and nothing
-     * to sweep, because a draught is ended by being used rather than by running
+     * to sweep, because a draft is ended by being used rather than by running
      * out. The unique index on (character, stat, scope) caps how many can be
      * held at once.
      *
@@ -603,7 +662,7 @@ class GameService
      * Called once the work has been costed and committed -- the job row already
      * carries the shortened clock and the larger haul, so the charge has done
      * its job and being spent is the sink (§11.1). `global` goes with it: a
-     * draught that applies everywhere applied here.
+     * draft that applies everywhere applied here.
      *
      * Read-only paths never call this. Costing a hex you are only looking at
      * must not burn what you are carrying, which is why this is a step of its
@@ -621,7 +680,7 @@ class GameService
     }
 
     /**
-     * Drink one. §8.5 -- this arms the action the draught names; it does not
+     * Drink one. §8.5 -- this arms the action the draft names; it does not
      * start a clock. A second flask of the same kind replaces the charge rather
      * than stacking, which is what stops an afternoon of potions being banked.
      *
@@ -640,9 +699,9 @@ class GameService
                 throw new GameException("You have no {$def['name']}.", 'insufficient');
             }
 
-            // §8.5 -- one charge per stat PER ACTION. A woodcutting draught and
-            // a mining draught are different things and both may be held; two
-            // draughts on the same stat and the same action are the same thing
+            // §8.5 -- one charge per stat PER ACTION. A woodcutting draft and
+            // a mining draft are different things and both may be held; two
+            // drafts on the same stat and the same action are the same thing
             // twice, and the better one wins.
             $scope = $def['scope'] ?? 'global';
 
@@ -651,7 +710,7 @@ class GameService
                 ->where('scope', $scope)
                 ->first();
 
-            // Refused before the flask is opened, never after. A weaker draught
+            // Refused before the flask is opened, never after. A weaker draft
             // poured on top of a stronger one would be paid for and never felt,
             // and an idle game must not take something away for nothing -- so
             // this reads as "you already have better", not as a downgrade.
@@ -661,7 +720,7 @@ class GameService
                         ? "A {$def['name']} is already waiting on the same work. A second would not make it any stronger."
                         : sprintf(
                             '%s is already waiting on the same work, and it is the stronger of the two. Keep the %s for later.',
-                            Catalog::item($armed->item_key)['name'] ?? 'A stronger draught',
+                            Catalog::item($armed->item_key)['name'] ?? 'A stronger draft',
                             $def['name'],
                         ),
                     'weaker_charge',
@@ -697,6 +756,38 @@ class GameService
      * this is the one thing the drop table needs to know about the belt. Best
      * equipped wins, because nothing stops a player owning two.
      */
+    /**
+     * §7.3 -- what the tool on this line takes out of a hex each second.
+     *
+     * The best equipped one, not the sum: you swing one axe. A broken tool is
+     * no tool, exactly as it is for §8's reach.
+     */
+    public function lineToolAttack(Character $character, string $line): int
+    {
+        $slot = Catalog::slotForSkill($line);
+        $best = 0;
+
+        foreach ($character->items as $item) {
+            if (! $item->equipped || $item->durability <= 0) {
+                continue;
+            }
+
+            $def = Catalog::item($item->item_key);
+            if (($def['slot'] ?? null) !== $slot) {
+                continue;
+            }
+
+            // §8.0.1 -- a flat rolled line on a tool is more mining attack, and
+            // it is only ever mining attack.
+            $best = max(
+                $best,
+                Formulas::toolAttack($def) + Formulas::flatOption($item->options ?? [], 'attack'),
+            );
+        }
+
+        return $best;
+    }
+
     public function lineToolRarity(Character $character, string $line): ?string
     {
         $slot = Catalog::slotForSkill($line);
@@ -782,13 +873,13 @@ class GameService
      * Two hexes standing still, nothing at all on the road, and up to four for
      * an Explorer deep enough into the tree (§7.5). Deliberately untouched by
      * level or gear: the only thing that widens the eye is having walked, which
-     * is the one behaviour worth paying for here and the only one whose reward
+     * is the one behavior worth paying for here and the only one whose reward
      * cannot be bought.
      */
     public function sightRadius(Character $character): int
     {
-        if ($this->isTravelling($character)) {
-            return Balance::SIGHT_TRAVELLING;
+        if ($this->isTraveling($character)) {
+            return Balance::SIGHT_TRAVELING;
         }
 
         // §7.5 -- the one thing that widens it, already capped.
@@ -1036,7 +1127,7 @@ class GameService
      *
      * Every gate is here rather than on the button: the client draws a list, the
      * server decides what is payable (§16). The unique index on (character,
-     * quest) is the last line of defence against a doubled request, exactly as
+     * quest) is the last line of defense against a doubled request, exactly as
      * it is for a bought node.
      *
      * @return array<string,mixed>
@@ -1342,9 +1433,9 @@ class GameService
      */
     public function packHere(Character $character): ?array
     {
-        // On the road there is no hex under your feet yet. A traveller is
+        // On the road there is no hex under your feet yet. A traveler is
         // stopped by a pack when they arrive (§9.5.6), not while they walk.
-        if ($this->isTravelling($character)) {
+        if ($this->isTraveling($character)) {
             return null;
         }
 
@@ -1388,10 +1479,14 @@ class GameService
                 continue;
             }
 
-            return ['job' => $job, 'level' => (int) ($this->jobLevels($character)[$job] ?? 0)];
+            return [
+                'job' => $job,
+                'family' => $family,
+                'level' => (int) ($this->jobLevels($character)[$job] ?? 0),
+            ];
         }
 
-        return ['job' => null, 'level' => 0];
+        return ['job' => null, 'family' => null, 'level' => 0];
     }
 
     /**
@@ -1417,12 +1512,23 @@ class GameService
         $items = $this->itemRows($character);
         $job = $this->battleJobLevel($character);
 
-        // §8.5 -- a battle draught is armed for exactly this and nothing else.
-        $bonuses = $this->bonuses($character, 'battle');
-        $pair = Formulas::combatPair($items, $job['level'], $bonuses['power'], $bonuses['defence']);
+        // §8.5 -- a battle draft is armed for exactly this and nothing else.
+        // §7.4 -- the tree is scoped by the family in the slot. A Swordhand's
+        // nodes are worth nothing with a shield on the arm.
+        $bonuses = $this->bonuses($character, 'battle', $job['family']);
+        $pair = Formulas::combatPair($items, $job['level'], $bonuses['power'], $bonuses['defense']);
+
+        // §9.5.5 -- the exchange with the swing taken out. The plate is a
+        // promise: this is what the arithmetic says, and the fight then wanders
+        // by BATTLE_SWING either way.
+        $pool = Formulas::battlePool($items);
+        $expected = Formulas::expectedBattle($pair['attack'], $pair['defense'], $pool, $monster);
+
+        $bill = Formulas::cappedBattleWear($expected['damageTaken'], $pool);
+        $share = $this->wearShares($items, $bill);
 
         $warnings = [];
-        $wear = ['weapon' => 0, 'armor' => 0];
+        $wear = ['pool' => $pool, 'taken' => $bill, 'weapon' => 0];
 
         foreach ($items as $item) {
             if (! $item['equipped'] || $item['durability'] <= 0) {
@@ -1431,22 +1537,27 @@ class GameService
 
             $def = Catalog::item($item['key']);
             $slot = $def['slot'] ?? null;
-            $max = (int) ($def['maxDurability'] ?? 1);
-
-            // The worst case is what a warning has to be built on: the fight is
-            // not rolled yet, and "it might survive" is not a thing to tell
-            // somebody about to lose a legendary.
-            if ($slot === 'weapon') {
-                $wear['weapon'] = Formulas::weaponWear($pair['attack'], $monster, false, $max);
-                $cost = $wear['weapon'];
-            } elseif (in_array($slot, ['armor', 'boots', 'gloves'], true)) {
-                $cost = Formulas::armorWear((int) ($def['defence'] ?? 0), $monster, false, $max);
-                $wear['armor'] = max($wear['armor'], $cost);
-            } else {
+            if (! in_array($slot, Balance::COMBAT_SLOTS, true)) {
                 continue;
             }
 
-            if ($cost >= $item['durability']) {
+            $cost = $share[$item['id']] ?? 0;
+
+            // §9.5.6 -- the blade pays separately, and it pays for what it is
+            // swung at rather than for what it takes.
+            if ($slot === 'weapon') {
+                $wear['weapon'] = Formulas::weaponWear(
+                    $monster,
+                    $expected['rounds'],
+                    (int) ($def['maxDurability'] ?? 1),
+                );
+                $cost += $wear['weapon'];
+            }
+
+            // The warning is built on what the arithmetic says plus the swing
+            // against you: the fight is not run yet, and "it might survive" is
+            // not a thing to tell somebody about to lose a legendary.
+            if ($cost * (1 + Balance::BATTLE_SWING) >= $item['durability']) {
                 $warnings[] = $def['name'].' will not survive this.';
             }
         }
@@ -1493,12 +1604,16 @@ class GameService
                 'tier' => $monster['tier'],
                 'profile' => $monster['profile'],
                 'attack' => $monster['attack'],
-                'defence' => $monster['defence'],
+                'defense' => $monster['defense'],
+                'hp' => $monster['hp'],
                 'description' => $monster['description'],
             ],
             'attack' => $pair['attack'],
-            'defence' => $pair['defence'],
-            'odds' => round(Formulas::battleOdds($pair['attack'], $pair['defence'], $monster), 3),
+            'defense' => $pair['defense'],
+            // §9.5.5 -- what the exchange says, before the swing.
+            'pool' => $pool,
+            'expected' => $expected,
+            'odds' => round(Formulas::battleOdds($pair['attack'], $pair['defense'], $monster), 3),
             'job' => $job['job'],
             'jobLevel' => $job['level'],
             'wear' => $wear,
@@ -1579,15 +1694,16 @@ class GameService
             $monster = Monsters::ROSTER[$key];
 
             $job = $this->battleJobLevel($character);
-            $bonuses = $this->bonuses($character, 'battle');
+            $bonuses = $this->bonuses($character, 'battle', $job['family']);
+            $items = $this->itemRows($character);
             $pair = Formulas::combatPair(
-                $this->itemRows($character),
+                $items,
                 $job['level'],
                 $bonuses['power'],
-                $bonuses['defence'],
+                $bonuses['defense'],
             );
 
-            $odds = Formulas::battleOdds($pair['attack'], $pair['defence'], $monster);
+            $odds = Formulas::battleOdds($pair['attack'], $pair['defense'], $monster);
 
             // Seeded server-side (§16). A pack's seed is fixed to its hex and
             // bucket, which costs nothing because it is cleared below and the
@@ -1609,7 +1725,19 @@ class GameService
                     Balance::mapSeed() ^ 0x6a77,
                 );
 
-            $won = Formulas::battleWin($pair['attack'], $pair['defence'], $monster, $seed);
+            // §9.5.5 -- the exchange, run to a conclusion here rather than on
+            // collection: the kit that took the fight is the kit that fought
+            // it, and swapping to a better sword while the clock runs buys
+            // nothing.
+            $pool = Formulas::battlePool($items);
+            $fight = Formulas::resolveBattle(
+                $pair['attack'],
+                $pair['defense'],
+                $pool,
+                $monster,
+                $seed,
+            );
+            $won = $fight['won'];
 
             if ($pin !== null) {
                 // Cleared on ENGAGEMENT rather than on resolution (§9.5.1):
@@ -1618,7 +1746,7 @@ class GameService
                 Packs::clear($col, $row, $pin['bucket'], (int) $pin['until'], $now);
             }
 
-            // §8.5 -- a battle draught was armed for exactly this, and the roll
+            // §8.5 -- a battle draft was armed for exactly this, and the roll
             // above already carries it.
             $this->spendBuffs($character, 'battle');
 
@@ -1642,8 +1770,13 @@ class GameService
                     'monster' => $key,
                     'won' => $won,
                     'odds' => round($odds, 3),
+                    'rounds' => $fight['rounds'],
+                    'damageTaken' => $fight['damageTaken'],
+                    'damageDealt' => $fight['damageDealt'],
+                    'pool' => $pool,
+                    'left' => $fight['left'],
                     'attack' => $pair['attack'],
-                    'defence' => $pair['defence'],
+                    'defense' => $pair['defense'],
                     'job' => $job['job'],
                     'seed' => $seed,
                     'carrier' => $carrier?->id,
@@ -1682,54 +1815,48 @@ class GameService
         $col = (int) $job->col;
         $row = (int) $job->row;
 
-        // §9.5.6 -- two wear rolls, both on a gap. The weapon pays for the gap
-        // to their guard, one worn piece pays for the excess of their attack
-        // over its own.
+        // §9.5.6 -- the beating, spent. The pool that held you up IS the gear,
+        // so what the fight took off the pool comes off the pieces -- capped,
+        // because an uncapped exchange in the center would strip a legendary
+        // set in one go and §8.2's warning would be the only thing between a
+        // player and a week of work.
         $wear = [];
-        $weapon = null;
-        $worn = [];
+        $rounds = (int) ($payload['rounds'] ?? 1);
+        $pool = (int) ($payload['pool'] ?? 0);
+        $bill = Formulas::cappedBattleWear((int) ($payload['damageTaken'] ?? 0), $pool);
 
+        $items = $this->itemRows($character);
+        $share = $this->wearShares($items, $bill);
+
+        $byId = [];
+        foreach ($character->items as $item) {
+            $byId[$item->id] = $item;
+        }
+
+        foreach ($share as $id => $amount) {
+            if (! isset($byId[$id]) || $amount <= 0) {
+                continue;
+            }
+
+            $wear[] = $this->wearInFight($byId[$id], $amount);
+        }
+
+        // §9.5.6 -- and the blade pays separately, for what it was swung AT.
+        // Enemy armor is what blunts a weapon, so a wall costs an edge even
+        // when the edge wins.
         foreach ($character->items as $item) {
             if (! $item->equipped || $item->durability <= 0) {
                 continue;
             }
 
             $def = Catalog::item($item->item_key);
-            $slot = $def['slot'] ?? null;
-
-            if ($slot === 'weapon') {
-                $weapon = $item;
-            } elseif (in_array($slot, ['armor', 'boots', 'gloves'], true)) {
-                $worn[] = $item;
+            if (($def['slot'] ?? null) !== 'weapon') {
+                continue;
             }
-        }
 
-        if ($weapon !== null) {
-            $def = Catalog::item($weapon->item_key);
-            $wear[] = $this->wearInFight($weapon, Formulas::weaponWear(
-                (int) ($payload['attack'] ?? 0),
+            $wear[] = $this->wearInFight($item, Formulas::weaponWear(
                 $monster,
-                $won,
-                (int) ($def['maxDurability'] ?? 1),
-            ));
-        }
-
-        // §9.5.6 -- random rather than spread, so the repair bills stagger
-        // instead of arriving together and a weak piece is eventually found
-        // out rather than never. An empty slot absorbs nothing, and it
-        // contributed nothing to the hold either.
-        if ($worn !== []) {
-            $piece = $worn[Hash::randInt(
-                Hash::hash2($col, $row, $seed ^ 0x1d0d),
-                0,
-                count($worn) - 1,
-            )];
-
-            $def = Catalog::item($piece->item_key);
-            $wear[] = $this->wearInFight($piece, Formulas::armorWear(
-                (int) ($def['defence'] ?? 0),
-                $monster,
-                $won,
+                $rounds,
                 (int) ($def['maxDurability'] ?? 1),
             ));
         }
@@ -1774,7 +1901,7 @@ class GameService
 
         // §9.5.7 -- A LOSS IS A DEATH. Not "a loss with nothing to absorb it":
         // losing the fight is losing, and what follows is the same whatever was
-        // on your back. Armor still decides whether you lose -- defence feeds
+        // on your back. Armor still decides whether you lose -- defense feeds
         // the hold, and the hold is half the margin -- it just no longer
         // decides what losing costs.
         $died = ! $won;
@@ -1799,7 +1926,7 @@ class GameService
                     $recovered = $this->restoreLoot($character, $carrier->loot);
                 } else {
                     // §2 -- an item another wallet can pick up is a direct
-                    // player-to-player transfer, and "random row" is no defence
+                    // player-to-player transfer, and "random row" is no defense
                     // at all: empty the bag to the one thing worth moving, fight
                     // naked, die on purpose, and a partner walks over and
                     // collects it. So the row BURNS unless its owner is the one
@@ -1835,10 +1962,17 @@ class GameService
                 'tier' => $monster['tier'],
                 'profile' => $monster['profile'],
                 'attack' => $monster['attack'],
-                'defence' => $monster['defence'],
+                'defense' => $monster['defense'],
+                'hp' => $monster['hp'],
             ],
             'attack' => (int) ($payload['attack'] ?? 0),
-            'defence' => (int) ($payload['defence'] ?? 0),
+            'defense' => (int) ($payload['defense'] ?? 0),
+            // §9.5.5 -- the exchange, as it actually went. There is no health
+            // bar to watch, so the receipt is where the fight is read.
+            'rounds' => $rounds,
+            'pool' => $pool,
+            'damageTaken' => (int) ($payload['damageTaken'] ?? 0),
+            'damageDealt' => (int) ($payload['damageDealt'] ?? 0),
             'gold' => $gold,
             'job' => $payload['job'] ?? null,
             'jobXp' => $xp,
@@ -1873,7 +2007,7 @@ class GameService
      */
     public function carrierHere(Character $character): ?Carrier
     {
-        if ($this->isTravelling($character)) {
+        if ($this->isTraveling($character)) {
             return null;
         }
 
@@ -1893,7 +2027,7 @@ class GameService
      * monster that dropped one would be exactly the grind->NFT faucet the
      * threat model exists to close. A harder pack answers with better OPTION
      * ROLLS instead -- the same mechanism the capital bazaar uses (§8.0.1), and
-     * the reason a centre kill can hand you a rare carrying three lines.
+     * the reason a center kill can hand you a rare carrying three lines.
      *
      * §7.6 -- it needs a strap. Without one it is named as left behind rather
      * than forced in or silently dropped: an unwinnable refusal at the end of a
@@ -2257,13 +2391,15 @@ class GameService
         if ($distance > $this->sightRadius($character)) {
             return [
                 'canMine' => false,
-                'reason' => $this->isTravelling($character)
+                'reason' => $this->isTraveling($character)
                     ? 'You are watching your feet. Nothing is scouted until you stop.'
                     : 'Too far to make out. Walk there and see for yourself.',
                 'seconds' => 0,
                 'baseSeconds' => 0,
-                'skillReduction' => 0,
-                'equipReduction' => 0,
+                'durability' => 0,
+                'toolAttack' => 0,
+                'skillAttack' => 0,
+                'rate' => 0.0,
                 'clamped' => false,
                 'yield' => 0,
                 'material' => null,
@@ -2295,8 +2431,10 @@ class GameService
             'reason' => null,
             'seconds' => 0,
             'baseSeconds' => $tile['baseSeconds'],
-            'skillReduction' => 0,
-            'equipReduction' => 0,
+            'durability' => 0,
+            'toolAttack' => 0,
+            'skillAttack' => 0,
+            'rate' => 0.0,
             'clamped' => false,
             'yield' => 0,
             'material' => $tile['material'],
@@ -2399,7 +2537,15 @@ class GameService
             $note = "This ground carries {$best}. Your tool reliably takes {$have} — the better grade is a long shot.";
         }
 
-        $trip = Formulas::tripTime($tile['baseSeconds'], $skillLevel, $bonuses['tripReduction']);
+        // §4.0 -- bare hands are bare hands. Gathering pays the base rate even
+        // when there is a perfectly good axe on your back, because the whole
+        // point of the verb is that you are not using it.
+        $trip = Formulas::tripTime(
+            $tile['baseSeconds'],
+            $skillLevel,
+            $bonuses['tripReduction'],
+            $gathering ? 0 : $this->lineToolAttack($character, $skillKey),
+        );
 
         // §8.2 -- nothing is destroyed without warning, and a trip wears gear
         // like a fight does. An hour of work that ends in a lost axe has to be
@@ -2413,7 +2559,7 @@ class GameService
         $reason = null;
         $working = $this->miningTrip($character);
 
-        if ($this->isTravelling($character)) {
+        if ($this->isTraveling($character)) {
             $reason = 'You are on the road. Stop the journey, or wait until you arrive.';
         } elseif ($working !== null) {
             $reason = $working->isReady($now)
@@ -2435,8 +2581,10 @@ class GameService
             'reason' => $reason,
             'seconds' => $trip['total'],
             'baseSeconds' => $trip['base'],
-            'skillReduction' => $trip['skillReduction'],
-            'equipReduction' => $trip['equipReduction'],
+            'durability' => $trip['durability'],
+            'toolAttack' => $trip['toolAttack'],
+            'skillAttack' => $trip['skillAttack'],
+            'rate' => $trip['rate'],
             'clamped' => $trip['clamped'],
             'yield' => Formulas::tripYield(
                 $tile['baseYield'],
@@ -2548,7 +2696,7 @@ class GameService
         ];
 
         if ($distance > $this->sightRadius($character)) {
-            $base['reason'] = $this->isTravelling($character)
+            $base['reason'] = $this->isTraveling($character)
                 ? 'You are watching your feet. Nothing is scouted until you stop.'
                 : 'Too far to make out. Walk there and see for yourself.';
             $base['unseen'] = true;
@@ -2616,7 +2764,7 @@ class GameService
         $working = $this->miningTrip($character);
 
         $base['reason'] = match (true) {
-            $this->isTravelling($character) => 'You are on the road. Stop the journey, or wait until you arrive.',
+            $this->isTraveling($character) => 'You are on the road. Stop the journey, or wait until you arrive.',
             $working !== null => $working->isReady($now)
                 ? 'Your reward is waiting. Claim it before working anything else.'
                 : 'You are already working a hex. Finish that one first.',
@@ -2763,7 +2911,7 @@ class GameService
             // which capital to use a decision rather than a formality.
             if ($job->settlement_id !== null) {
                 $bench = $this->settlement((string) $job->settlement_id);
-                $away = $this->isTravelling($character)
+                $away = $this->isTraveling($character)
                     || (int) $character->col !== (int) $bench['col']
                     || (int) $character->row !== (int) $bench['row'];
 
@@ -3572,9 +3720,43 @@ class GameService
         $guild ??= $this->guildOf($character);
 
         return $guild !== null
-            && ! $this->isTravelling($character)
+            && ! $this->isTraveling($character)
             && (int) $character->col === $guild->col
             && (int) $character->row === $guild->row;
+    }
+
+    /**
+     * §9.5.4 -- what this character is worth in a fight, right now.
+     *
+     * Flat attack and defense off the gear and the battle job, and the pool
+     * their durability adds up to. Not the percentage stats of the same name:
+     * `power` and `defense` multiply this and are on `bonuses` with everything
+     * else that is a percentage.
+     *
+     * @return array<string,int|string|null>
+     */
+    private function combatPayload(Character $character): array
+    {
+        $items = $this->itemRows($character);
+        $job = $this->battleJobLevel($character);
+        // §7.4 -- scoped by the family in the slot, so the sheet says what the
+        // kit you are actually carrying is worth.
+        $bonuses = $this->bonuses($character, 'battle', $job['family']);
+
+        $pair = Formulas::combatPair(
+            $items,
+            $job['level'],
+            $bonuses['power'],
+            $bonuses['defense'],
+        );
+
+        return [
+            'attack' => $pair['attack'],
+            'defense' => $pair['defense'],
+            'pool' => Formulas::battlePool($items),
+            'job' => $job['job'],
+            'jobLevel' => $job['level'],
+        ];
     }
 
     /**
@@ -3707,7 +3889,7 @@ class GameService
     }
 
     /**
-     * §10.0.3 -- exactly 1024 colours, and the column can hold nothing else.
+     * §10.0.3 -- exactly 1024 colors, and the column can hold nothing else.
      *
      * base64 of 3072 raw RGB bytes. Not a data URI, not a file, not a URL: a
      * flag is the one piece of player-drawn content this game carries, and what
@@ -3793,7 +3975,7 @@ class GameService
             if (! in_array($recipe['skill'], $settlement['lines'], true)) {
                 throw new GameException("{$settlement['name']} does not run that line.", 'no_line');
             }
-            if ($this->isTravelling($character) || $character->col !== $settlement['col'] || $character->row !== $settlement['row']) {
+            if ($this->isTraveling($character) || $character->col !== $settlement['col'] || $character->row !== $settlement['row']) {
                 throw new GameException('You have to be at the settlement.', 'not_present');
             }
 
@@ -3944,10 +4126,10 @@ class GameService
             );
         }
 
-        if ($this->isTravelling($character)) {
+        if ($this->isTraveling($character)) {
             throw new GameException(
                 'You are already on the road. Stop where you are before setting a new course.',
-                'travelling',
+                'traveling',
             );
         }
 
@@ -4011,8 +4193,8 @@ class GameService
      */
     public function cancelTravel(Character $character): array
     {
-        if (! $this->isTravelling($character)) {
-            throw new GameException('You are not going anywhere.', 'not_travelling');
+        if (! $this->isTraveling($character)) {
+            throw new GameException('You are not going anywhere.', 'not_traveling');
         }
 
         $perHex = $this->journeyPerHex($character);
@@ -4057,7 +4239,7 @@ class GameService
     }
 
     /** True while the character is somewhere between two hexes. */
-    public function isTravelling(Character $character): bool
+    public function isTraveling(Character $character): bool
     {
         return $character->travel_ends_at !== null;
     }
@@ -4082,7 +4264,7 @@ class GameService
     /** @return array<string,mixed>|null */
     public function travelState(Character $character): ?array
     {
-        if (! $this->isTravelling($character)) {
+        if (! $this->isTraveling($character)) {
             return null;
         }
 
@@ -4110,7 +4292,7 @@ class GameService
      * you make again.
      *
      * LAZY, and it has to be. Simulating a walk hex by hex would mean a job per
-     * traveller per ten minutes; instead the road is caught up whenever the
+     * traveler per ten minutes; instead the road is caught up whenever the
      * character is next read, from the high-water mark to wherever the clock
      * says they have got to. §5.6's promise holds -- a journey of two hundred
      * hexes and one of a single hex still cost the same two requests, because
@@ -4130,7 +4312,7 @@ class GameService
      */
     private function interceptIfDue(Character $character, int $now): bool
     {
-        if (! $this->isTravelling($character) || ! Balance::packsEnabled()) {
+        if (! $this->isTraveling($character) || ! Balance::packsEnabled()) {
             return false;
         }
 
@@ -4177,7 +4359,7 @@ class GameService
     /** Land a journey whose clock has run out. Called from settle, never directly. */
     private function arriveIfDue(Character $character, int $now): bool
     {
-        if (! $this->isTravelling($character) || $now < (int) $character->travel_ends_at) {
+        if (! $this->isTraveling($character) || $now < (int) $character->travel_ends_at) {
             return false;
         }
 
@@ -4212,7 +4394,7 @@ class GameService
     {
         // Mid-journey you are between hexes, so you are at nothing: the trader
         // you left is behind you and the one ahead is not in earshot yet.
-        if ($this->isTravelling($character)) {
+        if ($this->isTraveling($character)) {
             return null;
         }
 
@@ -4311,7 +4493,12 @@ class GameService
                 'item_key' => $itemKey,
                 'durability' => $def['maxDurability'],
                 'equipped' => false,
-                'options' => $this->rollFor($character, $def, $this->bazaarBonus($character)),
+                // §8.0.1 -- gold buys a plain item, at every shelf including a
+                // capital's. An option is what a BENCH puts on a thing: it is
+                // the difference between a piece somebody made and a piece
+                // somebody stocked, and a shop that sold rolled goods would
+                // make crafting the slower way to buy one.
+                'options' => [],
             ]);
         });
     }
@@ -4325,7 +4512,7 @@ class GameService
             }
 
             // You cannot sell in the middle of a forest. The trader is an NPC at
-            // a settlement, not a travelling buyer.
+            // a settlement, not a traveling buyer.
             $this->requireSettlement($character, 'trade');
 
             // §3.3 -- gold must never bridge to NFT-tier value, so the trader
@@ -4473,7 +4660,9 @@ class GameService
                 Balance::CRAFT_BASE_SECONDS[$def['rarity']] ?? Balance::CRAFT_BASE_SECONDS['common'],
                 $here['tier'],
                 $presence,
-                $this->bonuses($character, 'processing')['processingSpeed'],
+                // §7.4 -- the bench category, so a Smith's tree speeds the
+                // weapon bench and leaves the tannery alone.
+                $this->bonuses($character, 'processing', Catalog::category($def))['processingSpeed'],
             );
 
             return GameJob::create([
@@ -4766,6 +4955,40 @@ class GameService
     }
 
     /**
+     * §7.4 -- which bucket a job's `stat` nodes are locked to, or null when the
+     * job has no work of its own to lock them to.
+     *
+     * The key is the same shape `bonuses()` builds when it is asked about an
+     * action: the action, and the thing under it when there is one.
+     *
+     *   gathering    woodcutting        the trip, on that line
+     *   processing   processing:wood…   the run, at that line's bench
+     *   craft        processing:weapon  the craft clock, at that bench only
+     *   battle       battle:sword       the fight, and only with that in hand
+     *
+     * Craft files under `processing` because a bench clock IS the processing
+     * clock (§8.4) -- the two are the same building and the same stat. The
+     * three categories cannot collide with the five lines.
+     */
+    private function nodeBucket(string $job): ?string
+    {
+        $source = Jobs::JOBS[$job]['source'] ?? null;
+
+        return match (Jobs::JOBS[$job]['kind']) {
+            Jobs::GATHERING => $source,
+            Jobs::PROCESSING, Jobs::CRAFT => Jobs::PROCESSING.':'.$source,
+            // §9.5.4 -- the WEAPON FAMILY, not the job's role word. A
+            // Swordhand's nodes are worth nothing while a shield is in the
+            // slot: the family you carry is your class, and a tree bought for
+            // one of them must not pay out through another.
+            Jobs::BATTLE => 'battle:'.(
+                array_search($job, Catalog::BATTLE_JOB_FOR_FAMILY, true) ?: $source
+            ),
+            default => null,
+        };
+    }
+
+    /**
      * §7.4.3 -- what this character's bought nodes add up to.
      *
      * Returned as a bundle rather than applied here, because the pieces land in
@@ -4807,13 +5030,19 @@ class GameService
                     // are two different pieces of work on the same word --
                     // filing both under `woodcutting` would pay a Sawyer out on
                     // a felling trip.
-                    $jobKind = Jobs::JOBS[$job]['kind'];
-                    if ($jobKind === Jobs::GATHERING || $jobKind === Jobs::PROCESSING) {
-                        $line = $jobKind === Jobs::PROCESSING
-                            ? Jobs::PROCESSING.':'.Jobs::JOBS[$job]['source']
-                            : Jobs::JOBS[$job]['source'];
-                        $byLine[$line][$effect['stat']] =
-                            ($byLine[$line][$effect['stat']] ?? 0) + $effect['value'];
+                    // §7.4 -- EVERY stat node is locked to the work its job is
+                    // about. A tree makes you better at its own class and at
+                    // nothing else; the alternative is a character taking three
+                    // trees and stacking all of them on one trip.
+                    //
+                    // The bucket is the ACTION and the thing under it, because
+                    // a forest and a saw pit are two different pieces of work
+                    // on the same word: filing both under `woodcutting` would
+                    // pay a Sawyer out on a felling trip.
+                    $bucket = $this->nodeBucket($job);
+                    if ($bucket !== null) {
+                        $byLine[$bucket][$effect['stat']] =
+                            ($byLine[$bucket][$effect['stat']] ?? 0) + $effect['value'];
                         break;
                     }
 
@@ -4904,7 +5133,7 @@ class GameService
      *
      * Every gate is checked here and nowhere else that matters: the client draws
      * the tree, the server decides what may be bought (§16). The unique index on
-     * (character, node) is the last line of defence against a doubled request.
+     * (character, node) is the last line of defense against a doubled request.
      */
     public function buyNode(Character $character, string $nodeKey): array
     {
@@ -5285,6 +5514,11 @@ class GameService
             // §10 -- the guild this character belongs to, if any. On the state
             // rather than fetched, because membership decides what a bench will
             // make (§8.0's legendary rung) and the two must never disagree.
+            // §9.5.4 -- the flat pair, and the pool that IS the health bar
+            // (§9.5.5). On the state rather than only on a fight preview: it is
+            // what the kit is worth, and a player should not have to find a
+            // pack standing on their hex to be told.
+            'combat' => $this->combatPayload($character),
             'guild' => $this->stateGuildPayload($character, $guild = $this->guildOf($character)),
             // §10.0 -- and whether they are standing in their own hall, which
             // is the one question the legendary bench asks.

@@ -42,7 +42,7 @@ final class WorldGen
 
     // --------------------------------------------------------------- rings
 
-    /** Normalised distance from map centre, 0 at the capital ring, 1 at the rim. */
+    /** Normalised distance from map center, 0 at the capital ring, 1 at the rim. */
     /**
      * Forget everything derived from the map settings.
      *
@@ -80,7 +80,7 @@ final class WorldGen
         return sqrt($dc * $dc + $dr * $dr);
     }
 
-    /** §5.2 -- concentric rings drive generation, not just colour. */
+    /** §5.2 -- concentric rings drive generation, not just color. */
     public static function ringOf(int $col, int $row): string
     {
         $r = self::radiusOf($col, $row);
@@ -113,7 +113,7 @@ final class WorldGen
 
     /**
      * §5.3 -- clustered regions, deliberately NOT noise. A jittered lattice
-     * (one seed per cell, 5x5 neighbourhood search) rather than scattered seed
+     * (one seed per cell, 5x5 neighborhood search) rather than scattered seed
      * points: scattered seeds produced ~186-tile regions, far beyond a low-level
      * character's travel range, stranding players in a single biome.
      */
@@ -242,7 +242,7 @@ final class WorldGen
      * between. Polynomial interpolation keeps the curve identical on both
      * sides of the wire, which a trig-driven meander could not promise.
      */
-    private static function riverCentre(int $index, int $t): float
+    private static function riverCenter(int $index, int $t): float
     {
         $segment = Balance::RIVER_SEGMENT;
         $cell = (int) floor($t / $segment);
@@ -267,7 +267,7 @@ final class WorldGen
     }
 
     /**
-     * A hex is in the channel if it lies between this step's centre and the
+     * A hex is in the channel if it lies between this step's center and the
      * next one's, which is what keeps a steep reach unbroken: consecutive
      * bands share an endpoint, so the water is continuous by construction
      * rather than by picking a width that happens to cover the slope.
@@ -280,8 +280,8 @@ final class WorldGen
             $along = $axis === 0 ? $col : $row;
             $across = $axis === 0 ? $row : $col;
 
-            $here = self::riverCentre($index, $along);
-            $next = self::riverCentre($index, $along + 1);
+            $here = self::riverCenter($index, $along);
+            $next = self::riverCenter($index, $along + 1);
 
             if ($across >= min($here, $next) - $half && $across <= max($here, $next) + $half) {
                 return true;
@@ -384,8 +384,8 @@ final class WorldGen
     /**
      * Where inside its cell a site sits, on one axis.
      *
-     * The window a site may choose from is narrower than the cell and centred
-     * in it, leaving a margin at each edge. Two sites in neighbouring cells are
+     * The window a site may choose from is narrower than the cell and centerd
+     * in it, leaving a margin at each edge. Two sites in neighboring cells are
      * then at least `cell - window + 1` apart on that axis -- which is `minGap`
      * -- and hex distance is never less than the larger axial difference, so the
      * floor holds diagonally too.
@@ -403,9 +403,9 @@ final class WorldGen
     /**
      * §5.2 -- which tier, if any, each concentric ring carries.
      *
-     * Capitals sit in the contested ring, not the dead centre: the walk to a
+     * Capitals sit in the contested ring, not the dead center: the walk to a
      * capital bench is meant to cross ground other prospectors are working, and
-     * the centre is reserved for dungeon mouths alone. Both of those rings are
+     * the center is reserved for dungeon mouths alone. Both of those rings are
      * PvP ground.
      */
     private const TIER_FOR_RING = [
@@ -443,7 +443,7 @@ final class WorldGen
      *
      * Everything a site has to pass except the crowding test, which is
      * deliberately left out: that is what self::crowdedByBetter asks about its
-     * *neighbours*, and putting it here would recurse.
+     * *neighbors*, and putting it here would recurse.
      */
     private static function settledSite(string $tier, int $cellCol, int $cellRow): ?array
     {

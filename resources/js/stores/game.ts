@@ -180,7 +180,7 @@ export const useGame = defineStore('game', () => {
   /**
    * Move the camera. Local only -- tiles are generated, never fetched.
    *
-   * §5.1 -- the centre is held on the map. Without this a pan can carry the
+   * §5.1 -- the center is held on the map. Without this a pan can carry the
    * camera off the edge and leave the viewport empty, which reads as a broken
    * render rather than as an edge.
    */
@@ -201,14 +201,14 @@ export const useGame = defineStore('game', () => {
     rebuildTiles()
   }
 
-  function centreOnCharacter(): void {
+  function centerOnCharacter(): void {
     const char = state.value?.character
     if (char) setView(char.col, char.row)
   }
 
   /*
    * Sight belongs to the character, not the camera, so the camera never
-   * recentres itself. Watching the position rather than patching travelTo means
+   * recenters itself. Watching the position rather than patching travelTo means
    * the two can never disagree about where you are.
    */
   watch(
@@ -222,7 +222,7 @@ export const useGame = defineStore('game', () => {
       // An empty previous is the first state landing, which boot() already
       // followed with a fetch of its own.
       if (!key || !previous) return
-      centreOnCharacter()
+      centerOnCharacter()
     },
   )
 
@@ -540,7 +540,7 @@ export const useGame = defineStore('game', () => {
     configureWorld(await api.getWorld())
 
     absorb(await api.getState())
-    centreOnCharacter()
+    centerOnCharacter()
     await refreshMutations()
 
     booted.value = true
@@ -613,7 +613,7 @@ export const useGame = defineStore('game', () => {
    *
    * Never gated client-side. The button is always live and the server is what
    * says no, because every reason it could say no is a fact only the server
-   * holds -- and a cell greyed out for a reason the player cannot read is
+   * holds -- and a cell grayed out for a reason the player cannot read is
    * worse than a cell that answers.
    */
   async function startGathering(col: number, row: number): Promise<void> {
@@ -782,7 +782,7 @@ export const useGame = defineStore('game', () => {
 
   async function travelTo(col: number, row: number): Promise<void> {
     const ok = await act(() => api.travelTo(col, row))
-    // The map recentres itself: the position watcher above is driven by the
+    // The map recenters itself: the position watcher above is driven by the
     // state this call just absorbed.
     if (ok !== null) await select(col, row)
   }
@@ -873,7 +873,7 @@ export const useGame = defineStore('game', () => {
     // helpers
     tileAt, held, note,
     // actions
-    boot, setView, setViewport, centreOnCharacter, refreshMutations, refreshState,
+    boot, setView, setViewport, centerOnCharacter, refreshMutations, refreshState,
     select, clearSelection,
     haul, clearHaul, battle, fight, clearBattle, carriers,
     guilds, guild, atGuildHall, halls, openHalls, closeHalls,

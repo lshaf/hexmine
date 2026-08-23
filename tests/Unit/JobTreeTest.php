@@ -97,7 +97,7 @@ final class JobTreeTest extends TestCase
         $this->assertSame(range(2, Balance::JOB_MAX_LEVEL, 2), $levels);
         $this->assertCount(Jobs::NODES_PER_WAYFARING, $levels, 'a level was shared by two skills');
 
-        // And each row is labelled by the first of its three, so the panel can
+        // And each row is labeled by the first of its three, so the panel can
         // say where a depth begins without claiming its whole row arrives there.
         foreach (Jobs::WAYFARING_TIER_JOB_LEVEL as $tier => $opens) {
             $inRow = array_values(array_filter(
@@ -106,7 +106,7 @@ final class JobTreeTest extends TestCase
             ));
 
             $this->assertCount(3, $inRow, "row {$tier} is not three wide");
-            $this->assertSame($opens, $inRow[0]['jobLevel'], "row {$tier} is mislabelled");
+            $this->assertSame($opens, $inRow[0]['jobLevel'], "row {$tier} is mislabeled");
         }
     }
 
@@ -452,6 +452,103 @@ final class JobTreeTest extends TestCase
     }
 
     /** Keys are namespaced by job, so two trees can share a node name. */
+    /**
+     * §7.4 -- a tree makes you better at its OWN class and at nothing else.
+     *
+     * Every `stat` node belongs to a bucket, and there is no global one. Left
+     * unlocked, a character could take three trees and stack all of them on one
+     * trip -- which is the shortcut the line-locked tool ladder exists to close,
+     * arrived at through the skill panel instead.
+     */
+    public function test_every_stat_node_is_locked_to_its_own_class(): void
+    {
+        $service = app(\App\Game\GameService::class);
+        $bucket = new \ReflectionMethod($service, 'nodeBucket');
+
+        foreach (Jobs::NODES as $key => $node) {
+            if ($node['effect']['kind'] !== 'stat') {
+                continue;
+            }
+
+            $this->assertNotNull(
+                $bucket->invoke($service, $node['job']),
+                "{$key} moves a stat and pays out everywhere",
+            );
+        }
+    }
+
+    /**
+     * §7.4 -- and the bucket is the work, not the word.
+     *
+     * A battle tree is locked to the WEAPON FAMILY rather than to the job's
+     * role, because the family in the slot is what decides your class (§9.5.4):
+     * a Swordhand's nodes must be worth nothing with a shield on the arm.
+     */
+    public function test_a_battle_tree_is_locked_to_its_weapon_family(): void
+    {
+        $service = app(\App\Game\GameService::class);
+        $bucket = new \ReflectionMethod($service, 'nodeBucket');
+
+        foreach (\App\Game\Catalog::BATTLE_JOB_FOR_FAMILY as $family => $job) {
+            $this->assertSame(
+                'battle:'.$family,
+                $bucket->invoke($service, $job),
+                "{$job} is not locked to the {$family} it is fought with",
+            );
+        }
+    }
+
+    /**
+     * §7.4 -- a gathering tree moves the two stats a TRIP has, and no others.
+     *
+     * `travelSpeed` used to be a third of them and was dead weight twice over:
+     * a node is filed under its line and only counts on that line's work, and
+     * walking is not woodcutting -- so it could never pay out. It would have
+     * been off-class if it had.
+     */
+    public function test_a_gathering_tree_moves_only_trip_stats(): void
+    {
+        foreach (Jobs::NODES as $key => $node) {
+            if ($node['effect']['kind'] !== 'stat') {
+                continue;
+            }
+            if (Jobs::JOBS[$node['job']]['kind'] !== Jobs::GATHERING) {
+                continue;
+            }
+
+            $this->assertContains(
+                $node['effect']['stat'],
+                ['yield', 'tripReduction'],
+                "{$key} moves a stat a trip cannot feel",
+            );
+        }
+    }
+
+    /**
+     * §8.4 -- a craft tree moves the one stat a bench clock reads, and nothing
+     * a trip would feel.
+     *
+     * It used to hand out yield, trip time and travel speed, which made an
+     * Armorer's tree pay out on somebody's mining trips.
+     */
+    public function test_a_craft_tree_moves_only_the_bench_clock(): void
+    {
+        foreach (Jobs::NODES as $key => $node) {
+            if ($node['effect']['kind'] !== 'stat') {
+                continue;
+            }
+            if (Jobs::JOBS[$node['job']]['kind'] !== Jobs::CRAFT) {
+                continue;
+            }
+
+            $this->assertSame(
+                'processingSpeed',
+                $node['effect']['stat'],
+                "{$key} makes a smith better at something that is not smithing",
+            );
+        }
+    }
+
     public function test_node_keys_are_namespaced_by_job(): void
     {
         foreach (Jobs::NODES as $key => $node) {

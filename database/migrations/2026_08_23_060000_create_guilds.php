@@ -25,7 +25,7 @@ return new class extends Migration
             $table->string('code', 5)->unique();
             $table->string('description', 500)->default('');
 
-            // §10.0.3 -- exactly 1024 colours, base64 of 3072 raw RGB bytes.
+            // §10.0.3 -- exactly 1024 colors, base64 of 3072 raw RGB bytes.
             // No upload, no URL, no file: what can be in this column is bounded
             // by the column's own shape.
             $table->text('flag')->nullable();

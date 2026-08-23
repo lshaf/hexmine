@@ -10,7 +10,7 @@
  *    invisible; a needle parked at the origin is still a reading.
  *  - Quarter ticks say how full at a glance, without a second number.
  *  - The needle overshoots the track, like the cursor on a slide rule, so your
- *    eye lands on the position rather than on a coloured area.
+ *    eye lands on the position rather than on a colored area.
  *
  * The level number is the XP row's label, not a badge -- the thing being
  * measured names its own scale. Gold has no cap, so it gets no scale; it sits
@@ -78,8 +78,8 @@ const pct = (s: Scale) => `${Math.min(100, Math.max(0, (s.at / s.of) * 100))}%`
  * §8.5 -- what has been drunk and is still waiting.
  *
  * Two channels, the same split §13.1 uses for gear: the **glyph** is the action
- * the charge is armed for, the **colour** is the stat it moves. A player with
- * three draughts in them can read all three at a glance without a word of text,
+ * the charge is armed for, the **color** is the stat it moves. A player with
+ * three drafts in them can read all three at a glance without a word of text,
  * which is the only reason this earns space on a plate that otherwise carries
  * one number.
  *
@@ -92,13 +92,13 @@ const STAT_TONE: Record<StatKey, string> = {
   travelSpeed: 'var(--violet)',
   processingSpeed: '#8fbf7f',
   power: 'var(--ember)',
-  defence: 'var(--ember)',
+  defense: 'var(--ember)',
 }
 
 const charges = computed(() =>
   game.buffs.map((b) => ({
     id: `${b.stat}:${b.scope}`,
-    name: ITEM_BY_KEY[b.key]?.name ?? 'Draught',
+    name: ITEM_BY_KEY[b.key]?.name ?? 'Draft',
     path: SCOPE_PATHS[b.scope] ?? SCOPE_PATHS.global!,
     tone: STAT_TONE[b.stat],
     effect: `${statLine(b.stat, b.value)} ${SCOPE_LABEL[b.scope]}`,
@@ -454,7 +454,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
  * so nothing here may drain or the two would say opposite things in the same
  * shape. What this does instead is *breathe*: a bloom behind the socket swells
  * and fades on its own slow cycle, which reads as held energy rather than as
- * time going. Colour is the stat, the glyph inside is the action -- the same
+ * time going. Color is the stat, the glyph inside is the action -- the same
  * two channels §13.1 splits rarity and material across.
  */
 .charge {
@@ -510,7 +510,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
   color: var(--vellum-dim);
 }
 
-/* The card is anchored under the cluster rather than centred: it is a readout
+/* The card is anchored under the cluster rather than centerd: it is a readout
    of that plate, and a modal in the middle of the map would lose the thread. */
 .pop-wrap {
   position: fixed;

@@ -48,7 +48,7 @@ final class Catalog
 
             // Tier 2 -- Refined
             'planks' => ['name' => 'Planks', 'tier' => 2, 'palette' => 'wood', 'npcPrice' => 7, 'description' => 'Sawn and seasoned. The backbone of crafting.'],
-            'ingots' => ['name' => 'Ingots', 'tier' => 2, 'palette' => 'iron', 'npcPrice' => 9, 'description' => 'Smelted iron, poured into bar moulds.'],
+            'ingots' => ['name' => 'Ingots', 'tier' => 2, 'palette' => 'iron', 'npcPrice' => 9, 'description' => 'Smelted iron, poured into bar molds.'],
             'leather' => ['name' => 'Leather', 'tier' => 2, 'palette' => 'pelt', 'npcPrice' => 8, 'description' => 'Tanned hide, supple enough to work.'],
             'cut_stone' => ['name' => 'Cut Stone', 'tier' => 2, 'palette' => 'stone', 'npcPrice' => 7, 'description' => 'Dressed blocks, square and true.'],
             'cloth' => ['name' => 'Cloth', 'tier' => 2, 'palette' => 'fiber', 'npcPrice' => 6, 'description' => 'Spun and woven fiber bolts.'],
@@ -125,7 +125,7 @@ final class Catalog
     /**
      * §8.5 -- the action a charge is waiting on, said as a place in a sentence.
      *
-     * "Drank a Forest Draught. It holds until you work a forest hex." A draught
+     * "Drank a Forest Draft. It holds until you work a forest hex." A draft
      * is bought for one thing you do, so the message that confirms it has to
      * name that thing rather than a number of minutes it no longer has.
      */
@@ -249,29 +249,49 @@ final class Catalog
     public const OPTION_SCOPED_STATS = ['yield', 'tripReduction'];
 
     /**
-     * §8.0.1 -- every (stat, scope) pair a roll on this slot may land on.
+     * §8.0.1 -- the flat lines a roll may land on, beside the percentage ones.
      *
-     * @return array<int,array{stat:string,scope:?string}>
+     * `attack` and `defense` are SOLID numbers, not the percentage stats that
+     * share their names (§9.5.4): a fight is decided by an exchange and a ±15%
+     * swing cannot decide one. So a rolled line may be either kind, and `kind`
+     * on the line is what tells them apart -- without it "+2 defense" and "+2%
+     * defense" would be the same row saying two different things.
+     *
+     * On a gathering tool a flat `attack` is MINING attack (§7.3) and never
+     * touches a fight, exactly as the tool's own attack does not. `defense` has
+     * nothing to mean on a tool, so a tool never rolls one.
+     */
+    public const OPTION_FLAT_TOOL = ['attack'];
+
+    public const OPTION_FLAT_WORN = ['attack', 'defense'];
+
+    /**
+     * §8.0.1 -- every (stat, scope, kind) a roll on this slot may land on.
+     *
+     * @return array<int,array{stat:string,scope:?string,kind:string}>
      */
     public static function optionRollsFor(string $slot): array
     {
-        $flat = fn (array $stats) => array_map(
-            static fn (string $stat) => ['stat' => $stat, 'scope' => null],
+        $lines = fn (array $stats, string $kind) => array_map(
+            static fn (string $stat) => ['stat' => $stat, 'scope' => null, 'kind' => $kind],
             $stats,
         );
 
         if (self::skillForSlot($slot) !== null) {
-            return $flat(self::OPTION_STATS_TOOL);
+            return array_merge(
+                $lines(self::OPTION_STATS_TOOL, 'percent'),
+                $lines(self::OPTION_FLAT_TOOL, 'flat'),
+            );
         }
 
-        $pool = $flat(self::OPTION_STATS_WORN);
+        $pool = $lines(self::OPTION_STATS_WORN, 'percent');
         foreach (self::OPTION_SCOPED_STATS as $stat) {
             foreach (self::SKILLS as $line) {
-                $pool[] = ['stat' => $stat, 'scope' => $line];
+                $pool[] = ['stat' => $stat, 'scope' => $line, 'kind' => 'percent'];
             }
         }
 
-        return $pool;
+        return array_merge($pool, $lines(self::OPTION_FLAT_WORN, 'flat'));
     }
 
     /** @return array<int,string> */
@@ -371,20 +391,20 @@ final class Catalog
             // `station` on a shop item is the smallest settlement that stocks it.
             // Villages carry the basics; the better gear is a reason to walk to a
             // city, which is the same tier pressure §6 puts on processing lines.
-            'stone_axe' => ['name' => 'Stone Axe', 'slot' => 'axe', 'rarity' => 'common', 'tradeable' => false, 'stat' => 'yield', 'value' => 0.02, 'palette' => 'stone', 'goldPrice' => 17, 'maxDurability' => 40, 'station' => 'village', 'description' => 'A chipped edge lashed to a handle. Better than bare hands.'],
-            'chipped_pick' => ['name' => 'Chipped Pick', 'slot' => 'pickaxe', 'rarity' => 'common', 'tradeable' => false, 'stat' => 'yield', 'value' => 0.02, 'palette' => 'stone', 'goldPrice' => 17, 'maxDurability' => 40, 'station' => 'village', 'description' => 'Second-hand, and shorter than it started. Still bites ore.'],
-            'crude_bow' => ['name' => 'Crude Bow', 'slot' => 'bow', 'rarity' => 'common', 'tradeable' => false, 'stat' => 'yield', 'value' => 0.02, 'palette' => 'wood', 'goldPrice' => 17, 'maxDurability' => 40, 'station' => 'village', 'description' => 'Green stave, gut string. Close range or nothing.'],
-            'stone_mallet' => ['name' => 'Stone Mallet', 'slot' => 'hammer', 'rarity' => 'common', 'tradeable' => false, 'stat' => 'yield', 'value' => 0.02, 'palette' => 'stone', 'goldPrice' => 17, 'maxDurability' => 40, 'station' => 'village', 'description' => 'A rock on a stick. It still splits badlands shale.'],
-            'bent_sickle' => ['name' => 'Bent Sickle', 'slot' => 'sickle', 'rarity' => 'common', 'tradeable' => false, 'stat' => 'yield', 'value' => 0.02, 'palette' => 'fiber', 'goldPrice' => 17, 'maxDurability' => 40, 'station' => 'village', 'description' => 'Someone straightened it once. It did not take.'],
+            'stone_axe' => ['name' => 'Stone Axe', 'slot' => 'axe', 'rarity' => 'common', 'tradeable' => false, 'attack' => 3, 'palette' => 'stone', 'goldPrice' => 17, 'maxDurability' => 40, 'station' => 'village', 'description' => 'A chipped edge lashed to a handle. Better than bare hands.'],
+            'chipped_pick' => ['name' => 'Chipped Pick', 'slot' => 'pickaxe', 'rarity' => 'common', 'tradeable' => false, 'attack' => 3, 'palette' => 'stone', 'goldPrice' => 17, 'maxDurability' => 40, 'station' => 'village', 'description' => 'Second-hand, and shorter than it started. Still bites ore.'],
+            'crude_bow' => ['name' => 'Crude Bow', 'slot' => 'bow', 'rarity' => 'common', 'tradeable' => false, 'attack' => 3, 'palette' => 'wood', 'goldPrice' => 17, 'maxDurability' => 40, 'station' => 'village', 'description' => 'Green stave, gut string. Close range or nothing.'],
+            'stone_mallet' => ['name' => 'Stone Mallet', 'slot' => 'hammer', 'rarity' => 'common', 'tradeable' => false, 'attack' => 3, 'palette' => 'stone', 'goldPrice' => 17, 'maxDurability' => 40, 'station' => 'village', 'description' => 'A rock on a stick. It still splits badlands shale.'],
+            'bent_sickle' => ['name' => 'Bent Sickle', 'slot' => 'sickle', 'rarity' => 'common', 'tradeable' => false, 'attack' => 3, 'palette' => 'fiber', 'goldPrice' => 17, 'maxDurability' => 40, 'station' => 'village', 'description' => 'Someone straightened it once. It did not take.'],
 
-            'iron_hatchet' => ['name' => 'Iron Hatchet', 'slot' => 'axe', 'rarity' => 'uncommon', 'tradeable' => false, 'stat' => 'yield', 'value' => 0.05, 'palette' => 'iron', 'goldPrice' => 98, 'maxDurability' => 70, 'station' => 'city', 'description' => 'Shop-grade steel. Reliable, unremarkable.'],
-            'miners_pick' => ['name' => "Miner's Pick", 'slot' => 'pickaxe', 'rarity' => 'uncommon', 'tradeable' => false, 'stat' => 'yield', 'value' => 0.05, 'palette' => 'iron', 'goldPrice' => 98, 'maxDurability' => 70, 'station' => 'city', 'description' => 'Guild pattern, guild price. Every seam in the range has met one.'],
-            'recurve_bow' => ['name' => 'Recurve Bow', 'slot' => 'bow', 'rarity' => 'uncommon', 'tradeable' => false, 'stat' => 'yield', 'value' => 0.05, 'palette' => 'pelt', 'goldPrice' => 98, 'maxDurability' => 70, 'station' => 'city', 'description' => 'Backed and glued. Drops a plains buck without the chase.'],
-            'iron_sledge' => ['name' => 'Iron Sledge', 'slot' => 'hammer', 'rarity' => 'uncommon', 'tradeable' => false, 'stat' => 'yield', 'value' => 0.05, 'palette' => 'iron', 'goldPrice' => 98, 'maxDurability' => 70, 'station' => 'city', 'description' => 'Heavy enough that the stone does most of the arguing.'],
-            'steel_sickle' => ['name' => 'Steel Sickle', 'slot' => 'sickle', 'rarity' => 'uncommon', 'tradeable' => false, 'stat' => 'yield', 'value' => 0.05, 'palette' => 'iron', 'goldPrice' => 98, 'maxDurability' => 70, 'station' => 'city', 'description' => 'Holds an edge through a full field, then wants a stone.'],
+            'iron_hatchet' => ['name' => 'Iron Hatchet', 'slot' => 'axe', 'rarity' => 'uncommon', 'tradeable' => false, 'attack' => 6, 'palette' => 'iron', 'goldPrice' => 98, 'maxDurability' => 70, 'station' => 'city', 'description' => 'Shop-grade steel. Reliable, unremarkable.'],
+            'miners_pick' => ['name' => "Miner's Pick", 'slot' => 'pickaxe', 'rarity' => 'uncommon', 'tradeable' => false, 'attack' => 6, 'palette' => 'iron', 'goldPrice' => 98, 'maxDurability' => 70, 'station' => 'city', 'description' => 'Guild pattern, guild price. Every seam in the range has met one.'],
+            'recurve_bow' => ['name' => 'Recurve Bow', 'slot' => 'bow', 'rarity' => 'uncommon', 'tradeable' => false, 'attack' => 6, 'palette' => 'pelt', 'goldPrice' => 98, 'maxDurability' => 70, 'station' => 'city', 'description' => 'Backed and glued. Drops a plains buck without the chase.'],
+            'iron_sledge' => ['name' => 'Iron Sledge', 'slot' => 'hammer', 'rarity' => 'uncommon', 'tradeable' => false, 'attack' => 6, 'palette' => 'iron', 'goldPrice' => 98, 'maxDurability' => 70, 'station' => 'city', 'description' => 'Heavy enough that the stone does most of the arguing.'],
+            'steel_sickle' => ['name' => 'Steel Sickle', 'slot' => 'sickle', 'rarity' => 'uncommon', 'tradeable' => false, 'attack' => 6, 'palette' => 'iron', 'goldPrice' => 98, 'maxDurability' => 70, 'station' => 'city', 'description' => 'Holds an edge through a full field, then wants a stone.'],
 
-            'travel_cloak' => ['name' => 'Travel Cloak', 'slot' => 'armor', 'rarity' => 'common', 'tradeable' => false, 'stat' => 'tripReduction', 'value' => 0.02, 'attack' => 0, 'defence' => 2, 'palette' => 'fiber', 'goldPrice' => 26, 'maxDurability' => 60, 'station' => 'village', 'description' => 'Keeps the weather off. Shaves a little off every trip.'],
-            'hide_shoes' => ['name' => 'Hide Shoes', 'slot' => 'boots', 'rarity' => 'uncommon', 'tradeable' => false, 'stat' => 'travelSpeed', 'value' => 0.04, 'attack' => 0, 'defence' => 2, 'palette' => 'pelt', 'goldPrice' => 70, 'maxDurability' => 50, 'station' => 'city', 'description' => 'Soft-soled and quiet. Not built for the badlands.'],
+            'travel_cloak' => ['name' => 'Travel Cloak', 'slot' => 'armor', 'rarity' => 'common', 'tradeable' => false, 'stat' => 'tripReduction', 'value' => 0.02, 'attack' => 0, 'defense' => 2, 'palette' => 'fiber', 'goldPrice' => 26, 'maxDurability' => 60, 'station' => 'village', 'description' => 'Keeps the weather off. Shaves a little off every trip.'],
+            'hide_shoes' => ['name' => 'Hide Shoes', 'slot' => 'boots', 'rarity' => 'uncommon', 'tradeable' => false, 'stat' => 'travelSpeed', 'value' => 0.04, 'attack' => 0, 'defense' => 2, 'palette' => 'pelt', 'goldPrice' => 70, 'maxDurability' => 50, 'station' => 'city', 'description' => 'Soft-soled and quiet. Not built for the badlands.'],
 
             // ------------------------- Crafted starter -- raw + one refined, +4%
             // The first thing a player makes on a line. Cheap, short-lived, and
@@ -399,11 +419,11 @@ final class Catalog
             // Raw sits in every rung beside the refined. Wood is worth carrying
             // home as wood, not only as something to feed the saw, and the
             // gathering lines get a sink that does not run through a queue.
-            'hewn_axe' => ['name' => 'Hewn Axe', 'slot' => 'axe', 'rarity' => 'common', 'tradeable' => false, 'stat' => 'yield', 'value' => 0.03, 'palette' => 'wood', 'station' => 'village', 'maxDurability' => 60, 'inputs' => ['wood' => 6, 'planks' => 2, 'heartknot' => 2], 'description' => 'Your first real tool. It will not last, but it will teach.'],
-            'wood_pickaxe' => ['name' => 'Wood Pickaxe', 'slot' => 'pickaxe', 'rarity' => 'common', 'tradeable' => false, 'stat' => 'yield', 'value' => 0.03, 'palette' => 'wood', 'station' => 'village', 'maxDurability' => 60, 'inputs' => ['wood' => 6, 'planks' => 2, 'flux_salt' => 2], 'description' => 'Wood against rock. It lasts exactly as long as you would expect.'],
-            'shortbow' => ['name' => 'Shortbow', 'slot' => 'bow', 'rarity' => 'common', 'tradeable' => false, 'stat' => 'yield', 'value' => 0.03, 'palette' => 'wood', 'station' => 'village', 'maxDurability' => 60, 'inputs' => ['wood' => 6, 'cloth' => 2, 'horn' => 2], 'description' => 'Straight stave, woven string. Quiet, and quick to redraw.'],
-            'stone_maul' => ['name' => 'Stone Maul', 'slot' => 'hammer', 'rarity' => 'common', 'tradeable' => false, 'stat' => 'yield', 'value' => 0.03, 'palette' => 'stone', 'station' => 'village', 'maxDurability' => 60, 'inputs' => ['stone' => 6, 'cut_stone' => 2, 'whetgrit' => 2], 'description' => 'Dressed head, seated cold. Stone breaks stone.'],
-            'reed_sickle' => ['name' => 'Reed Sickle', 'slot' => 'sickle', 'rarity' => 'common', 'tradeable' => false, 'stat' => 'yield', 'value' => 0.03, 'palette' => 'fiber', 'station' => 'village', 'maxDurability' => 60, 'inputs' => ['fiber' => 6, 'cloth' => 2, 'quench_reed' => 2], 'description' => 'Bound at the grip so it stops turning in a wet hand.'],
+            'hewn_axe' => ['name' => 'Hewn Axe', 'slot' => 'axe', 'rarity' => 'common', 'tradeable' => false, 'attack' => 4, 'palette' => 'wood', 'station' => 'village', 'maxDurability' => 60, 'inputs' => ['wood' => 6, 'planks' => 2, 'heartknot' => 2], 'description' => 'Your first real tool. It will not last, but it will teach.'],
+            'wood_pickaxe' => ['name' => 'Wood Pickaxe', 'slot' => 'pickaxe', 'rarity' => 'common', 'tradeable' => false, 'attack' => 4, 'palette' => 'wood', 'station' => 'village', 'maxDurability' => 60, 'inputs' => ['wood' => 6, 'planks' => 2, 'flux_salt' => 2], 'description' => 'Wood against rock. It lasts exactly as long as you would expect.'],
+            'shortbow' => ['name' => 'Shortbow', 'slot' => 'bow', 'rarity' => 'common', 'tradeable' => false, 'attack' => 4, 'palette' => 'wood', 'station' => 'village', 'maxDurability' => 60, 'inputs' => ['wood' => 6, 'cloth' => 2, 'horn' => 2], 'description' => 'Straight stave, woven string. Quiet, and quick to redraw.'],
+            'stone_maul' => ['name' => 'Stone Maul', 'slot' => 'hammer', 'rarity' => 'common', 'tradeable' => false, 'attack' => 4, 'palette' => 'stone', 'station' => 'village', 'maxDurability' => 60, 'inputs' => ['stone' => 6, 'cut_stone' => 2, 'whetgrit' => 2], 'description' => 'Dressed head, seated cold. Stone breaks stone.'],
+            'reed_sickle' => ['name' => 'Reed Sickle', 'slot' => 'sickle', 'rarity' => 'common', 'tradeable' => false, 'attack' => 4, 'palette' => 'fiber', 'station' => 'village', 'maxDurability' => 60, 'inputs' => ['fiber' => 6, 'cloth' => 2, 'quench_reed' => 2], 'description' => 'Bound at the grip so it stops turning in a wet hand.'],
 
             // -------------- Crafted -- the uncommon grade, +6-8%, city bench
             // §5.3 -- this rung wants hardwood rather than wood, hematite rather
@@ -412,44 +432,44 @@ final class Catalog
             //
             // The partner is the other half of the thing: iron for an axe head,
             // wood for a pick haft, cloth for a bowstring.
-            'ironbound_axe' => ['name' => 'Ironbound Axe', 'slot' => 'axe', 'rarity' => 'uncommon', 'tradeable' => false, 'stat' => 'yield', 'value' => 0.05, 'palette' => 'iron', 'station' => 'city', 'maxDurability' => 120, 'inputs' => ['hardwood' => 6, 'beams' => 3, 'ingots' => 2, 'heartknot' => 3], 'description' => 'Wedged head, banded eye. Fells clean and comes back out.'],
-            'iron_pickaxe' => ['name' => 'Iron Pickaxe', 'slot' => 'pickaxe', 'rarity' => 'uncommon', 'tradeable' => false, 'stat' => 'yield', 'value' => 0.05, 'palette' => 'iron', 'station' => 'city', 'maxDurability' => 120, 'inputs' => ['hematite' => 6, 'steel_ingots' => 3, 'planks' => 2, 'flux_salt' => 3], 'description' => 'Balanced head, seasoned haft. The workhorse tool.'],
-            'sinew_longbow' => ['name' => 'Sinew Longbow', 'slot' => 'bow', 'rarity' => 'uncommon', 'tradeable' => false, 'stat' => 'yield', 'value' => 0.05, 'palette' => 'pelt', 'station' => 'city', 'maxDurability' => 120, 'inputs' => ['thick_pelt' => 6, 'boiled_leather' => 3, 'cloth' => 2, 'horn' => 3], 'description' => 'Sinew-backed and heavy to draw. The herd never hears it.'],
-            'banded_sledge' => ['name' => 'Banded Sledge', 'slot' => 'hammer', 'rarity' => 'uncommon', 'tradeable' => false, 'stat' => 'yield', 'value' => 0.05, 'palette' => 'iron', 'station' => 'city', 'maxDurability' => 120, 'inputs' => ['basalt' => 6, 'dressed_basalt' => 3, 'ingots' => 2, 'whetgrit' => 3], 'description' => 'Iron banding over a stone core. It takes the shock instead of you.'],
-            'toothed_sickle' => ['name' => 'Toothed Sickle', 'slot' => 'sickle', 'rarity' => 'uncommon', 'tradeable' => false, 'stat' => 'yield', 'value' => 0.05, 'palette' => 'iron', 'station' => 'city', 'maxDurability' => 120, 'inputs' => ['flax' => 6, 'linen' => 3, 'ingots' => 2, 'quench_reed' => 3], 'description' => 'Serrated inside the curve. It saws where a plain edge slides.'],
+            'ironbound_axe' => ['name' => 'Ironbound Axe', 'slot' => 'axe', 'rarity' => 'uncommon', 'tradeable' => false, 'attack' => 8, 'palette' => 'iron', 'station' => 'city', 'maxDurability' => 120, 'inputs' => ['hardwood' => 6, 'beams' => 3, 'ingots' => 2, 'heartknot' => 3], 'description' => 'Wedged head, banded eye. Fells clean and comes back out.'],
+            'iron_pickaxe' => ['name' => 'Iron Pickaxe', 'slot' => 'pickaxe', 'rarity' => 'uncommon', 'tradeable' => false, 'attack' => 8, 'palette' => 'iron', 'station' => 'city', 'maxDurability' => 120, 'inputs' => ['hematite' => 6, 'steel_ingots' => 3, 'planks' => 2, 'flux_salt' => 3], 'description' => 'Balanced head, seasoned haft. The workhorse tool.'],
+            'sinew_longbow' => ['name' => 'Sinew Longbow', 'slot' => 'bow', 'rarity' => 'uncommon', 'tradeable' => false, 'attack' => 8, 'palette' => 'pelt', 'station' => 'city', 'maxDurability' => 120, 'inputs' => ['thick_pelt' => 6, 'boiled_leather' => 3, 'cloth' => 2, 'horn' => 3], 'description' => 'Sinew-backed and heavy to draw. The herd never hears it.'],
+            'banded_sledge' => ['name' => 'Banded Sledge', 'slot' => 'hammer', 'rarity' => 'uncommon', 'tradeable' => false, 'attack' => 8, 'palette' => 'iron', 'station' => 'city', 'maxDurability' => 120, 'inputs' => ['basalt' => 6, 'dressed_basalt' => 3, 'ingots' => 2, 'whetgrit' => 3], 'description' => 'Iron banding over a stone core. It takes the shock instead of you.'],
+            'toothed_sickle' => ['name' => 'Toothed Sickle', 'slot' => 'sickle', 'rarity' => 'uncommon', 'tradeable' => false, 'attack' => 8, 'palette' => 'iron', 'station' => 'city', 'maxDurability' => 120, 'inputs' => ['flax' => 6, 'linen' => 3, 'ingots' => 2, 'quench_reed' => 3], 'description' => 'Serrated inside the curve. It saws where a plain edge slides.'],
 
-            'leather_armor' => ['name' => 'Leather Armor', 'slot' => 'armor', 'rarity' => 'uncommon', 'tradeable' => false, 'stat' => 'tripReduction', 'value' => 0.05, 'attack' => 0, 'defence' => 3, 'palette' => 'pelt', 'station' => 'city', 'maxDurability' => 130, 'inputs' => ['thick_pelt' => 8, 'boiled_leather' => 4, 'cloth' => 2, 'sinew' => 3], 'description' => 'Light enough to walk in all day.'],
-            'reinforced_boots' => ['name' => 'Reinforced Boots', 'slot' => 'boots', 'rarity' => 'uncommon', 'tradeable' => false, 'stat' => 'travelSpeed', 'value' => 0.05, 'attack' => 0, 'defence' => 2, 'palette' => 'stone', 'station' => 'city', 'maxDurability' => 140, 'inputs' => ['basalt' => 8, 'dressed_basalt' => 3, 'leather' => 2, 'slate_scale' => 3], 'description' => 'Stone-shod. Ugly, and you will stop caring by noon.'],
-            'work_gloves' => ['name' => 'Work Gloves', 'slot' => 'gloves', 'rarity' => 'common', 'tradeable' => false, 'stat' => 'processingSpeed', 'value' => 0.03, 'attack' => 1, 'defence' => 0, 'palette' => 'fiber', 'station' => 'village', 'maxDurability' => 90, 'inputs' => ['fiber' => 6, 'cloth' => 2, 'beeswax' => 2], 'description' => 'Doubled at the palm. Speeds work on the settlement lines.'],
+            'leather_armor' => ['name' => 'Leather Armor', 'slot' => 'armor', 'rarity' => 'uncommon', 'tradeable' => false, 'stat' => 'tripReduction', 'value' => 0.05, 'attack' => 0, 'defense' => 3, 'palette' => 'pelt', 'station' => 'city', 'maxDurability' => 130, 'inputs' => ['thick_pelt' => 8, 'boiled_leather' => 4, 'cloth' => 2, 'sinew' => 3], 'description' => 'Light enough to walk in all day.'],
+            'reinforced_boots' => ['name' => 'Reinforced Boots', 'slot' => 'boots', 'rarity' => 'uncommon', 'tradeable' => false, 'stat' => 'travelSpeed', 'value' => 0.05, 'attack' => 0, 'defense' => 2, 'palette' => 'stone', 'station' => 'city', 'maxDurability' => 140, 'inputs' => ['basalt' => 8, 'dressed_basalt' => 3, 'leather' => 2, 'slate_scale' => 3], 'description' => 'Stone-shod. Ugly, and you will stop caring by noon.'],
+            'work_gloves' => ['name' => 'Work Gloves', 'slot' => 'gloves', 'rarity' => 'common', 'tradeable' => false, 'stat' => 'processingSpeed', 'value' => 0.03, 'attack' => 1, 'defense' => 0, 'palette' => 'fiber', 'station' => 'village', 'maxDurability' => 90, 'inputs' => ['fiber' => 6, 'cloth' => 2, 'beeswax' => 2], 'description' => 'Doubled at the palm. Speeds work on the settlement lines.'],
 
             // ------------------ Rare -- the rare grade, +8%, capital bench
             // §5.3 -- heartoak, meteoric iron, dire pelt: contested ring only.
             // Reinforced Frame gates the rung on top of that, being the one
             // tier-2 that needs two processing lines, so rare gear implies both
             // a settled player and one willing to work the middle of the map.
-            'broadaxe' => ['name' => 'Broadaxe', 'slot' => 'axe', 'rarity' => 'rare', 'tradeable' => false, 'stat' => 'yield', 'value' => 0.08, 'palette' => 'iron', 'station' => 'capital', 'maxDurability' => 160, 'inputs' => ['heartoak' => 8, 'bentwood' => 4, 'ingots' => 3, 'heartknot' => 4, 'reinforced_frame' => 1], 'description' => 'Two hands, a long haul, and a tree down in three swings.'],
-            'deep_pick' => ['name' => 'Deep Pick', 'slot' => 'pickaxe', 'rarity' => 'rare', 'tradeable' => false, 'stat' => 'yield', 'value' => 0.08, 'palette' => 'iron', 'station' => 'capital', 'maxDurability' => 160, 'inputs' => ['meteoric_iron' => 8, 'skysteel' => 4, 'planks' => 3, 'flux_salt' => 4, 'reinforced_frame' => 1], 'description' => 'Long in the head, for seams that do not start at the surface.'],
-            'warbow' => ['name' => 'Warbow', 'slot' => 'bow', 'rarity' => 'rare', 'tradeable' => false, 'stat' => 'yield', 'value' => 0.08, 'palette' => 'pelt', 'station' => 'capital', 'maxDurability' => 160, 'inputs' => ['dire_pelt' => 8, 'lacquered_hide' => 4, 'canvas' => 3, 'horn' => 4, 'reinforced_frame' => 1], 'description' => 'A draw weight most people cannot hold. It does not need a second shot.'],
-            'splitting_maul' => ['name' => 'Splitting Maul', 'slot' => 'hammer', 'rarity' => 'rare', 'tradeable' => false, 'stat' => 'yield', 'value' => 0.08, 'palette' => 'stone', 'station' => 'capital', 'maxDurability' => 160, 'inputs' => ['granite' => 8, 'polished_granite' => 4, 'ingots' => 3, 'whetgrit' => 4, 'reinforced_frame' => 1], 'description' => 'Wedge-headed. It does not crush the rock, it opens it.'],
-            'threshing_scythe' => ['name' => 'Threshing Scythe', 'slot' => 'sickle', 'rarity' => 'rare', 'tradeable' => false, 'stat' => 'yield', 'value' => 0.08, 'palette' => 'iron', 'station' => 'capital', 'maxDurability' => 160, 'inputs' => ['hemp' => 8, 'canvas' => 4, 'skysteel' => 3, 'quench_reed' => 4, 'reinforced_frame' => 1], 'description' => 'Long snath, long blade. A field goes down in rows, not handfuls.'],
-            'banded_mail' => ['name' => 'Banded Mail', 'slot' => 'armor', 'rarity' => 'rare', 'tradeable' => false, 'stat' => 'tripReduction', 'value' => 0.08, 'attack' => 1, 'defence' => 5, 'palette' => 'iron', 'station' => 'capital', 'maxDurability' => 160, 'inputs' => ['dire_pelt' => 8, 'lacquered_hide' => 4, 'steel_ingots' => 3, 'sinew' => 4, 'reinforced_frame' => 1], 'description' => 'Iron bands over tanned hide. Heavy, and worth every pound of it.'],
-            'marching_boots' => ['name' => 'Marching Boots', 'slot' => 'boots', 'rarity' => 'rare', 'tradeable' => false, 'stat' => 'travelSpeed', 'value' => 0.08, 'attack' => 0, 'defence' => 3, 'palette' => 'pelt', 'station' => 'capital', 'maxDurability' => 160, 'inputs' => ['dire_pelt' => 8, 'lacquered_hide' => 4, 'polished_granite' => 3, 'tar_seep' => 4, 'reinforced_frame' => 1], 'description' => 'Built for the road between rings, not the walk to the next hex.'],
-            'tanners_gloves' => ['name' => "Tanner's Gloves", 'slot' => 'gloves', 'rarity' => 'rare', 'tradeable' => false, 'stat' => 'processingSpeed', 'value' => 0.08, 'attack' => 3, 'defence' => 1, 'palette' => 'pelt', 'station' => 'capital', 'maxDurability' => 160, 'inputs' => ['hemp' => 8, 'canvas' => 4, 'lacquered_hide' => 3, 'beeswax' => 4, 'reinforced_frame' => 1], 'description' => 'Cut for the settlement lines. The work goes faster and the hands last.'],
+            'broadaxe' => ['name' => 'Broadaxe', 'slot' => 'axe', 'rarity' => 'rare', 'tradeable' => false, 'attack' => 10, 'palette' => 'iron', 'station' => 'capital', 'maxDurability' => 160, 'inputs' => ['heartoak' => 8, 'bentwood' => 4, 'ingots' => 3, 'heartknot' => 4, 'reinforced_frame' => 1], 'description' => 'Two hands, a long haul, and a tree down in three swings.'],
+            'deep_pick' => ['name' => 'Deep Pick', 'slot' => 'pickaxe', 'rarity' => 'rare', 'tradeable' => false, 'attack' => 10, 'palette' => 'iron', 'station' => 'capital', 'maxDurability' => 160, 'inputs' => ['meteoric_iron' => 8, 'skysteel' => 4, 'planks' => 3, 'flux_salt' => 4, 'reinforced_frame' => 1], 'description' => 'Long in the head, for seams that do not start at the surface.'],
+            'warbow' => ['name' => 'Warbow', 'slot' => 'bow', 'rarity' => 'rare', 'tradeable' => false, 'attack' => 10, 'palette' => 'pelt', 'station' => 'capital', 'maxDurability' => 160, 'inputs' => ['dire_pelt' => 8, 'lacquered_hide' => 4, 'canvas' => 3, 'horn' => 4, 'reinforced_frame' => 1], 'description' => 'A draw weight most people cannot hold. It does not need a second shot.'],
+            'splitting_maul' => ['name' => 'Splitting Maul', 'slot' => 'hammer', 'rarity' => 'rare', 'tradeable' => false, 'attack' => 10, 'palette' => 'stone', 'station' => 'capital', 'maxDurability' => 160, 'inputs' => ['granite' => 8, 'polished_granite' => 4, 'ingots' => 3, 'whetgrit' => 4, 'reinforced_frame' => 1], 'description' => 'Wedge-headed. It does not crush the rock, it opens it.'],
+            'threshing_scythe' => ['name' => 'Threshing Scythe', 'slot' => 'sickle', 'rarity' => 'rare', 'tradeable' => false, 'attack' => 10, 'palette' => 'iron', 'station' => 'capital', 'maxDurability' => 160, 'inputs' => ['hemp' => 8, 'canvas' => 4, 'skysteel' => 3, 'quench_reed' => 4, 'reinforced_frame' => 1], 'description' => 'Long snath, long blade. A field goes down in rows, not handfuls.'],
+            'banded_mail' => ['name' => 'Banded Mail', 'slot' => 'armor', 'rarity' => 'rare', 'tradeable' => false, 'stat' => 'tripReduction', 'value' => 0.08, 'attack' => 1, 'defense' => 5, 'palette' => 'iron', 'station' => 'capital', 'maxDurability' => 160, 'inputs' => ['dire_pelt' => 8, 'lacquered_hide' => 4, 'steel_ingots' => 3, 'sinew' => 4, 'reinforced_frame' => 1], 'description' => 'Iron bands over tanned hide. Heavy, and worth every pound of it.'],
+            'marching_boots' => ['name' => 'Marching Boots', 'slot' => 'boots', 'rarity' => 'rare', 'tradeable' => false, 'stat' => 'travelSpeed', 'value' => 0.08, 'attack' => 0, 'defense' => 3, 'palette' => 'pelt', 'station' => 'capital', 'maxDurability' => 160, 'inputs' => ['dire_pelt' => 8, 'lacquered_hide' => 4, 'polished_granite' => 3, 'tar_seep' => 4, 'reinforced_frame' => 1], 'description' => 'Built for the road between rings, not the walk to the next hex.'],
+            'tanners_gloves' => ['name' => "Tanner's Gloves", 'slot' => 'gloves', 'rarity' => 'rare', 'tradeable' => false, 'stat' => 'processingSpeed', 'value' => 0.08, 'attack' => 3, 'defense' => 1, 'palette' => 'pelt', 'station' => 'capital', 'maxDurability' => 160, 'inputs' => ['hemp' => 8, 'canvas' => 4, 'lacquered_hide' => 3, 'beeswax' => 4, 'reinforced_frame' => 1], 'description' => 'Cut for the settlement lines. The work goes faster and the hands last.'],
 
             // ------------ NFT -- six kinds across four tiers, +12-15% hard cap
             // Each line's top tool wants its own rare material and its own dungeon
             // shard, so kitting out a second line means crossing the map, §4. The
             // rare grade underneath them is what makes it a haul as well as a
             // raid: tier 1, 2, 3 and 4 in one recipe.
-            'ironwood_axe' => ['name' => 'Ironwood Axe', 'slot' => 'axe', 'rarity' => 'epic', 'tradeable' => true, 'stat' => 'yield', 'value' => 0.11, 'palette' => 'wood', 'station' => 'capital', 'maxDurability' => 200, 'inputs' => ['ironwood' => 3, 'heartoak' => 8, 'bentwood' => 4, 'heartknot' => 4, 'reinforced_frame' => 2, 'shard_verdant' => 1], 'description' => 'Cut from the thing it is meant to cut. Marketplace-tradeable.'],
-            'mythril_pickaxe' => ['name' => 'Mythril Pickaxe', 'slot' => 'pickaxe', 'rarity' => 'epic', 'tradeable' => true, 'stat' => 'yield', 'value' => 0.11, 'palette' => 'iron', 'station' => 'capital', 'maxDurability' => 200, 'inputs' => ['mythril_ore' => 3, 'meteoric_iron' => 8, 'skysteel' => 4, 'flux_salt' => 4, 'reinforced_frame' => 2, 'essence' => 1], 'description' => 'Rings like a bell on ore. Marketplace-tradeable.'],
-            'beastfang_bow' => ['name' => 'Beastfang Bow', 'slot' => 'bow', 'rarity' => 'epic', 'tradeable' => true, 'stat' => 'yield', 'value' => 0.11, 'palette' => 'pelt', 'station' => 'capital', 'maxDurability' => 200, 'inputs' => ['beastfang_hide' => 3, 'dire_pelt' => 8, 'lacquered_hide' => 4, 'horn' => 4, 'reinforced_frame' => 2, 'shard_sanguine' => 1], 'description' => 'Strung with something that used to run. Marketplace-tradeable.'],
-            'obsidian_sledge' => ['name' => 'Obsidian Sledge', 'slot' => 'hammer', 'rarity' => 'epic', 'tradeable' => true, 'stat' => 'yield', 'value' => 0.11, 'palette' => 'stone', 'station' => 'capital', 'maxDurability' => 200, 'inputs' => ['obsidian_shard' => 3, 'granite' => 8, 'polished_granite' => 4, 'whetgrit' => 4, 'reinforced_frame' => 2, 'shard_cinder' => 1], 'description' => 'Glass that lands like iron. Marketplace-tradeable.'],
-            'silkweave_sickle' => ['name' => 'Silkweave Sickle', 'slot' => 'sickle', 'rarity' => 'epic', 'tradeable' => true, 'stat' => 'yield', 'value' => 0.11, 'palette' => 'fiber', 'station' => 'capital', 'maxDurability' => 200, 'inputs' => ['silkweave_fiber' => 3, 'hemp' => 8, 'canvas' => 4, 'quench_reed' => 4, 'reinforced_frame' => 2, 'shard_zephyr' => 1], 'description' => 'The grass parts before it arrives. Marketplace-tradeable.'],
+            'ironwood_axe' => ['name' => 'Ironwood Axe', 'slot' => 'axe', 'rarity' => 'epic', 'tradeable' => true, 'attack' => 14, 'palette' => 'wood', 'station' => 'capital', 'maxDurability' => 200, 'inputs' => ['ironwood' => 3, 'heartoak' => 8, 'bentwood' => 4, 'heartknot' => 4, 'reinforced_frame' => 2, 'shard_verdant' => 1], 'description' => 'Cut from the thing it is meant to cut. Marketplace-tradeable.'],
+            'mythril_pickaxe' => ['name' => 'Mythril Pickaxe', 'slot' => 'pickaxe', 'rarity' => 'epic', 'tradeable' => true, 'attack' => 14, 'palette' => 'iron', 'station' => 'capital', 'maxDurability' => 200, 'inputs' => ['mythril_ore' => 3, 'meteoric_iron' => 8, 'skysteel' => 4, 'flux_salt' => 4, 'reinforced_frame' => 2, 'essence' => 1], 'description' => 'Rings like a bell on ore. Marketplace-tradeable.'],
+            'beastfang_bow' => ['name' => 'Beastfang Bow', 'slot' => 'bow', 'rarity' => 'epic', 'tradeable' => true, 'attack' => 14, 'palette' => 'pelt', 'station' => 'capital', 'maxDurability' => 200, 'inputs' => ['beastfang_hide' => 3, 'dire_pelt' => 8, 'lacquered_hide' => 4, 'horn' => 4, 'reinforced_frame' => 2, 'shard_sanguine' => 1], 'description' => 'Strung with something that used to run. Marketplace-tradeable.'],
+            'obsidian_sledge' => ['name' => 'Obsidian Sledge', 'slot' => 'hammer', 'rarity' => 'epic', 'tradeable' => true, 'attack' => 14, 'palette' => 'stone', 'station' => 'capital', 'maxDurability' => 200, 'inputs' => ['obsidian_shard' => 3, 'granite' => 8, 'polished_granite' => 4, 'whetgrit' => 4, 'reinforced_frame' => 2, 'shard_cinder' => 1], 'description' => 'Glass that lands like iron. Marketplace-tradeable.'],
+            'silkweave_sickle' => ['name' => 'Silkweave Sickle', 'slot' => 'sickle', 'rarity' => 'epic', 'tradeable' => true, 'attack' => 14, 'palette' => 'fiber', 'station' => 'capital', 'maxDurability' => 200, 'inputs' => ['silkweave_fiber' => 3, 'hemp' => 8, 'canvas' => 4, 'quench_reed' => 4, 'reinforced_frame' => 2, 'shard_zephyr' => 1], 'description' => 'The grass parts before it arrives. Marketplace-tradeable.'],
 
-            'ironwood_armor' => ['name' => 'Ironwood Armor', 'slot' => 'armor', 'rarity' => 'epic', 'tradeable' => true, 'stat' => 'tripReduction', 'value' => 0.11, 'attack' => 1, 'defence' => 7, 'palette' => 'wood', 'station' => 'capital', 'maxDurability' => 210, 'inputs' => ['ironwood' => 3, 'heartoak' => 8, 'bentwood' => 4, 'pine_pitch' => 4, 'reinforced_frame' => 2, 'shard_verdant' => 1], 'description' => 'Grown, not forged. Marketplace-tradeable.'],
-            'beastfang_boots' => ['name' => 'Beastfang Boots', 'slot' => 'boots', 'rarity' => 'epic', 'tradeable' => true, 'stat' => 'travelSpeed', 'value' => 0.11, 'attack' => 0, 'defence' => 4, 'palette' => 'pelt', 'station' => 'capital', 'maxDurability' => 190, 'inputs' => ['beastfang_hide' => 3, 'dire_pelt' => 8, 'lacquered_hide' => 4, 'sinew' => 4, 'reinforced_frame' => 2, 'relic' => 1], 'description' => 'Something fast died for these. Marketplace-tradeable.'],
-            'silkweave_gloves' => ['name' => 'Silkweave Gloves', 'slot' => 'gloves', 'rarity' => 'epic', 'tradeable' => true, 'stat' => 'processingSpeed', 'value' => 0.11, 'attack' => 4, 'defence' => 1, 'palette' => 'fiber', 'station' => 'capital', 'maxDurability' => 195, 'inputs' => ['silkweave_fiber' => 3, 'hemp' => 8, 'canvas' => 4, 'beeswax' => 4, 'reinforced_frame' => 2, 'shard_zephyr' => 1], 'description' => 'Spun so fine the work goes quicker for feeling less. Marketplace-tradeable.'],
+            'ironwood_armor' => ['name' => 'Ironwood Armor', 'slot' => 'armor', 'rarity' => 'epic', 'tradeable' => true, 'stat' => 'tripReduction', 'value' => 0.11, 'attack' => 1, 'defense' => 7, 'palette' => 'wood', 'station' => 'capital', 'maxDurability' => 210, 'inputs' => ['ironwood' => 3, 'heartoak' => 8, 'bentwood' => 4, 'pine_pitch' => 4, 'reinforced_frame' => 2, 'shard_verdant' => 1], 'description' => 'Grown, not forged. Marketplace-tradeable.'],
+            'beastfang_boots' => ['name' => 'Beastfang Boots', 'slot' => 'boots', 'rarity' => 'epic', 'tradeable' => true, 'stat' => 'travelSpeed', 'value' => 0.11, 'attack' => 0, 'defense' => 4, 'palette' => 'pelt', 'station' => 'capital', 'maxDurability' => 190, 'inputs' => ['beastfang_hide' => 3, 'dire_pelt' => 8, 'lacquered_hide' => 4, 'sinew' => 4, 'reinforced_frame' => 2, 'relic' => 1], 'description' => 'Something fast died for these. Marketplace-tradeable.'],
+            'silkweave_gloves' => ['name' => 'Silkweave Gloves', 'slot' => 'gloves', 'rarity' => 'epic', 'tradeable' => true, 'stat' => 'processingSpeed', 'value' => 0.11, 'attack' => 4, 'defense' => 1, 'palette' => 'fiber', 'station' => 'capital', 'maxDurability' => 195, 'inputs' => ['silkweave_fiber' => 3, 'hemp' => 8, 'canvas' => 4, 'beeswax' => 4, 'reinforced_frame' => 2, 'shard_zephyr' => 1], 'description' => 'Spun so fine the work goes quicker for feeling less. Marketplace-tradeable.'],
 
         ]
             // §9.5.4 -- the six combat groups, three grades at every rung. The
@@ -490,7 +510,7 @@ final class Catalog
      */
     public const NAME_PREFIXES = [
         'Ash', 'Kel', 'Thorn', 'Dun', 'Red', 'Stone', 'Var', 'Mill', 'Black',
-        'High', 'Ember', 'Grey', 'Oak', 'Iron', 'Cold', 'Sable', 'Wren', 'Marrow',
+        'High', 'Ember', 'Gray', 'Oak', 'Iron', 'Cold', 'Sable', 'Wren', 'Marrow',
         'Elder', 'Fern', 'Hollow', 'Brack',
     ];
 

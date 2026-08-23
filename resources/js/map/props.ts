@@ -352,7 +352,7 @@ function settlementProp(tier: SettlementTier, seed: number): string {
   }
 
   // Capital: one mark and its footing. The flanking huts were an accessory --
-  // they only muddied the base into the same grey lump a city makes.
+  // they only muddied the base into the same gray lump a city makes.
   return rect(-15, 6, 30, 6, shade(STONE, -0.24)) + spire(0, 6, 34)
 }
 
@@ -520,7 +520,7 @@ function waterProp(tile: Tile): string {
 
 /**
  * Everything that stands on top of a tile. `y` values are negative-up from the
- * tile centre, matching the hex geometry origin.
+ * tile center, matching the hex geometry origin.
  */
 export function tileProps(tile: Tile, depleted: boolean): string {
   if (tile.dungeon) return dungeonProp()
@@ -698,7 +698,7 @@ export function tileProps(tile: Tile, depleted: boolean): string {
  * One tile, drawn on its own, for the almanac's ground tab.
  *
  * §5.3 gave every biome four variants and §13.2 tells them apart by tint AND by
- * prop treatment -- so a flat colour chip shows half the difference. Four
+ * prop treatment -- so a flat color chip shows half the difference. Four
  * greens next to each other are hard work; four greens with conifers, broadleaf
  * crowns, two buttressed giants and a banded trunk on them are not.
  *
@@ -725,11 +725,11 @@ export function variantSpecimen(variant: VariantKey, size = 66): string {
   const side = shade(top, -0.4)
   const edge = shade(top, -0.2)
 
-  // A prop is filled with its own ground's colour, so on the map a tree only
+  // A prop is filled with its own ground's color, so on the map a tree only
   // reads because it stands in front of the DARKER slab of the tile behind it
   // (§13.2's painter's sort is what guarantees that). Draw one specimen alone
   // and there is nothing behind it, so the silhouette disappears into the fill.
-  // The neighbour directly upslope is put back for exactly that reason -- it is
+  // The neighbor directly upslope is put back for exactly that reason -- it is
   // what the hex actually looks like in place, not a vignette behind it.
   const backTop = shade(top, -0.3)
   const back =
@@ -739,7 +739,7 @@ export function variantSpecimen(variant: VariantKey, size = 66): string {
     '</g>'
 
   // Tall props stand well above their own tile -- a giant reaches ~26px up --
-  // so the box is far deeper above the centre than below it.
+  // so the box is far deeper above the center than below it.
   const w = 62
   const boxH = 82
   const h = Math.round((size * boxH) / w)
@@ -758,7 +758,7 @@ export function variantSpecimen(variant: VariantKey, size = 66): string {
 /**
  * §5.3 -- one stretch of water, off the map, for the almanac.
  *
- * Same argument as variantSpecimen(): the neighbour upslope goes back in,
+ * Same argument as variantSpecimen(): the neighbor upslope goes back in,
  * because a surface drawn against nothing has no edge to read against. Water
  * needs it more than the land does -- its marks are strokes rather than
  * silhouettes, and a stroke on an empty field is a scratch.
@@ -809,7 +809,7 @@ export function herdProp(tile: Tile): string {
  * 58x34 hex two bright points on a dark shape read as "something is looking at
  * you" before the silhouette resolves into anything.
  *
- * Solid fills only (§13.2). Ember rather than a biome colour, because a pack
+ * Solid fills only (§13.2). Ember rather than a biome color, because a pack
  * belongs to no ground: it walked here.
  */
 function pack(x: number, y: number): string {
@@ -844,7 +844,7 @@ export function packProp(tile: Tile): string {
  * a pale marker planted beside it. Eyes are the pack's whole tell, so taking
  * them away is what says this one is not looking at you.
  *
- * `mine` puts the marker in ember, which is §13.3's colour for a state to deal
+ * `mine` puts the marker in ember, which is §13.3's color for a state to deal
  * with -- and a row of yours sitting on a hex four days out is exactly that.
  * Somebody else's is bone, which is a fact rather than a task.
  */

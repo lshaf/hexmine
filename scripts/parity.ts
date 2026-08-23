@@ -150,7 +150,7 @@ const span = config.size
  * Placed as fractions of the map, not fixed coordinates, so the boxes follow
  * MAP_RADIUS rather than being pinned to one map size.
  *
- * §5.1 -- coordinates are signed and centred, so fraction 0 is the far west
+ * §5.1 -- coordinates are signed and centerd, so fraction 0 is the far west
  * edge, 0.5 is the origin, and 1 is the far east. A box is still kept clear of
  * the very edge: both sides now refuse to place a settlement off the map, but a
  * box that is half void is testing half as much.
@@ -160,7 +160,7 @@ const at = (f: number) => Math.round((f - 0.5) * span)
 const BOXES = [
   { col: 0.02, row: 0.04, w: 0.18, h: 0.18 }, // outer rim, villages
   { col: 0.24, row: 0.28, w: 0.16, h: 0.16 }, // mid ring, cities
-  { col: 0.48, row: 0.48, w: 0.24, h: 0.24 }, // dead centre, capitals
+  { col: 0.48, row: 0.48, w: 0.24, h: 0.24 }, // dead center, capitals
   { col: 0.78, row: 0.16, w: 0.2, h: 0.2 }, // the far rim
 ].map((b) => ({
   col: at(b.col),

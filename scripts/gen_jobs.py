@@ -18,26 +18,36 @@ def bag_units(n): return ('bagUnits', None, n)
 def bag_rows(n): return ('bagRows', None, n)
 
 # ---------------------------------------------------------------- craft trees
+# §7.4 -- a craft tree may only move `processingSpeed`, because that is the one
+# stat a bench clock reads (§8.4). Its four biggest nodes are UNLOCKS instead,
+# for two reasons: thirteen speed nodes came to 17% against a 15% ceiling, which
+# left gear nothing to add, and §7.4 already says a bench grows by learning what
+# it can make rather than by shaving another percent off the clock. It used to hand out yield, trip time and
+# travel speed, which made an Armorer's tree pay out on somebody's MINING trips
+# -- a craft job improving work it has nothing to do with. Locked to its own
+# bench in GameService, so a Smith is faster at the weapon bench and nowhere
+# else.
+
 SMITH = [
- ('whetstone_round','Whetstone Round',stat('yield',.01),'Ten minutes on the stone before every shift.'),
+ ('whetstone_round','Whetstone Round',stat('processingSpeed',.01),'Ten minutes on the stone before every shift.'),
  ('cold_shut_eye','Cold-Shut Eye',cost(.03),'Spot the bad weld before the billet is wasted.'),
  ('dry_seated_haft','Dry-Seated Haft',dur(.05),'A haft seated dry outlives one seated green.'),
  ('bellows_rhythm','Bellows Rhythm',stat('processingSpeed',.01),'Air on the coals in time, not in a panic.'),
  ('offcut_ledger','Offcut Ledger',cost(.03),'Nothing leaves the shop as scrap that could be stock.'),
  ('hammer_sense','Hammer Sense',opt(.07),'You can hear when a piece has come out right.'),
 
- ('drawn_temper','Drawn Temper',dur(.05),'Colour the steel back down and it stops chipping.'),
+ ('drawn_temper','Drawn Temper',dur(.05),'Color the steel back down and it stops chipping.'),
  ('quench_oil','Quench Oil',dur(.05),'Oil where water would crack it.'),
- ('edge_geometry','Edge Geometry',stat('yield',.02),'The angle matters more than the arm behind it.'),
+ ('edge_geometry','Edge Geometry',unlock('smith.edge_geometry'),'The angle matters more than the arm behind it.'),
  ('charcoal_husbandry','Charcoal Husbandry',cost(.03),'A hotter fire from less fuel.'),
  ('billet_folding','Billet Folding',opt(.07),'Fold it again and the flaws fold out.'),
- ('anvil_song','Anvil Song',stat('processingSpeed',.02),'The pitch tells you when to stop.'),
+ ('anvil_song','Anvil Song',unlock('smith.anvil_song'),'The pitch tells you when to stop.'),
  ('twin_stroke','Twin Stroke',batch(1),'Two blanks under the hammer in one heat.'),
  ('shoulder_fit','Shoulder Fit',dur(.05),'Seat the shoulder and the head never works loose.'),
 
  ('differential_temper','Differential Temper',dur(.05),'Hard at the edge, soft at the spine.'),
  ('pattern_weld','Pattern Weld',opt(.07),'Layers that show, and hold.'),
- ('hollow_grind','Hollow Grind',stat('yield',.01),'Less steel behind the edge, more bite in front of it.'),
+ ('hollow_grind','Hollow Grind',stat('processingSpeed',.01),'Less steel behind the edge, more bite in front of it.'),
  ('forge_economy','Forge Economy',cost(.03),'One heat where an apprentice takes three.'),
  ('striker_pair','Striker Pair',stat('processingSpeed',.01),'A second hammer, timed to yours.'),
  ('crucible_steel','Crucible Steel',opt(.07),'Melt it properly and the grain comes out even.'),
@@ -45,87 +55,87 @@ SMITH = [
  ('flux_reading','Flux Reading',cost(.03),'Read the flux and you waste no metal to scale.'),
 
  ('mastersmith_eye','Mastersmith Eye',opt(.07),'You know what it will be before it is.'),
- ('socket_and_wedge','Socket and Wedge',stat('yield',.02),'A head that cannot fly off is a head you can swing hard.'),
- ('hearth_discipline','Hearth Discipline',stat('processingSpeed',.02),'The fire is never waiting on you.'),
- ('tang_extension','Tang Extension',stat('yield',.01),'Steel all the way through the grip.'),
+ ('socket_and_wedge','Socket and Wedge',unlock('smith.socket_and_wedge'),'A head that cannot fly off is a head you can swing hard.'),
+ ('hearth_discipline','Hearth Discipline',unlock('smith.hearth_discipline'),'The fire is never waiting on you.'),
+ ('tang_extension','Tang Extension',stat('processingSpeed',.01),'Steel all the way through the grip.'),
  ('scale_hammering','Scale Hammering',stat('processingSpeed',.01),'Knock the scale off while it is still cheap to.'),
  ('heat_ledger','Heat Ledger',stat('processingSpeed',.01),'Every heat written down, every heat learned from.'),
 
- ('the_named_blade','The Named Blade',stat('yield',.01),'The shop is known for one thing, and this is it.'),
+ ('the_named_blade','The Named Blade',stat('processingSpeed',.01),'The shop is known for one thing, and this is it.'),
  ('shop_of_record','Shop of Record',stat('processingSpeed',.01),'Every settlement on the ring sends work to you.'),
 ]
 
 ARMORER = [
- ('measured_cut','Measured Cut',stat('tripReduction',.01),'Cut once, to the wearer, not to the pattern.'),
+ ('measured_cut','Measured Cut',stat('processingSpeed',.01),'Cut once, to the wearer, not to the pattern.'),
  ('hide_grading','Hide Grading',cost(.03),'The bad half of a hide never reaches the bench.'),
  ('doubled_seam','Doubled Seam',dur(.05),'The seam gives out long before the plate does.'),
- ('boot_last','Boot Last',stat('travelSpeed',.01),'Built on a last, not guessed at.'),
+ ('boot_last','Boot Last',stat('processingSpeed',.01),'Built on a last, not guessed at.'),
  ('scrap_leather','Scrap Leather',cost(.03),'Offcuts become straps, gussets and lining.'),
  ('fit_by_eye','Fit by Eye',opt(.07),'A glance and you know where it will chafe.'),
 
  ('waxed_thread','Waxed Thread',dur(.05),'Wax it and the wet stops rotting the stitch.'),
  ('riveted_lap','Riveted Lap',dur(.05),'Rivets where thread would fail.'),
- ('weight_balance','Weight Balance',stat('tripReduction',.02),'Carried on the hips, not hung off the shoulders.'),
+ ('weight_balance','Weight Balance',unlock('armorer.weight_balance'),'Carried on the hips, not hung off the shoulders.'),
  ('tannin_economy','Tannin Economy',cost(.03),'The same bark liquor, three times over.'),
  ('padded_arming','Padded Arming',opt(.07),'What goes under the plate decides whether it is bearable.'),
- ('flex_panel','Flex Panel',stat('travelSpeed',.02),'Rigid where it must be, and nowhere else.'),
+ ('flex_panel','Flex Panel',unlock('armorer.flex_panel'),'Rigid where it must be, and nowhere else.'),
  ('paired_cutting','Paired Cutting',batch(1),'Two sets nested from one hide.'),
  ('edge_binding','Edge Binding',dur(.05),'Bound edges do not fray, and fraying is how armor dies.'),
 
  ('hardened_boss','Hardened Boss',dur(.05),'One thick place where the blows land.'),
  ('articulation','Articulation',opt(.07),'Plates that move with the joint instead of against it.'),
- ('sole_stitching','Sole Stitching',stat('travelSpeed',.01),'Stitched, not glued. Glue is for indoors.'),
+ ('sole_stitching','Sole Stitching',stat('processingSpeed',.01),'Stitched, not glued. Glue is for indoors.'),
  ('pattern_nesting','Pattern Nesting',cost(.03),'Every scrap of the hide accounted for before the knife.'),
- ('breathable_lining','Breathable Lining',stat('tripReduction',.01),'You can wear it all day, which is the whole point.'),
+ ('breathable_lining','Breathable Lining',stat('processingSpeed',.01),'You can wear it all day, which is the whole point.'),
  ('lamellar_lacing','Lamellar Lacing',opt(.07),'Laced so a broken plate is replaced, not the suit.'),
  ('bulk_tanning','Bulk Tanning',batch(1),'The pit holds more than one hide at a time.'),
  ('hide_yield','Hide Yield',cost(.03),'Nothing left on the beam but hair and lime.'),
 
  ('bespoke_fitting','Bespoke Fitting',opt(.07),'Made for one prospector, and it shows.'),
- ('load_transfer','Load Transfer',stat('tripReduction',.02),'The weight goes into the ground, not into you.'),
- ('road_sole','Road Sole',stat('travelSpeed',.02),'Built for the hexes between rings.'),
- ('gusset_work','Gusset Work',stat('tripReduction',.01),'Room to move exactly where you need it.'),
- ('ankle_support','Ankle Support',stat('travelSpeed',.01),'The difference over ten hexes is an hour.'),
- ('cold_weather_lining','Cold-Weather Lining',stat('travelSpeed',.01),'Tundra stops being a reason to turn back.'),
+ ('load_transfer','Load Transfer',unlock('armorer.load_transfer'),'The weight goes into the ground, not into you.'),
+ ('road_sole','Road Sole',unlock('armorer.road_sole'),'Built for the hexes between rings.'),
+ ('gusset_work','Gusset Work',stat('processingSpeed',.01),'Room to move exactly where you need it.'),
+ ('ankle_support','Ankle Support',stat('processingSpeed',.01),'The difference over ten hexes is an hour.'),
+ ('cold_weather_lining','Cold-Weather Lining',stat('processingSpeed',.01),'Tundra stops being a reason to turn back.'),
 
- ('the_second_skin','The Second Skin',stat('tripReduction',.01),'You stop noticing you are wearing it.'),
- ('outfitter_of_the_ring','Outfitter of the Ring',stat('travelSpeed',.01),'Every capital keeps a set of yours in stock.'),
+ ('the_second_skin','The Second Skin',stat('processingSpeed',.01),'You stop noticing you are wearing it.'),
+ ('outfitter_of_the_ring','Outfitter of the Ring',stat('processingSpeed',.01),'Every capital keeps a set of yours in stock.'),
 ]
 
 ALCHEMIST = [
- ('clean_glass','Clean Glass',stat('processingSpeed',.01),'A dirty flask ruins a good draught.'),
+ ('clean_glass','Clean Glass',stat('processingSpeed',.01),'A dirty flask ruins a good draft.'),
  ('measured_pour','Measured Pour',cost(.03),'Weighed, not eyeballed.'),
  ('sealed_stopper','Sealed Stopper',dur(.05),'What does not evaporate does not need remaking.'),
- ('cold_steep','Cold Steep',stat('yield',.01),'Slower, and it keeps what heat would burn off.'),
+ ('cold_steep','Cold Steep',stat('processingSpeed',.01),'Slower, and it keeps what heat would burn off.'),
  ('spent_mash','Spent Mash',cost(.03),'The second pressing is weaker, not worthless.'),
  ('nose_for_it','Nose for It',opt(.07),'You can smell a batch going wrong.'),
 
  ('double_boiler','Double Boiler',dur(.05),'Nothing scorches at the bottom of the pot.'),
  ('resin_binding','Resin Binding',dur(.05),'Resin holds the mixture together in the flask.'),
- ('potency_titration','Potency Titration',stat('yield',.02),'Strong enough to work, weak enough to drink.'),
+ ('potency_titration','Potency Titration',unlock('alchemist.potency_titration'),'Strong enough to work, weak enough to drink.'),
  ('reflux_still','Reflux Still',cost(.03),'The vapour comes back down instead of out the window.'),
  ('sediment_reading','Sediment Reading',opt(.07),'What settles tells you what you made.'),
- ('warm_room','Warm Room',stat('processingSpeed',.02),'A steady room is half the recipe.'),
+ ('warm_room','Warm Room',unlock('alchemist.warm_room'),'A steady room is half the recipe.'),
  ('batch_kettle','Batch Kettle',batch(1),'One fire under a bigger pot.'),
  ('wax_seal','Wax Seal',dur(.05),'A waxed flask survives a fall down a shaft.'),
 
  ('fractional_draw','Fractional Draw',dur(.05),'Take only the middle of the run.'),
  ('mineral_mordant','Mineral Mordant',opt(.07),'Ore dust fixes what plant matter will not.'),
- ('slow_infusion','Slow Infusion',stat('yield',.01),'Two days steeping beats two hours boiling.'),
+ ('slow_infusion','Slow Infusion',stat('processingSpeed',.01),'Two days steeping beats two hours boiling.'),
  ('solvent_recovery','Solvent Recovery',cost(.03),'The spirit is worth more than what it dissolved.'),
  ('bench_order','Bench Order',stat('processingSpeed',.01),'Everything within reach, nothing in the way.'),
  ('crystal_seeding','Crystal Seeding',opt(.07),'Drop one crystal in and the rest follow.'),
  ('rack_brewing','Rack Brewing',batch(1),'Six flasks at a time, all the same.'),
  ('lees_reclaim','Lees Reclaim',cost(.03),'What sinks to the bottom goes back in the next pot.'),
 
- ('perfect_draught','Perfect Draught',opt(.07),'Every flask off the rack is the good one.'),
- ('deep_reserve','Deep Reserve',stat('yield',.02),'Kept properly, it is as good in a month.'),
- ('steady_hand','Steady Hand',stat('processingSpeed',.02),'No spills, no waste, no second attempt.'),
- ('bitter_tincture','Bitter Tincture',stat('yield',.01),'Nobody enjoys it. Everybody finishes it.'),
+ ('perfect_draft','Perfect Draft',opt(.07),'Every flask off the rack is the good one.'),
+ ('deep_reserve','Deep Reserve',unlock('alchemist.deep_reserve'),'Kept properly, it is as good in a month.'),
+ ('steady_hand','Steady Hand',unlock('alchemist.steady_hand'),'No spills, no waste, no second attempt.'),
+ ('bitter_tincture','Bitter Tincture',stat('processingSpeed',.01),'Nobody enjoys it. Everybody finishes it.'),
  ('kiln_dried_stock','Kiln-Dried Stock',stat('processingSpeed',.01),'Dry ingredients keep, and keep their strength.'),
  ('shelf_life','Shelf Life',stat('processingSpeed',.01),'Nothing on the shelf is ever wasted.'),
 
- ('the_house_blend','The House Blend',stat('yield',.01),'Copied everywhere, matched nowhere.'),
+ ('the_house_blend','The House Blend',stat('processingSpeed',.01),'Copied everywhere, matched nowhere.'),
  ('capital_supplier','Capital Supplier',stat('processingSpeed',.01),'The bazaar buys everything you can make.'),
 ]
 
@@ -134,7 +144,7 @@ def battle(prefix, names, primary, secondary, n_primary, v_primary, v_secondary)
     """22 stat nodes then 8 dormant ability unlocks, in tier order.
 
     No tree reaches the +15% ceiling on its own: a full Shieldbearer lands at
-    12% defence, leaving gear a reason to exist for a character who took it.
+    12% defense, leaving gear a reason to exist for a character who took it.
     The primary/secondary split is what gives each battle job its shape --
     defensive, even, offensive -- rather than the node count alone.
     """
@@ -204,7 +214,7 @@ SWORD_NAMES = [
  ('the_even_hand','The Even Hand','Neither reckless nor slow.'),
  ('ability_riposte','Riposte','Dormant: punish a blocked attack.'),
  ('ability_feint','Feint','Dormant: open a guard by threatening elsewhere.'),
- ('ability_flurry','Flurry','Dormant: a burst that trades defence for output.'),
+ ('ability_flurry','Flurry','Dormant: a burst that trades defense for output.'),
  ('ability_disarm','Disarm','Dormant: strip a weapon for a round.'),
  ('ability_sidestep','Sidestep','Dormant: avoid one attack outright.'),
  ('ability_execute','Execute','Dormant: finish a wounded enemy.'),
@@ -337,7 +347,7 @@ SMELTER_NAMES = [
  ('hand_sorting','Hand Sorting','The waste rock never gets a share of the charcoal.'),
  ('bloomery','The Bloomery','Unlocks a low stack that makes a bloom out of ore and time.'),
  ('charge_order','Charge Order','Ore, fuel, ore, fuel. Never two of one.'),
- ('roasting_bed','Roasting Bed','Unlocks a bed that drives the sulphur off before the smelt.'),
+ ('roasting_bed','Roasting Bed','Unlocks a bed that drives the sulfur off before the smelt.'),
  ('tuyere_angle','Tuyere Angle','The air goes where the heat is wanted.'),
 
  ('bellows_pair','Bellows Pair','Two bags, alternating, and the blast never drops.'),
@@ -354,7 +364,7 @@ SMELTER_NAMES = [
  ('slag_reclaim','Slag Reclaim','There is iron in what was thrown away.'),
  ('continuous_run','Continuous Run','Charged from the top while it pours from the bottom.'),
  ('banded_frame','Banded Frame','Unlocks banding timber and iron into one thing.'),
- ('ingot_moulds','Ingot Moulds','A row of moulds, and one pour fills them all.'),
+ ('ingot_molds','Ingot Molds','A row of molds, and one pour fills them all.'),
  ('blast_timing','Blast Timing','Hard while it is charged, gentle while it is working.'),
  ('wrought_and_cast','Wrought and Cast','Unlocks knowing which of the two a job actually wants.'),
 
@@ -427,7 +437,7 @@ MASON_NAMES = [
  ('ashlar_course','Ashlar Course','Unlocks stone cut close enough to lay without mortar.'),
  ('dust_reclaim','Dust Reclaim','Even the grit sells, to the next mason\'s saw.'),
  ('drafted_margin','Drafted Margin','Cut the border first and the middle takes care of itself.'),
- ('moulded_work','Moulded Work','Unlocks profiles, and stone that is more than a box.'),
+ ('molded_work','Molded Work','Unlocks profiles, and stone that is more than a box.'),
  ('double_banker','Double Banker','Two benches, one setting-out, both finished together.'),
  ('wet_cutting','Wet Cutting','Water carries the dust away and the blade lasts twice as long.'),
  ('frost_stone','Frost Stone','Unlocks working the stone that only opens in winter.'),
@@ -444,7 +454,7 @@ MASON_NAMES = [
 ]
 
 WEAVER_NAMES = [
- ('retting_judgement','Retting Judgement','A day too long and it rots. A day too short and it fights you.'),
+ ('retting_judgment','Retting Judgment','A day too long and it rots. A day too short and it fights you.'),
  ('sorted_stricks','Sorted Stricks','Long with long, short with short, and nothing on the wrong cloth.'),
  ('the_brake','The Brake','Unlocks a brake that cracks the woody core out of the stalk.'),
  ('scutching_blade','Scutching Blade','Beat it downward and the boon falls away on its own.'),
@@ -492,11 +502,19 @@ WEAVER_NAMES = [
 #
 # Effects run in a fixed pattern so every tier carries a mix rather than one
 # tier being all yield: 9 yield, 9 trip, 5 travel, 7 unlock.
+# §7.4 -- a gathering tree pays out on its own line and on nothing else, which
+# leaves it exactly two stats: how big the haul is and how fast the trip runs.
+#
+# `travelSpeed` used to be a third of them and was dead weight twice over. A
+# node is filed under its line and only counts on that line's work, and walking
+# is not woodcutting -- so those nodes could never pay out at all. They would
+# also have been off-class if they had: a woodcutter's tree makes them better at
+# felling, not at getting there.
 GATHER_PATTERN = [
-    'y', 't', 'v', 'y', 't', 'u',
-    'y', 't', 'v', 'y', 't', 'u', 'y', 't',
-    'v', 'y', 't', 'u', 'y', 't', 'v', 'u',
-    'y', 't', 'v', 'u', 'y', 't',
+    'y', 't', 'y', 'y', 't', 'u',
+    'y', 't', 't', 'y', 't', 'u', 'y', 't',
+    'y', 'y', 't', 'u', 'y', 't', 't', 'u',
+    'y', 't', 'y', 'u', 'y', 't',
     'u', 'u',
 ]
 
@@ -510,8 +528,6 @@ def gather(prefix, names):
             e = stat('yield', .01)
         elif kind == 't':
             e = stat('tripReduction', .01)
-        elif kind == 'v':
-            e = stat('travelSpeed', .01)
         else:
             e = unlock(f'{prefix}.{key}')
         out.append((key, name, e, desc))
@@ -694,7 +710,7 @@ HARVESTING_NAMES = [
 # points would make walking a trade-off against every bench in the game, and the
 # point of it is the opposite.
 #
-# It levels by hexes crossed, and travelling grants no character XP at all -- so
+# It levels by hexes crossed, and traveling grants no character XP at all -- so
 # this is the only thing a long walk pays out. What it pays in is the two things
 # a walker owns: how far the eye reaches (§5.6) and how much the back carries
 # (§7.6).
@@ -765,9 +781,9 @@ TREES = {
     'alchemist': ALCHEMIST,
 
     # 12/5 defensive, 8.8/8.8 even, 5/12 offensive -- shield, sword, magic.
-    'shieldbearer': battle('shieldbearer', SHIELD_NAMES, 'defence', 'power', 12, .01, .005),
-    'swordhand': battle('swordhand', SWORD_NAMES, 'power', 'defence', 11, .008, .008),
-    'runecaster': battle('runecaster', RUNE_NAMES, 'power', 'defence', 12, .01, .005),
+    'shieldbearer': battle('shieldbearer', SHIELD_NAMES, 'defense', 'power', 12, .01, .005),
+    'swordhand': battle('swordhand', SWORD_NAMES, 'power', 'defense', 11, .008, .008),
+    'runecaster': battle('runecaster', RUNE_NAMES, 'power', 'defense', 12, .01, .005),
 }
 
 JOBS = [
@@ -789,9 +805,9 @@ JOBS = [
     ('armorer', 'Armorer', 'craft', 'armor', 'pelt', 'Cuts and fits what is worn, which is the only gear that counts on every line at once.'),
     ('alchemist', 'Alchemist', 'craft', 'consumable', 'fiber', 'Brews what is drunk. Everything made here is spent, and the expiry is the sink.'),
 
-    ('shieldbearer', 'Shieldbearer', 'battle', 'defence', 'stone', 'Stands in front. Dormant until raid combat exists.'),
+    ('shieldbearer', 'Shieldbearer', 'battle', 'defense', 'stone', 'Stands in front. Dormant until raid combat exists.'),
     ('swordhand', 'Swordhand', 'battle', 'balance', 'wood', 'Trades evenly between the blow and the block. Dormant until raid combat exists.'),
-    ('runecaster', 'Runecaster', 'battle', 'offence', 'raid', 'Cuts the marks that burn. Dormant until raid combat exists.'),
+    ('runecaster', 'Runecaster', 'battle', 'offense', 'raid', 'Cuts the marks that burn. Dormant until raid combat exists.'),
 ]
 
 # ------------------------------------------------------------------ structure

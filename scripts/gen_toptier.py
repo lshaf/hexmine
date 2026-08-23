@@ -47,13 +47,19 @@ WORN = {
 
 SLOTS = dict(LINES, **WORN)
 
+# §8 -- a gathering tool's base is its ATTACK, and it has no percentage at all.
+# A tool used to lead with "+14% yield", which conflated the two halves of a
+# trip: attack is how fast you work through a hex (§7.3) and yield is how big
+# the haul is. Worn gear keeps a percentage, because a coat has no attack of its
+# own to lead with.
 STAT = {
-    'axe': 'yield', 'pickaxe': 'yield', 'bow': 'yield', 'hammer': 'yield',
-    'sickle': 'yield', 'armor': 'tripReduction', 'boots': 'travelSpeed',
-    'gloves': 'processingSpeed',
+    'armor': 'tripReduction', 'boots': 'travelSpeed', 'gloves': 'processingSpeed',
 }
 
-# §9.5.4 -- "Every armor, boots and gloves item gains attack and defence next to
+# §7.3 -- the top of the tool ladder, in mining attack.
+TOOL_ATTACK = {'legendary': 17, 'unique': 19}
+
+# §9.5.4 -- "Every armor, boots and gloves item gains attack and defense next to
 # its work stat." Every rung below this one already did; these two did not, which
 # left a legendary wardencoat worth LESS in a fight than a common travel cloak
 # and made the doc's "a full legendary work set is a coin toss against a tier-3
@@ -61,12 +67,13 @@ STAT = {
 #
 # Deliberately far under the battle rung of the same rarity (legendary battle
 # armor is 2/18 against 1/9 here). That gap IS §9.5.4's shape: work gear reaches
-# the contested ring, the centre asks for battle gear, and giving up trip time
+# the contested ring, the center asks for battle gear, and giving up trip time
 # and travel speed is the decision rather than a level being.
 #
-# The five gathering tools stay at nothing, because §8 rule 5 keeps combat and
-# gathering apart in both directions: a weapon never gathers, and a sickle never
-# fights.
+# The five gathering tools stay at nothing HERE, because §8 rule 5 keeps combat
+# and gathering apart in both directions: a weapon never gathers, and a sickle
+# never fights. A tool's own `attack` is MINING attack (§7.3) and comes from
+# TOOL_ATTACK above; combat never reads it.
 PAIR = {
     'armor':  {'legendary': (1, 9),  'unique': (2, 10)},
     'boots':  {'legendary': (0, 5),  'unique': (0, 6)},
@@ -141,20 +148,28 @@ def rows():
         biome = SLOTS[slot][0]
         lkey, lname, ldesc = LEGENDARY[slot]
         ukey, uname, uperk, udesc = UNIQUE[slot]
-        lattack, ldefence = PAIR.get(slot, {}).get('legendary', (0, 0))
-        uattack, udefence = PAIR.get(slot, {}).get('unique', (0, 0))
+        lattack, ldefense = PAIR.get(slot, {}).get('legendary', (0, 0))
+        uattack, udefense = PAIR.get(slot, {}).get('unique', (0, 0))
+
+        tool = slot in LINES
 
         yield {
             'key': lkey, 'name': lname, 'slot': slot, 'rarity': 'legendary',
-            'tradeable': True, 'stat': STAT[slot], 'value': 0.14,
-            'attack': lattack, 'defence': ldefence,
+            'tradeable': True,
+            'stat': None if tool else STAT[slot],
+            'value': None if tool else 0.14,
+            'attack': TOOL_ATTACK['legendary'] if tool else lattack,
+            'defense': 0 if tool else ldefense,
             'palette': PALETTE[biome], 'station': 'guild', 'maxDurability': 240,
             'inputs': legendary_inputs(slot), 'perk': None, 'description': ldesc,
         }
         yield {
             'key': ukey, 'name': uname, 'slot': slot, 'rarity': 'unique',
-            'tradeable': False, 'stat': STAT[slot], 'value': 0.15,
-            'attack': uattack, 'defence': udefence,
+            'tradeable': False,
+            'stat': None if tool else STAT[slot],
+            'value': None if tool else 0.15,
+            'attack': TOOL_ATTACK['unique'] if tool else uattack,
+            'defense': 0 if tool else udefense,
             'palette': PALETTE[biome], 'station': None, 'maxDurability': 260,
             'inputs': None, 'perk': uperk, 'description': udesc,
         }
@@ -192,13 +207,14 @@ def emit_php():
             f"'slot' => '{i['slot']}'",
             f"'rarity' => '{i['rarity']}'",
             f"'tradeable' => {'true' if i['tradeable'] else 'false'}",
-            f"'stat' => '{i['stat']}'",
-            f"'value' => {i['value']}",
-            f"'palette' => '{i['palette']}'",
         ]
-        if i['attack'] or i['defence']:
+        if i['stat']:
+            parts.append(f"'stat' => '{i['stat']}'")
+            parts.append(f"'value' => {i['value']}")
+        parts.append(f"'palette' => '{i['palette']}'")
+        if i['attack'] or i['defense']:
             parts.append(f"'attack' => {i['attack']}")
-            parts.append(f"'defence' => {i['defence']}")
+            parts.append(f"'defense' => {i['defense']}")
         if i['station']:
             parts.append(f"'station' => '{i['station']}'")
         parts.append(f"'maxDurability' => {i['maxDurability']}")
@@ -228,13 +244,14 @@ def emit_ts():
             f"slot: '{i['slot']}'",
             f"rarity: '{i['rarity']}'",
             f"tradeable: {'true' if i['tradeable'] else 'false'}",
-            f"stat: '{i['stat']}'",
-            f"value: {i['value']}",
-            f"palette: '{i['palette']}'",
         ]
-        if i['attack'] or i['defence']:
+        if i['stat']:
+            parts.append(f"stat: '{i['stat']}'")
+            parts.append(f"value: {i['value']}")
+        parts.append(f"palette: '{i['palette']}'")
+        if i['attack'] or i['defense']:
             parts.append(f"attack: {i['attack']}")
-            parts.append(f"defence: {i['defence']}")
+            parts.append(f"defense: {i['defense']}")
         if i['station']:
             parts.append(f"station: '{i['station']}'")
         parts.append(f"maxDurability: {i['maxDurability']}")

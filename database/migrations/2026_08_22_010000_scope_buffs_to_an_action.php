@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Schema;
  *
  * The rule was "one buff per stat", enforced by a unique index on
  * (character_id, stat). With sixty action-scoped potions that rule would mean a
- * woodcutting-yield draught and a mining-yield draught could never be running
+ * woodcutting-yield draft and a mining-yield draft could never be running
  * at once, which is the entire point of scoping them.
  *
  * So the rule becomes "one buff per stat PER ACTION". Its intent is unchanged

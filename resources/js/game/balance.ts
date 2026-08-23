@@ -20,7 +20,7 @@ export const HOUR = 60 * MINUTE
 export const MAP = {
   /** §5.1. Server-authoritative: the client is handed these by GET /api/world,
    *  so they are documentation, not the source of truth. The map is square and
-   *  centred on the origin -- a radius of 200 is every column and every row
+   *  centerd on the origin -- a radius of 200 is every column and every row
    *  from -200 to 200, so `size` is `radius * 2 + 1`. */
   radius: 2500,
   size: 5001,
@@ -41,9 +41,9 @@ export const MAP = {
    * instead of that field is how the fog and the server end up disagreeing.
    */
   sightRadius: 1,
-  sightTravelling: 0,
-  /** §5 -- ten minutes of ground per hex, before travelSpeed divides it. */
-  travelMsPerHex: 10 * MINUTE,
+  sightTraveling: 0,
+  /** §5 -- five minutes of ground per hex, before travelSpeed divides it. */
+  travelMsPerHex: 5 * MINUTE,
 } as const
 
 export const MINING = {
@@ -51,16 +51,16 @@ export const MINING = {
   baseMinSeconds: 30 * 60,
   baseMaxSeconds: 60 * 60,
   /** clamp() floor and ceiling. The floor is mandatory from day one, §7.3. */
-  floorSeconds: 30 * 60,
+  floorSeconds: 15 * 60,
   ceilingSeconds: 60 * 60,
-  /** Max reduction from a fully levelled relevant skill, §7.3. */
-  maxSkillReductionSeconds: 20 * 60,
-  /** Max reduction from best-in-slot equipment, §7.3. */
-  maxEquipReductionSeconds: 10 * 60,
+  /** §7.3 -- what bare hands take out of a hex per second. */
+  baseAttack: 10,
+  /** §7.3 -- what a maxed line skill adds to that rate. */
+  skillAttack: 10,
   /** Exactly two mining slots per hex, §5.1. */
   slotsPerTile: 2,
   /** Depleted tiles regrow after ~9h, §5.1. */
-  regrowMs: 9 * HOUR,
+  regrowMs: 12 * HOUR,
   /** Leaving a hex mid-progress forfeits partial yield, §11.1. */
   abandonRefund: 0,
 } as const

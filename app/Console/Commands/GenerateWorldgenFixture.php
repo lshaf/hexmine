@@ -48,7 +48,7 @@ class GenerateWorldgenFixture extends Command
         }
 
         // The four that have to be in every fixture: a dungeon mouth, the dead
-        // centre, and both far corners -- which are now opposite in sign (§5.1).
+        // center, and both far corners -- which are now opposite in sign (§5.1).
         $mouth = WorldGen::dungeonSites()[0];
         $coords[] = [$mouth['col'], $mouth['row']];
         $coords[] = [0, 0];

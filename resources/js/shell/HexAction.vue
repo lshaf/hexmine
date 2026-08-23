@@ -28,7 +28,7 @@ withDefaults(
      * §12 -- the same idea pointed the other way: a state worth crossing the
      * screen for, and a welcome one. Ember is what something WRONG looks like,
      * so gold waiting on the ledger must not borrow it -- a reward drawn in the
-     * colour of a full bag reads as an alarm going off over good news.
+     * color of a full bag reads as an alarm going off over good news.
      */
     good?: boolean
   }>(),
@@ -135,9 +135,9 @@ defineEmits<{ (e: 'activate'): void }>()
   letter-spacing: 0.14em;
 }
 
-/* §7.6 -- a state, not a mode. The cell keeps working; it is just the colour of
+/* §7.6 -- a state, not a mode. The cell keeps working; it is just the color of
    something you have to deal with. The rim is the hairline the shape already
-   has (see .hex in app.css), so this is a colour swap rather than a second
+   has (see .hex in app.css), so this is a color swap rather than a second
    border that a clip-path would eat. */
 .alert .hex {
   background: var(--ember);
@@ -156,7 +156,7 @@ defineEmits<{ (e: 'activate'): void }>()
 }
 
 /* §12 -- the affirmative twin of .alert, and drawn exactly the same way so the
-   two read as one grammar: the cell has something to tell you, and the colour
+   two read as one grammar: the cell has something to tell you, and the color
    says whether that is a problem or a payout. */
 .good .hex {
   background: var(--sap);

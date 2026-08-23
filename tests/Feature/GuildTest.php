@@ -333,10 +333,10 @@ final class GuildTest extends TestCase
     }
 
     /**
-     * §10.0.3 -- exactly 1024 colours, and the column can hold nothing else.
+     * §10.0.3 -- exactly 1024 colors, and the column can hold nothing else.
      * Not a URL, not a file, not a data URI.
      */
-    public function test_a_flag_is_1024_colours_and_nothing_else(): void
+    public function test_a_flag_is_1024_colors_and_nothing_else(): void
     {
         $this->standAt('city');
         $this->purse(Balance::GUILD_FOUNDING_COST);

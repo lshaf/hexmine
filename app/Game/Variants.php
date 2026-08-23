@@ -76,7 +76,7 @@ final class Variants
         'bentwood' => ['name' => 'Bentwood', 'tier' => 2, 'palette' => 'wood', 'npcPrice' => 26, 'description' => 'Steamed, bent round a form, and left to set. It holds the curve forever.'],
         'steel_ingots' => ['name' => 'Steel Ingots', 'tier' => 2, 'palette' => 'iron', 'npcPrice' => 18, 'description' => 'Carbon worked through the iron. Springs back where plain bar stays bent.'],
         'skysteel' => ['name' => 'Skysteel', 'tier' => 2, 'palette' => 'iron', 'npcPrice' => 32, 'description' => 'Folded out of what fell. Pale, and it rings a long time after the strike.'],
-        'boiled_leather' => ['name' => 'Boiled Leather', 'tier' => 2, 'palette' => 'pelt', 'npcPrice' => 16, 'description' => 'Boiled hard and moulded wet. Sets like a shell and weighs nothing.'],
+        'boiled_leather' => ['name' => 'Boiled Leather', 'tier' => 2, 'palette' => 'pelt', 'npcPrice' => 16, 'description' => 'Boiled hard and molded wet. Sets like a shell and weighs nothing.'],
         'lacquered_hide' => ['name' => 'Lacquered Hide', 'tier' => 2, 'palette' => 'pelt', 'npcPrice' => 30, 'description' => 'Layered, lacquered, and left in the dark to cure. Turns a blade.'],
         'dressed_basalt' => ['name' => 'Dressed Basalt', 'tier' => 2, 'palette' => 'stone', 'npcPrice' => 15, 'description' => 'Squared out of the column. Every face is already flat; you only true it.'],
         'polished_granite' => ['name' => 'Polished Granite', 'tier' => 2, 'palette' => 'stone', 'npcPrice' => 28, 'description' => 'Ground down through four grits. The finish is what makes it last.'],

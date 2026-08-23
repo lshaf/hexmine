@@ -45,7 +45,7 @@ PALETTE = {
 # Per biome, four variants in grade order. Each carries:
 #
 #   tile      the ground's own name, what the map calls it
-#   tint      §13.2 fill for the hex, a shift of the base biome colour
+#   tint      §13.2 fill for the hex, a shift of the base biome color
 #   raw       tier 1 material the hex gives up  (key, Name, npcPrice)
 #   refined   tier 2 it processes into          (key, Name, npcPrice, minutes)
 #   props     which prop treatment props.ts draws
@@ -115,7 +115,7 @@ DESCRIPTIONS = {
     'bentwood': 'Steamed, bent round a form, and left to set. It holds the curve forever.',
     'steel_ingots': 'Carbon worked through the iron. Springs back where plain bar stays bent.',
     'skysteel': 'Folded out of what fell. Pale, and it rings a long time after the strike.',
-    'boiled_leather': 'Boiled hard and moulded wet. Sets like a shell and weighs nothing.',
+    'boiled_leather': 'Boiled hard and molded wet. Sets like a shell and weighs nothing.',
     'lacquered_hide': 'Layered, lacquered, and left in the dark to cure. Turns a blade.',
     'dressed_basalt': 'Squared out of the column. Every face is already flat; you only true it.',
     'polished_granite': 'Ground down through four grits. The finish is what makes it last.',

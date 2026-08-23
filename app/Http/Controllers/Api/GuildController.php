@@ -47,7 +47,7 @@ class GuildController extends GameController
             'name' => ['required', 'string', 'max:'.Balance::GUILD_NAME_MAX],
             'code' => ['required', 'string', 'max:'.Balance::GUILD_CODE_MAX],
             'description' => ['nullable', 'string', 'max:'.Balance::GUILD_DESCRIPTION_MAX],
-            // Length-checked rather than parsed: a flag is exactly 1024 colours
+            // Length-checked rather than parsed: a flag is exactly 1024 colors
             // and the service refuses anything that is not (§10.0.3).
             'flag' => ['nullable', 'string', 'max:8192'],
         ]);

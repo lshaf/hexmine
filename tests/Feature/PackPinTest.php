@@ -102,11 +102,11 @@ final class PackPinTest extends TestCase
             $this->assertStringContainsString('standing here', (string) $preview['reason']);
         }
 
-        // A neighbour is refused for the same reason: the pin is about the
+        // A neighbor is refused for the same reason: the pin is about the
         // ground under your feet, not the ground you are pointing at.
-        $neighbour = $this->game->previewTile($this->character->fresh(), $col + 1, $row);
-        $this->assertFalse($neighbour['canMine']);
-        $this->assertTrue($neighbour['pinned']);
+        $neighbor = $this->game->previewTile($this->character->fresh(), $col + 1, $row);
+        $this->assertFalse($neighbor['canMine']);
+        $this->assertTrue($neighbor['pinned']);
 
         $this->expectException(GameException::class);
         $this->game->startMining($this->character->fresh(), $col, $row, Drops::GATHERING);
@@ -285,7 +285,7 @@ final class PackPinTest extends TestCase
         $arrived->settle($character);
         $character = $character->fresh();
 
-        $this->assertFalse($arrived->isTravelling($character), 'still on the road after arriving');
+        $this->assertFalse($arrived->isTraveling($character), 'still on the road after arriving');
 
         if ($character->col === $target['col'] && $character->row === $target['row']) {
             // A clear road is a legitimate outcome, and on a sparse outer ring
@@ -369,7 +369,7 @@ final class PackPinTest extends TestCase
         $character = $character->fresh();
 
         // Either it was stopped, or it has banked the hexes it checked.
-        if ($half->isTravelling($character)) {
+        if ($half->isTraveling($character)) {
             $this->assertGreaterThan(0, (int) $character->travel_scanned_hexes, 'the road was walked and not remembered');
             $this->assertLessThanOrEqual(10, (int) $character->travel_scanned_hexes);
 

@@ -9,8 +9,8 @@
  *    Per-tile SVGs with overflow:visible stack drop-shadows into mush.
  *  - Painter's algorithm: tiles sorted by screen Y so tall props occlude
  *    correctly.
- *  - No alpha anywhere. Transparency ghosts hexes through their neighbours, so
- *    every "faded" state is a precomputed solid colour instead.
+ *  - No alpha anywhere. Transparency ghosts hexes through their neighbors, so
+ *    every "faded" state is a precomputed solid color instead.
  */
 import { computed, ref } from 'vue'
 import type { ComponentPublicInstance } from 'vue'
@@ -172,7 +172,7 @@ function onPointerUp(event: PointerEvent) {
   }
 }
 
-/** Client coordinates -> map space, honouring the current viewBox. */
+/** Client coordinates -> map space, honoring the current viewBox. */
 function toMapSpace(clientX: number, clientY: number): DOMPoint | null {
   const svg = svgEl.value
   const ctm = svg?.getScreenCTM()
@@ -213,7 +213,7 @@ interface RenderTile {
 /*
  * Beyond sight the map states two things and no more: the lie of the land, and
  * whether anybody lives on it. Tier is the whole message -- no name, no size of
- * settlement beyond the pip, nothing that needed asking the server. Colours are
+ * settlement beyond the pip, nothing that needed asking the server. Colors are
  * the atlas legend, so one vocabulary covers both maps.
  */
 const MARK: Record<string, { fill: string; r: number; dungeon: boolean }> = {
@@ -223,7 +223,7 @@ const MARK: Record<string, { fill: string; r: number; dungeon: boolean }> = {
   dungeon: { fill: '#7d5fa8', r: 6, dungeon: true },
 }
 
-/** A flat-top hexagon of the given radius, centred on the origin. */
+/** A flat-top hexagon of the given radius, centerd on the origin. */
 function pip(r: number): string {
   const h = r * 0.866
   return `M${-r},0 L${-r / 2},${-h} L${r / 2},${-h} L${r},0 L${r / 2},${h} L${-r / 2},${h} Z`

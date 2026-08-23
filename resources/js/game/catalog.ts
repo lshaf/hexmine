@@ -124,7 +124,7 @@ export const MATERIALS: Record<MaterialKey, Material> = {
   },
   ingots: {
     key: 'ingots', name: 'Ingots', tier: 2, palette: 'iron',
-    npcPrice: 9, description: 'Smelted iron, poured into bar moulds.',
+    npcPrice: 9, description: 'Smelted iron, poured into bar molds.',
   },
   leather: {
     key: 'leather', name: 'Leather', tier: 2, palette: 'pelt',
@@ -381,7 +381,7 @@ export const STAT_LABEL: Record<StatKey, string> = {
   travelSpeed: 'travel speed',
   processingSpeed: 'processing speed',
   power: 'power',
-  defence: 'defence',
+  defense: 'defense',
 }
 
 /**

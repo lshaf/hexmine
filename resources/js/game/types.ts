@@ -215,11 +215,11 @@ export interface Material {
   critter?: boolean
   /** §9.5.8 -- which half of a monster this is, and nothing else has it. */
   spoil?: 'plate' | 'ichor'
-  /** §9.5.8 -- 1..5, the monster tier that gives it up. Grade 5 is the centre ring. */
+  /** §9.5.8 -- 1..5, the monster tier that gives it up. Grade 5 is the center ring. */
   grade?: number
   /** Biome lock for tier 1 and tier 3. Raid + refined materials are unlocked. */
   biome?: Biome
-  /** Accent colour for the procedural icon system, §13.1. */
+  /** Accent color for the procedural icon system, §13.1. */
   palette: 'wood' | 'iron' | 'pelt' | 'stone' | 'fiber' | 'raid'
   /** NPC buy-back price in gold. Deliberately poor, §3.2. */
   npcPrice: number
@@ -259,7 +259,7 @@ export type EquipSlot = GatherSlot | 'armor' | 'boots' | 'gloves' | 'weapon'
 
 /**
  * §8.1 -- the rarity ladder. Ordered weakest to strongest; rarity sets the power
- * ceiling, the colour, and which station can make the thing.
+ * ceiling, the color, and which station can make the thing.
  *
  * Rarity is NOT tradeability. `unique` is the strongest and is soulbound; `epic`
  * and `legendary` are the tradeable ones. Read `ItemDef.tradeable` for that, and
@@ -282,7 +282,7 @@ export type StatKey =
   /** §7.4 -- the two battle stats. Dormant until raid combat exists, and
    *  clamped by the same STAT_CEILING as everything else when it does. */
   | 'power'
-  | 'defence'
+  | 'defense'
 
 /**
  * §8.5 -- what a buff can be pointed at.
@@ -290,7 +290,7 @@ export type StatKey =
  * The five gathering lines are the §7.2 skills, so a line-scoped buff lands on
  * exactly the trips that line already governs. `travel` and `processing` are
  * the two other things a character spends real time on, and `battle` (§9.5) is
- * the one that is not work at all -- the only place `power` and `defence` are
+ * the one that is not work at all -- the only place `power` and `defense` are
  * worth drinking for.
  */
 export type BuffScope = SkillKey | 'travel' | 'processing' | 'battle'
@@ -321,7 +321,8 @@ export interface ItemDef {
    * soulbound, because §2 forbids a grind→NFT faucet.
    */
   tradeable: boolean
-  stat: StatKey
+  /** Absent on a gathering tool, whose base is its solid `attack` instead. */
+  stat?: StatKey
   /**
    * §8.5 -- the action this buff applies to, on consumables only.
    *
@@ -338,21 +339,27 @@ export interface ItemDef {
    * percentage -- the ceiling is +15% and the rolled options already reach it.
    */
   perk?: string
-  /** Fractional bonus, e.g. 0.06 = +6%. */
-  value: number
+  /**
+   * §8 -- the percentage the piece is FOR, and absent on a gathering tool.
+   *
+   * A tool's base is its solid `attack` (§7.3) and it has no percentage at all:
+   * attack is how fast you work through a hex and yield is how big the haul is,
+   * which are two questions and therefore two numbers.
+   */
+  value?: number
   /**
    * §9.5.4 -- which of the three battle jobs this weapon levels, and the shape
-   * of its attack/defence pair. Weapons only: one slot holds all three
+   * of its attack/defense pair. Weapons only: one slot holds all three
    * families, and the family you carry is your class.
    */
   family?: 'shield' | 'sword' | 'focus'
   /**
-   * §9.5.4 -- FLAT combat numbers, and deliberately not the `power`/`defence`
+   * §9.5.4 -- FLAT combat numbers, and deliberately not the `power`/`defense`
    * StatKeys, which stay percentages under §8.1's +15% ceiling. A fight cannot
    * be decided by a swing that small, so it needs a base; these are it.
    */
   attack?: number
-  defence?: number
+  defense?: number
   palette: Material['palette']
   /** Gold cost if sold by the NPC shop; absent for crafted/NFT items. */
   goldPrice?: number
@@ -400,10 +407,21 @@ export interface ItemOption {
    * being so. A tool needs no scope -- its slot already locks it to one line.
    */
   scope?: SkillKey
+  /**
+   * §8.0.1 -- percentage or solid number, and absent means percentage so every
+   * row already stored keeps its shape.
+   *
+   * `attack` and `defense` are FLAT (§9.5.4) and share their names with two
+   * percentage stats, so without this "+2 defense" and "+2% defense" would be
+   * the same row saying two different things. A flat line never carries a
+   * scope: it has no gathering line to belong to, and on a tool the slot
+   * already names one.
+   */
+  kind?: 'percent' | 'flat'
 }
 
 /**
- * §9.5.2 -- one of the eight. `attack` and `defence` are FLAT, and they are not
+ * §9.5.2 -- one of the eight. `attack` and `defense` are FLAT, and they are not
  * the percentage stats of the same name: §8.1's ceiling is +15%, and a fight
  * cannot be decided by a swing that small.
  */
@@ -424,13 +442,15 @@ export interface Monster {
   /** What a player reads instead of a level: brute, carapace, swift. */
   profile: 'brute' | 'carapace' | 'swift'
   attack: number
-  defence: number
+  defense: number
+  /** §9.5.5 -- what it has to be worked through. Its half of the exchange. */
+  hp: number
   /** §9.5.6 -- a swift one blunts a weapon harder than its numbers suggest. */
   wearBias: number
   gold: [number, number]
   plate: SpoilKey
   ichor: SpoilKey
-  /** The grade above its own, rarely. Grade 5 exists only off the centre ring. */
+  /** The grade above its own, rarely. Grade 5 exists only off the center ring. */
   rareSpoil?: SpoilKey
   description: string
 }
@@ -556,7 +576,7 @@ export interface BattleJob {
 
 export type Job = FieldJob | ProcessingJob | CraftJob | BattleJob
 
-// --------------------------------------------------------------- travelling
+// --------------------------------------------------------------- traveling
 
 /**
  * A journey in progress, §5. Ten minutes of ground per hex, and the hexes

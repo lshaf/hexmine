@@ -8,7 +8,7 @@
  *
  * Palette is §13.3 verbatim -- it is the game's identity, not a choice to make.
  * Alpha is fine on this layer: the no-transparency rule in §13.2 is about tiles
- * inside the map SVG ghosting through their neighbours, which does not apply to
+ * inside the map SVG ghosting through their neighbors, which does not apply to
  * chrome sitting on top of it.
  */
 
@@ -23,10 +23,10 @@
   --copper: #c1793f;
   --ember: #b8453f;
   /*
-   * The affirmative. Ember is the colour of something to deal with -- a full
+   * The affirmative. Ember is the color of something to deal with -- a full
    * bag, a broken tool, a destructive button -- and it was standing in for good
    * news as well, which read as an alarm going off over a reward. This is what
-   * "done, and in your favour" is drawn in.
+   * "done, and in your favor" is drawn in.
    */
   --sap: #8fbf7f;
   --gold: #d8b34a;
@@ -144,7 +144,7 @@ h3 {
 /* ------------------------------------------------------------------ shapes */
 
 /*
- * Hairline borders on a clipped shape: the outer element is the border colour
+ * Hairline borders on a clipped shape: the outer element is the border color
  * and the inner one, inset by a pixel, is the fill. `background-clip` tricks do
  * not follow a clip-path, so this is the reliable way to get a crisp edge.
  */
@@ -266,7 +266,7 @@ button:focus-visible,
 }
 
 /*
- * §8.1 -- the rarity ladder. One colour per rung, matching RARITY_TREATMENT in
+ * §8.1 -- the rarity ladder. One color per rung, matching RARITY_TREATMENT in
  * theme/palette.ts so an item name and its icon frame always agree. Any screen
  * that names an item should tint it: rarity is the thing players scan for.
  */

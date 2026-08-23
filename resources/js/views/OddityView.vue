@@ -200,7 +200,7 @@ const CLASSES = [
   },
 ]
 
-/** No `props` or `colour` field anywhere here, and that is the point: a feature
+/** No `props` or `color` field anywhere here, and that is the point: a feature
  *  changes the table a hex rolls against, never the hex. §13.2 is untouched. */
 const FEATURE_ROWS = [
   { name: 'Plain', weight: '55%', effect: 'Grade at base rate. No feature roll.', where: 'anywhere', tell: 'none' },
@@ -210,7 +210,7 @@ const FEATURE_ROWS = [
 ]
 
 const REAGENTS = [
-  { name: 'Toadstool', key: 'toadstool', biome: 'forest' as Biome, feeds: 'Forest Draught, and the reworked yield potions' },
+  { name: 'Toadstool', key: 'toadstool', biome: 'forest' as Biome, feeds: 'Forest Draft, and the reworked yield potions' },
   { name: 'Lichen', key: 'lichen', biome: 'mountain' as Biome, feeds: 'Quarry Salts' },
   { name: 'Bitterroot', key: 'bitterroot', biome: 'plains' as Biome, feeds: 'Guild Cordial' },
   { name: 'Ashcap', key: 'ashcap', biome: 'badlands' as Biome, feeds: 'Prospector’s Flask' },
@@ -450,7 +450,7 @@ const PHASES = [
           which hex is which: the richer ground is blended in among ordinary ground of
           the same biome, and scouting is the only thing that separates them. Alongside
           it: twenty-two new materials, a bare-handed <em>forage</em> verb that potions
-          depend on, and the retirement of the <code>yield</code> stat in favour of
+          depend on, and the retirement of the <code>yield</code> stat in favor of
           cooldown.
         </p>
       </section>
@@ -588,7 +588,7 @@ const PHASES = [
           <code>tripYield()</code> — and then rolls <strong>once</strong> against the tile’s
           oddity table. At most one oddity per trip. That cap is what keeps this a
           texture change rather than a second economy: the main haul stays the thing you
-          plan around, and the oddity is the reason one hex quietly beats its neighbour
+          plan around, and the oddity is the reason one hex quietly beats its neighbor
           without ever looking different from it.
         </p>
 
@@ -621,9 +621,9 @@ const PHASES = [
           That is the difference between a map you read and a map you <em>work</em>. A
           visible Prize tile turns the inner ring into a queue at a known address; an
           invisible one means the way to find good ground is to go and scout it, which is
-          the behaviour §5.2 wants out of the contested band anyway. It also costs §13.2
+          the behavior §5.2 wants out of the contested band anyway. It also costs §13.2
           nothing: no new tile props, no new legend, no third thing competing with rarity
-          and material for the same colour.
+          and material for the same color.
         </p>
 
         <div class="sheet-hold">
@@ -809,7 +809,7 @@ const PHASES = [
         </div>
 
         <p class="tiny muted prose">
-          <strong>No cosmetic tier here.</strong> A recolour is a material whose sink is
+          <strong>No cosmetic tier here.</strong> A recolor is a material whose sink is
           taste, and taste does not consume anything twice — the ask was more ways to
           build, so every one of these ends in a bench.
         </p>
@@ -1248,7 +1248,7 @@ trip   = clamp(timed, FLOOR, CEILING)                // FLOOR 30 min → 20 min<
             <strong>Two hexes of the same biome stop being the same hex — without
             looking different.</strong> That is the whole thesis, and the tile feature is
             the only part that delivers it. Because it is never drawn, the way to find
-            good ground is to go and scout it, which is the behaviour §5.2 wants out of
+            good ground is to go and scout it, which is the behavior §5.2 wants out of
             the contested band. It also costs §13.2 nothing: no new props, no new legend.
           </li>
           <li class="on">
