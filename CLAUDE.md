@@ -218,9 +218,16 @@ mentally navigable map. Rare-material biome variants sit inside/near the PvP rin
   in a radius). Fills outward naturally.
 
 ### 5.5 Hunting grounds
-Not a tile type. **Temporary herd markers** spawn on open Plains/Grassland hexes and decay
-after ~4h. Yields Pelt (Tier 1) + small Essence (Tier 4) — the only activity bridging the
-mining and raid material tracks. No party, no raid charge, just AP + time.
+Not a tile type. **Temporary herd markers** spawn on open **Plains** hexes and decay after
+~4h. Yields Pelt (Tier 1) + small Essence (Tier 4) — the only activity bridging the mining
+and raid material tracks. No party, no raid charge, just time.
+
+**Plains and nowhere else, because that is hunting's ground.** Herds briefly wandered
+onto every biome, on the argument that a bow should be worth carrying on a walk you took
+for another reason. It made hunting the one line with no biome of its own — every other
+tool in §8.0 is worked on named ground, and a line that pays out everywhere is a line the
+map cannot put anywhere. The pull toward the plains is the same pull §4 puts on the other
+four.
 
 ### 5.6 Sight and travel — a fog, not a fence
 

@@ -241,8 +241,11 @@ final class Drops
             $table[$herb] = 2.5;
         }
 
-        // Whatever the ground itself is, in the small amounts a hunter notices.
-        $table[Variants::BIOME_VARIANTS[$biome][0]['material']] = 5.0;
+        // Whatever the ground itself is, in the small amounts a hunter notices
+        // -- and never at the cost of the primary. On the plains the ground IS
+        // the primary (§5.5), so a plain assignment here would quietly demote
+        // pelt from 45 to 5 and hand the table to horn.
+        $table[Variants::BIOME_VARIANTS[$biome][0]['material']] ??= 5.0;
 
         return $table;
     }

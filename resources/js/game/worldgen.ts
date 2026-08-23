@@ -21,6 +21,7 @@
 import { hash2, rand01, randInt } from './hash'
 import { BIOME_VARIANTS, type VariantDef } from './variants'
 import { MONSTERS_BY_RING } from './monsters'
+import { BIOME_MATERIAL, SKILL_BY_KEY } from './catalog'
 import { hexDistance } from '@/map/hexGeometry'
 import type {
   Biome,
@@ -637,10 +638,12 @@ export function dungeonAt(col: number, row: number): { key: string; name: string
  * §5.5 -- herd markers are temporary and time-bucketed, so they are derivable
  * rather than stored and every client agrees on where they are.
  */
-// §5.5 -- animals live on every kind of ground, so a herd may wander onto any
-// hex. It used to be plains and grassland only, which made hunting an errand
-// you made a special trip for rather than a reason to carry a bow.
-function herdUntil(col: number, row: number, _biome: Biome, now: number): number | undefined {
+// §5.5 -- a herd stands on hunting ground and nowhere else. Herds wandering
+// onto every biome made the bow the one tool with no ground of its own: every
+// line has a biome it is worked on (§8.0), and hunting's is the plains.
+function herdUntil(col: number, row: number, biome: Biome, now: number): number | undefined {
+  if (BIOME_MATERIAL[biome] !== SKILL_BY_KEY.hunting.material) return undefined
+
   const c = cfg()
 
   const bucket = Math.floor(now / c.herdLifetimeMs)

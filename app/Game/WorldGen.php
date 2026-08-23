@@ -655,10 +655,14 @@ final class WorldGen
      */
     private static function herdUntil(int $col, int $row, string $biome, int $now): ?int
     {
-        // §5.5 -- animals live on every kind of ground, not only the two that
-        // grow grass. Keeping herds off the forest and the badlands made
-        // hunting a plains errand; letting them wander anywhere is what makes
-        // a bow worth carrying on a walk you took for another reason.
+        // §5.5 -- a herd stands on hunting ground and nowhere else. Herds
+        // wandering onto every biome made the bow the one tool with no
+        // ground of its own: every line has a biome it is worked on (§8.0),
+        // and hunting's is the plains.
+        if (Catalog::BIOME_MATERIAL[$biome] !== Catalog::skills()['hunting']['material']) {
+            return null;
+        }
+
         $lifetime = Balance::scaled(Balance::HERD_LIFETIME_MS);
         $bucket = intdiv($now, $lifetime);
         $h = Hash::hash2($col * 31 + $bucket, $row * 17 + $bucket, Balance::mapSeed() ^ 0xbeef);
