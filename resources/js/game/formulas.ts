@@ -80,6 +80,33 @@ export function aggregateStat(
   return Math.min(total, EQUIPMENT.statCap[best])
 }
 
+/**
+ * §8 -- one item per slot, so picking a piece out of the pack is a question
+ * about the piece already on the belt: what does the swap actually move.
+ *
+ * Projected through aggregateStat() rather than subtracted, because a stat is
+ * not the item's own number. §8.1's falloff reorders every contributor and its
+ * ceiling clamps the sum, so a piece worth twice as much on paper can be worth
+ * nothing at all once it is on -- which is exactly the thing worth saying
+ * before a swap rather than after it.
+ */
+export function aggregateAfterSwap(
+  items: OwnedItem[],
+  incoming: OwnedItem,
+  outgoing: OwnedItem | null,
+  stat: StatKey,
+  line: SkillKey | null = null,
+): number {
+  const swapped = items.map((item) => {
+    if (item.id === incoming.id) return { ...item, equipped: true }
+    if (outgoing && item.id === outgoing.id) return { ...item, equipped: false }
+
+    return item
+  })
+
+  return aggregateStat(swapped, stat, line)
+}
+
 /** Salvage returned when an item is discarded, §8.2. */
 /**
  * §8.2 -- what a trader pays for a piece of shop gear.
@@ -126,6 +153,8 @@ export interface TripBreakdown {
   hp: number
   toolAttack: number
   skillAttack: number
+  /** §7.4.3 -- whole points of attack off the line's own tree. */
+  skillBite: number
   /** Work taken out of the hex per second, all in. */
   rate: number
   /** After clamp. This is the number that actually runs, or 0 if you cannot. */
@@ -139,7 +168,7 @@ export interface TripBreakdown {
 /**
  * §7.3 -- a hex is an amount of WORK, and a mine is how long you take over it.
  *
- *   rate      = (attack + skill_attack) * (1 + trip_reduction)
+ *   rate      = (attack + skill_attack + skill_bite) * (1 + trip_reduction)
  *   trip_time = clamp(hp / rate, guard, ceiling)
  *
  * `attack` is the WHOLE base rate rather than a bonus on top of one: a pick is
@@ -155,9 +184,11 @@ export function mineTime(
   skillLevel: number,
   equipTripReduction: number,
   toolAttack = 0,
+  skillBite = 0,
 ): TripBreakdown {
   const skill = skillAttack(skillLevel)
-  const attack = Math.max(0, toolAttack) + skill
+  const bite = Math.max(0, Math.min(skillBite, SKILLS.biteCap))
+  const attack = Math.max(0, toolAttack) + skill + bite
 
   const rate = attack * (1 + Math.max(0, equipTripReduction))
 
@@ -168,6 +199,7 @@ export function mineTime(
     hp,
     toolAttack,
     skillAttack: skill,
+    skillBite: bite,
     rate: Math.round(rate * 100) / 100,
     total,
     clamped: attack > 0 && total !== raw,
@@ -392,7 +424,7 @@ export interface StatChip {
   value: string
 }
 
-const PAIR_STATS = new Set<StatKey>(['power', 'defense'])
+export const PAIR_STATS = new Set<StatKey>(['power', 'defense'])
 
 /**
  * §8.5 -- the gathering line a buff scope names, or null.

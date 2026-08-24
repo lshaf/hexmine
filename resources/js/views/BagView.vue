@@ -30,12 +30,20 @@ import {
   SCOPE_ACTION,
   SCOPE_LABEL,
   SLOT_LABEL,
+  STAT_LABEL,
+  skillForSlot,
 } from '@/game/catalog'
-import { statLine } from '@/game/formulas'
+import {
+  PAIR_STATS,
+  aggregateAfterSwap,
+  aggregateStat,
+  flatOption,
+  statLine,
+} from '@/game/formulas'
 import StatChips from '@/components/StatChips.vue'
 import { itemIcon, materialIcon } from '@/icons/procedural'
 import SvgIcon from '@/components/SvgIcon.vue'
-import type { ItemDef, MaterialKey, OwnedItem } from '@/game/types'
+import type { ItemDef, ItemOption, MaterialKey, OwnedItem, StatKey } from '@/game/types'
 
 const game = useGame()
 
@@ -250,6 +258,128 @@ const material = computed(() =>
 const description = computed(() =>
   material.value ? material.value.description : (def.value?.description ?? ''),
 )
+
+/**
+ * §8 -- one item per slot, so a piece in the pack is never a question on its
+ * own: it is a question about the one already on the belt. Everything below
+ * exists to answer it here, at the tap, rather than sending a prospector to the
+ * hero screen to hold two sets of numbers in their head.
+ */
+const pickedGear = computed(() => (picked.value?.kind === 'gear' ? picked.value : null))
+
+/** What is worn in the slot this piece wants. Null when the slot is empty. */
+const worn = computed<OwnedItem | null>(() => {
+  const slot = pickedGear.value ? def.value?.slot : undefined
+  if (!slot) return null
+
+  return (
+    game.equipment.find(
+      (item) =>
+        item.equipped &&
+        item.id !== pickedGear.value?.item.id &&
+        ITEM_BY_KEY[item.key]?.slot === slot,
+    ) ?? null
+  )
+})
+
+const wornDef = computed(() => (worn.value ? ITEM_BY_KEY[worn.value.key] : undefined))
+
+/** §8 rule 1 -- a tool's numbers are read on its own line and nowhere else. */
+const swapLine = computed(() => (def.value?.slot ? skillForSlot(def.value.slot) : null))
+
+/** The solid pair (§9.5.4), rolled lines included -- what statChips prints. */
+const solid = (item: OwnedItem, itemDef: ItemDef, stat: 'attack' | 'defense'): number =>
+  (itemDef[stat] ?? 0) + flatOption(item.options ?? [], stat)
+
+/** One piece's own percentage contribution to a stat, before any kit maths. */
+const ownPercent = (item: OwnedItem, itemDef: ItemDef, stat: StatKey): number =>
+  (itemDef.stat === stat ? itemDef.value ?? 0 : 0) +
+  (item.options ?? [])
+    .filter((o: ItemOption) => o.kind !== 'flat' && o.stat === stat)
+    .reduce((sum, o) => sum + o.value, 0)
+
+/** Every percentage either piece touches. The pair is solid and is said above. */
+const percentStats = computed<StatKey[]>(() => {
+  const gear = pickedGear.value
+  const into = def.value
+  const off = wornDef.value
+  if (!gear || !into || !worn.value || !off) return []
+
+  const stats = new Set<StatKey>()
+  const collect = (item: OwnedItem, itemDef: ItemDef) => {
+    if (itemDef.stat && !PAIR_STATS.has(itemDef.stat)) stats.add(itemDef.stat)
+    for (const option of item.options ?? []) {
+      if (option.kind !== 'flat' && !PAIR_STATS.has(option.stat)) stats.add(option.stat)
+    }
+  }
+
+  collect(gear.item, into)
+  collect(worn.value, off)
+
+  return [...stats]
+})
+
+/**
+ * What the swap moves, said once per fact.
+ *
+ * The pair subtracts, because §9.5.4's numbers are solid. A percentage does
+ * not: it is projected through the whole kit both ways (§8.1's falloff and
+ * ceiling), so what is printed is what the swap is actually worth rather than
+ * the difference between two labels.
+ */
+const changes = computed<Array<{ text: string; better: boolean }>>(() => {
+  const gear = pickedGear.value
+  const into = def.value
+  const off = wornDef.value
+  if (!gear || !into || !worn.value || !off) return []
+
+  const out: Array<{ text: string; better: boolean }> = []
+
+  for (const [stat, word] of [['attack', 'atk'], ['defense', 'def']] as const) {
+    const delta = solid(gear.item, into, stat) - solid(worn.value, off, stat)
+    if (delta !== 0) {
+      out.push({ text: `${delta > 0 ? '+' : ''}${delta} ${word}`, better: delta > 0 })
+    }
+  }
+
+  for (const stat of percentStats.value) {
+    const before = aggregateStat(game.equipment, stat, swapLine.value)
+    const after = aggregateAfterSwap(game.equipment, gear.item, worn.value, stat, swapLine.value)
+    if (Math.abs(after - before) < 1e-9) continue
+
+    out.push({ text: statLine(stat, after - before, swapLine.value), better: after > before })
+  }
+
+  return out
+})
+
+/**
+ * §8.1 rule 1 -- the swap that buys nothing.
+ *
+ * A better number on the label and no movement in the total means the kit is
+ * already at the ceiling for that stat. Worth saying before the tap: it is the
+ * one case where the obvious upgrade is not one.
+ */
+const ceilingNote = computed<string>(() => {
+  const gear = pickedGear.value
+  const into = def.value
+  const off = wornDef.value
+  if (!gear || !into || !worn.value || !off) return ''
+
+  for (const stat of percentStats.value) {
+    const before = aggregateStat(game.equipment, stat, swapLine.value)
+    const after = aggregateAfterSwap(game.equipment, gear.item, worn.value, stat, swapLine.value)
+    if (Math.abs(after - before) > 1e-9) continue
+    if (ownPercent(gear.item, into, stat) <= ownPercent(worn.value, off, stat)) continue
+
+    // The labels are stored mid-sentence ("mine time"), and this one opens one.
+    const words = STAT_LABEL[stat]
+
+    return `${words[0]!.toUpperCase()}${words.slice(1)} is capped on your kit — the surplus is wasted.`
+  }
+
+  return ''
+})
 
 async function drink(key: string): Promise<void> {
   await game.drink(key)
@@ -477,16 +607,68 @@ async function scrap(item: OwnedItem): Promise<void> {
 
             <!-- Gear: equipping is the tidiest way to free a strap, so it leads. -->
             <template v-else-if="picked.kind === 'gear' && def">
-              <div class="fact row tiny">
+              <!--
+                §8 -- one item per slot, so this is a swap and the plate is
+                shaped like one: what comes off, what goes on, and what moves.
+                The worn side is drawn dim and the pack side marked, which is
+                the map's own fog grammar (§5.6) doing the same job indoors.
+              -->
+              <div v-if="worn && wornDef" class="swap">
+                <div class="side off">
+                  <span class="eyebrow">Equipped</span>
+                  <div class="side-head">
+                    <strong class="tiny" :class="`rarity-${wornDef.rarity}`">{{ wornDef.name }}</strong>
+                    <span class="tiny mono muted">{{ worn.durability }}/{{ wornDef.maxDurability }}</span>
+                  </div>
+                  <StatChips :def="wornDef" :options="worn.options ?? []" />
+                </div>
+
+                <div class="side on">
+                  <span class="eyebrow">Stowed</span>
+                  <div class="side-head">
+                    <strong class="tiny" :class="`rarity-${def.rarity}`">{{ def.name }}</strong>
+                    <span class="tiny mono">{{ picked.item.durability }}/{{ def.maxDurability }}</span>
+                  </div>
+                  <StatChips :def="def" :options="picked.item.options ?? []" />
+                </div>
+
+                <!--
+                  §13.3 -- sap for what the swap wins, ember for what it costs.
+                  A stat is neither of those and StatChips is right to draw it
+                  plain; a CHANGE is exactly a thing to weigh, which is the one
+                  reading this plate exists for.
+                -->
+                <div class="moves">
+                  <span class="eyebrow">Net change</span>
+                  <span v-if="changes.length" class="chips">
+                    <span
+                      v-for="(change, i) in changes"
+                      :key="i"
+                      class="chip tiny move"
+                      :class="change.better ? 'up' : 'down'"
+                    >{{ change.text }}</span>
+                  </span>
+                  <span v-else class="tiny muted">Identical stats — only condition differs.</span>
+                </div>
+
+                <p v-if="ceilingNote" class="tiny ceiling">{{ ceilingNote }}</p>
+              </div>
+
+              <div v-else class="fact row tiny">
                 <span class="grow">{{ picked.item.durability }}/{{ def.maxDurability }} durability</span>
                 <StatChips :def="def" :options="picked.item.options ?? []" />
               </div>
+
               <div class="acts">
                 <button
                   class="btn btn-sm"
                   type="button"
                   :disabled="game.busy || picked.item.durability <= 0"
-                  :title="picked.item.durability <= 0 ? 'Broken — repair it first' : 'Worn gear costs no strap'"
+                  :title="picked.item.durability <= 0
+                    ? 'Broken — repair it first'
+                    : worn && wornDef
+                      ? `Swaps out the ${wornDef.name} — costs no strap`
+                      : 'Worn gear costs no strap'"
                   @click="equip(picked.item)"
                 >
                   Equip
@@ -763,6 +945,111 @@ async function scrap(item: OwnedItem): Promise<void> {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+/*
+ * The swap plate, §8 -- one item per slot.
+ *
+ * Two bands of ONE block rather than two panels side by side: at 320px a pair
+ * of columns puts four words on a line and a name on three, and the thing being
+ * compared is a handful of small numbers, which read better stacked than
+ * scanned across a gutter. The order is the trade -- what is on, what would go
+ * on, what moves -- so the plate ends on the reason to tap Equip.
+ */
+.swap {
+  margin: 9px 0 11px;
+  background: rgba(0, 0, 0, 0.34);
+  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+}
+
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 8px 11px;
+}
+
+/*
+ * What you are giving up is drawn down, what you would be wearing is drawn up
+ * -- the map's fog grammar (§5.6) indoors. The rarity color stays on both names
+ * either way: which rung a piece is on is the fact the eye scans for, and
+ * dimming it would cost more than the contrast buys.
+ */
+.side.off {
+  color: var(--vellum-dim);
+}
+
+.side.off :deep(.chip) {
+  background: #191f1c;
+}
+
+/*
+ * The incoming piece is marked with a copper edge rather than a lighter fill:
+ * the chips inside carry their own raised background, and lifting the band
+ * behind them flattened the two into one shape. Copper is what the dock already
+ * spends on the thing being proposed.
+ */
+.side.on {
+  border-top: 1px solid var(--line);
+  border-left: 2px solid var(--copper);
+  padding-left: 9px;
+}
+
+.side-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.eyebrow {
+  font-size: 8.5px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--vellum-dim);
+}
+
+/* The answer the plate was opened for, so it sits under the rule on its own. */
+.moves {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  padding: 8px 11px;
+  border-top: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.moves .chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.move {
+  font-variant-numeric: tabular-nums;
+}
+
+/* §13.3 -- sap is what is worth crossing the screen for, ember is what has to
+   be dealt with. A trade is made of both, and this is the one row in the app
+   where a stat is a verdict rather than a fact. */
+.move.up {
+  color: #b7d6a4;
+  background: #1c2519;
+}
+
+.move.down {
+  color: #e0a09b;
+  background: #2a1a19;
+}
+
+/* §8.1 rule 1 -- the qualification, not an alarm. Copper is what the dock
+   already spends on "yes, but": work in progress, and a refusal with a reason. */
+.ceiling {
+  margin: -2px 0 11px;
+  line-height: 1.45;
+  color: var(--copper);
 }
 
 /* Copper for the refusal, gold for the upgrade -- the same reading the dock
