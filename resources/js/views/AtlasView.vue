@@ -27,6 +27,7 @@ import {
 } from '@/game/worldgen'
 import type { SettlementMark } from '@/game/worldgen'
 import { ACTION_PATHS } from '@/icons/actions'
+import LineMarks from '@/components/LineMarks.vue'
 import { BIOME_COLOR, BIOME_LABEL } from '@/theme/palette'
 import type { SettlementTier } from '@/game/types'
 
@@ -516,7 +517,13 @@ onBeforeUnmount(() => {
     <div class="readout">
       <template v-if="picked">
         <span class="label">{{ picked.tier }}</span>
-        <span class="name">{{ picked.name }}</span>
+        <!-- §6 -- what the walk is FOR. A chart that names a capital four days
+             away and will not say whether it smelts is a chart you have to
+             walk to twice, so the marks ride the name the card draws them on. -->
+        <span class="name-row">
+          <span class="name">{{ picked.name }}</span>
+          <LineMarks :lines="picked.lines" />
+        </span>
         <span class="tiny muted">
           {{ picked.col }},{{ picked.row }} · {{ pickedDistance }} hexes from you
         </span>
@@ -624,6 +631,13 @@ onBeforeUnmount(() => {
   font-size: 14px;
   font-weight: 600;
   text-transform: capitalize;
+}
+
+/* §6 -- name and lines on one row, the same shape the tile card uses. */
+.name-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
 }
 
 .controls {

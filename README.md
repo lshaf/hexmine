@@ -80,8 +80,8 @@ What the camera cannot move is what you are allowed to know. Live state — whic
 tiles are worked out, who is standing on them — is scoped **server-side** to the
 character's travel range, and `GET /api/map` takes no coordinates precisely so
 there is nothing for a caller to widen. Beyond that radius the map draws the
-land and a pip for whoever lives on it, and nothing else: no props, no names, no
-slot counts. Not undrawn — unknowable. Selecting is bounded the same way, since
+land, a settlement glyph and a dimmed name for whoever lives on it, and nothing
+else: no props, no slot counts, no live state. Not undrawn — unknowable. Selecting is bounded the same way, since
 a tap out there would be a query out there, and nothing beyond sight is
 actionable anyway: sight and travel range are the same radius, and the dashed
 ring is both.
@@ -127,10 +127,23 @@ Type is a slab serif (Bitter) for display and gauge numerals, and Archivo set in
 wide-tracked small caps for every label — the convention of survey-map
 annotation, which is what a HUD over a map is.
 
-Inside sight the map is the game: props, labels, depletion, slot pips, your own
-trips. Outside it, the tier pip is the whole message — vellum for a village,
-copper for a city, gold for a capital, violet for a dungeon. The same legend the
-atlas uses, so one vocabulary covers both.
+Inside sight the map is the game: props, depletion, slot pips, your own trips.
+Outside it, a settlement keeps its own silhouette and its own name — the
+silhouette drawn at the same size with the light taken out of it, the name in
+dim vellum rather than lit: a scatter of huts for a village, a toothed wall for
+a city, a spired mark for a capital, a black mouth for a dungeon. Scouting a hex
+lights the town up rather than replacing one drawing with another, and §13.2's
+shape-category rule is what keeps the three apart once the color is gone.
+
+Identity is not fogged because it is not the server's to withhold: name, tier
+and the lines a place runs are pure functions of `(col, row, seed)`, and the
+atlas has charted all of them at any distance since it was built. What the fog
+holds back is the live half — depletion, who is working the ground, what a hex
+would pay. What a settlement *refines* is on the tile card rather than the hex,
+in the same slot a seam fills with its material.
+
+The atlas keeps its dots: at whole-map scale a silhouette is smaller than the
+ink it is drawn with.
 
 The dock reads the hex **under the character's feet**, never the one that
 happens to be selected, and changes shape as well as content: Mine in the field,

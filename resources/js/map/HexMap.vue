@@ -24,8 +24,8 @@ import {
   screenToTile,
   tileToScreen,
 } from './hexGeometry'
-import { corpseProp, herdProp, packProp, tileProps } from './props'
-import { GOLD, VELLUM, depletedColor, shade, variantColor, waterColor } from '@/theme/palette'
+import { corpseProp, dungeonGlyph, herdProp, packProp, settlementGlyph, tileProps } from './props'
+import { GOLD, VELLUM, VELLUM_DIM, depletedColor, shade, variantColor, waterColor } from '@/theme/palette'
 import type { Job, Tile, TravelState } from '@/game/types'
 import type { Carrier } from '@/api/types'
 
@@ -204,29 +204,18 @@ interface RenderTile {
   isSelected: boolean
   slotsUsed: number
   label: string | null
+  /** Scouted names are vellum; the rest are dim, so the ring still reads. */
+  labelLit: boolean
   jobState: 'none' | 'active' | 'ready'
   rare: boolean
-  /** Out of sight: all a tile gets is whether somebody lives on it. */
-  mark: { fill: string; r: number; dungeon: boolean } | null
-}
-
-/*
- * Beyond sight the map states two things and no more: the lie of the land, and
- * whether anybody lives on it. Tier is the whole message -- no name, no size of
- * settlement beyond the pip, nothing that needed asking the server. Colors are
- * the atlas legend, so one vocabulary covers both maps.
- */
-const MARK: Record<string, { fill: string; r: number; dungeon: boolean }> = {
-  village: { fill: VELLUM, r: 4, dungeon: false },
-  city: { fill: '#c1793f', r: 5.5, dungeon: false },
-  capital: { fill: GOLD, r: 7, dungeon: false },
-  dungeon: { fill: '#7d5fa8', r: 6, dungeon: true },
-}
-
-/** A flat-top hexagon of the given radius, centerd on the origin. */
-function pip(r: number): string {
-  const h = r * 0.866
-  return `M${-r},0 L${-r / 2},${-h} L${r / 2},${-h} L${r},0 L${r / 2},${h} L${-r / 2},${h} Z`
+  /**
+   * Out of sight: whoever lives here, drawn as their own silhouette (§5.6).
+   * Tier is still the whole message -- the shape says village, city, capital or
+   * dungeon mouth and nothing else does. A pip said the same thing in a
+   * vocabulary the map used nowhere else, so a scouted settlement and an
+   * unscouted one were two different drawings of one place.
+   */
+  glyph: string
 }
 
 /** Tier 3 keys, §4 -- the gold pip on the map means "contested ring payout". */
@@ -270,9 +259,17 @@ const renderTiles = computed<RenderTile[]>(() =>
 
     // Everything below the fill is either live state the server only sends for
     // tiles in sight, or ornament that would bury the pips out there.
-    const mark = inSight
-      ? null
-      : (tile.dungeon ? MARK.dungeon : tile.settlement ? MARK[tile.settlement.tier] : null) ?? null
+    // Beyond sight the map states two things and no more: the lie of the land,
+    // and whether anybody lives on it. Same silhouette as in sight, at the same
+    // size, with the light taken out of it -- so scouting a hex lights the town
+    // up rather than replacing one drawing with another.
+    const glyph = inSight
+      ? ''
+      : tile.dungeon
+        ? dungeonGlyph()
+        : tile.settlement
+          ? settlementGlyph(tile.settlement.tier, tile.propSeed)
+          : ''
 
     return {
       key: `${tile.col},${tile.row}`,
@@ -301,10 +298,16 @@ const renderTiles = computed<RenderTile[]>(() =>
       onBoundary: props.sight > 0 && distance === props.sight,
       isSelected,
       slotsUsed: inSight ? tile.slotsUsed : 0,
-      label: inSight ? (tile.settlement?.name ?? tile.dungeon?.name ?? null) : null,
+      // §5.6 -- a place is named whether or not you have stood in it. Identity
+      // is terrain: name, tier and lines all fall out of (col, row, seed), and
+      // the atlas has always drawn them at any distance. What the fog holds
+      // back is the server's half -- depletion, who is working here, what the
+      // hex would pay -- so an unscouted name is dimmed rather than withheld.
+      label: tile.settlement?.name ?? tile.dungeon?.name ?? null,
+      labelLit: inSight,
       jobState: jobsByTile.value.get(`${tile.col},${tile.row}`) ?? 'none',
       rare: inSight && rare,
-      mark,
+      glyph,
     }
   }),
 )
@@ -405,15 +408,7 @@ const SLOT_PIP_Y = HEX_H / 2 - 4
         <g v-if="t.corpse" v-html="t.corpse" />
 
         <!-- Beyond sight: is anybody there. Nothing else is knowable. -->
-        <path
-          v-if="t.mark"
-          :d="pip(t.mark.r)"
-          :fill="t.mark.fill"
-          stroke="#141b18"
-          stroke-width="1.4"
-          stroke-linejoin="round"
-          :transform="t.mark.dungeon ? 'rotate(90)' : undefined"
-        />
+        <g v-if="t.glyph" v-html="t.glyph" />
 
         <!-- Rare-material tell: a gold pip, only in the contested ring. -->
         <circle v-if="t.rare && !t.depleted" cx="0" :cy="-HEX_H / 2 + 5" r="2.6" :fill="GOLD" />
@@ -483,7 +478,7 @@ const SLOT_PIP_Y = HEX_H / 2 - 4
           v-if="t.label"
           y="-26"
           text-anchor="middle"
-          :fill="VELLUM"
+          :fill="t.labelLit ? VELLUM : VELLUM_DIM"
           font-size="9"
           font-weight="700"
           letter-spacing="0.4"

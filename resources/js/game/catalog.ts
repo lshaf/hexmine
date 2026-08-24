@@ -330,6 +330,21 @@ export const RECIPE_BY_KEY: Record<string, Recipe> = Object.fromEntries(
   RECIPES.map((r) => [r.key, r]),
 )
 
+/**
+ * §6 -- what each processing line turns out, which is the only thing a
+ * prospector actually asks of a settlement from across the map: not "does this
+ * village run the wood line" but "can I get planks here".
+ *
+ * The first recipe on a line is its own: banding a frame is the iron line's
+ * SECOND recipe and takes planks as well, so it names no line by itself.
+ */
+export const LINE_OUTPUT: Record<SkillKey, MaterialKey> = Object.fromEntries(
+  SKILL_LIST.map((skill) => [
+    skill.key,
+    RECIPES.find((recipe) => recipe.skill === skill.key)!.output,
+  ]),
+) as Record<SkillKey, MaterialKey>
+
 /** Which recipes a settlement can run, given the lines it hosts, §6. */
 export const recipesForLines = (lines: SkillKey[]): Recipe[] =>
   RECIPES.filter((r) => lines.includes(r.skill))

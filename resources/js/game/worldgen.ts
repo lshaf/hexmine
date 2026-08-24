@@ -586,6 +586,8 @@ export interface SettlementMark {
   row: number
   tier: SettlementTier
   name: string
+  /** §6 -- which of the five lines it runs. Two hashes, so the chart affords it. */
+  lines: SkillKey[]
 }
 
 /**
@@ -624,7 +626,7 @@ export function settlementMarksIn(
         if (!inBounds(col, row)) continue
         if (crowdedByBetter(tier, col, row)) continue
 
-        out.push({ col, row, tier, name: nameFor(col, row, tier) })
+        out.push({ col, row, tier, name: nameFor(col, row, tier), lines: linesFor(tier, col, row) })
       }
     }
   }

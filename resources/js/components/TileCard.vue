@@ -22,8 +22,10 @@ import { waterLabel } from '@/game/water'
 import { VARIANT_LABEL } from '@/game/variants'
 import { hexDistance } from '@/map/hexGeometry'
 import { materialIcon } from '@/icons/procedural'
+import { dungeonProp, waterGlyph } from '@/map/props'
 import HexAction from '@/shell/HexAction.vue'
 import SvgIcon from './SvgIcon.vue'
+import LineMarks from './LineMarks.vue'
 import type { MaterialKey } from '@/game/types'
 
 const game = useGame()
@@ -39,16 +41,6 @@ const distance = computed(() => {
 })
 
 const open = ref(false)
-
-/**
- * What the map's glyph says, in words. Out of sight a settlement is a tier and
- * nothing else (§5.6), so this is the whole of what the card may call it.
- */
-const TIER_LABEL: Record<string, string> = {
-  village: 'A village',
-  city: 'A city',
-  capital: 'A capital',
-}
 
 const depleted = computed(() => Boolean(tile.value && tile.value.regrowsAt > game.now))
 
@@ -76,15 +68,44 @@ const seam = computed(() => Boolean(!unseen.value && preview.value?.material))
 
 
 /**
- * The seam's icon, and only while there is a seam to show.
+ * The portrait's material, scouted or not.
  *
- * Gated on sight rather than on `preview` alone: setting off drops sight to
- * zero without clearing the selection, and a material icon left standing over
- * "unscouted" would be the card contradicting itself.
+ * The server's preview when there is one, and the tile's own material when
+ * there is not -- which out of sight is every time, because the preview
+ * endpoint refuses unscouted ground (§5.6). That is not a leak: a hex's variant
+ * is a pure function of (col, row, seed), the map already paints the fogged
+ * tile in that variant's own tint, and the card's title has always named it
+ * ("Ironwood Grove"). A blank portrait over a title that named the ground was
+ * the card being coy about something it had just said.
+ *
+ * What stays fogged is the live half the server owns: how much is left, who is
+ * standing on it, what the work would cost.
  */
-const mat = computed(() =>
-  !unseen.value && preview.value?.material ? MATERIALS[preview.value.material] : null,
-)
+const mat = computed(() => {
+  const key = preview.value?.material ?? tile.value?.material
+
+  return key ? MATERIALS[key] : null
+})
+
+/**
+ * §6 -- what the settlement standing here refines, said as the material each
+ * line turns out. The map draws one billet per line at the foot of the tile;
+ * this is the same fact with the names on it.
+ *
+ * Not sight-gated, and neither is the name above: what a settlement RUNS falls
+ * out of (col, row, seed) exactly as its tier does, and the map draws the same
+ * billets on a fogged glyph. A walk of four days is a decision, and deciding it
+ * blind was never the fog protecting anything.
+ */
+const refines = computed(() => tile.value?.settlement?.lines ?? [])
+
+/**
+ * §9.1 -- the mouth, in the portrait, at the size the other tiles are drawn.
+ *
+ * The map's own drawing rather than a second one: its coordinates run from the
+ * hex center, so the viewBox is a square around that origin.
+ */
+const dungeonSpecimen = `<svg viewBox="-17 -15 34 34" width="34" height="34" aria-hidden="true">${dungeonProp()}</svg>`
 
 /**
  * §4 -- the kinds this hex can pay out, in order of likelihood.
@@ -216,10 +237,17 @@ const travelHint = computed(() => {
 })
 
 /**
- * Unscouted ground is named by what the glyph on the map already says and no
- * more: a tier, or the biome under it. Withholding the settlement's name is not
- * decoration -- the map draws a pip out there rather than a label, and a card
- * that quietly knew better would make the pip a lie.
+ * §5.6 -- what the card may call a hex it has never stood on.
+ *
+ * Everything derived from (col, row, seed) is fair: the lie of the land, water,
+ * and WHO LIVES THERE -- their name, their tier and the lines they run. The
+ * atlas has always charted all of it at any distance, and the same bundle
+ * computes it here, so withholding it on this card was a fiction rather than a
+ * fog. What is actually held back is the server's half: depletion, who is
+ * working the ground, what a hex would pay.
+ *
+ * A way down keeps its plain label, because a dungeon's NAME is the one thing
+ * out there that is not derived -- it comes off the world config with the site.
  */
 const title = computed(() => {
   const t = tile.value
@@ -231,12 +259,8 @@ const title = computed(() => {
   // fog the map does not actually have.
   if (t.water) return waterLabel(t.biome, t.water)
 
-  if (unseen.value) {
-    return t.settlement
-      ? (TIER_LABEL[t.settlement.tier] ?? VARIANT_LABEL[t.variant])
-      : t.dungeon
-        ? 'A way down'
-        : VARIANT_LABEL[t.variant]
+  if (unseen.value && !t.settlement) {
+    return t.dungeon ? 'A way down' : VARIANT_LABEL[t.variant]
   }
 
   return t.settlement?.name ?? t.dungeon?.name ?? VARIANT_LABEL[t.variant]
@@ -261,8 +285,24 @@ watch(open, (isOpen) => {
       <div class="inner">
         <div class="head">
         <button class="summary" type="button" @click="open = !open">
-          <SvgIcon v-if="mat" :svg="materialIcon(mat, 26)" class="mat" />
-          <span v-else class="pin" aria-hidden="true" />
+          <!--
+            The portrait: what this hex is ABOUT, in one slot.
+
+            A seam is its material. A settlement is the lines it runs (§6),
+            packed into the same nested comb the map and the bag use -- so the
+            slot answers the same question for both kinds of ground rather than
+            holding a blank hexagon on every hex that is not a mine.
+          -->
+          <span class="portrait">
+            <LineMarks v-if="refines.length" layout="comb" :lines="refines" />
+            <SvgIcon v-else-if="mat" :svg="materialIcon(mat, 34)" />
+            <!-- Water and a dungeon mouth are drawn rather than named, in the
+                 map's own hand: the specimen is the same drawing the almanac
+                 uses, and the mouth is the one the map puts on the hex. -->
+            <SvgIcon v-else-if="tile.water" :svg="waterGlyph(tile.biome, tile.water, 34)" />
+            <SvgIcon v-else-if="tile.dungeon" :svg="dungeonSpecimen" />
+            <span v-else class="pin" aria-hidden="true" />
+          </span>
 
           <span class="grow text">
             <span class="label">
@@ -380,10 +420,10 @@ watch(open, (isOpen) => {
             <!-- §7.3 -- the rate, and nothing about hit points. What a player
                  can act on is that the number goes up when the tool does.
                  
-                 Two terms, never three: the first line is the tool OR the
-                 hands, because §4.0 gives gathering no tool and §8.0 rule 1
-                 gives the other two no bare-handed mode. A mine is worked with
-                 one or the other and never with both. -->
+                 The first line is the tool OR the hands, never both, because
+                 §4.0 gives gathering no tool and §8.0 rule 1 gives the other
+                 two no bare-handed mode. The tree's own points sit under the
+                 line level and are drawn only once there are some. -->
             <div v-if="openVerb === t.key" :id="`verb-${t.key}`" class="rates tiny">
               <div class="row-between">
                 <span class="muted">{{ t.key === 'gather' ? 'Bare hands' : 'Tool' }}</span>
@@ -394,6 +434,10 @@ watch(open, (isOpen) => {
                 <span class="readout" :class="{ good: t.cost.skillAttack > 0 }">
                   +{{ t.cost.skillAttack }}
                 </span>
+              </div>
+              <div v-if="t.cost.skillBite > 0" class="row-between">
+                <span class="muted">Tree</span>
+                <span class="readout good">+{{ t.cost.skillBite }}</span>
               </div>
               <div class="row-between rate">
                 <span>Your rate</span>
@@ -456,15 +500,31 @@ watch(open, (isOpen) => {
   text-align: left;
 }
 
-.mat {
+/*
+ * The portrait's own square. Everything that can stand here -- a seam's
+ * material, a settlement's comb, or the empty hexagon -- is centered in it and
+ * measured from the same edge, so a card's name starts at one x whatever the
+ * hex turns out to be. A capital's comb is wider than the square and grows it;
+ * it stays centered, which is the part that reads.
+ */
+.portrait {
+  display: grid;
+  place-items: center;
   flex: 0 0 auto;
+  min-width: 34px;
+  min-height: 34px;
 }
 
+/*
+ * The portrait standing empty: water, a dungeon mouth, open country. Smaller
+ * than the slot and darker than anything else on the plate, because it is a
+ * place where a fact would be rather than a fact -- at full size and full
+ * contrast it read as a thing the hex was holding.
+ */
 .pin {
-  width: 22px;
-  height: 22px;
-  flex: 0 0 auto;
-  background: var(--hud-line);
+  width: 26px;
+  height: 26px;
+  background: var(--hud-line-soft);
   clip-path: var(--hex-clip);
 }
 
@@ -478,6 +538,11 @@ watch(open, (isOpen) => {
   font-family: var(--font-display);
   font-size: 14px;
   font-weight: 600;
+  /* The marks beside it are fixed width, so the name is what gives when a
+     capital running all five lands on a phone. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .stats {

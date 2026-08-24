@@ -9,7 +9,7 @@
  */
 import { hash2, rand01, randInt } from '@/game/hash'
 import { desaturate, shade, variantColor, waterColor } from '@/theme/palette'
-import { HEX_SIDE_PATH, HEX_TOP_PATH, ROW_STEP } from './hexGeometry'
+import { HEX_H, HEX_SIDE_PATH, HEX_TOP_PATH, HEX_W, ROW_STEP } from './hexGeometry'
 import { VARIANT_PROPS } from '@/game/variants'
 import type { Biome, SettlementTier, Tile, VariantKey, WaterKind } from '@/game/types'
 
@@ -264,13 +264,42 @@ const STONE = '#8b8f93'
 const SLATE = '#5f6b72'
 const PENNANT = '#d8b34a'
 
-function hut(x: number, y: number, scale = 1, roof = ROOF): string {
+/**
+ * §5.6 -- the same masonry, twice. Outside sight a settlement keeps its
+ * silhouette and loses its light: same shapes, same geometry, a solid
+ * desaturated palette instead (§13.2 -- never opacity). Scouting the hex is
+ * what lights it up, so nothing on the map changes SIZE when the fog lifts.
+ */
+type Masonry = {
+  roof: string
+  wall: string
+  stone: string
+  slate: string
+  pennant: string
+}
+
+const LIT: Masonry = { roof: ROOF, wall: WALL, stone: STONE, slate: SLATE, pennant: PENNANT }
+
+const fogged = (hex: string): string => shade(desaturate(hex, 0.5), -0.45)
+
+const FOG: Masonry = {
+  roof: fogged(ROOF),
+  wall: fogged(WALL),
+  stone: fogged(STONE),
+  slate: fogged(SLATE),
+  pennant: fogged(PENNANT),
+}
+
+function hut(x: number, y: number, scale = 1, pal: Masonry = LIT): string {
   const w = 9 * scale
   const h = 7 * scale
   return (
-    rect(x - w / 2, y - h, w, h, WALL) +
-    poly(`${x},${y - h - 6 * scale} ${x + w / 2 + 1.5},${y - h} ${x - w / 2 - 1.5},${y - h}`, roof) +
-    rect(x - 1.2 * scale, y - 3.4 * scale, 2.4 * scale, 3.4 * scale, shade(WALL, -0.55))
+    rect(x - w / 2, y - h, w, h, pal.wall) +
+    poly(
+      `${x},${y - h - 6 * scale} ${x + w / 2 + 1.5},${y - h} ${x - w / 2 - 1.5},${y - h}`,
+      pal.roof,
+    ) +
+    rect(x - 1.2 * scale, y - 3.4 * scale, 2.4 * scale, 3.4 * scale, shade(pal.wall, -0.55))
   )
 }
 
@@ -285,18 +314,18 @@ function gable(x: number, y: number, scale: number, roof: string): string {
  * it. The teeth are the tell -- no terrain prop on this map has a repeating
  * hard edge, so a toothed horizontal reads as "city" even at a glance.
  */
-function rampart(y: number, halfWidth: number, height: number): string {
+function rampart(y: number, halfWidth: number, height: number, pal: Masonry = LIT): string {
   const top = y - height
-  let out = rect(-halfWidth, top, halfWidth * 2, height, STONE)
+  let out = rect(-halfWidth, top, halfWidth * 2, height, pal.stone)
   // Lit face along the bottom, so the wall does not read as a flat slab.
-  out += rect(-halfWidth, y - height * 0.4, halfWidth * 2, height * 0.4, shade(STONE, -0.2))
+  out += rect(-halfWidth, y - height * 0.4, halfWidth * 2, height * 0.4, shade(pal.stone, -0.2))
 
   // Few and chunky. Seven fine teeth vanished at map scale -- five fat ones
   // survive, and the tooth rhythm is the whole point of the shape.
   const teeth = 5
   const step = (halfWidth * 2) / teeth
   for (let i = 0; i < teeth; i++) {
-    out += rect(-halfWidth + i * step + step * 0.1, top - 4.4, step * 0.6, 4.6, STONE)
+    out += rect(-halfWidth + i * step + step * 0.1, top - 4.4, step * 0.6, 4.6, pal.stone)
   }
 
   // Gate: the one opening in the run, and the darkest thing on the tile.
@@ -310,7 +339,7 @@ function rampart(y: number, halfWidth: number, height: number): string {
  * The capital's spire. Deliberately the tallest thing on the map -- taller than
  * a mountain peak (22) -- so the painter's sort (§13.2) makes it occlude hard.
  */
-function spire(x: number, y: number, height: number): string {
+function spire(x: number, y: number, height: number, pal: Masonry = LIT): string {
   const w = 9
   const topW = 6
   const top = y - height
@@ -318,53 +347,88 @@ function spire(x: number, y: number, height: number): string {
     // Tapered shaft, drawn as a trapezoid so it narrows with height.
     poly(
       `${x - w / 2},${y} ${x + w / 2},${y} ${x + topW / 2},${top} ${x - topW / 2},${top}`,
-      STONE,
+      pal.stone,
     ) +
     poly(
       `${x - w / 2},${y} ${x},${y} ${x},${top} ${x - topW / 2},${top}`,
-      shade(STONE, 0.14),
+      shade(pal.stone, 0.14),
     ) +
     // Spike roof.
-    poly(`${x},${top - 11} ${x + topW / 2 + 1.6},${top} ${x - topW / 2 - 1.6},${top}`, SLATE) +
+    poly(`${x},${top - 11} ${x + topW / 2 + 1.6},${top} ${x - topW / 2 - 1.6},${top}`, pal.slate) +
     // Mast and pennant. The only cloth on the map, and the only gold: §10 makes
     // capitals the thing guilds spend their gold to hold.
-    rect(x - 0.6, top - 19, 1.2, 9, shade(STONE, -0.3)) +
-    poly(`${x + 0.6},${top - 19} ${x + 9},${top - 16.4} ${x + 0.6},${top - 13.8}`, PENNANT)
+    rect(x - 0.6, top - 19, 1.2, 9, shade(pal.stone, -0.3)) +
+    poly(`${x + 0.6},${top - 19} ${x + 9},${top - 16.4} ${x + 0.6},${top - 13.8}`, pal.pennant)
   )
 }
 
-function settlementProp(tier: SettlementTier, seed: number): string {
+function settlementProp(tier: SettlementTier, seed: number, pal: Masonry = LIT): string {
   if (tier === 'village') {
     // Scatter: spread wide enough that they read as separate marks. Any closer
     // and three huts become one blob, which is the city's read, not this one.
     return (
-      hut(-14, 9, 0.78) +
-      hut(12, 6, 0.72) +
-      hut(-1, 13, 0.68) +
-      (rand01(seed) > 0.5 ? hut(6, 15, 0.55) : '')
+      hut(-14, 9, 0.78, pal) +
+      hut(12, 6, 0.72, pal) +
+      hut(-1, 13, 0.68, pal) +
+      (rand01(seed) > 0.5 ? hut(6, 15, 0.55, pal) : '')
     )
   }
 
   if (tier === 'city') {
     // Enclosure: one steep roof rising behind the wall, in a slate dark enough
     // to separate from the masonry, then the wall cropping its feet.
-    return gable(-2, 3, 1.5, shade(SLATE, -0.3)) + rampart(12, 20, 9)
+    return gable(-2, 3, 1.5, shade(pal.slate, -0.3)) + rampart(12, 20, 9, pal)
   }
 
   // Capital: one mark and its footing. The flanking huts were an accessory --
   // they only muddied the base into the same gray lump a city makes.
-  return rect(-15, 6, 30, 6, shade(STONE, -0.24)) + spire(0, 6, 34)
+  return rect(-15, 6, 30, 6, shade(pal.stone, -0.24)) + spire(0, 6, 34, pal)
+}
+
+/**
+ * §5.6 -- the settlement's own silhouette with the light taken out of it (§13.2
+ * tells the three tiers apart by shape category, so the fog keeps the
+ * distinction for free).
+ *
+ * What the tile does NOT carry, in or out of the fog, is which of the five
+ * lines the place runs: a hex is a shape on a map, and a row of billets on it
+ * was a legend to decode at a glance nobody asked for. The lines are on the
+ * card, where a tap is the question being asked (§6).
+ */
+export function settlementGlyph(tier: SettlementTier, seed: number): string {
+  return settlementProp(tier, seed, FOG)
+}
+
+/**
+ * The mouth is the one prop the fog cannot simply darken: it is already the
+ * blackest thing on the map, and a shaded tile would swallow it whole. So the
+ * unscouted version goes the other way -- the frame comes UP to fogged masonry
+ * and the opening stays black, which is the same silhouette read as a hole in a
+ * wall rather than a smudge on dark ground.
+ */
+const DUNGEON_LIT = { mouth: '#2a2320', dark: '#0b0d0c', lintel: '#4a3d35', eye: '#d8b34a' }
+const DUNGEON_FOG = {
+  mouth: shade(FOG.stone, -0.2),
+  dark: '#0b0d0c',
+  lintel: FOG.stone,
+  eye: fogged(PENNANT),
 }
 
 /** Dungeon entrance, §9.1 -- sited in the barren capital ring. */
-function dungeonProp(): string {
+function dungeonProp(fog = false): string {
+  const pal = fog ? DUNGEON_FOG : DUNGEON_LIT
   return (
-    poly('-13,12 -9,-4 9,-4 13,12', '#2a2320') +
-    poly('-7,12 -5,2 5,2 7,12', '#0b0d0c') +
-    poly('-13,-4 0,-11 13,-4', '#4a3d35') +
-    `<circle cx="-9" cy="4" r="1.8" fill="#d8b34a"/>` +
-    `<circle cx="9" cy="4" r="1.8" fill="#d8b34a"/>`
+    poly('-13,12 -9,-4 9,-4 13,12', pal.mouth) +
+    poly('-7,12 -5,2 5,2 7,12', pal.dark) +
+    poly('-13,-4 0,-11 13,-4', pal.lintel) +
+    `<circle cx="-9" cy="4" r="1.8" fill="${pal.eye}"/>` +
+    `<circle cx="9" cy="4" r="1.8" fill="${pal.eye}"/>`
   )
+}
+
+/** The same mouth, unscouted -- §9.1's five are on the map before you walk. */
+export function dungeonGlyph(): string {
+  return dungeonProp(true)
 }
 
 
@@ -763,6 +827,47 @@ export function variantSpecimen(variant: VariantKey, size = 66): string {
  * needs it more than the land does -- its marks are strokes rather than
  * silhouettes, and a stroke on an empty field is a scratch.
  */
+/**
+ * §5.3 -- one hex of water, and nothing behind it.
+ *
+ * The specimen above puts the upslope neighbor back so a prop has a darker
+ * slab to read against, which is right on an almanac plate and wrong in a card
+ * where every other portrait is a single object: two stacked hexagons read as
+ * two things, and the tile card is answering "what is this hex".
+ *
+ * Water needs no backing anyway -- its fill is already unlike anything the land
+ * is drawn in, which is the whole reason §5.3 tints it by the ground it crosses
+ * rather than letting it cut one blue line across five kinds of country.
+ */
+export function waterGlyph(biome: Biome, kind: WaterKind, size = 34): string {
+  const tile = {
+    col: 0,
+    row: 0,
+    biome,
+    variant: biome as VariantKey,
+    water: kind,
+    propSeed: SPECIMEN_SEED,
+    settlement: undefined,
+    dungeon: undefined,
+    herdUntil: undefined,
+  } as unknown as Tile
+
+  const top = waterColor(biome, kind)
+
+  // Tight to the slab: half a hex above the center, half plus its depth below.
+  const w = HEX_W
+  const boxH = HEX_H + 12
+
+  return (
+    `<svg viewBox="${-w / 2} ${-HEX_H / 2 - 2} ${w} ${boxH}" width="${size}" ` +
+    `height="${Math.round((size * boxH) / w)}" aria-hidden="true">` +
+    `<path d="${HEX_SIDE_PATH}" fill="${shade(top, -0.4)}"/>` +
+    `<path d="${HEX_TOP_PATH}" fill="${top}" stroke="${shade(top, -0.2)}" stroke-width="0.5"/>` +
+    waterProp(tile) +
+    '</svg>'
+  )
+}
+
 export function waterSpecimen(biome: Biome, kind: WaterKind, size = 66): string {
   const tile = {
     col: 0,
