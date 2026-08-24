@@ -300,8 +300,12 @@ final class GameLoopTest extends TestCase
      * it should have to argue with this test rather than slip through.
      *
      * ~1,080 character XP a day is what an unbroken career averages at speed 1
-     * (28 mining trips a day unequipped, 48 on the 30-minute floor, plus the
+     * (28 mining trips a day unequipped, 48 on the old 30-minute floor, plus the
      * processing those hauls feed). The target is level 100 at about six months.
+     *
+     * The divisor is a measurement rather than a derivation, which is why this
+     * test still passes after §7.3 dropped the floor to a guard -- see
+     * Balance::xpForLevel(). Re-fitting it is a pacing decision of its own.
      */
     public function test_the_level_curve_lands_on_the_six_month_target(): void
     {
@@ -396,6 +400,33 @@ final class GameLoopTest extends TestCase
         }
 
         $this->fail('no herd anywhere on the map');
+    }
+
+    /** Stand on a forest hex that actually has a seam to work. */
+    private function standOnMineableGround(): array
+    {
+        $now = $this->game->now();
+
+        for ($col = -Balance::mapRadius(); $col <= Balance::mapRadius(); $col++) {
+            for ($row = -Balance::mapRadius(); $row <= Balance::mapRadius(); $row++) {
+                $tile = $this->game->buildTile($col, $row, $now);
+
+                if ($tile['biome'] !== 'forest' || ($tile['material'] ?? null) === null) {
+                    continue;
+                }
+
+                if ($tile['settlement'] !== null || $tile['water'] !== null) {
+                    continue;
+                }
+
+                $this->character->update(['col' => $col, 'row' => $row]);
+                $this->character->refresh();
+
+                return [$col, $row];
+            }
+        }
+
+        $this->fail('no workable forest anywhere on the map');
     }
 
     /**
@@ -1325,6 +1356,51 @@ final class GameLoopTest extends TestCase
     }
 
     /**
+     * §5.5 / §7.3 -- a herd is a pile of work, and the bow is what gets through
+     * it.
+     *
+     * It was a flat twenty-five minutes for as long as §7.3's clamp would have
+     * rounded any difference away. The floor is a guard now, so the hunting
+     * line has the same ladder every other line has: the crude bow is the
+     * reference trip and everything above it is felt on the clock.
+     */
+    public function test_a_better_bow_works_a_herd_faster(): void
+    {
+        [$col, $row] = $this->standOnAHerd();
+
+        \App\Models\CharacterItem::create([
+            'character_id' => $this->character->id,
+            'item_key' => 'crude_bow',
+            'durability' => 200,
+            'equipped' => true,
+            'options' => [],
+        ]);
+
+        $crude = $this->game->previewHunt($this->character->fresh(), $col, $row);
+        $this->assertTrue($crude['canHunt'], $crude['reason'] ?? '');
+
+        // A crude bow on a herd is twenty-five minutes, which is what a hunt
+        // has always cost -- the same yardstick a hex's HP was set by.
+        $this->assertSame(25 * 60, $crude['seconds']);
+        $this->assertSame(Balance::HERD_HP, $crude['hp']);
+        $this->assertTrue($crude['able']);
+
+        \App\Models\CharacterItem::where('character_id', $this->character->id)->delete();
+        \App\Models\CharacterItem::create([
+            'character_id' => $this->character->id,
+            'item_key' => 'recurve_bow',
+            'durability' => 200,
+            'equipped' => true,
+            'options' => [],
+        ]);
+
+        $recurve = $this->game->previewHunt($this->character->fresh(), $col, $row);
+        $this->assertGreaterThan($crude['toolAttack'], $recurve['toolAttack']);
+        $this->assertLessThan($crude['seconds'], $recurve['seconds']);
+        $this->assertFalse($recurve['clamped']);
+    }
+
+    /**
      * §5.5 -- a herd pays pelt for a bow, and no Tier 4 for anybody.
      *
      * Essence used to be a line in this table. It is raid loot: a herd on a
@@ -1873,21 +1949,23 @@ final class GameLoopTest extends TestCase
         $this->character->save();
         $this->standAtWoodcuttingVillage();
 
-        // Every cost node the Smith tree has.
+        // Every cost node the Armorer tree has. It is the bench that leans on
+        // the discount -- a Smith's tree spends most of itself on what comes
+        // off the anvil instead, which is what makes the two different trees.
         $keys = [];
-        foreach (\App\Game\Jobs::nodesFor('smith') as $key => $node) {
+        foreach (\App\Game\Jobs::nodesFor('armorer') as $key => $node) {
             if ($node['effect']['kind'] === 'costReduction') {
                 $keys[] = $key;
             }
         }
         $this->grantNodes($keys);
 
-        $this->give(['wood' => 40, 'planks' => 40, 'heartknot' => 40]);
-        $before = $this->game->held($this->character->fresh(), 'wood');
-        $this->craftNow('hewn_axe');
-        $spent = $before - $this->game->held($this->character->fresh(), 'wood');
+        $this->give(['fiber' => 40, 'cloth' => 40, 'beeswax' => 40]);
+        $before = $this->game->held($this->character->fresh(), 'fiber');
+        $this->craftNow('work_gloves');
+        $spent = $before - $this->game->held($this->character->fresh(), 'fiber');
 
-        $this->assertGreaterThan(0, $spent, 'a maxed Smith crafted out of thin air');
+        $this->assertGreaterThan(0, $spent, 'a maxed Armorer crafted out of thin air');
         $this->assertLessThan(6, $spent, 'the discount did nothing at all');
     }
 
@@ -2144,14 +2222,14 @@ final class GameLoopTest extends TestCase
         $this->assertStringContainsString('Both slots', $preview['reason']);
     }
 
-    /** §7.3 -- the floor clamp is mandatory and must bind. */
-    public function test_trip_time_never_drops_below_the_floor(): void
+    /** §7.3 -- the clamp is a guard, and a guard that binds is a bug. */
+    public function test_trip_time_never_drops_below_the_guard(): void
     {
         // Best tool in the game, maxed skill, best-in-slot gear on the hardest
-        // hex: still over the floor, so the ladder has somewhere left to go.
+        // hex: nowhere near the guard, so the ladder has somewhere left to go.
         $best = \App\Game\Formulas::toolAttack(\App\Game\Catalog::item('mythril_pickaxe'));
         $trip = \App\Game\Formulas::tripTime(
-            3600,
+            Balance::TILE_HP_MAX,
             Balance::SKILL_MAX_LEVEL,
             Balance::STAT_CEILING,
             $best,
@@ -2160,9 +2238,311 @@ final class GameLoopTest extends TestCase
         $this->assertFalse($trip['clamped'], 'the top of the tool ladder is wasted');
 
         // Even absurd inputs cannot breach it.
-        $absurd = \App\Game\Formulas::tripTime(1800, 9999, 99.0, 9999);
+        $absurd = \App\Game\Formulas::tripTime(Balance::TILE_HP_MAX, 9999, 99.0, 9999);
         $this->assertSame(Balance::MINING_FLOOR_SECONDS, $absurd['total']);
         $this->assertTrue($absurd['clamped']);
+    }
+
+    /**
+     * §7.3 -- the line skill is floor(level / 10), and bare hands are that plus
+     * BARE_HAND_ATTACK because gathering is the verb with no tool in it (§4.0).
+     */
+    public function test_bare_hands_step_a_point_every_ten_levels(): void
+    {
+        $this->assertSame(Balance::BARE_HAND_ATTACK, \App\Game\Formulas::gatherAttack(0));
+        $this->assertSame(Balance::BARE_HAND_ATTACK, \App\Game\Formulas::gatherAttack(1));
+        $this->assertSame(Balance::BARE_HAND_ATTACK, \App\Game\Formulas::gatherAttack(9));
+        $this->assertSame(Balance::BARE_HAND_ATTACK + 1, \App\Game\Formulas::gatherAttack(10));
+        $this->assertSame(Balance::BARE_HAND_ATTACK + 2, \App\Game\Formulas::gatherAttack(20));
+
+        // The line skill stops where the line skill stops.
+        $capped = intdiv(Balance::SKILL_MAX_LEVEL, Balance::MINING_SKILL_LEVELS_PER_ATTACK);
+        $this->assertSame($capped, \App\Game\Formulas::skillAttack(Balance::SKILL_MAX_LEVEL));
+        $this->assertSame($capped, \App\Game\Formulas::skillAttack(9999));
+        $this->assertSame(
+            Balance::BARE_HAND_ATTACK + $capped,
+            \App\Game\Formulas::gatherAttack(9999),
+        );
+    }
+
+    /**
+     * §4.0 / §8.0 rule 1 -- no trip in the game mixes hands and a tool.
+     *
+     * Mining and hunting are refused without their tool rather than downgraded,
+     * so the attack a trip runs on is the tool's OR the hands', never a sum.
+     * The consequence that has to hold is the direction: bare hands are the
+     * FLOOR under the ladder, so the very cheapest tool must still beat them.
+     *
+     * They did not, briefly. While BARE_HAND_ATTACK was the base every verb
+     * shared it could sit above the common rung harmlessly; the moment it
+     * became gathering's whole rate, four against a Stone Axe's three meant
+     * buying your first axe made the hex SLOWER, which is §12 step 5 inverted.
+     */
+    public function test_bare_hands_are_the_floor_under_the_tool_ladder(): void
+    {
+        $this->assertLessThan(
+            Balance::MINING_COMMON_ATTACK,
+            Balance::BARE_HAND_ATTACK,
+            'bare hands out-work the cheapest tool in the game',
+        );
+
+        $hex = Balance::TILE_HP_MIN;
+
+        // At every level of the line, and against every rung actually sold.
+        foreach ([1, 10, 25, Balance::SKILL_MAX_LEVEL] as $level) {
+            $hands = \App\Game\Formulas::tripTime(
+                $hex,
+                $level,
+                0.0,
+                Balance::BARE_HAND_ATTACK,
+            )['total'];
+
+            foreach (['stone_axe', 'chipped_pick', 'crude_bow', 'iron_hatchet'] as $key) {
+                $attack = \App\Game\Formulas::toolAttack(\App\Game\Catalog::item($key));
+                $tooled = \App\Game\Formulas::tripTime($hex, $level, 0.0, $attack)['total'];
+
+                $this->assertLessThan(
+                    $hands,
+                    $tooled,
+                    "{$key} is slower than bare hands at line level {$level}",
+                );
+            }
+        }
+    }
+
+    /**
+     * §7.3 -- the HP range is calibrated once, and this is where that is written
+     * down.
+     *
+     * 2,700 is fifteen minutes for the common rung with nothing learned yet,
+     * and 5,400 is thirty. Nothing at runtime derives those seconds -- HP is
+     * the fact the world rolls -- so if the numbers are ever retuned it should
+     * have to argue with this test rather than drift quietly.
+     */
+    public function test_the_hp_range_is_fifteen_to_thirty_minutes_at_the_common_rung(): void
+    {
+        $fresh = 1;
+
+        $easy = \App\Game\Formulas::tripTime(
+            Balance::TILE_HP_MIN,
+            $fresh,
+            0.0,
+            Balance::MINING_COMMON_ATTACK,
+        );
+        $hard = \App\Game\Formulas::tripTime(
+            Balance::TILE_HP_MAX,
+            $fresh,
+            0.0,
+            Balance::MINING_COMMON_ATTACK,
+        );
+
+        $this->assertSame(15 * 60, $easy['total']);
+        $this->assertSame(30 * 60, $hard['total']);
+
+        // A herd is read off the same yardstick, at twenty-five.
+        $herd = \App\Game\Formulas::tripTime(
+            Balance::HERD_HP,
+            $fresh,
+            0.0,
+            Balance::MINING_COMMON_ATTACK,
+        );
+        $this->assertSame(25 * 60, $herd['total']);
+    }
+
+    /**
+     * §5.3 -- better ground is more work, and the rung it is named for is how
+     * much more.
+     *
+     * A variant is one rung of the equipment ladder, and that used to be
+     * decoration: an Ironwood Grove was the same afternoon's work as the plain
+     * forest beside it. Every grade of ground now takes ITS rung exactly as
+     * long as base ground takes the common one, which is the sentence this
+     * pins -- fifteen minutes to thirty, all the way up the ladder.
+     */
+    public function test_each_grade_of_ground_costs_its_own_rung_the_base_fifteen_to_thirty(): void
+    {
+        $fresh = 1;
+
+        // Several rolls rather than one, so the assertion is about the ladder
+        // rather than about whichever hex hash zero happens to produce.
+        foreach ([0, 1, 7, 12345, 999983, 0xffffffff] as $hash) {
+            $base = \App\Game\Formulas::tripTime(
+                \App\Game\WorldGen::tileHp($hash, 'common'),
+                $fresh,
+                0.0,
+                Balance::MINING_COMMON_ATTACK,
+            )['total'];
+
+            $this->assertGreaterThanOrEqual(15 * 60, $base);
+            $this->assertLessThanOrEqual(30 * 60, $base);
+
+            foreach (Balance::TILE_HP_GRADE_ATTACK as $grade => $attack) {
+                $own = \App\Game\Formulas::tripTime(
+                    \App\Game\WorldGen::tileHp($hash, $grade),
+                    $fresh,
+                    0.0,
+                    $attack,
+                )['total'];
+
+                // A second either way is integer division, not a design gap.
+                $this->assertLessThanOrEqual(
+                    1,
+                    abs($own - $base),
+                    "{$grade} ground does not cost its own rung what base ground costs the common one",
+                );
+            }
+        }
+    }
+
+    /**
+     * §5.3 -- and the other half of the same rule: at a FIXED rung, better
+     * ground is strictly more work.
+     *
+     * The test above would still pass if HP and the rung ladder were both
+     * flat. This is the one that fails if the grade stops costing anything.
+     */
+    public function test_better_ground_is_strictly_more_work_at_one_rung(): void
+    {
+        foreach ([0, 1, 7, 12345, 999983, 0xffffffff] as $hash) {
+            $previous = 0;
+            foreach (array_keys(Balance::TILE_HP_GRADE_ATTACK) as $grade) {
+                $hp = \App\Game\WorldGen::tileHp($hash, $grade);
+                $this->assertGreaterThan($previous, $hp, "{$grade} ground is no harder than the grade below it");
+                $previous = $hp;
+            }
+        }
+    }
+
+    /**
+     * §5.3 -- the base grade is the yardstick, so it comes through untouched.
+     *
+     * If common ground ever picked up a multiplier the HP range would mean two
+     * things at once, and the calibration test above would be measuring a
+     * number nothing on the map actually carries.
+     */
+    public function test_the_base_grade_is_the_unscaled_roll(): void
+    {
+        $this->assertSame(
+            Balance::MINING_COMMON_ATTACK,
+            Balance::TILE_HP_GRADE_ATTACK['common'],
+        );
+
+        foreach ([0, 1, 12345, 0xffffffff] as $hash) {
+            $this->assertSame(
+                \App\Game\Hash::randInt($hash, Balance::TILE_HP_MIN, Balance::TILE_HP_MAX),
+                \App\Game\WorldGen::tileHp($hash, 'common'),
+            );
+        }
+    }
+
+    /**
+     * §5.3 -- the grade ladder only ever climbs, and it covers every grade the
+     * variant table can produce.
+     *
+     * A grade with no entry would fall back to the common rung and cost
+     * nothing extra, which is the silent version of the bug this whole rule
+     * exists to fix.
+     */
+    public function test_every_variant_grade_is_on_the_hp_ladder_and_it_only_climbs(): void
+    {
+        $ladder = Balance::TILE_HP_GRADE_ATTACK;
+
+        $this->assertSame(
+            \App\Game\Variants::GRADES,
+            array_keys($ladder),
+            'the HP ladder and the variant grades have drifted apart',
+        );
+
+        $previous = 0;
+        foreach ($ladder as $grade => $attack) {
+            $this->assertGreaterThan($previous, $attack, "{$grade} is not above the grade below it");
+            $previous = $attack;
+        }
+
+        foreach (\App\Game\Variants::BIOME_VARIANTS as $biome => $variants) {
+            foreach ($variants as $variant) {
+                $this->assertArrayHasKey(
+                    $variant['grade'],
+                    $ladder,
+                    "{$biome}'s {$variant['key']} has a grade the HP ladder does not know",
+                );
+            }
+        }
+    }
+
+    /**
+     * §7.3 -- a character who has learned nothing is worth nothing extra.
+     *
+     * The skill term was `ceil(level / 10)`, which handed the very first level
+     * of a line a free point: a panel describing what your skill was worth to
+     * this trip printed "+1" at somebody who had never swung an axe.
+     */
+    public function test_an_unskilled_line_adds_no_attack(): void
+    {
+        $this->assertSame(0, \App\Game\Formulas::skillAttack(0));
+        $this->assertSame(0, \App\Game\Formulas::skillAttack(1));
+        $this->assertSame(0, \App\Game\Formulas::skillAttack(9));
+        $this->assertSame(1, \App\Game\Formulas::skillAttack(10));
+
+        $trip = \App\Game\Formulas::tripTime(Balance::TILE_HP_MIN, 1, 0.0, 3);
+        $this->assertSame(0, $trip['skillAttack']);
+        $this->assertSame(3.0, $trip['rate']);
+    }
+
+    /**
+     * §8.0 rule 1 -- nothing in your hands and nothing learned is NO trip.
+     *
+     * Not a very long one. The rate is zero, so the arithmetic has no answer,
+     * and what the card owes the player is a refusal rather than a clock nobody
+     * can reach.
+     */
+    public function test_no_attack_at_all_is_a_refusal_rather_than_a_long_trip(): void
+    {
+        $none = \App\Game\Formulas::tripTime(Balance::TILE_HP_MIN, 1, 0.0, 0);
+
+        $this->assertFalse($none['able']);
+        $this->assertSame(0, $none['total']);
+        $this->assertSame(0.0, $none['rate']);
+        $this->assertFalse($none['clamped']);
+
+        // One point of anything is enough to make it a trip again.
+        $some = \App\Game\Formulas::tripTime(Balance::TILE_HP_MIN, 1, 0.0, 1);
+        $this->assertTrue($some['able']);
+        $this->assertGreaterThan(0, $some['total']);
+
+        // Including a point that came from the line rather than from a tool --
+        // which is why the arithmetic alone is not the whole answer. §8.0 rule
+        // 1 refuses the VERB without its tool, so previewTile overrides this
+        // for a bare-handed dig no matter how well the line is known.
+        $learned = \App\Game\Formulas::tripTime(Balance::TILE_HP_MIN, 10, 0.0, 0);
+        $this->assertTrue($learned['able']);
+    }
+
+    /**
+     * §8.0 rule 1 -- a skilled prospector with no axe still cannot mine.
+     *
+     * The rate would be one a second off the line alone, which is a clock; the
+     * button beside it is dead, and a card that prints a time next to a refusal
+     * is telling the player two different things.
+     */
+    public function test_a_skilled_line_with_no_tool_still_cannot_mine(): void
+    {
+        [$col, $row] = $this->standOnMineableGround();
+
+        $this->character->skills()->updateOrCreate(
+            ['skill_key' => 'woodcutting'],
+            ['level' => 30, 'xp' => 0],
+        );
+
+        $mine = $this->game->previewTile($this->character->fresh(), $col, $row);
+        $this->assertTrue($mine['bare'], 'the character found a tool somewhere');
+        $this->assertFalse($mine['able'], 'a bare-handed dig was costed as a trip');
+        $this->assertFalse($mine['canMine']);
+
+        // The floor under it is still open, and it IS able: hands are a rate.
+        $gather = $this->game->previewGather($this->character->fresh(), $col, $row);
+        $this->assertTrue($gather['able']);
+        $this->assertGreaterThan(0, $gather['seconds']);
     }
 
     /**
@@ -2175,11 +2555,12 @@ final class GameLoopTest extends TestCase
         // stat, so they take the same bite -- what separates them is how long
         // they last. Distinct rungs only.
         $ladder = ['stone_axe', 'hewn_axe', 'iron_hatchet', 'ironwood_axe'];
-        $last = \App\Game\Formulas::tripTime(3600, 0, 0.0)['total'];
+        $hex = Balance::TILE_HP_MAX;
+        $last = \App\Game\Formulas::tripTime($hex, 1, 0.0, Balance::BARE_HAND_ATTACK)['total'];
 
-        // Bare hands take exactly what the tile was rolled for: a hex's
-        // durability IS its base seconds at the bare-handed rate.
-        $this->assertSame(3600, $last);
+        // Bare hands are the floor under the ladder and are slower than any of
+        // it -- the hex is the same pile of work either way (§4.0).
+        $this->assertGreaterThan(30 * 60, $last);
 
         foreach ($ladder as $key) {
             $def = \App\Game\Catalog::item($key);
@@ -2188,9 +2569,10 @@ final class GameLoopTest extends TestCase
             $attack = \App\Game\Formulas::toolAttack($def);
             $this->assertGreaterThan(0, $attack, "{$key} has no bite");
 
-            $total = \App\Game\Formulas::tripTime(3600, 0, 0.0, $attack)['total'];
-            $this->assertLessThan($last, $total, "{$key} was no faster than the rung below");
-            $last = $total;
+            $trip = \App\Game\Formulas::tripTime($hex, 1, 0.0, $attack);
+            $this->assertLessThan($last, $trip['total'], "{$key} was no faster than the rung below");
+            $this->assertFalse($trip['clamped'], "{$key} is wasted on this hex");
+            $last = $trip['total'];
         }
     }
 

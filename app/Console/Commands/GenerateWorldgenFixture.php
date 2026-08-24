@@ -66,7 +66,7 @@ class GenerateWorldgenFixture extends Command
                 $tile['variant'],
                 $tile['ring'],
                 $tile['material'] ?? '-',
-                $tile['baseSeconds'],
+                $tile['hp'],
                 $tile['baseYield'],
                 $s ? $s['name'].':'.$s['tier'].':'.implode(',', $s['lines']) : '-',
                 $tile['dungeon'] ? $tile['dungeon']['key'] : '-',

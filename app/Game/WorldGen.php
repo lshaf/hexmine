@@ -761,6 +761,27 @@ final class WorldGen
     }
 
     /**
+     * §5.3 -- a hex's HP, scaled by the grade of ground it turned out to be.
+     *
+     * The roll is the same 2,700-5,400 it always was; what the grade decides is
+     * the rung that roll is measured at. Base ground is the common rung, so it
+     * comes through untouched, and an Ironwood Grove is four and two thirds
+     * times the work because that is the ratio between an Ironwood Axe and a
+     * Stone one -- the better ground asks for the better tool by costing what
+     * the better tool is worth.
+     *
+     * Integer arithmetic on purpose. A float multiplier would be two
+     * generators rounding a repeating decimal and hoping (scripts/parity.ts).
+     */
+    public static function tileHp(int $hash, string $grade): int
+    {
+        $roll = Hash::randInt($hash, Balance::TILE_HP_MIN, Balance::TILE_HP_MAX);
+        $attack = Balance::TILE_HP_GRADE_ATTACK[$grade] ?? Balance::MINING_COMMON_ATTACK;
+
+        return intdiv($roll * $attack, Balance::MINING_COMMON_ATTACK);
+    }
+
+    /**
      * Build a tile. $mutation carries the only server-owned state a tile has;
      * everything else is derived.
      *
@@ -806,7 +827,7 @@ final class WorldGen
             'variant' => $variant['key'] ?? $biome,
             'ring' => $ring,
             'material' => $material,
-            'baseSeconds' => Hash::randInt($hTime, Balance::MINING_BASE_MIN_SECONDS, Balance::MINING_BASE_MAX_SECONDS),
+            'hp' => self::tileHp($hTime, $variant['grade'] ?? 'common'),
             'baseYield' => Hash::randInt($hYield, 3, 8),
             'slotsUsed' => $mutation['slotsUsed'] ?? 0,
             'regrowsAt' => $regrowsAt,

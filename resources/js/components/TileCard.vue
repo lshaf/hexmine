@@ -8,9 +8,10 @@
  * that is about somewhere else, and putting it beside the haul and trip time is
  * what turns those numbers into a decision.
  *
- * Compact by default. The §7.3 breakdown expands on request, because it matters
- * exactly once -- the first time gear fails to make a trip shorter and the
- * player needs to see the floor clamp doing it.
+ * Compact by default, and disclosed twice over. The card opens to what this
+ * ground is worth; each verb on it then opens to how its clock was arrived at,
+ * because that matters exactly once -- the first time a better tool does not
+ * shorten a trip as much as expected and the rate has to explain itself.
  */
 import { computed, ref, watch } from 'vue'
 import { useGame } from '@/stores/game'
@@ -51,6 +52,7 @@ const TIER_LABEL: Record<string, string> = {
 
 const depleted = computed(() => Boolean(tile.value && tile.value.regrowsAt > game.now))
 
+
 /**
  * §5.6 -- outside sight there is no scouting report, because there is no
  * scouting. The card falls back to what the seed already told this device: the
@@ -60,6 +62,18 @@ const depleted = computed(() => Boolean(tile.value && tile.value.regrowsAt > gam
  * flicker through "unscouted" while a request for a hex in sight is in flight.
  */
 const unseen = computed(() => distance.value > game.sight)
+
+/**
+ * §5.1 -- this hex has something to work, whether or not you may work it now.
+ *
+ * Deliberately not `trip`: a trip is priced at zero the moment a verb is
+ * refused, which took the slot count off the plate exactly when it was most
+ * worth reading. Two seats are a fact about the GROUND, shared with everybody,
+ * and they hold whether the belt is ready or not -- so the plate keeps saying
+ * how many are free and the dock keeps saying what you may do about it.
+ */
+const seam = computed(() => Boolean(!unseen.value && preview.value?.material))
+
 
 /**
  * The seam's icon, and only while there is a seam to show.
@@ -102,23 +116,37 @@ const huntDrops = computed(() => shown(preview.value?.hunt?.drops))
 /**
  * One entry per verb the dock offers here, in the order the dock offers them.
  *
- * Each is named by its own line rather than by a phrase, because the names are
- * already the thing that tells them apart -- a hex in the badlands offers a
- * Quarrying reward and a Gather reward, and nothing has to say more than that.
+ * Named with the dock's own words -- Mine, Gather, Hunt -- because these rows
+ * are the price list for those three buttons and the correspondence should be
+ * exact. They used to read "Woodcutting reward", which repeated a noun on every
+ * row, said "reward" three times over a set of pips that are visibly rewards,
+ * and wrapped to two lines on a phone. Which line the seam trains is the lede's
+ * job and it is already doing it.
  */
 const tables = computed(() => {
-  const line = preview.value?.skill
+  const p = preview.value
+  if (!p) return []
 
   return [
-    {
-      key: 'mine',
-      label: line ? `${SKILL_BY_KEY[line].name} reward` : 'Reward',
-      rows: drops.value,
-    },
-    { key: 'gather', label: 'Gather reward', rows: gatherDrops.value },
-    { key: 'hunt', label: 'Hunting reward', rows: huntDrops.value },
+    { key: 'mine', label: 'Mine', rows: drops.value, cost: p },
+    { key: 'gather', label: 'Gather', rows: gatherDrops.value, cost: p.gather },
+    { key: 'hunt', label: 'Hunt', rows: huntDrops.value, cost: p.hunt },
   ].filter((t) => t.rows.length)
 })
+
+/**
+ * §7.3 -- which verb has its arithmetic showing, or none.
+ *
+ * One at a time. The numbers a prospector is actually comparing are the three
+ * clocks, and those are on the closed rows already -- so there is never a
+ * reason to hold two breakdowns open, and an accordion keeps the card inside
+ * the height it has to share with the dock (§13.2).
+ */
+const openVerb = ref<string | null>(null)
+
+const toggleVerb = (key: string) => {
+  openVerb.value = openVerb.value === key ? null : key
+}
 
 /**
  * The server costs a trip for any workable hex in sight, standing on it or not,
@@ -217,6 +245,13 @@ const title = computed(() => {
 // A new hex is a fresh question; do not carry the previous one's expansion.
 watch(tile, () => {
   open.value = false
+  openVerb.value = null
+})
+
+// Closing the card closes what was open inside it, so reopening is the same
+// glance every time rather than whatever was left showing.
+watch(open, (isOpen) => {
+  if (!isOpen) openVerb.value = null
 })
 </script>
 
@@ -236,15 +271,23 @@ watch(tile, () => {
             <span class="name">{{ title }}</span>
           </span>
 
-          <span v-if="trip" class="stats">
-            <span class="stat">
-              <span class="label">Reward</span>
-              <span class="readout">{{ trip.yield }}</span>
-            </span>
-            <span class="stat">
-              <span class="label">Mine</span>
-              <span class="readout">{{ formatSpan(wallTime(trip.seconds)) }}</span>
-            </span>
+          <!-- Slots alone, and always. The haul and the clock used to sit here
+               too, and once each verb started pricing itself they were the
+               mining row's two numbers said a second time thirty pixels higher
+               -- and said for one verb as though they held for all three.
+
+               Slots stays because it is a fact about the HEX rather than about
+               a verb: two seats, shared with everybody, whatever you came here
+               to do. Which is also why it no longer hangs off the trip -- a
+               trip prices at zero the moment a verb is refused, so the one
+               moment the plate went quiet was the moment you had no tool, and
+               it filled the gap with a sentence the button beside it was
+               already saying. -->
+          <span v-if="depleted" class="reason tiny">
+            Regrows in {{ formatDuration(tile.regrowsAt - game.now) }}
+          </span>
+
+          <span v-else-if="seam" class="stats">
             <span class="stat">
               <span class="label">Slots</span>
               <span class="readout">{{ tile.slotsUsed }}/2</span>
@@ -266,9 +309,7 @@ watch(tile, () => {
             </span>
           </span>
 
-          <span v-else class="reason tiny">
-            {{ depleted ? `Regrows in ${formatDuration(tile.regrowsAt - game.now)}` : preview?.reason }}
-          </span>
+          <span v-else class="reason tiny">{{ preview?.reason }}</span>
 
           <span v-if="trip || tables.length" class="chevron" :class="{ open }" aria-hidden="true">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
@@ -296,65 +337,86 @@ watch(tile, () => {
             {{ mat.name }} · trains {{ SKILL_BY_KEY[trip.skill ?? skillForMaterial(mat.key)].name }}
           </p>
 
-          <!-- §4 -- what this ground can give up, most likely first and with no
-               odds attached. Naming the odds would turn a hex into a spreadsheet;
-               naming the kinds is what lets you decide whether to spend an hour
-               here, which is the only decision the card exists to support.
-               
-               One list per verb, because the three verbs pay out of three
-               tables: a dig takes the seam, bare hands take what is lying
-               about, and a hunt takes the animal. Folding them together would
-               say the seam drops essence. A list is here only when its verb is
-               -- the hunting table arrives empty without a herd or without a
-               bow, so its presence IS the answer to "can I hunt here". -->
-          <div
-            v-for="t in tables"
-            :key="t.key"
-            class="inset drops"
-            :class="t.key"
-          >
-            <span class="label muted">{{ t.label }}</span>
+          <!-- §4 / §7.3 -- one price line per verb, because this hex answers to
+               up to three of them and each has its own clock now: a dig takes
+               the seam at the pick's rate, bare hands take what is lying about
+               at no rate at all, and a hunt takes the animal at the bow's.
+               Folding them together would say the seam drops essence and that
+               all three cost the same hour.
+
+               The kinds stay on the face of it -- what a hex can give up is a
+               fact about the place and the card owes it at a glance. What is
+               behind the tap is only how the clock got to its number. -->
+          <div v-for="t in tables" :key="t.key" class="inset verb" :class="t.key">
+            <button
+              class="price"
+              type="button"
+              :aria-expanded="openVerb === t.key"
+              :aria-controls="`verb-${t.key}`"
+              @click="toggleVerb(t.key)"
+            >
+              <span class="label muted">{{ t.label }}</span>
+              <span class="leader" aria-hidden="true" />
+              <!-- §8.0 rule 1 -- nothing in your hands and nothing learned is
+                   not a very long trip, it is no trip. A clock here would be a
+                   number that cannot be reached. -->
+              <span v-if="t.cost.able" class="readout clock">
+                {{ formatSpan(wallTime(t.cost.seconds)) }}
+              </span>
+              <span v-else class="readout clock unable">Can't</span>
+              <span class="chevron small" :class="{ open: openVerb === t.key }" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="m6 15 6-6 6 6" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </span>
+            </button>
+
             <div class="pips">
               <span v-for="d in t.rows" :key="d.key" class="pip" :title="d.name">
                 <SvgIcon :svg="materialIcon(d, 18)" />{{ d.name }}
               </span>
             </div>
-          </div>
 
-          <div v-if="trip" class="inset breakdown tiny">
-            <div class="row-between">
-              <span class="muted">Ground to work through</span>
-              <span class="readout">{{ trip.durability }}</span>
+            <!-- §7.3 -- the rate, and nothing about hit points. What a player
+                 can act on is that the number goes up when the tool does.
+                 
+                 Two terms, never three: the first line is the tool OR the
+                 hands, because §4.0 gives gathering no tool and §8.0 rule 1
+                 gives the other two no bare-handed mode. A trip is worked with
+                 one or the other and never with both. -->
+            <div v-if="openVerb === t.key" :id="`verb-${t.key}`" class="rates tiny">
+              <div class="row-between">
+                <span class="muted">{{ t.key === 'gather' ? 'Bare hands' : 'Tool' }}</span>
+                <span class="readout">{{ t.cost.toolAttack }}</span>
+              </div>
+              <div class="row-between">
+                <span class="muted">Skill</span>
+                <span class="readout" :class="{ good: t.cost.skillAttack > 0 }">
+                  +{{ t.cost.skillAttack }}
+                </span>
+              </div>
+              <div class="row-between rate">
+                <span>Your rate</span>
+                <span class="readout" :class="t.cost.able ? 'good' : 'unable'">
+                  {{ t.cost.rate }}/s
+                </span>
+              </div>
+              <p v-if="!t.cost.able" class="note unable">
+                {{
+                  t.key === 'hunt'
+                    ? 'No bow. A herd is not something you take by hand.'
+                    : 'Nothing to work it with. Equip a tool for this line, or gather it by hand.'
+                }}
+              </p>
+              <p v-if="t.cost.clamped" class="note clamp">
+                Held at the {{ floorMinutes }}-minute guard. Nothing works this
+                ground faster.
+              </p>
+              <p v-if="compressed" class="note">
+                Game clock says {{ formatSpan(gameTime(t.cost.seconds)) }} —
+                the development clock is ×{{ game.timeScale }}.
+              </p>
             </div>
-            <div class="row-between">
-              <span class="muted">Tool</span>
-              <span class="readout" :class="{ good: trip.toolAttack > 0 }">
-                +{{ trip.toolAttack }}/s
-              </span>
-            </div>
-            <div class="row-between">
-              <span class="muted">Skill</span>
-              <span class="readout" :class="{ good: trip.skillAttack > 0 }">
-                +{{ trip.skillAttack }}/s
-              </span>
-            </div>
-            <div class="row-between">
-              <span class="muted">Your rate</span>
-              <span class="readout good">{{ trip.rate }}/s</span>
-            </div>
-            <hr class="divider" />
-            <div class="row-between">
-              <span>Mine time</span>
-              <span class="readout">{{ formatSpan(gameTime(trip.seconds)) }}</span>
-            </div>
-            <p v-if="trip.clamped" class="note clamp">
-              Clamped to the {{ floorMinutes }}-minute floor. A faster rate is
-              wasted on this hex.
-            </p>
-            <p v-if="compressed" class="note">
-              Development clock ×{{ game.timeScale }} — it finishes in
-              {{ formatSpan(wallTime(trip.seconds)) }}.
-            </p>
           </div>
         </div>
 
@@ -461,9 +523,6 @@ watch(tile, () => {
   margin: 0 0 8px;
 }
 
-.breakdown .row-between {
-  padding: 1px 0;
-}
 
 .good {
   color: #8fbf7f;
@@ -478,6 +537,13 @@ watch(tile, () => {
 
 .clamp {
   color: #e8a06a;
+}
+
+/* §13.3 -- ember is the color of a state to deal with, and a verb you cannot
+   perform is exactly that: something to go and fix, not a warning about danger
+   and not a disappointment. */
+.unable {
+  color: var(--ember);
 }
 
 .dungeon {
@@ -523,22 +589,88 @@ watch(tile, () => {
   }
 }
 
-/* §4 -- the drop list. Pips rather than rows: this is a set of possibilities,
-   not a table of values, and a column of numbers would imply odds that are
-   deliberately not given. */
-.drops {
+/* §4 / §7.3 -- a verb, priced.
+ *
+ * The card is a costing sheet and now reads like one: a name on the left, the
+ * clock on the right, and a hairline running between them so the three verbs
+ * scan as a column of prices rather than three unrelated blocks. That leader is
+ * the only decoration here and it is doing work -- it is what lets an eye drop
+ * straight down the times without reading a word. */
+.verb {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
-.drops .pips {
+.verb + .verb {
+  margin-top: 8px;
+}
+
+.price {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  /* A thumb target rather than a text baseline. The row is the full width of
+     the card, so the only dimension that needed arguing for is this one. */
+  min-height: 28px;
+  padding: 2px 0;
+  background: none;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.price:focus-visible {
+  outline: 1px solid var(--vellum-dim);
+  outline-offset: 3px;
+}
+
+.leader {
+  flex: 1 1 auto;
+  min-width: 12px;
+  height: 1px;
+  background: var(--line);
+}
+
+.clock {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  flex: 0 0 auto;
+}
+
+.chevron.small {
+  display: inline-flex;
+}
+
+/* §7.3 -- the arithmetic, under a rule so it reads as an aside to the price
+   above rather than as more of the reward list. */
+.rates {
+  border-top: 1px solid var(--line);
+  padding-top: 6px;
+}
+
+.rates .row-between {
+  padding: 1px 0;
+}
+
+.rates .rate {
+  margin-top: 3px;
+  padding-top: 4px;
+  border-top: 1px solid var(--line);
+}
+
+/* Pips rather than rows: this is a set of possibilities, not a table of values,
+   and a column of numbers would imply odds that are deliberately not given. */
+.pips {
   display: flex;
   flex-wrap: wrap;
   gap: 4px 10px;
 }
 
-.drops .pip {
+.pip {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -546,18 +678,21 @@ watch(tile, () => {
   color: var(--vellum-dim);
 }
 
-.drops + .drops {
-  margin-top: 8px;
-}
-
 /* Gold, the same reading the dock and the map already give a herd: an
    opportunity standing here rather than ground that will keep. */
-.drops.hunt .label {
+.verb.hunt .label {
   color: var(--gold);
 }
 
 /* §4.0 -- the floor under the ladder, and it says so by being the quiet one. */
-.drops.gather .label {
+.verb.gather .label {
   color: #7b8580;
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .chevron {
+    transition: none;
+  }
+}
+
 </style>

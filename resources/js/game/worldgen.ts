@@ -45,8 +45,11 @@ export interface WorldConfig {
   biomeCell: number
   biomeRegionCells: number
   rings: { center: number; inner: number; mid: number }
-  baseMinSeconds: number
-  baseMaxSeconds: number
+  hpMin: number
+  hpMax: number
+  /** §5.3 -- the tool rung each grade of ground is measured at. */
+  hpGradeAttack: Record<string, number>
+  commonAttack: number
   rareSpawnChance: number
   slotsPerTile: number
   herdLifetimeMs: number
@@ -727,6 +730,25 @@ export function variantOf(
   return variants[0]
 }
 
+/**
+ * §5.3 -- a hex's HP, scaled by the grade of ground it turned out to be.
+ *
+ * Mirrors WorldGen::tileHp(). The roll is the same 2,700-5,400 it always was;
+ * what the grade decides is the rung that roll is measured at, so an Ironwood
+ * Grove is four and two thirds times the work an ordinary forest is -- the
+ * ratio between an Ironwood Axe and a Stone one.
+ *
+ * Integer arithmetic, because a float multiplier would be two generators
+ * rounding a repeating decimal and hoping (scripts/parity.ts).
+ */
+export function tileHp(hash: number, grade: string): number {
+  const c = cfg()
+  const roll = randInt(hash, c.hpMin, c.hpMax)
+  const attack = c.hpGradeAttack[grade] ?? c.commonAttack
+
+  return Math.floor((roll * attack) / c.commonAttack)
+}
+
 /** Build a tile. `mutation` is the only server-owned state a tile can carry. */
 export function generateTile(
   col: number,
@@ -755,9 +777,11 @@ export function generateTile(
 
   let material: MaterialKey | undefined
   let variant: VariantKey = biome
+  let grade = 'common'
   if (ring !== 'center' && !settlement && !water) {
     const picked = variantOf(col, row, biome, ring)
     variant = picked.key
+    grade = picked.grade
     material = picked.material as MaterialKey
   }
 
@@ -768,7 +792,7 @@ export function generateTile(
     variant,
     ring,
     material,
-    baseSeconds: randInt(hTime, c.baseMinSeconds, c.baseMaxSeconds),
+    hp: tileHp(hTime, grade),
     baseYield: randInt(hYield, 3, 8),
     slotsUsed: mutation?.slotsUsed ?? 0,
     regrowsAt: mutation?.regrowsAt ?? 0,

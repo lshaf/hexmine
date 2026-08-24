@@ -47,16 +47,26 @@ export const MAP = {
 } as const
 
 export const MINING = {
-  /** base_tile_time range, §7.3. */
-  baseMinSeconds: 30 * 60,
-  baseMaxSeconds: 60 * 60,
-  /** clamp() floor and ceiling. The floor is mandatory from day one, §7.3. */
-  floorSeconds: 15 * 60,
+  /** §7.3 -- a hex's HP, which is the only thing the world rolls for it.
+   *  2,700 is fifteen minutes for the common rung with nothing learned yet. */
+  hpMin: 2700,
+  hpMax: 5400,
+  /** §5.3 -- the tool rung each grade of ground is measured at. Base ground is
+   *  the common rung and comes through untouched; every grade above it costs
+   *  what its own rung is worth, so better ground asks for a better tool. */
+  hpGradeAttack: { common: 3, uncommon: 6, rare: 10, epic: 14 },
+  /** clamp() bounds. The floor is a guard, not a lever -- §7.3. */
+  floorSeconds: 60,
   ceilingSeconds: 60 * 60,
-  /** §7.3 -- what bare hands take out of a hex per second. */
-  baseAttack: 10,
-  /** §7.3 -- what a maxed line skill adds to that rate. */
-  skillAttack: 10,
+  /** §4.0 -- what bare hands manage per second. GATHERING's rate and no other
+   *  verb's: a seam wants a pick and a herd wants a bow, and neither has a
+   *  bare-handed mode to fall back on. */
+  bareHandAttack: 2,
+  /** §7.3 -- levels of the line that buy one more point a second. Floored, so
+   *  a character who has learned nothing adds nothing. */
+  skillLevelsPerAttack: 10,
+  /** §8.3 -- the common rung, which every hex's HP is measured against. */
+  commonAttack: 3,
   /** Exactly two mining slots per hex, §5.1. */
   slotsPerTile: 2,
   /** Depleted tiles regrow after ~9h, §5.1. */
@@ -68,7 +78,8 @@ export const MINING = {
 export const HUNTING = {
   /** Herd markers decay after ~4h, §5.5. */
   markerLifetimeMs: 4 * HOUR,
-  baseSeconds: 25 * 60,
+  /** §7.3 -- a herd's HP. 4,500 is 25 minutes with a crude bow. */
+  herdHp: 4500,
   peltYield: [2, 5] as const,
 } as const
 

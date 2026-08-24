@@ -133,8 +133,15 @@ final class PackPinTest extends TestCase
         };
         $later->skip = $pack['until'] - $this->game->now() + 1000;
 
-        $this->assertNull(
-            $later->packHere($this->character->fresh()),
+        // Gone means THIS pack is gone. The next bucket is free to roll another
+        // one onto the same hex -- that is a fresh pack with a fresh clock, not
+        // the old one refusing to leave, and asserting null here made the test
+        // pass or fail on what the wall clock happened to say.
+        $after = $later->packHere($this->character->fresh());
+
+        $this->assertNotSame(
+            $pack['bucket'],
+            $after['bucket'] ?? null,
             'the pack outstayed its bucket',
         );
     }

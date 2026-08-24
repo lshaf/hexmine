@@ -121,61 +121,77 @@ export function repairCost(def: ItemDef, missingDurability: number): Record<stri
 // -------------------------------------------------------------------- mining
 
 export interface TripBreakdown {
-  base: number
-  /** §7.3 -- how much work the hex is. Base seconds at the bare-handed rate. */
-  durability: number
+  /** §7.3 -- how much work the hex is. The world rolls this and nothing else. */
+  hp: number
   toolAttack: number
   skillAttack: number
   /** Work taken out of the hex per second, all in. */
   rate: number
-  /** After clamp. This is the number that actually runs. */
+  /** After clamp. This is the number that actually runs, or 0 if you cannot. */
   total: number
-  /** True when the clamp bound the result -- surfaced in the UI so the player
-   *  can see that more gear would be wasted here. */
+  /** True when the guard bound the result. It should never be, on real gear. */
   clamped: boolean
+  /** §8.0 rule 1 -- false when nothing in your hands and nothing learned. */
+  able: boolean
 }
 
 /**
  * §7.3 -- a hex is an amount of WORK, and a trip is how long you take over it.
  *
- *   durability = base_seconds * baseAttack
- *   rate       = (base + tool + skill) * (1 + trip_reduction)
- *   trip_time  = clamp(durability / rate, 15min, 60min)
+ *   rate      = (attack + skill_attack) * (1 + trip_reduction)
+ *   trip_time = clamp(hp / rate, guard, ceiling)
  *
- * The floor clamp is mandatory and is in the formula from day one: without it
- * any future buff or equipment tier creates a sub-floor or zero-time exploit.
- * Do not remove it, and do not apply bonuses after it.
+ * `attack` is the WHOLE base rate rather than a bonus on top of one: a pick is
+ * what mines and a bow is what hunts, and neither verb has a bare-handed mode
+ * to add to. Gathering passes MINING.bareHandAttack, because for that one verb
+ * your hands are the tool.
+ *
+ * At zero attack there is no trip at all -- `able` is false and the caller says
+ * so, rather than printing a clock nobody can reach.
  */
 export function tripTime(
-  baseSeconds: number,
+  hp: number,
   skillLevel: number,
   equipTripReduction: number,
   toolAttack = 0,
 ): TripBreakdown {
-  const durability = tileDurability(baseSeconds)
+  const skill = skillAttack(skillLevel)
+  const attack = Math.max(0, toolAttack) + skill
 
-  const skillProgress = Math.min(1, skillLevel / SKILLS.maxLevel)
-  const skillAttack = MINING.skillAttack * skillProgress
+  const rate = attack * (1 + Math.max(0, equipTripReduction))
 
-  const rate = (MINING.baseAttack + toolAttack + skillAttack) * (1 + Math.max(0, equipTripReduction))
-
-  const raw = Math.round(durability / Math.max(1, rate))
-  const total = Math.min(MINING.ceilingSeconds, Math.max(MINING.floorSeconds, raw))
+  const raw = attack > 0 ? Math.round(hp / rate) : 0
+  const total = attack > 0 ? Math.min(MINING.ceilingSeconds, Math.max(MINING.floorSeconds, raw)) : 0
 
   return {
-    base: baseSeconds,
-    durability,
+    hp,
     toolAttack,
-    skillAttack: Math.round(skillAttack),
+    skillAttack: skill,
     rate: Math.round(rate * 100) / 100,
     total,
-    clamped: total !== raw,
+    clamped: attack > 0 && total !== raw,
+    able: attack > 0,
   }
 }
 
-/** §7.3 -- how much work a hex is, which is what a trip actually spends. */
-export function tileDurability(baseSeconds: number): number {
-  return baseSeconds * MINING.baseAttack
+/**
+ * §7.3 -- what the line skill is worth per second. The one term every verb
+ * shares. Floored, because ceil handed the first level of a line a free point.
+ */
+export function skillAttack(skillLevel: number): number {
+  const level = Math.max(0, Math.min(skillLevel, SKILLS.maxLevel))
+
+  return Math.floor(level / MINING.skillLevelsPerAttack)
+}
+
+/**
+ * §4.0 -- what a pair of hands manages per second, all in.
+ *
+ * GATHERING's rate and nothing else's. Mining and hunting are refused without
+ * their tool rather than downgraded, so no trip mixes hands and a tool.
+ */
+export function gatherAttack(skillLevel: number): number {
+  return MINING.bareHandAttack + skillAttack(skillLevel)
 }
 
 /**
@@ -208,9 +224,10 @@ export function processingTime(
   tier: SettlementTier,
   presence: boolean,
   equipProcessingBonus: number,
+  presenceBonus?: number,
 ): number {
   const tierSpeed = PROCESSING.speed[tier]
-  const presenceSpeed = presence ? 1 - PROCESSING.presenceSpeedBonus : 1
+  const presenceSpeed = presence ? 1 - (presenceBonus ?? PROCESSING.presenceSpeedBonus) : 1
   return Math.max(30, Math.round(baseSeconds * tierSpeed * presenceSpeed * (1 - equipProcessingBonus)))
 }
 

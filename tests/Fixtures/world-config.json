@@ -9,13 +9,20 @@
         "inner": 0.34,
         "mid": 0.64
     },
-    "baseMinSeconds": 1800,
-    "baseMaxSeconds": 3600,
+    "hpMin": 2700,
+    "hpMax": 5400,
+    "hpGradeAttack": {
+        "common": 3,
+        "uncommon": 6,
+        "rare": 10,
+        "epic": 14
+    },
+    "commonAttack": 3,
     "rareSpawnChance": 0.18,
     "slotsPerTile": 2,
-    "herdLifetimeMs": 1440000,
+    "herdLifetimeMs": 240000,
     "herdChance": 0.06,
-    "packLifetimeMs": 720000,
+    "packLifetimeMs": 120000,
     "packChance": {
         "outer": 0.02,
         "mid": 0.1,

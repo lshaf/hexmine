@@ -196,6 +196,9 @@ cross-map travel — same design pressure as biome-locked mining.
 - **Exactly 2 mining slots per hex.** When both are full, the tile is closed to others.
 - Tiles are **depletable**, then **regrow after ~9h** (tune). Depleted tiles keep their
   biome color (drained, not dead) and show remnant/sapling props.
+- **A gathering tree can leave more of the seam standing** (`depletion`, §7.4.3),
+  never all of it: the cap is a share of the world's own chance, so a worked hex
+  still closes and the map still turns over.
 
 ### 5.2 Ring layout (concentric, drives generation)
 | Ring | Contents |
@@ -219,6 +222,43 @@ never an errand.
 Clustered regions (Voronoi-style from seed points), **not** random noise — players need a
 mentally navigable map. Rare-material biome variants sit inside/near the PvP ring.
 
+**Four grades a biome, and the grade is a rung of the equipment ladder.** Base,
+Better, Best, Contested — each named for a tool rung, each giving up a better
+material than the one under it.
+
+**Better ground is more work, and the rung it is named for is how much more.**
+A hex's HP roll (§7.3) is scaled by its grade, and the scale is the *attack of
+the tool that grade is named for* over the common rung's:
+
+| Grade | Rung | Attack | HP is |
+|---|---|---|---|
+| Base | village | 3 | the roll, untouched |
+| Better | city | 6 | **×2** |
+| Best | crafted rare | 10 | **×3⅓** |
+| Contested | epic | 14 | **×4⅔** |
+
+So **every grade of ground takes its own rung exactly as long as base ground
+takes the common one** — fifteen minutes to thirty, all the way up. There is a
+test pinning that sentence, and another pinning the other half of it: at a
+*fixed* rung, better ground is strictly more work.
+
+It used to be a flat roll, which made the grade decoration: an Ironwood Grove
+was the same afternoon's work as the plain forest beside it, and the only thing
+gating the best material on the map was where it spawned. The rung is the price
+now.
+
+**Gold per hour comes out flat across the four, and that is the intended
+shape.** The price ladder (2–3g · 4–5g · 7–9g) and the HP ladder are the same
+ladder, so better ground never pays better *in coin* — it pays in **access**,
+because it is the only source of the refined stock the upper recipes want
+(§9.5.4's `medium` and `high` grades). The contested grade pays no gold at all:
+a Tier 3 is capped per wallet and the trader will not touch it.
+
+**A hex is never refused for want of the matching rung.** An epic hex worked
+with a stone axe simply runs into the 60-minute ceiling, the same as any other
+hex the arithmetic outruns. §5.6 has exactly two refusals and this is not one of
+them.
+
 ### 5.4 Player spawning
 - **Auto-assigned**, not player-chosen (prevents spot-sniping and landgrabbing)
 - Placement favors **under-populated regions** by local density (hexes per active wallet
@@ -230,7 +270,10 @@ meaning neither water nor a settlement nor a dungeon mouth, for the reason §9.5
 keeps packs off a capital: a settlement is worked ground (§6), and a deer in the
 market square is the same category error as a monster camped on the only
 five-line bench in the region. They decay after ~4h. Yields Pelt, the plains animal parts (horn, sinew), the biome's critter and a little of
-whatever grows there. No party, no raid charge, just time.
+whatever grows there. No party, no raid charge, just time — and the bow decides
+how much of it, because a herd is a pile of work read exactly as a hex is
+(§7.3). A crude bow is the 25-minute reference trip; a Beastfang Bow is five,
+and there is no bare-handed hunt to fall back on.
 
 **No Tier 4, and that is a §2 rule rather than a tuning value.** Essence used to be
 on this table, as "the only activity bridging the mining and raid material tracks".
@@ -368,10 +411,17 @@ timer you feed.
 What their nodes may touch is bounded by §7.4.3 and by nothing new: the run's
 clock (`processingSpeed`, line-locked), what it eats (`costReduction`), what
 comes off it (`batch`, extra output **per run** rather than per batch, so the
-number the player picks never multiplies the effect), and what the line can make
-at all (`unlock`). The two effects a craft bench owns — a rolled option and a
-starting durability — belong to an *object*, and a run makes a material, which
-has neither.
+number the player picks never multiplies the effect), what standing there is
+worth (`presence`, §6.2), and how many runs a line can keep going at once
+(`runSlot`). The two effects a craft bench owns — a rolled option and a starting
+durability — belong to an *object*, and a run makes a material, which has
+neither.
+
+**`runSlot` is the capability a processing tree ends on**, and it is deliberately
+the last thing bought: one run at a time is the rule, and a reeve who keeps a
+second pit going has earned it on that line and on no other. §6.1's five public
+slots are untouched — the settlement is as congested as it ever was, and what
+changed is how much of the congestion one prospector may be.
 
 ---
 
@@ -411,42 +461,105 @@ Each line also has its **own tool slot** (§8.0) — axe, pickaxe, bow, hammer, 
 Tools are not the specialisation lever: all five can be equipped at once and every line
 offers the same ladder. The skill point cap is the lever, and it is the only one.
 
-### 7.3 Mining time — a hex has durability, and a trip works through it
+### 7.3 Working a hex — there is no timer, there is HP and a rate
+
+**Mining, gathering and hunting have no cooldown.** They never really did — what
+they had was a rolled duration with a discount stapled to it — and now they have
+nothing of the kind. A hex is a **pile of work with a number on it**; a tool has
+an **attack**; the clock is what falls out of dividing one by the other.
 
 ```
-tile_durability = base_tile_time * MINING_BASE_ATTACK
-rate            = (MINING_BASE_ATTACK + tool_attack + skill_attack) * (1 + tripReduction)
-trip_time       = clamp(tile_durability / rate, 15min, 60min)
+rate      = (attack + skill_attack) * (1 + tripReduction)
+trip_time = clamp(hp / rate, 1min, 60min)
 ```
 
-- `base_tile_time`: 30–60 min depending on tile, exactly as before
-- `MINING_BASE_ATTACK`: **10** — what bare hands take out of a hex per second
-- `tool_attack`: the gathering tool's **base stat, and its only one**
-- `skill_attack`: up to **10** more at maxed line skill
+- `hp`: **2,700–5,400**, rolled per tile, then **scaled by the tile's grade**
+  (§5.3) — base ground untouched, up to ×4⅔ on contested. A herd is 4,500 (§5.5)
+- `attack`: **the whole base rate**, and it is the tool's — or, for gathering
+  alone, `BARE_HAND_ATTACK` (**2**)
+- `skill_attack`: `floor(level / 10)` — five more points at maxed line skill
 
-**A tile's durability is its base seconds at the bare-handed rate**, so an
-ungeared unskilled trip takes exactly what a trip always took. Nothing about the
-world generator changed; what changed is what gear does to it.
+**HP is what the world rolls, and it is the only thing it rolls.** There used to
+be a range of *seconds* that a reference rate converted into work, which meant a
+tile carried its answer rather than its question: the same fact stored once as a
+duration and once as a pile, with a constant between them waiting to drift. How
+long a hex takes is `hp / rate`, and that is nobody's business but the
+character's.
 
-*(It used to subtract flat minutes — twenty for skill, ten for best-in-slot.
-That made a good tool worth exactly as much on a poor hex as on a rich one,
-which is backwards: the ladder should pay most where the ground is hardest. A
-rate does that for free, and it is what lets a tool have an **attack** at all
-rather than a second schedule invented for mining.)*
+The range is **calibrated once and then left alone**: 2,700 is fifteen minutes
+for somebody holding the common rung (attack 3) with nothing learned yet, and
+5,400 is thirty. That is the *base* grade of ground; §5.3 scales the roll by the
+rung a better grade is named for, so those same fifteen-to-thirty minutes are
+what every grade costs the rung it belongs to. That is the whole of what the numbers mean and the only reason
+they are these numbers — there is a test pinning it. Seconds appear nowhere in
+the model.
 
-The measured ladder on the hardest hex in the game, unskilled:
+**The tool is the rate, not a bonus on top of one.** Mining and hunting never
+read the bare-handed number: §8.0 rule 1 refuses the verb outright without its
+tool and points at the gather button instead, so a trip is worked with the tool
+or with the hands and **never with both**. That is what makes a pickaxe's attack
+mean something plain — six times a Stone Axe is six times the rate, not 1.6
+times it once a shared base is added underneath.
 
-| Rung | Attack | 60-min hex |
-|---|---|---|
-| Bare hands | 0 | 60m |
-| Village | 3 | 46m |
-| Crafted starter | 4 | 43m |
-| City | 6 | 38m |
-| Crafted uncommon | 8 | 33m |
-| Rare | 10 | 30m |
-| Epic (NFT) | 14 | 25m |
-| Legendary | 17 | 22m |
-| Unique | 19 | 21m |
+**Zero attack is a refusal, not a very long trip.** Nothing in your hands and
+nothing learned means the ground does not move, so the arithmetic has no answer
+to give: the trip reports `able: false`, and the card says so where the clock
+would have been. A number nobody can reach is worse than an honest no.
+
+**A line you have not learned adds nothing.** `floor`, not `ceil` — the skill
+term used to hand the very first level of a line a free point, so a panel
+describing what your skill was worth to this trip printed **+1** at a character
+who had never swung an axe.
+
+**Bare hands must stay under the cheapest tool, and that is a rule rather than a
+tuning value.** They were **4** while the number was the floor every verb stood
+on — shared by hands and tools alike, so sitting above the common rung meant
+nothing. The moment it became gathering's *whole* rate it started competing with
+the ladder directly, and at four it won: bare hands worked a hex in twelve
+minutes against a Stone Axe's fifteen, which turns §12 step 5 — buy the axe,
+work the same hex, see the payoff — into a hex that got **slower**. There is a
+test asserting every tool in the game beats bare hands at every level.
+
+*(The trip used to subtract flat minutes — twenty for skill, ten for
+best-in-slot. That made a good tool worth exactly as much on a poor hex as on a
+rich one, which is backwards: the ladder should pay most where the ground is
+hardest.)*
+
+The measured ladder, unskilled:
+
+| Rung | Attack | 2,700 HP | 5,400 HP |
+|---|---|---|---|
+| Bare hands *(gather only)* | 2 | 22.5m | 45m |
+| Village | 3 | **15m** | **30m** |
+| Crafted starter | 4 | 11m | 22.5m |
+| City | 6 | 7.5m | 15m |
+| Crafted uncommon | 8 | 5.6m | 11m |
+| Rare | 10 | 4.5m | 9m |
+| Epic (NFT) | 14 | 3.2m | 6.4m |
+| Legendary | 17 | 2.6m | 5.3m |
+| Unique | 19 | 2.4m | 4.7m |
+
+Best tool, maxed skill and best-in-slot gear on the hardest hex: **3.3 minutes**.
+
+**Gathering is this same arithmetic with your hands in the tool's place** (§4.0).
+Not a separate verb with a separate schedule — the identical hex and the
+identical HP, worked at the one rate that needs no purchase, which is exactly
+why it is the floor under the ladder rather than a punishment. What it costs you
+is **worth**, not time: scrap sells for a gold and the seam does not.
+
+**A herd is a pile of work too** (§5.5). Hunting used to be a flat 25 minutes
+sitting deliberately *outside* this formula, because the old floor clamp would
+have rounded the difference away. It goes through the same arithmetic now, so a
+crude bow is the 25-minute reference and a Beastfang Bow does it in five.
+Hunting was the one line whose tool bought nothing but permission.
+
+**The floor is a guard rather than a lever, and it sits at 1 minute.** It was
+fifteen and it *bound*, which made the top half of the ladder wasted ground —
+paid for and never felt, with §8 rule 4 promising every line the same ladder.
+Fifteen minutes is where the common rung lands, not where the game stops. One
+minute rather than three because the tool being the whole rate makes the ladder
+six times steep rather than three; on real gear it never binds, and if it ever
+does that is a tuning bug rather than a design working.
 
 **A gathering tool has no percentage at all.** Its base *is* the attack. It used
 to lead with "+2% woodcutting yield" and have its attack derived from that, and
@@ -456,12 +569,6 @@ first.
 
 Yield is still reachable on a tool — through a rolled option (§8.0.1), which is
 where a *bonus* belongs. What a tool is *for* is speed.
-
-**The floor is 15 minutes and the clamp is mandatory**, from day one and for the
-same reason it always was: without it any future buff or tier creates a
-sub-floor or zero-time exploit. Best tool, maxed skill and best-in-slot gear on
-a 60-minute hex lands a shade over it — deliberately, so the top of the ladder is
-still worth climbing.
 
 **A tool's attack is mining attack and nothing else.** §8 rule 5 keeps the two
 ladders apart in both directions: a pickaxe is worth nothing in a fight, which
@@ -504,10 +611,11 @@ line can make at all. Five of them rather than one because §6 is already a
 five-line structure: a village runs one of the five, a city two, a capital all
 five.
 
-Only one stat applies to a run, which makes these the most capability-heavy
-trees in the game: eleven `unlock` nodes against twelve `stat` ones. That is the
-right shape for the work — a processing line grows by learning what it can make,
-not by shaving another percent off the clock.
+Only one stat applies to a run, so the rest of a processing tree is spent on the
+three things that are not the clock: what the run eats, what comes off it, and
+what being *there* is worth. The five differ in which of those they lean on — a
+Tanner is nearly half `presence`, because a pit is watched rather than set going;
+a Sawyer leans on the clock; a Smelter and a Weaver on fuel and stock.
 
 **A processing job's level comes from finished runs, paid on what came off the
 bench.** A bigger batch is more work and teaches more; a run walked away from
@@ -554,17 +662,30 @@ not woodcutting, so they could never pay out at all.)*
 
 **What each kind may move, after that:**
 
-| Kind | Stat |
-|---|---|
-| gathering | `yield`, `tripReduction` — the two things a trip has |
-| processing · craft | `processingSpeed` — the one thing a bench clock reads (§8.4) |
-| battle | `power`, `defense` |
-| wayfaring | nothing at all (§7.5) |
+| Kind | Stat | And the rest of the tree |
+|---|---|---|
+| gathering | `yield`, `tripReduction` — the two things a trip has | `toolWear`, `depletion` |
+| processing | `processingSpeed` — the one thing a bench clock reads (§8.4) | `costReduction`, `batch`, `presence`, `runSlot` |
+| craft | `processingSpeed` | `costReduction`, and what the bench makes: `craftDurability`, `craftOption`, `optionTier` — or, at the consumable bench, `batch`, `brewExtra`, `stackCap` |
+| battle | none — the pair is solid (§9.5.4) | `pair`, `battleWear`, `weaponWear`, `goldFind`, `lootOption` |
+| wayfaring | nothing at all (§7.5) | `sight`, `bagUnits`, `bagRows` |
 
-A craft tree's four biggest nodes are **unlocks** rather than speed, for two
-reasons: thirteen speed nodes came to 17% against a 15% ceiling, which left gear
-nothing to add, and a bench grows by learning what it can make rather than by
-shaving another percent off the clock.
+**A craft tree spends most of itself on what comes off the bench** rather than on
+the clock, for two reasons: thirteen speed nodes came to 17% against a 15%
+ceiling, which left gear nothing to add, and a bench is worth walking to for what
+it *makes*, not for the ten minutes it saves.
+
+**The consumable bench is the one that proves the rule.** A potion has no
+durability and no rolled line, so an Alchemist's tree cannot carry the two
+effects the other two benches are built on — it deals in how many flasks come off
+a rack and how deep the shelf is instead. A tree of effects that do nothing to
+the thing being made is the shape §7.4.3 exists to forbid.
+
+**No two trees of a kind are the same tree.** What a node does is chosen per job
+and what it is *worth* is read off its depth, so a capstone outweighs an opening
+node of the same kind — five gathering trees used to run one shared pattern and
+the three battle trees were twenty points of the pair followed by ten identical
+wear nodes. There is a test asserting no two trees share a shape.
 
 **The three battle jobs level on the road** (§9.5), and on nothing else. Which
 of them earns the XP is decided by the **weapon family** in the `weapon` slot —
@@ -573,7 +694,14 @@ They must never be given a stand-in XP source from gathering; a battle job that
 levels by digging would make combat optional.
 
 *(They were dormant until map combat existed, which is what §9.5 was written to
-fix. Dungeon floors will feed the same three jobs when they are designed.)*
+fix. Their trees stayed dormant a while longer — two thirds percentages nobody
+could feel, one third ability hooks waiting on parties. Both are gone. Dungeon
+floors will feed the same three jobs when they are designed.)*
+
+**Nothing in a tree may wait on a system that does not exist.** A node is bought
+with one of a hundred skill points; a node that pays out only once dungeons are
+designed is asking for that point on credit, and the panel has no honest way to
+say so. Effects for undesigned systems belong in §14 until the system is built.
 
 #### 7.4.1 Two numbers, and only one of them is power
 
@@ -616,15 +744,68 @@ a matter of judgment. A node's effect must be one of these, and nothing else:
 
 | Effect | What it does | Cap |
 |---|---|---|
-| `unlock` | Makes a recipe craftable at all | none — capability, not power |
 | `stat` | A `StatKey` percentage | **feeds the same aggregate and clamp as gear, options and buffs** |
+| `pair` | Whole points of `attack` or `defense` (§9.5.4) | `SKILL_PAIR_CAP` (12) |
+| `battleWear` | A share of what a fight takes off the worn kit, spared | `SKILL_BATTLE_WEAR_CAP` (15%) |
+| `weaponWear` | The same for the blade, which pays its own stream (§9.5.6) | `SKILL_WEAPON_WEAR_CAP` (15%) |
+| `goldFind` | More of what a pack pays (§9.5.8) | `SKILL_GOLD_FIND_CAP` (25%) |
+| `lootOption` | Chance of an extra rolled option on looted gear | `SKILL_LOOT_OPTION_CAP` (25%) |
+| `toolWear` | Share of trips that leave the line's tool untouched | `SKILL_TOOL_WEAR_CAP` (25%) |
+| `depletion` | Taken off the chance a trip works the hex out (§5.1) | `SKILL_DEPLETION_CAP` (12%) |
+| `presence` | Added to the §6.2 presence bonus, on that line's bench | `SKILL_PRESENCE_CAP` (20%) |
+| `runSlot` | Runs of that line you may keep going at once | `SKILL_RUN_SLOT_CAP` (+2) |
 | `craftOption` | Chance of an extra rolled option (§8.0.1) on what you make | `SKILL_OPTION_CHANCE_CAP` |
+| `optionTier` | Chance a rolled line is drawn a grade deeper, never past the rung | `SKILL_OPTION_TIER_CAP` (25%) |
 | `craftDurability` | Higher starting max durability on what you make | `SKILL_DURABILITY_CAP` |
+| `brewExtra` | Chance of an extra flask off a brew | `SKILL_BREW_EXTRA_CAP` (35%) |
+| `stackCap` | Deeper shelf for each potion carried (§8.5) | `SKILL_STACK_CAP` (+10) |
 | `costReduction` | Fewer inputs per craft | `SKILL_COST_REDUCTION_CAP` |
 | `batch` | More output per craft or processing run | `SKILL_BATCH_CAP` |
 | `sight` | Whole hexes of sight (§5.6), on top of the base one | `SKILL_SIGHT_CAP` |
 | `bagUnits` | Units the bag holds (§7.6), on top of the flat base | `SKILL_BAG_UNITS_CAP` (+80) |
 | `bagRows` | Distinct things the bag holds, on top of the flat base | `SKILL_BAG_ROWS_CAP` (+20) |
+
+**Every kind on that list has a call site, and that is the rule the list is
+for.** `unlock` used to be on it — "makes a recipe craftable at all", uncapped,
+where the trees were supposed to grow. It gated nothing: the server collected the
+targets into an array and no recipe, hex or bench ever asked. A third of every
+processing tree, a quarter of every gathering tree and four nodes of each craft
+tree were bought with the scarcest thing a character has and changed no outcome.
+
+That is not a missing feature, it is the thing §7.4 already forbids: **nothing in
+a tree may wait on a system that does not exist.** A node is a point spent, and
+the panel has no honest way to say *not yet*. So the kind is gone rather than
+dormant, and what replaced it is the work each job actually does — a seam that
+survives the trip, a tool that outlasts it, a second pit going, a deeper draw on
+what the bench rolls. When a system arrives that genuinely needs gating, it
+arrives with a gate that gates something.
+
+**`pair` is solid and has nothing to do with the ceiling**, because attack and
+defense are solid numbers (§9.5.4). It has its own cap instead, and the cap is
+the point: twelve against a legendary kit's ~41 attack means a third of a
+hundred skill points, behind job level 28, is worth roughly a rung of gear.
+Never more — gear is the ladder §8 is built on, and a tree is a different road
+rather than a longer one.
+
+*(A battle node used to move `power` or `defense` by a percent, and it was the
+least legible thing in the game: "+1% power" moved a common sword's 5 attack to
+5. Two thirds of every battle tree did that, and the other third was ability
+hooks waiting on parties and raids that are not designed (§14) — a node nobody
+can feel is a node nobody should be asked to spend a point on. Every battle node
+is felt now, the next time a pack stops you on a road.)*
+
+**The two wear kinds are two questions, not one.** §9.5.6 runs two streams —
+what hit you comes off the armor, what you hit comes off the blade — so a tree
+that spared both with one number would be answering both with one node.
+`battleWear` is the shieldbearer's, `weaponWear` the runecaster's, and both are
+capped low because that bill is the largest sink in the game (§11.1).
+
+**A battle tree also gets paid.** `goldFind` and `lootOption` are the only place
+§9.5.8's payout is touched by a skill, and they are deliberately contained: coin,
+which bridges to nothing external (§3.2), and an extra *option* on looted gear,
+which is the same mechanism a harder pack already uses. Neither can reach rarity,
+because §2 forbids a grind→NFT faucet and loot stops at rare whatever anybody has
+bought.
 
 **A skill point can never take a stat past +15%.** `stat` nodes feed the very same
 sum and clamp as equipment, rolled options and potions (§8.1 rule 1). What they
@@ -633,9 +814,10 @@ a player deep in a tree reaches the same cap as one in full epic gear, and §8.1
 rule 4 stays true.
 
 The caps that are not the stat ceiling exist to protect §11 and §5.6, not §8.
-`costReduction` and `batch` both thin a materials sink, and `craftDurability`
-thins the repair sink. Left uncapped, a maxed crafter would quietly switch off
-the loss the whole economy is balanced around.
+`costReduction`, `batch` and `brewExtra` thin a materials sink; `craftDurability`
+and both wear kinds thin the repair sink; `depletion` thins the regrowth clock and
+`stackCap` the bag pressure §7.6 runs on. Left uncapped, a maxed specialist would
+quietly switch off the loss the whole economy is balanced around.
 
 `bagUnits` and `bagRows` are the same argument in counts rather than
 percentages. The bag is the pressure that turns a haul into a decision (§7.6),
@@ -647,14 +829,15 @@ radius of the map query — cost grows as the *square* of it. One hex is seven
 tiles, two is nineteen, three is thirty-seven, and ten would be three hundred
 and thirty-one. `SKILL_SIGHT_CAP` is a query budget rather than a balance one,
 and it is what lets sight be a reward at all instead of a scanner handed to
-anyone patient enough to walk. It is also a **count, not a
-percentage**, so like `unlock` it has nothing to do with the stat ceiling. It
-is capability.
+anyone patient enough to walk. It is also a **count, not a percentage**, so like
+`runSlot`, `stackCap` and the bag pair it has nothing to do with the stat
+ceiling. It is capability.
 
-**`unlock` is the one with no cap, and that is deliberate** — it is where the
-trees grow. New materials, new biome variants and new equipment tiers arrive as
-new unlock nodes rather than as bigger numbers, so the trees can keep expanding
-without ever touching the ceiling.
+**Where the trees grow now is depth, not a kind.** A node's value is read off the
+tier it sits at, so a tier-5 node of a kind is worth two or three times a tier-1
+one. New materials and new equipment tiers arrive as new *recipes* at the benches
+that already reach them (§8.0) rather than as nodes promising them, which is what
+keeps a point spent on a tree worth something the day it is spent.
 
 #### 7.4.4 Pacing — six months, and it does not move
 
@@ -669,6 +852,13 @@ job_xp_for_level(L) = round(17 * L^1.5)       // ~32,000 XP, ~1,600 crafts to jo
 
 The `40` floor is there so the first level costs about three mining trips rather
 than half of one.
+
+**Open, and it is the one thing §7.3 knocked over.** That income was measured
+when a trip clamped at 30 minutes. A geared prospector now works a hex in five
+to ten, so the late-career trip rate is several times what the curve was sized
+against and six months is no longer what it buys. The curve has deliberately
+**not** been re-fitted: how fast a well-equipped character should level is a
+pacing decision, not a consequence of removing a timer.
 
 **XP is never passed through `Balance::scaled()`, and must never be.** Timers
 compress with `GAME_TIME_SCALE`; XP does not. A trip pays the same XP at speed 1
@@ -688,7 +878,7 @@ a waiting room.
 | Tree | **15 nodes, 3/3/3/3/3** | 30 nodes, 6/8/8/6/2 |
 | Cost | **Nothing — granted at its job level** | 1 skill point each |
 | Levels from | **Hexes crossed** | Bench work, or raiding |
-| Pays in | **Capability only — never a stat** | Stats, unlocks, craft effects |
+| Pays in | **Capability only — never a stat** | Stats, and the work of the job |
 | Gating | **One skill per level**, every 2nd level, 2 → 30 | A whole depth at once, at 1 / 5 / 12 / 20 / 28 |
 
 **The shape is the same five depths as everything else**, and that is
@@ -1230,6 +1420,9 @@ the three benches are their own building and queue against nobody.
   draft on top of a legendary philtre would be paid for and never felt, and an
   idle game must not take something away for nothing. The refusal reads as *you
   already have better*, and the flask stays in the bag.
+- **How many of one draft may be carried is the Alchemist's** (`stackCap`,
+  §7.4.3), on top of the flat stack. It widens the cellar and never the effect:
+  the clamp is on what an action's charges add up to, and that is untouched.
 - One charge per (stat, action) is still enforced by a unique index rather than
   by code, and that index is also the cap on hoarding: a cellar of seventy
   drafts is still four stats across eight actions once drunk. The ceiling on
@@ -1611,10 +1804,29 @@ Four numbers hold the shape, and each of them had to be what it is:
 - **You strike first.** A small edge, and the right one: engaging is a decision
   you made and being engaged is not.
 
-**A fight takes time, and you are held on that hex while it runs.** Three
-minutes plus two a tier, so five at the treeline and eleven in the center — well
-under the cheapest bench run (§8.4), because the pin (§9.5.3) is already holding
-you and a long clock on top would make one pack a lost afternoon.
+**The fight is settled the instant you close, and then you watch it.** The
+server runs the whole loop at engagement, stores it round by round, and hands
+the rounds over with the job; the screen draws both pools draining against each
+other at one round a beat, and the receipt (§9.5.8) replaces the plate when the
+last blow lands.
+
+*(It used to be a cooldown — three minutes plus two a tier, a clock ticking down
+to something already decided. The fight was the most interesting arithmetic in
+the game and the player saw none of it. A replay costs nothing a countdown did
+not already cost, and it is the one place the durability-as-health rule becomes
+visible: what drains on screen is what you will be paying to repair.)*
+
+**The clock is the exchange, not the monster.** A rout is over in two seconds
+and a grind against a wall takes ten — which is the whole reason to watch one —
+and the longest fight the game allows is under fifteen. It is the one clock that
+does **not** go through `scaled()`: `GAME_TIME_SCALE` compresses game hours so a
+tester need not wait them out, and an animation is not an hour.
+
+**The client is handed the outcome early, and that is fine.** A fight cannot be
+abandoned (§9.5.3) and nothing is left to decide, so reading ahead buys a few
+seconds of knowing and nothing else. The result rides the job rather than the
+animation, so closing the tab mid-exchange costs the replay and never the
+receipt — reopening catches the bars up to where the clock says the fight is.
 
 Three things follow, and all three are the same rule the rest of the game runs
 on:

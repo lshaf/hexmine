@@ -143,7 +143,7 @@ final class Formulas
      *
      * @return array<int,array{stat:string,value:float,scope?:string}>
      */
-    public static function rollOptions(array $def, int $seed, int $extra = 0): array
+    public static function rollOptions(array $def, int $seed, int $extra = 0, float $upgrade = 0.0): array
     {
         $ceiling = (Balance::OPTION_ROLLS[$def['rarity']] ?? 0) + $extra;
         if ($ceiling <= 0) {
@@ -178,11 +178,23 @@ final class Formulas
             $pick = $choices[Hash::randInt(Hash::hash2($seed, 910 + $i, Balance::mapSeed()), 0, count($choices) - 1)];
             $used[] = self::optionKey($pick);
 
-            $tier = $tiers[Hash::randInt(
+            $index = Hash::randInt(
                 Hash::hash2($seed, 930 + $i, Balance::mapSeed()),
                 0,
                 count($tiers) - 1,
-            )];
+            );
+
+            // §8.0.1 -- the bag a line is drawn from still stops at the item's
+            // own rarity. `$upgrade` is a bench's chance of reaching one band
+            // deeper into it, never past the top of it, so a maker's tree makes
+            // a good roll likelier and can never make a better item.
+            if ($upgrade > 0 && $index < count($tiers) - 1 && Hash::rand01(
+                Hash::hash2($seed, 950 + $i, Balance::mapSeed())
+            ) < $upgrade) {
+                $index++;
+            }
+
+            $tier = $tiers[$index];
 
             $flat = ($pick['kind'] ?? 'percent') === 'flat';
             $valueSeed = Hash::hash2($seed, 920 + $i, Balance::mapSeed());
@@ -308,6 +320,8 @@ final class Formulas
         int $jobLevel = 0,
         float $power = 0.0,
         float $defense = 0.0,
+        int $treeAttack = 0,
+        int $treeDefense = 0,
     ): array {
         $gearAttack = 0;
         $gearDefense = 0;
@@ -337,9 +351,13 @@ final class Formulas
 
         $might = intdiv($jobLevel, Balance::BATTLE_JOB_DIVISOR);
 
+        // §7.4 -- the tree's solid numbers join the gear before the percentage
+        // multiplies, because they are the same kind of thing: what you are
+        // carrying and what you know how to do with it. The job level is added
+        // after, as the flat proof of having fought.
         return [
-            'attack' => (int) round($gearAttack * (1 + $power)) + $might,
-            'defense' => (int) round($gearDefense * (1 + $defense)) + $might,
+            'attack' => (int) round(($gearAttack + $treeAttack) * (1 + $power)) + $might,
+            'defense' => (int) round(($gearDefense + $treeDefense) * (1 + $defense)) + $might,
         ];
     }
 
@@ -418,7 +436,11 @@ final class Formulas
      * pool left when it rings takes it, and a dead heat goes against the one
      * who picked the fight.
      *
-     * @return array{won:bool,rounds:int,damageTaken:int,damageDealt:int,left:int,foeLeft:int}
+     * The round-by-round `log` is what the screen draws (§9.5.5): the fight is
+     * over the instant you close, and the modal is a replay of something the
+     * server already settled rather than a negotiation with it.
+     *
+     * @return array{won:bool,rounds:int,damageTaken:int,damageDealt:int,left:int,foeLeft:int,log:list<array{hit:int,back:int,hp:int,foe:int}>}
      */
     public static function resolveBattle(
         int $attack,
@@ -432,6 +454,7 @@ final class Formulas
         $taken = 0;
         $dealt = 0;
         $round = 0;
+        $log = [];
 
         while ($hp > 0 && $foe > 0 && $round < Balance::BATTLE_MAX_ROUNDS) {
             $round++;
@@ -441,12 +464,15 @@ final class Formulas
             $dealt += $hit;
 
             if ($foe <= 0) {
+                $log[] = ['hit' => $hit, 'back' => 0, 'hp' => $hp, 'foe' => 0];
                 break;
             }
 
             $back = self::strike((int) $monster['attack'], $defense, $seed, $round, 1);
             $hp -= $back;
             $taken += $back;
+
+            $log[] = ['hit' => $hit, 'back' => $back, 'hp' => max(0, $hp), 'foe' => $foe];
         }
 
         // The bell is a loss. Anything else and a big enough pool grinds down
@@ -460,7 +486,20 @@ final class Formulas
             'damageDealt' => $dealt,
             'left' => max(0, $hp),
             'foeLeft' => max(0, $foe),
+            'log' => $log,
         ];
+    }
+
+    /**
+     * §9.5.5 -- how long the exchange takes on screen, in milliseconds.
+     *
+     * Derived from the fight rather than from the monster's tier: a rout is
+     * short and a grind against a wall is long, which is the whole reason to
+     * watch it. Real milliseconds, never `scaled()` -- see BATTLE_ROUND_MS.
+     */
+    public static function battleDurationMs(int $rounds): int
+    {
+        return max(1, $rounds) * Balance::BATTLE_ROUND_MS + Balance::BATTLE_TAIL_MS;
     }
 
     /** §9.5.5 -- one blow, floored at a chip and wandering by the swing. */
@@ -620,61 +659,83 @@ final class Formulas
     /**
      * §7.3 -- a hex is an amount of WORK, and a trip is how long you take over it.
      *
-     *   durability = base_seconds * MINING_BASE_ATTACK
-     *   rate       = (base + tool + skill) * (1 + trip_reduction)
-     *   trip_time  = clamp(durability / rate, 15m, 60m)
+     *   rate      = (attack + skill_attack) * (1 + trip_reduction)
+     *   trip_time = clamp(hp / rate, guard, ceiling)
      *
-     * The old formula subtracted flat minutes for skill and for gear, which
-     * made a good tool worth exactly as much on a rich hex as on a poor one. A
-     * rate does the thing the ladder is for: a better tool takes a bigger bite
-     * out of whatever is in front of it, so the hardest ground is where it pays
-     * most.
+     * `$hp` is the tile's own, rolled by the world and stored nowhere else.
      *
-     * The floor clamp is mandatory and has been in the formula from day one:
-     * without it any future buff or equipment tier creates a sub-floor or
-     * zero-time exploit. Do not remove it, and do not apply bonuses after it.
+     * `$attack` is the WHOLE base rate rather than a bonus on top of one. A
+     * pick is what mines and a bow is what hunts -- neither verb has a
+     * bare-handed mode to add to, because §8.0 rule 1 refuses it outright and
+     * points at the gather button instead. Gathering passes
+     * Balance::BARE_HAND_ATTACK here, because for that one verb your hands
+     * ARE the tool.
      *
-     * @return array{base:int,durability:int,toolAttack:int,skillAttack:int,rate:float,total:int,clamped:bool}
+     * At zero attack the answer is not a very long trip, it is NO trip: nothing
+     * in your hands and nothing learned means the ground does not move. `able`
+     * is false, `total` is zero, and the caller says so rather than printing a
+     * clock nobody can reach.
+     *
+     * The clamp survives as a GUARD rather than a lever -- see
+     * Balance::MINING_FLOOR_SECONDS. Do not apply bonuses after it.
+     *
+     * @return array{hp:int,toolAttack:int,skillAttack:int,rate:float,total:int,clamped:bool,able:bool}
      */
     public static function tripTime(
-        int $baseSeconds,
+        int $hp,
         int $skillLevel,
         float $equipTripReduction,
         int $toolAttack = 0,
     ): array {
-        $durability = self::tileDurability($baseSeconds);
+        $skillAttack = self::skillAttack($skillLevel);
+        $attack = max(0, $toolAttack) + $skillAttack;
 
-        $skillProgress = min(1.0, $skillLevel / Balance::SKILL_MAX_LEVEL);
-        $skillAttack = Balance::MINING_SKILL_ATTACK * $skillProgress;
+        $rate = $attack * (1 + max(0.0, $equipTripReduction));
 
-        $rate = (Balance::MINING_BASE_ATTACK + $toolAttack + $skillAttack)
-            * (1 + max(0.0, $equipTripReduction));
-
-        $raw = (int) round($durability / max(1.0, $rate));
-        $total = min(Balance::MINING_CEILING_SECONDS, max(Balance::MINING_FLOOR_SECONDS, $raw));
+        $raw = $attack > 0 ? (int) round($hp / $rate) : 0;
+        $total = $attack > 0
+            ? min(Balance::MINING_CEILING_SECONDS, max(Balance::MINING_FLOOR_SECONDS, $raw))
+            : 0;
 
         return [
-            'base' => $baseSeconds,
-            'durability' => $durability,
+            'hp' => $hp,
             'toolAttack' => $toolAttack,
-            'skillAttack' => (int) round($skillAttack),
+            'skillAttack' => $skillAttack,
             'rate' => round($rate, 2),
             'total' => $total,
-            'clamped' => $total !== $raw,
+            'clamped' => $attack > 0 && $total !== $raw,
+            'able' => $attack > 0,
         ];
     }
 
     /**
-     * §7.3 -- how much work a hex is, which is what a trip actually spends.
+     * §7.3 -- what the line skill is worth per second, on its own line.
      *
-     * Derived from the base seconds the world already rolls for the tile rather
-     * than stored beside them: they are the same fact said twice, and at
-     * MINING_BASE_ATTACK a bare-handed trip therefore takes exactly the seconds
-     * the tile was rolled for.
+     * `floor(level / 10)`: whole points, stepped rather than smooth, so the
+     * number on the panel is one a prospector can hold in their head and watch
+     * go up. It is the one term every verb shares.
+     *
+     * Floor rather than ceil, because ceil handed the first level of a line a
+     * free point -- a character who had never swung an axe read "+1" on a panel
+     * describing what their skill was worth.
      */
-    public static function tileDurability(int $baseSeconds): int
+    public static function skillAttack(int $skillLevel): int
     {
-        return $baseSeconds * Balance::MINING_BASE_ATTACK;
+        $level = max(0, min($skillLevel, Balance::SKILL_MAX_LEVEL));
+
+        return intdiv($level, Balance::MINING_SKILL_LEVELS_PER_ATTACK);
+    }
+
+    /**
+     * §4.0 -- what a pair of hands manages per second, all in.
+     *
+     * This is GATHERING's rate and nothing else's. Mining and hunting never
+     * reach it: they are refused without their tool rather than downgraded, so
+     * there is no trip anywhere in the game that mixes hands and a tool.
+     */
+    public static function gatherAttack(int $skillLevel): int
+    {
+        return Balance::BARE_HAND_ATTACK + self::skillAttack($skillLevel);
     }
 
     /**
@@ -713,9 +774,10 @@ final class Formulas
         string $tier,
         bool $presence,
         float $equipProcessingBonus,
+        ?float $presenceBonus = null,
     ): int {
         $tierSpeed = Balance::settlementSpeed($tier);
-        $presenceSpeed = $presence ? 1 - Balance::PRESENCE_SPEED_BONUS : 1;
+        $presenceSpeed = $presence ? 1 - ($presenceBonus ?? Balance::PRESENCE_SPEED_BONUS) : 1;
 
         return max(30, (int) round($baseSeconds * $tierSpeed * $presenceSpeed * (1 - $equipProcessingBonus)));
     }

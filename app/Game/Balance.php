@@ -103,28 +103,104 @@ final class Balance
 
     // ------------------------------------------------------------- mining §7.3
 
-    public const MINING_BASE_MIN_SECONDS = 30 * 60;
-    public const MINING_BASE_MAX_SECONDS = 60 * 60;
+    /**
+     * §7.3 -- a hex's HP. What the world rolls, and the only thing it rolls.
+     *
+     * This used to be a range of SECONDS that a reference rate converted into
+     * work, which meant a tile carried its answer rather than its question: the
+     * same fact stored once as a duration and once as a pile, with a constant
+     * in between them waiting to drift. HP is the fact. How long it takes you
+     * is `hp / rate`, and it is nobody's business but the character's.
+     *
+     * Calibrated once, here, and then left alone: 2,700 is fifteen minutes for
+     * somebody holding the common rung (attack 3) with nothing learned yet, and
+     * 5,400 is thirty. That is the whole of what the numbers mean and the only
+     * reason they are these numbers -- there is a test pinning it.
+     */
+    public const TILE_HP_MIN = 2700;
+    public const TILE_HP_MAX = 5400;
 
-    /** clamp() bounds. The floor is mandatory -- see Formulas::tripTime(). */
-    public const MINING_FLOOR_SECONDS = 15 * 60;
+    /**
+     * §5.3 -- what a grade of ground costs, as the rung it is named for.
+     *
+     * A variant is one rung of the equipment ladder (Variants::GRADES), and
+     * until now that was decoration: an Ironwood Grove was the same afternoon's
+     * work as the plain forest beside it, so the only thing gating the best
+     * material on the map was where it spawned.
+     *
+     * These are the attacks of the gathering tools each grade is named for, and
+     * a hex's HP is scaled by its own over the common rung's. So every grade of
+     * ground takes ITS rung exactly as long as base ground takes the common
+     * one -- fifteen minutes to thirty, all the way up.
+     *
+     * Gold per hour comes out flat across the four, because the price ladder
+     * (2-3g / 4-5g / 7-9g) and this one are the same ladder. That is the
+     * intended shape: better ground pays in ACCESS -- it is the only source of
+     * the refined stock the upper recipes want -- and never in coin. The walk
+     * inward is the price, and the epic grade pays no gold at all.
+     *
+     * Scaled with integer arithmetic rather than a float multiplier so the PHP
+     * and TypeScript generators cannot round apart (scripts/parity.ts).
+     */
+    public const TILE_HP_GRADE_ATTACK = [
+        'common' => 3,
+        'uncommon' => 6,
+        'rare' => 10,
+        'epic' => 14,
+    ];
+
+    /**
+     * clamp() bounds, and the floor is a GUARD rather than a lever.
+     *
+     * It used to be fifteen minutes and it used to bind, which made the top of
+     * the tool ladder wasted ground: past a certain rung every hex took exactly
+     * as long as it had before. Fifteen minutes is where the common rung lands
+     * now, not where the game stops.
+     *
+     * One minute rather than three, because the tool IS the rate: with no flat
+     * base underneath it a Mythril Pickaxe works six times faster than a Stone
+     * Axe rather than twice, and a three-minute guard bound at the top of the
+     * ladder on the easiest hexes.
+     */
+    public const MINING_FLOOR_SECONDS = 60;
     public const MINING_CEILING_SECONDS = 60 * 60;
 
     /**
-     * §7.3 -- a hex has DURABILITY, and a trip is how long it takes to work
-     * through it. This is the rate bare hands manage, per second.
+     * §4.0 -- what BARE HANDS take out of a hex per second, before the line
+     * skill. Gathering's whole rate, and gathering's alone.
      *
-     * It is what makes the tool ladder felt without a second schedule for it: a
-     * hex is a fixed amount of work, and every point of tool attack is another
-     * point a second taken out of it. `MINING_BASE_MIN/MAX_SECONDS` are still
-     * the range, because a tile's durability is exactly its base seconds at
-     * this rate -- ungeared and unskilled, a trip takes what it always took.
+     * Mining and hunting never read this. A seam is worked with a pick and a
+     * herd is taken with a bow -- neither has a bare-handed mode, because §8.0
+     * rule 1 refuses the verb outright without its tool and points at the
+     * gather button instead. What a tool does is *be* the rate, not add to one.
+     *
+     * TWO, and it must stay under MINING_COMMON_ATTACK. It was four while this
+     * number was the floor every verb stood on -- shared by hands and tool
+     * alike, so it could sit above the common rung without meaning anything.
+     * Now that it is gathering's whole rate it competes with the tool ladder
+     * directly, and at four it BEAT it: bare hands worked a hex in twelve
+     * minutes against a Stone Axe's fifteen, which made §12's step 5 -- buy the
+     * axe, work the same hex, see the payoff -- a hex that got slower.
      */
-    public const MINING_BASE_ATTACK = 10;
+    public const BARE_HAND_ATTACK = 2;
 
-    /** §7.3 -- what a maxed line skill adds to that rate, on its own line. */
-    public const MINING_SKILL_ATTACK = 10;
+    /**
+     * §7.3 -- how many levels of the line buy one more point a second.
+     *
+     * `floor(level / 10)`, so a character who has learned nothing adds nothing.
+     * It was `ceil`, which handed the very first level of a line a free point
+     * and printed "+1" on the panel of somebody who had never worked it.
+     */
+    public const MINING_SKILL_LEVELS_PER_ATTACK = 10;
 
+    /**
+     * §8.3 -- the common rung, and the yardstick TILE_HP_MIN and TILE_HP_MAX
+     * were set by. WorldGen::tileHp() divides by it: base ground is measured at
+     * this rung, so it is the denominator every other grade climbs above.
+     *
+     * It is above BARE_HAND_ATTACK, and that direction is a rule -- see there.
+     */
+    public const MINING_COMMON_ATTACK = 3;
 
     /** Exactly two mining slots per hex, §5.1. */
     public const SLOTS_PER_TILE = 2;
@@ -459,6 +535,24 @@ final class Balance
     public const BATTLE_SECONDS_PER_TIER = 2 * self::MINUTE;
 
     /**
+     * §9.5.5 -- how long one round of the exchange takes ON SCREEN.
+     *
+     * The fight is settled the instant you close (§9.5.5), so this is not a
+     * cooldown and it is not deciding anything: it is how fast the thing that
+     * already happened is drawn. A short fight is two seconds and the longest
+     * possible one is under fifteen.
+     *
+     * Deliberately NOT through `scaled()`, and it is the one clock in the game
+     * that is not. `GAME_TIME_SCALE` compresses the game's hours so a tester
+     * does not wait them out; this is not an hour, it is an animation, and a
+     * 60x clock would collapse it to nothing.
+     */
+    public const BATTLE_ROUND_MS = 220;
+
+    /** A beat at the end so the last blow is read rather than glimpsed. */
+    public const BATTLE_TAIL_MS = 450;
+
+    /**
      * §9.5.8 -- what a win teaches the battle job that fought it.
      *
      * Paid per monster tier, so the center's two are worth four times the
@@ -492,12 +586,13 @@ final class Balance
     /**
      * Mirrors HUNTING in resources/js/game/balance.ts.
      *
-     * Flat, and deliberately outside Formulas::tripTime(): §7.3's clamp floors a
-     * trip at 30 minutes, so routing a 25-minute hunt through it would round the
-     * hunt UP and quietly delete the difference. §7.3 is a rule about working a
-     * hex for its seam; a herd is not a seam.
+     * A herd's HP, read exactly as a tile's is (§7.3). 4,500 is twenty-five
+     * minutes for a fresh hunter with a crude bow, which is what a hunt has
+     * always cost; what is new is that the bow now shortens it. It used to be a
+     * flat duration sitting outside Formulas::tripTime() because the old floor
+     * clamp would have rounded the difference away.
      */
-    public const HUNT_BASE_SECONDS = 25 * 60;
+    public const HERD_HP = 4500;
 
     /** Pelt haul before skill, gear and ring are applied. */
     public const HUNT_PELT_MIN = 2;
@@ -601,12 +696,13 @@ final class Balance
      * same STAT_CEILING clamp as gear, options and potions, so a skill point can
      * never take a stat past +15%.
      *
-     * These four can, though, and each one thins a §11 sink rather than a power
-     * curve -- cheaper crafts and bigger batches drain the materials sink, and
-     * tougher gear drains the repair sink. Uncapped, a maxed crafter would
-     * quietly switch off the loss the whole economy is balanced around. The bag
-     * and sight caps below are the same argument in counts rather than
-     * percentages.
+     * These can, though, and each one thins a §11 sink rather than a power
+     * curve -- cheaper crafts and bigger batches drain the materials sink,
+     * tougher gear and a spared tool drain the repair sink, and a seam that
+     * survives its trip drains the depletion clock. Uncapped, a maxed
+     * specialist would quietly switch off the loss the whole economy is
+     * balanced around. The bag and sight caps below are the same argument in
+     * counts rather than percentages.
      */
     public const SKILL_OPTION_CHANCE_CAP = 0.35;
 
@@ -615,6 +711,26 @@ final class Balance
     public const SKILL_COST_REDUCTION_CAP = 0.15;
 
     public const SKILL_BATCH_CAP = 2;
+
+    public const SKILL_TOOL_WEAR_CAP = 0.25;
+
+    public const SKILL_DEPLETION_CAP = 0.12;
+
+    public const SKILL_PRESENCE_CAP = 0.20;
+
+    public const SKILL_RUN_SLOT_CAP = 2;
+
+    public const SKILL_OPTION_TIER_CAP = 0.25;
+
+    public const SKILL_BREW_EXTRA_CAP = 0.35;
+
+    public const SKILL_STACK_CAP = 10;
+
+    public const SKILL_WEAPON_WEAR_CAP = 0.15;
+
+    public const SKILL_GOLD_FIND_CAP = 0.25;
+
+    public const SKILL_LOOT_OPTION_CAP = 0.25;
 
     /**
      * §7.6 -- what the Explorer tree (§7.5) may add to each limit: 120 -> 200
@@ -632,6 +748,35 @@ final class Balance
     public const SKILL_BAG_UNITS_CAP = 80;
 
     public const SKILL_BAG_ROWS_CAP = 20;
+
+    /**
+     * §7.4.3 -- how much of the SOLID pair one battle tree may grant.
+     *
+     * Solid numbers, because that is what attack and defense are (§9.5.4). A
+     * battle node used to move `power` or `defense` by a percent, which was the
+     * least legible thing in the game: "+1% power" moved a common sword's 5
+     * attack to 5, and a whole tree of them was worth about three points at the
+     * top of the ladder and nothing at all at the bottom.
+     *
+     * Twelve against a legendary kit's ~41 attack: a third of a hundred skill
+     * points, behind job level 28, is worth roughly a rung of gear. It has no
+     * business being worth more, because gear is the ladder §8 is built on and
+     * the tree is meant to be a different road rather than a longer one.
+     */
+    public const SKILL_PAIR_CAP = 12;
+
+    /**
+     * §7.4.3 -- how much of a fight's bill a battle tree may spare the kit.
+     *
+     * §9.5.6 makes durability the whole combat system, so this is the one
+     * effect a battle tree can have that is felt every time and understood
+     * immediately: a fighter who knows the work takes less off their gear.
+     *
+     * Capped hard, and low, because that bill is the largest sink in the game
+     * (§11.1) -- an uncapped version would switch off the loss the economy is
+     * balanced around.
+     */
+    public const SKILL_BATTLE_WEAR_CAP = 0.15;
 
     /**
      * §7.5 -- how many hexes of sight the Explorer tree can add, on top of the
@@ -935,9 +1080,15 @@ final class Balance
      * §7.4.4 -- sized against measured income, not picked.
      *
      * A career averages ~1,080 character XP a day at game speed 1 (28 mining
-     * trips a day unequipped, 48 on the 30-minute floor, plus the processing
+     * trips a day unequipped, 48 on the old 30-minute floor, plus the processing
      * those hauls feed). ~197,000 XP total against that rate puts level 100 at
      * roughly 182 days of unbroken play, which is the six-month target.
+     *
+     * OPEN: that income was measured when §7.3 clamped a trip at 30 minutes.
+     * The clamp is a guard at 3 minutes now and a geared prospector works a hex
+     * in 5-10, so the late-career trip rate is several times what this was
+     * sized against. The curve has not been re-fitted -- doing so is a
+     * deliberate pacing decision, not a side effect of the mining change.
      *
      * The flat 40 is a floor so the first level costs about three mining trips
      * rather than half of one.
