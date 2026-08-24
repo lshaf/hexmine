@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Game\Balance;
+use App\Game\Catalog;
 use App\Game\GameException;
 use App\Game\GameService;
 use App\Game\WorldGen;
@@ -232,7 +233,7 @@ final class GuildTest extends TestCase
         $this->assertSame($guild->id, $this->game->guildOf($walker->fresh())?->id);
 
         // Closed: gone from the list, and refused to anybody who asks anyway.
-        $this->game->updateGuild($this->character->fresh(), ['recruitment' => \App\Models\Guild::CLOSED]);
+        $this->game->updateGuild($this->character->fresh(), ['recruitment' => Guild::CLOSED]);
         $this->assertSame([], $this->game->recruitingGuilds());
 
         $late = $this->game->createCharacter(
@@ -312,7 +313,7 @@ final class GuildTest extends TestCase
         $this->game->setMemberRole($this->character->fresh(), $officer->id, GuildMember::OFFICER);
 
         // May close the door.
-        $this->game->updateGuild($officer->fresh(), ['recruitment' => \App\Models\Guild::CLOSED]);
+        $this->game->updateGuild($officer->fresh(), ['recruitment' => Guild::CLOSED]);
         $this->assertSame(Guild::CLOSED, Guild::find($guild->id)->recruitment);
 
         // May not repaint the guild.
@@ -372,7 +373,7 @@ final class GuildTest extends TestCase
      */
     public function test_legendary_is_made_at_your_own_hall_and_nowhere_else(): void
     {
-        $legendary = collect(\App\Game\Catalog::items())
+        $legendary = collect(Catalog::items())
             ->filter(fn (array $d) => ($d['rarity'] ?? null) === 'legendary' && ! empty($d['inputs']))
             ->keys()
             ->first();
@@ -617,7 +618,7 @@ final class GuildTest extends TestCase
         $this->purse(Balance::GUILD_FOUNDING_COST);
         $guild = $this->game->foundGuild($this->character->fresh(), $this->identity());
 
-        $this->game->updateGuild($this->character->fresh(), ['recruitment' => \App\Models\Guild::APPROVAL]);
+        $this->game->updateGuild($this->character->fresh(), ['recruitment' => Guild::APPROVAL]);
 
         $hopeful = $this->game->createCharacter(
             Player::create(['wallet' => '0xhopeful', 'session_id' => 'hopeful']),
@@ -654,7 +655,7 @@ final class GuildTest extends TestCase
         $this->standAt('city');
         $this->purse(Balance::GUILD_FOUNDING_COST);
         $guild = $this->game->foundGuild($this->character->fresh(), $this->identity());
-        $this->game->updateGuild($this->character->fresh(), ['recruitment' => \App\Models\Guild::APPROVAL]);
+        $this->game->updateGuild($this->character->fresh(), ['recruitment' => Guild::APPROVAL]);
 
         $hopeful = $this->game->createCharacter(
             Player::create(['wallet' => '0xturned', 'session_id' => 'turned']),
@@ -681,7 +682,7 @@ final class GuildTest extends TestCase
         $this->standAt('city');
         $this->purse(Balance::GUILD_FOUNDING_COST);
         $vetting = $this->game->foundGuild($this->character->fresh(), $this->identity());
-        $this->game->updateGuild($this->character->fresh(), ['recruitment' => \App\Models\Guild::APPROVAL]);
+        $this->game->updateGuild($this->character->fresh(), ['recruitment' => Guild::APPROVAL]);
 
         $open = $this->game->createCharacter(
             Player::create(['wallet' => '0xopenowner', 'session_id' => 'openowner']),

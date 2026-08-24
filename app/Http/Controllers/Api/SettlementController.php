@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Game\Balance;
+use App\Game\Catalog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -34,7 +35,7 @@ class SettlementController extends GameController
             (int) ($validated['batches'] ?? 1),
         );
 
-        $name = \App\Game\Catalog::recipe($validated['recipe'])['name'] ?? 'Work';
+        $name = Catalog::recipe($validated['recipe'])['name'] ?? 'Work';
         $where = $this->game->settlement($settlement)['name'];
 
         return $this->respond($character, $this->game->jobPayload($job), "{$name} queued at {$where}.");

@@ -8,6 +8,7 @@ use App\Game\Balance;
 use App\Game\Drops;
 use App\Game\GameException;
 use App\Game\GameService;
+use App\Game\HexGeometry;
 use App\Game\Packs;
 use App\Game\WorldGen;
 use App\Models\Character;
@@ -307,7 +308,7 @@ final class PackPinTest extends TestCase
         // has a two-hour clock and the road is only caught up when somebody
         // looks, so "is it still there" is a different question with a
         // legitimately different answer (§9.5.3).
-        $steps = \App\Game\HexGeometry::distance(
+        $steps = HexGeometry::distance(
             $from['col'],
             $from['row'],
             (int) $character->col,
@@ -388,7 +389,7 @@ final class PackPinTest extends TestCase
                 (int) $character->col,
                 (int) $character->row,
                 $startedAt,
-                \App\Game\HexGeometry::distance($from['col'], $from['row'], (int) $character->col, (int) $character->row),
+                HexGeometry::distance($from['col'], $from['row'], (int) $character->col, (int) $character->row),
             ),
             'the road ended on a hex nothing was ever standing on',
         );

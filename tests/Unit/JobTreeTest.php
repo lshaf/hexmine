@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace Tests\Unit;
 
 use App\Game\Balance;
+use App\Game\Catalog;
+use App\Game\GameService;
 use App\Game\Jobs;
 use PHPUnit\Framework\TestCase;
+use ReflectionMethod;
 
 /**
  * The skill trees are 495 rows of static data, and the two things that can go
@@ -569,8 +572,8 @@ final class JobTreeTest extends TestCase
      */
     public function test_every_stat_node_is_locked_to_its_own_class(): void
     {
-        $service = app(\App\Game\GameService::class);
-        $bucket = new \ReflectionMethod($service, 'nodeBucket');
+        $service = app(GameService::class);
+        $bucket = new ReflectionMethod($service, 'nodeBucket');
 
         foreach (Jobs::NODES as $key => $node) {
             if ($node['effect']['kind'] !== 'stat') {
@@ -593,10 +596,10 @@ final class JobTreeTest extends TestCase
      */
     public function test_a_battle_tree_is_locked_to_its_weapon_family(): void
     {
-        $service = app(\App\Game\GameService::class);
-        $bucket = new \ReflectionMethod($service, 'nodeBucket');
+        $service = app(GameService::class);
+        $bucket = new ReflectionMethod($service, 'nodeBucket');
 
-        foreach (\App\Game\Catalog::BATTLE_JOB_FOR_FAMILY as $family => $job) {
+        foreach (Catalog::BATTLE_JOB_FOR_FAMILY as $family => $job) {
             $this->assertSame(
                 'battle:'.$family,
                 $bucket->invoke($service, $job),

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 /**
@@ -30,8 +31,8 @@ return new class extends Migration
         });
 
         // Founded before the setting existed: an open door stays open.
-        \Illuminate\Support\Facades\DB::table('guilds')
-            ->update(['recruitment' => \Illuminate\Support\Facades\DB::raw(
+        DB::table('guilds')
+            ->update(['recruitment' => DB::raw(
                 "CASE WHEN recruiting = 1 THEN 'open' ELSE 'closed' END",
             )]);
 
@@ -67,8 +68,8 @@ return new class extends Migration
             $table->boolean('recruiting')->default(true);
         });
 
-        \Illuminate\Support\Facades\DB::table('guilds')
-            ->update(['recruiting' => \Illuminate\Support\Facades\DB::raw(
+        DB::table('guilds')
+            ->update(['recruiting' => DB::raw(
                 "CASE WHEN recruitment = 'closed' THEN 0 ELSE 1 END",
             )]);
 

@@ -5,14 +5,25 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Game\Balance;
+use App\Game\BattleGear;
+use App\Game\Catalog;
+use App\Game\Drops;
+use App\Game\Formulas;
 use App\Game\GameException;
 use App\Game\GameService;
+use App\Game\HexGeometry;
+use App\Game\Spoils;
 use App\Game\WorldGen;
+use App\Http\Controllers\Api\MiningController;
 use App\Models\Carrier;
 use App\Models\Character;
 use App\Models\CharacterItem;
+use App\Models\GameJob;
 use App\Models\Player;
+use Generator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
+use ReflectionMethod;
 use Tests\TestCase;
 
 /**
@@ -46,9 +57,9 @@ final class BattleResolveTest extends TestCase
      * Searched rather than fabricated: a pack is a hash of the hex and the
      * clock (§9.5.1), so the only honest way onto one is to go and find one.
      *
-     * @return \Generator<int,array<string,mixed>>
+     * @return Generator<int,array<string,mixed>>
      */
-    private function packHexes(): \Generator
+    private function packHexes(): Generator
     {
         $now = $this->game->now();
         $radius = Balance::mapRadius();
@@ -139,7 +150,7 @@ final class BattleResolveTest extends TestCase
      *
      * @return array<string,mixed>
      */
-    private function killCarrier(\App\Models\Character $fighter, Carrier $carrier, int $tries = 12): array
+    private function killCarrier(Character $fighter, Carrier $carrier, int $tries = 12): array
     {
         for ($i = 0; $i < $tries; $i++) {
             // §9.5.7 -- a loss is a death, and a death wakes you at the nearest
@@ -175,7 +186,7 @@ final class BattleResolveTest extends TestCase
      *
      * @return array<string,mixed>
      */
-    private function resolveFight(\App\Models\Character $fighter): array
+    private function resolveFight(Character $fighter): array
     {
         $job = $this->game->startBattle($fighter->fresh());
         $job->update(['ends_at' => $this->game->now() - 1]);
@@ -194,7 +205,7 @@ final class BattleResolveTest extends TestCase
      *
      * @return array<string,mixed>|null
      */
-    private function tryFight(\App\Models\Character $fighter): ?array
+    private function tryFight(Character $fighter): ?array
     {
         try {
             return $this->resolveFight($fighter);
@@ -208,76 +219,94 @@ final class BattleResolveTest extends TestCase
     }
 
     /**
-     * §9.5.5 -- a fight is collected through the same endpoint as a haul, and
-     * the endpoint has to survive that.
+     * §9.5.5 -- one endpoint collects every kind of job, and it has to survive
+     * the one whose receipt carries no haul.
      *
-     * One route claims every kind of job, and a battle is the only one whose
-     * receipt carries no material ledger at all: `finishBattle` returns an
-     * exchange and its consequences, with no `gained` in it. The controller
-     * casts that key so an empty haul serialises as {} rather than [], and doing
-     * so unguarded made every won fight a 500.
+     * `finishBattle` returns an exchange and its consequences: no material
+     * ledger anywhere in it, so no `gained` key. The controller casts that key
+     * so an empty haul serialises as {} rather than [], and casting it
+     * unguarded turned every collected fight into a 500.
      *
-     * At the HTTP layer on purpose. Every other battle test calls the service
-     * directly, which is exactly why this went unnoticed -- the service was
-     * always right and the controller was always wrong.
+     * Driven through the controller rather than the route because nothing in
+     * this suite authenticates over HTTP yet, and the defect is in the
+     * controller method rather than in the middleware in front of it. The
+     * service was always right here -- which is exactly why calling it directly,
+     * as every other battle test does, never caught this.
      */
-    public function test_a_fight_can_be_collected_through_the_jobs_endpoint(): void
+    public function test_collecting_a_fight_survives_the_haul_cast(): void
     {
         $this->standOnALivePack();
 
         $job = $this->game->startBattle($this->character->fresh());
         $job->update(['ends_at' => $this->game->now() - 1]);
 
-        $response = $this->withSession(['_token' => 'test'])
-            ->postJson("/api/jobs/{$job->id}/collect");
+        $payload = $this->collectThroughController($job->id);
 
-        $response->assertOk();
-
-        // The receipt is a fight's, not a haul's: it says how the exchange went
-        // and never pretends to a material ledger it does not have.
-        $response->assertJsonPath('result.won', fn ($won) => is_bool($won));
-        $this->assertArrayNotHasKey('gained', $response->json('result'));
+        $this->assertArrayHasKey('won', $payload, 'a fight came back without its outcome');
+        $this->assertArrayNotHasKey('gained', $payload, 'a fight came back with a material ledger');
     }
 
     /**
-     * And the other side of the same endpoint: a haul still serialises as an
-     * object, so an empty one is {} rather than [].
+     * And the other half: the cast the guard is wrapped around still happens.
      *
-     * The guard added for the fight above must not quietly stop casting on the
-     * path that needed the cast in the first place.
+     * An empty haul has to reach the client as {} rather than [], because the
+     * client reads it as Record<MaterialKey, number>. A guard that skipped the
+     * cast on every path would fix the fight and quietly break the mine.
      */
-    public function test_a_haul_is_still_collected_as_an_object(): void
+    public function test_collecting_an_empty_haul_still_casts_to_an_object(): void
     {
         $col = (int) $this->character->col;
         $row = (int) $this->character->row;
+        $now = $this->game->now();
 
-        $job = \App\Models\GameJob::create([
+        $job = GameJob::create([
             'character_id' => $this->character->id,
             'kind' => 'mining',
             'status' => 'active',
             'col' => $col,
             'row' => $row,
             'slot' => 0,
-            'material_key' => \App\Game\Catalog::BIOME_SCRAP[
-                WorldGen::generateTile($col, $row, $this->game->now())['biome']
+            'material_key' => Catalog::BIOME_SCRAP[
+                WorldGen::generateTile($col, $row, $now)['biome']
             ],
-            'quantity' => 2,
+            'quantity' => 1,
             'skill_key' => 'woodcutting',
-            'started_at' => $this->game->now() - 10,
-            'ends_at' => $this->game->now() - 1,
+            'started_at' => $now - 10,
+            'ends_at' => $now - 1,
         ]);
 
-        $response = $this->withSession(['_token' => 'test'])
-            ->postJson("/api/jobs/{$job->id}/collect");
+        $payload = $this->collectThroughController($job->id);
 
-        $response->assertOk();
-        $this->assertIsArray($response->json('result.gained'));
+        $this->assertArrayHasKey('gained', $payload);
+        $this->assertIsObject($payload['gained'], 'an empty haul would serialise as [] rather than {}');
+    }
+
+    /**
+     * Call MiningController::collect the way ResolveCharacter would have.
+     *
+     * The middleware's whole contribution is putting the character on the
+     * request, so a bare Request with that attribute set is the same call
+     * without the session plumbing.
+     *
+     * @return array<string,mixed>
+     */
+    private function collectThroughController(int $jobId): array
+    {
+        $request = Request::create("/api/jobs/{$jobId}/collect", 'POST');
+        $request->attributes->set('character', $this->character->fresh());
+
+        $response = app(MiningController::class)
+            ->collect($request, $jobId);
+
+        $this->assertSame(200, $response->getStatusCode());
+
+        return (array) $response->getData()->data;
     }
 
     /** Put a stack in the bag, through the service so the row rules apply. */
     private function give(string $key, int $quantity): void
     {
-        $add = new \ReflectionMethod($this->game, 'addMaterial');
+        $add = new ReflectionMethod($this->game, 'addMaterial');
         $add->setAccessible(true);
         $add->invoke($this->game, $this->character, $key, $quantity);
 
@@ -289,7 +318,7 @@ final class BattleResolveTest extends TestCase
         return CharacterItem::create([
             'character_id' => $this->character->id,
             'item_key' => $key,
-            'durability' => $durability ?? \App\Game\Catalog::item($key)['maxDurability'],
+            'durability' => $durability ?? Catalog::item($key)['maxDurability'],
             'equipped' => true,
             'options' => [],
         ]);
@@ -382,7 +411,7 @@ final class BattleResolveTest extends TestCase
             $this->character->fresh(),
             (int) $this->character->col,
             (int) $this->character->row,
-            \App\Game\Drops::GATHERING,
+            Drops::GATHERING,
         );
 
         $this->assertFalse($preview['pinned'], 'the hex stayed shut after the fight');
@@ -461,7 +490,7 @@ final class BattleResolveTest extends TestCase
         // §9.5.5 -- the clock is the exchange, and it is REAL milliseconds: an
         // animation is not a game hour, so scaled() must not touch it.
         $this->assertSame(
-            \App\Game\Formulas::battleDurationMs((int) $payload['rounds']),
+            Formulas::battleDurationMs((int) $payload['rounds']),
             (int) $job->ends_at - (int) $job->started_at,
             'the fight is not clocked by its own exchange',
         );
@@ -470,7 +499,7 @@ final class BattleResolveTest extends TestCase
         // quarter of a minute.
         $this->assertLessThan(
             15_000,
-            \App\Game\Formulas::battleDurationMs(Balance::BATTLE_MAX_ROUNDS),
+            Formulas::battleDurationMs(Balance::BATTLE_MAX_ROUNDS),
         );
     }
 
@@ -516,7 +545,7 @@ final class BattleResolveTest extends TestCase
             $this->equip($key);
         }
 
-        $pool = \App\Game\Formulas::battlePool(
+        $pool = Formulas::battlePool(
             $this->character->fresh()->items->map(fn (CharacterItem $i) => [
                 'id' => $i->id,
                 'key' => $i->item_key,
@@ -591,7 +620,7 @@ final class BattleResolveTest extends TestCase
             }
 
             foreach ($result['wear'] as $row) {
-                $max = \App\Game\Catalog::item(
+                $max = Catalog::item(
                     $row['slot'] === 'weapon' ? 'the_last_argument' : 'longwatch_carapace',
                 )['maxDurability'];
 
@@ -684,7 +713,7 @@ final class BattleResolveTest extends TestCase
         $this->assertTrue($mine['mine']);
         $this->assertGreaterThan(
             $this->game->sightRadius($this->character->fresh()),
-            \App\Game\HexGeometry::distance(
+            HexGeometry::distance(
                 (int) $this->character->fresh()->col,
                 (int) $this->character->fresh()->row,
                 $carrier->col,
@@ -851,7 +880,7 @@ final class BattleResolveTest extends TestCase
             $this->character->fresh(),
             $carrier->col,
             $carrier->row,
-            \App\Game\Drops::GATHERING,
+            Drops::GATHERING,
         );
 
         $this->assertFalse($preview['pinned'], 'a corpse fenced the hex off');
@@ -908,7 +937,7 @@ final class BattleResolveTest extends TestCase
             }
 
             foreach (array_keys($result['spoils']) as $key) {
-                $this->assertArrayHasKey($key, \App\Game\Spoils::STOCK, "{$key} is not a spoil");
+                $this->assertArrayHasKey($key, Spoils::STOCK, "{$key} is not a spoil");
                 $seen[$key] = true;
             }
 
@@ -963,7 +992,7 @@ final class BattleResolveTest extends TestCase
                 'looted gear arrived barely used',
             );
 
-            $this->assertArrayHasKey($loot['key'], \App\Game\BattleGear::ITEMS, 'a monster was carrying a sickle');
+            $this->assertArrayHasKey($loot['key'], BattleGear::ITEMS, 'a monster was carrying a sickle');
 
             if ($found >= 3) {
                 return;
@@ -996,7 +1025,7 @@ final class BattleResolveTest extends TestCase
         $this->equip('longwatch_carapace');
 
         // Fill every strap with something else.
-        foreach (array_slice(array_keys(\App\Game\Catalog::materials()), 0, Balance::BAG_ROWS) as $key) {
+        foreach (array_slice(array_keys(Catalog::materials()), 0, Balance::BAG_ROWS) as $key) {
             $this->give($key, 1);
         }
 

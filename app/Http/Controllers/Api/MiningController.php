@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Game\Balance;
+use App\Game\Drops;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -43,7 +44,7 @@ class MiningController extends GameController
             $character,
             (int) $validated['col'],
             (int) $validated['row'],
-            \App\Game\Drops::GATHERING,
+            Drops::GATHERING,
         );
 
         return $this->respond(

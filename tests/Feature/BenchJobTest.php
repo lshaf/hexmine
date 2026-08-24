@@ -5,11 +5,15 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Game\Balance;
+use App\Game\Catalog;
 use App\Game\GameException;
 use App\Game\GameService;
+use App\Game\WorldGen;
 use App\Models\Character;
+use App\Models\GameJob;
 use App\Models\Player;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use ReflectionMethod;
 use Tests\TestCase;
 
 /**
@@ -48,7 +52,7 @@ final class BenchJobTest extends TestCase
 
         for ($dc = -$range; $dc <= $range; $dc++) {
             for ($dr = -$range; $dr <= $range; $dr++) {
-                $s = \App\Game\WorldGen::settlementAt(
+                $s = WorldGen::settlementAt(
                     (int) $this->character->col + $dc,
                     (int) $this->character->row + $dr,
                 );
@@ -67,7 +71,7 @@ final class BenchJobTest extends TestCase
 
     private function give(array $stock): void
     {
-        $add = new \ReflectionMethod($this->game, 'addMaterial');
+        $add = new ReflectionMethod($this->game, 'addMaterial');
         $add->setAccessible(true);
 
         foreach ($stock as $key => $qty) {
@@ -140,10 +144,10 @@ final class BenchJobTest extends TestCase
         // first, and the queue would never be tested.
         for ($i = 0; $i < Balance::BENCH_SLOTS; $i++) {
             $other = $this->game->createCharacter(
-                \App\Models\Player::create(['wallet' => "0xbench{$i}"]),
+                Player::create(['wallet' => "0xbench{$i}"]),
             );
 
-            \App\Models\GameJob::create([
+            GameJob::create([
                 'character_id' => $other->id,
                 'kind' => 'craft',
                 'status' => 'active',
@@ -184,10 +188,10 @@ final class BenchJobTest extends TestCase
 
         for ($i = 0; $i < Balance::BENCH_SLOTS; $i++) {
             $other = $this->game->createCharacter(
-                \App\Models\Player::create(['wallet' => "0xmix{$i}"]),
+                Player::create(['wallet' => "0xmix{$i}"]),
             );
 
-            \App\Models\GameJob::create([
+            GameJob::create([
                 'character_id' => $other->id,
                 'kind' => 'craft',
                 'status' => 'active',
@@ -249,12 +253,12 @@ final class BenchJobTest extends TestCase
         $this->give(['wood' => 30]);
 
         $line = $bench['lines'][0];
-        $recipe = collect(\App\Game\Catalog::recipes())
+        $recipe = collect(Catalog::recipes())
             ->filter(fn (array $r) => $r['skill'] === $line)
             ->keys()
             ->first();
 
-        $this->give([\App\Game\Catalog::recipe($recipe)['input'] => 30]);
+        $this->give([Catalog::recipe($recipe)['input'] => 30]);
 
         $job = $this->game->startProcessing($this->character->fresh(), $bench['id'], $recipe, 1);
         $job->update(['ends_at' => $this->game->now() - 1]);
@@ -291,7 +295,7 @@ final class BenchJobTest extends TestCase
 
         // Fill every strap with something else.
         $rows = [];
-        foreach (array_keys(\App\Game\Catalog::materials()) as $key) {
+        foreach (array_keys(Catalog::materials()) as $key) {
             if (count($rows) >= Balance::BAG_ROWS) {
                 break;
             }

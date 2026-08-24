@@ -5,15 +5,18 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Game\Balance;
+use App\Game\Catalog;
 use App\Game\Formulas;
 use App\Game\GameException;
 use App\Game\GameService;
 use App\Game\Jobs;
+use App\Game\WorldGen;
 use App\Models\Character;
 use App\Models\CharacterNode;
 use App\Models\GameJob;
 use App\Models\Player;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use ReflectionMethod;
 use Tests\TestCase;
 
 /**
@@ -65,7 +68,7 @@ final class SkillEffectTest extends TestCase
 
     private function give(array $stock): void
     {
-        $add = new \ReflectionMethod($this->game, 'addMaterial');
+        $add = new ReflectionMethod($this->game, 'addMaterial');
         foreach ($stock as $key => $qty) {
             $add->invoke($this->game, $this->character->fresh(), $key, $qty);
         }
@@ -74,7 +77,7 @@ final class SkillEffectTest extends TestCase
 
     private function invoke(string $method, array $args): mixed
     {
-        return (new \ReflectionMethod($this->game, $method))->invoke($this->game, ...$args);
+        return (new ReflectionMethod($this->game, $method))->invoke($this->game, ...$args);
     }
 
     /** Stand at the woodcutting village §5.4 guarantees every spawn. */
@@ -84,7 +87,7 @@ final class SkillEffectTest extends TestCase
 
         for ($dc = -$range; $dc <= $range; $dc++) {
             for ($dr = -$range; $dr <= $range; $dr++) {
-                $s = \App\Game\WorldGen::settlementAt(
+                $s = WorldGen::settlementAt(
                     (int) $this->character->col + $dc,
                     (int) $this->character->row + $dr,
                 );
@@ -182,7 +185,7 @@ final class SkillEffectTest extends TestCase
         $this->assertEqualsWithDelta($bonus, (float) $job->payload['presenceBonus'], 1e-9);
 
         $flat = Formulas::processingTime(
-            \App\Game\Catalog::recipe('planks')['baseSeconds'],
+            Catalog::recipe('planks')['baseSeconds'],
             $settlement['tier'],
             true,
             0.0,
@@ -232,7 +235,7 @@ final class SkillEffectTest extends TestCase
         $this->standAtVillage();
 
         $recipe = null;
-        foreach (\App\Game\Catalog::items() as $key => $def) {
+        foreach (Catalog::items() as $key => $def) {
             if (! empty($def['consumable']) && ($def['rarity'] ?? '') === 'common' && isset($def['inputs'])) {
                 $recipe = [$key, $def];
                 break;
@@ -269,7 +272,7 @@ final class SkillEffectTest extends TestCase
      */
     public function test_option_tier_draws_from_a_deeper_bag_and_never_past_the_rung(): void
     {
-        $def = \App\Game\Catalog::item('ironwood_axe');
+        $def = Catalog::item('ironwood_axe');
         $this->assertNotNull($def);
 
         $plain = 0.0;
@@ -288,7 +291,7 @@ final class SkillEffectTest extends TestCase
 
         // A common item has one tier to draw from, so the upgrade has nowhere
         // to go and must change nothing at all.
-        $common = \App\Game\Catalog::item('stone_axe');
+        $common = Catalog::item('stone_axe');
         for ($seed = 1; $seed <= 50; $seed++) {
             $this->assertEquals(
                 Formulas::rollOptions($common, $seed, 1, 0.0),

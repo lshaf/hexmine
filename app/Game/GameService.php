@@ -20,6 +20,7 @@ use App\Models\GuildApplication;
 use App\Models\GuildMember;
 use App\Models\Player;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -648,7 +649,7 @@ class GameService
      * out. The unique index on (character, stat, scope) caps how many can be
      * held at once.
      *
-     * @return array<int,\App\Models\CharacterBuff>
+     * @return array<int,CharacterBuff>
      */
     public function armedBuffs(Character $character): array
     {
@@ -4119,7 +4120,7 @@ class GameService
     /**
      * One bank of slots: the jobs of that kind, oldest first, then the gaps.
      *
-     * @param  \Illuminate\Support\Collection<int,GameJob>  $jobs
+     * @param  Collection<int,GameJob>  $jobs
      * @return list<array<string,mixed>>
      */
     private function queueSlots(Character $character, $jobs, string $kind, int $size): array

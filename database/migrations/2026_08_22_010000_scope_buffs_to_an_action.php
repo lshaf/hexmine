@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 /**
@@ -47,7 +48,7 @@ return new class extends Migration
 
         // Two rows can differ only by scope, so collapsing back would violate
         // the old index. Keep the newest per (character, stat) and drop the rest.
-        \Illuminate\Support\Facades\DB::table('character_buffs')
+        DB::table('character_buffs')
             ->whereNotIn('id', function ($q) {
                 $q->selectRaw('MAX(id)')->from('character_buffs')->groupBy('character_id', 'stat');
             })

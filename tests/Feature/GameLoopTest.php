@@ -4,14 +4,38 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Game\Alchemy;
 use App\Game\Balance;
 use App\Game\Catalog;
+use App\Game\Components;
+use App\Game\Critters;
+use App\Game\Drops;
+use App\Game\Formulas;
 use App\Game\GameException;
 use App\Game\GameService;
+use App\Game\Hash;
+use App\Game\HexGeometry;
+use App\Game\Jobs;
+use App\Game\Quests;
+use App\Game\Tiles;
+use App\Game\Variants;
+use App\Game\WorldGen;
+use App\Http\Controllers\Api\MiningController;
+use App\Http\Controllers\Api\QuestController;
+use App\Http\Middleware\ResolveCharacter;
 use App\Models\Character;
+use App\Models\CharacterBuff;
+use App\Models\CharacterItem;
+use App\Models\CharacterMaterial;
+use App\Models\CharacterNode;
 use App\Models\GameJob;
 use App\Models\Player;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
+use Illuminate\Session\ArraySessionHandler;
+use Illuminate\Session\Store;
+use Illuminate\Support\Facades\Schema;
+use ReflectionMethod;
 use Tests\TestCase;
 
 /**
@@ -97,7 +121,7 @@ final class GameLoopTest extends TestCase
      */
     private function perHex(Character $character): int
     {
-        $hexes = \App\Game\HexGeometry::distance(
+        $hexes = HexGeometry::distance(
             (int) $character->col,
             (int) $character->row,
             (int) $character->travel_to_col,
@@ -122,7 +146,7 @@ final class GameLoopTest extends TestCase
         $from = ['col' => $this->character->col, 'row' => $this->character->row];
         $to = ['col' => $from['col'] + 6, 'row' => $from['row']];
 
-        $distance = \App\Game\HexGeometry::distance($from['col'], $from['row'], $to['col'], $to['row']);
+        $distance = HexGeometry::distance($from['col'], $from['row'], $to['col'], $to['row']);
         $travel = $this->game->travelTo($this->character, $to['col'], $to['row']);
 
         $this->assertSame($distance, $travel['hexes']);
@@ -200,7 +224,7 @@ final class GameLoopTest extends TestCase
         try {
             $this->game->travelTo($this->character, $col + 1, $row);
             $this->fail('set a second course while already walking');
-        } catch (\App\Game\GameException $e) {
+        } catch (GameException $e) {
             $this->assertSame('traveling', $e->errorCode);
         }
     }
@@ -218,7 +242,7 @@ final class GameLoopTest extends TestCase
         $found = null;
         for ($dc = -$range; $dc <= $range && ! $found; $dc++) {
             for ($dr = -$range; $dr <= $range && ! $found; $dr++) {
-                $s = \App\Game\WorldGen::settlementAt($this->character->col + $dc, $this->character->row + $dr);
+                $s = WorldGen::settlementAt($this->character->col + $dc, $this->character->row + $dr);
                 if ($s && in_array('woodcutting', $s['lines'], true)) {
                     $found = $s;
                 }
@@ -244,7 +268,7 @@ final class GameLoopTest extends TestCase
         try {
             $this->game->collectJob($this->character, $job->id);
             $this->fail('collected a job that was still running');
-        } catch (\App\Game\GameException $e) {
+        } catch (GameException $e) {
             $this->assertSame('not_ready', $e->errorCode);
         }
 
@@ -277,7 +301,7 @@ final class GameLoopTest extends TestCase
             $player = Player::create(['wallet' => "0xclock{$scale}", 'session_id' => "clock{$scale}"]);
             $character = $this->game->createCharacter($player);
 
-            $job = $this->game->startMining($character, $character->col, $character->row, \App\Game\Drops::GATHERING);
+            $job = $this->game->startMining($character, $character->col, $character->row, Drops::GATHERING);
             $job->update(['ends_at' => $this->game->now() - 1, 'quantity' => 5]);
 
             $before = $character->fresh()->xp;
@@ -441,7 +465,7 @@ final class GameLoopTest extends TestCase
     {
         config(['game.auto_provision' => true]);
 
-        // Laravel's Session\Store replaces an id that is not 40 alphanumerics
+        // Laravel's SessionStore replaces an id that is not 40 alphanumerics
         // with a fresh random one, which would silently defeat this test.
         $sessionId = str_repeat('a1b2', 10);
         $wallet = '0x'.substr(hash('sha256', $sessionId), 0, 40);
@@ -449,11 +473,11 @@ final class GameLoopTest extends TestCase
         // The row exists, orphaned from its session.
         $player = Player::create(['wallet' => $wallet, 'session_id' => null]);
 
-        $resolve = new \ReflectionMethod(\App\Http\Middleware\ResolveCharacter::class, 'resolvePlayer');
-        $middleware = new \App\Http\Middleware\ResolveCharacter($this->game);
+        $resolve = new ReflectionMethod(ResolveCharacter::class, 'resolvePlayer');
+        $middleware = new ResolveCharacter($this->game);
 
-        $request = \Illuminate\Http\Request::create('/api/state');
-        $session = new \Illuminate\Session\Store('test', new \Illuminate\Session\ArraySessionHandler(120), $sessionId);
+        $request = Request::create('/api/state');
+        $session = new Store('test', new ArraySessionHandler(120), $sessionId);
         $request->setLaravelSession($session);
 
         $resolved = $resolve->invoke($middleware, $request);
@@ -469,7 +493,7 @@ final class GameLoopTest extends TestCase
     {
         $byRank = [];
 
-        foreach (\App\Game\Catalog::items() as $key => $def) {
+        foreach (Catalog::items() as $key => $def) {
             if (empty($def['consumable'])) {
                 continue;
             }
@@ -510,7 +534,7 @@ final class GameLoopTest extends TestCase
     {
         $worst = [];
 
-        foreach (\App\Game\Catalog::items() as $key => $def) {
+        foreach (Catalog::items() as $key => $def) {
             if (empty($def['consumable'])) {
                 continue;
             }
@@ -542,7 +566,7 @@ final class GameLoopTest extends TestCase
     {
         $checked = 0;
 
-        foreach (\App\Game\Catalog::items() as $key => $def) {
+        foreach (Catalog::items() as $key => $def) {
             if (empty($def['consumable'])) {
                 continue;
             }
@@ -551,7 +575,7 @@ final class GameLoopTest extends TestCase
 
             $capped = array_filter(
                 array_keys($def['inputs'] ?? []),
-                fn (string $m) => \App\Game\Catalog::walletCap($m) !== null,
+                fn (string $m) => Catalog::walletCap($m) !== null,
             );
 
             $this->assertEmpty($capped, "{$key} wants a capped material -- the NFT rung can come back");
@@ -567,19 +591,19 @@ final class GameLoopTest extends TestCase
         $junk = ['deadfall', 'slag', 'bone_splinter', 'cinder', 'thistle'];
 
         foreach ($junk as $key) {
-            $def = \App\Game\Catalog::material($key);
+            $def = Catalog::material($key);
             $this->assertNotNull($def, "{$key} is not in the catalog");
             $this->assertSame(1, $def['npcPrice'], "{$key} sells for more than a copper");
             $this->assertSame(0, $def['tier'], "{$key} is not tier zero");
         }
 
-        foreach (\App\Game\Catalog::items() as $key => $def) {
+        foreach (Catalog::items() as $key => $def) {
             foreach (array_keys($def['inputs'] ?? []) as $input) {
                 $this->assertNotContains($input, $junk, "{$key} is crafted from junk");
             }
         }
 
-        foreach (\App\Game\Catalog::recipes() as $key => $recipe) {
+        foreach (Catalog::recipes() as $key => $recipe) {
             $this->assertNotContains($recipe['input'], $junk, "{$key} processes junk");
             $this->assertNotContains($recipe['output'], $junk, "{$key} produces junk");
         }
@@ -594,11 +618,11 @@ final class GameLoopTest extends TestCase
      */
     public function test_reagents_outsell_the_rubbish(): void
     {
-        $reagents = array_keys(\App\Game\Alchemy::REAGENTS);
+        $reagents = array_keys(Alchemy::REAGENTS);
         $this->assertCount(10, $reagents);
 
         foreach ($reagents as $key) {
-            $def = \App\Game\Catalog::material($key);
+            $def = Catalog::material($key);
             $this->assertSame(1, $def['tier'], "{$key} is not a raw material");
             $this->assertGreaterThan(1, $def['npcPrice'], "{$key} sells for scrap money");
             $this->assertNotNull($def['biome'] ?? null, "{$key} comes from no kind of ground");
@@ -607,7 +631,7 @@ final class GameLoopTest extends TestCase
         // Two per biome, so a recipe can want two different things off one tile.
         $byBiome = [];
         foreach ($reagents as $key) {
-            $byBiome[\App\Game\Catalog::material($key)['biome']][] = $key;
+            $byBiome[Catalog::material($key)['biome']][] = $key;
         }
         $this->assertCount(5, $byBiome, 'reagents do not cover the five biomes');
         foreach ($byBiome as $biome => $keys) {
@@ -626,14 +650,14 @@ final class GameLoopTest extends TestCase
      */
     public function test_craft_components_are_biome_locked_and_outsell_the_rubbish(): void
     {
-        $components = array_keys(\App\Game\Components::CRAFT);
+        $components = array_keys(Components::CRAFT);
         $this->assertCount(10, $components);
 
         $byBiome = [];
         $byBench = [];
 
         foreach ($components as $key) {
-            $def = \App\Game\Catalog::material($key);
+            $def = Catalog::material($key);
             $this->assertNotNull($def, "{$key} is not in the catalog");
             $this->assertSame(1, $def['tier'], "{$key} is not a raw material");
             $this->assertGreaterThan(1, $def['npcPrice'], "{$key} sells for scrap money");
@@ -661,12 +685,12 @@ final class GameLoopTest extends TestCase
     /** A tile of a known grade in a known biome, for exercising a table. */
     private function tileOfGrade(string $biome, int $grade): array
     {
-        $want = \App\Game\Variants::BIOME_VARIANTS[$biome][$grade]['key'];
+        $want = Variants::BIOME_VARIANTS[$biome][$grade]['key'];
         $radius = Balance::mapRadius();
 
         for ($col = -$radius; $col <= $radius; $col += 1) {
             for ($row = -$radius; $row <= $radius; $row += 1) {
-                $tile = \App\Game\WorldGen::generateTile($col, $row, 0);
+                $tile = WorldGen::generateTile($col, $row, 0);
                 if (($tile['variant'] ?? null) === $want) {
                     return $tile;
                 }
@@ -688,22 +712,22 @@ final class GameLoopTest extends TestCase
         $tile = $this->tileOfGrade('forest', 1);
 
         foreach ([1, 3, 7, 12, 40] as $units) {
-            foreach ([\App\Game\Drops::GATHERING, \App\Game\Drops::MINING, \App\Game\Drops::HUNTING] as $activity) {
-                $table = \App\Game\Drops::table($activity, $tile, 1);
+            foreach ([Drops::GATHERING, Drops::MINING, Drops::HUNTING] as $activity) {
+                $table = Drops::table($activity, $tile, 1);
 
                 for ($seed = 0; $seed < 12; $seed++) {
-                    $rolled = \App\Game\Drops::roll($table, $units, $seed);
+                    $rolled = Drops::roll($table, $units, $seed);
 
                     $this->assertSame($units, array_sum($rolled), "{$activity} lost or invented units");
                     $this->assertLessThanOrEqual(
-                        \App\Game\Drops::MAX_KINDS,
+                        Drops::MAX_KINDS,
                         count($rolled),
                         "{$activity} split past the strap budget",
                     );
 
                     foreach ($rolled as $key => $qty) {
                         $this->assertGreaterThan(0, $qty, "{$key} came back as an empty stack");
-                        $this->assertNotNull(\App\Game\Catalog::material((string) $key), "{$key} is not a material");
+                        $this->assertNotNull(Catalog::material((string) $key), "{$key} is not a material");
                     }
                 }
             }
@@ -721,7 +745,7 @@ final class GameLoopTest extends TestCase
     public function test_a_lesser_tool_mostly_takes_the_lesser_grade(): void
     {
         $tile = $this->tileOfGrade('forest', 1);
-        $table = \App\Game\Drops::table(\App\Game\Drops::MINING, $tile, 0);
+        $table = Drops::table(Drops::MINING, $tile, 0);
         $total = array_sum($table);
 
         $this->assertArrayHasKey('wood', $table, 'a common axe cannot take common timber');
@@ -731,7 +755,7 @@ final class GameLoopTest extends TestCase
         $this->assertLessThan(0.15, $table['hardwood'] / $total, 'the better grade is not a long shot');
 
         // With the right tool the ladder inverts, which is the reward.
-        $better = \App\Game\Drops::table(\App\Game\Drops::MINING, $tile, 1);
+        $better = Drops::table(Drops::MINING, $tile, 1);
         $this->assertGreaterThan(
             0.5,
             $better['hardwood'] / array_sum($better),
@@ -741,7 +765,7 @@ final class GameLoopTest extends TestCase
         // Each rung short halves the odds again, so a village pick on contested
         // ground is a lottery rather than a shortcut.
         $epic = $this->tileOfGrade('forest', 3);
-        $stretch = \App\Game\Drops::table(\App\Game\Drops::MINING, $epic, 0);
+        $stretch = Drops::table(Drops::MINING, $epic, 0);
         $this->assertLessThan(
             $stretch['hardwood'],
             $stretch['ironwood'],
@@ -761,7 +785,7 @@ final class GameLoopTest extends TestCase
     {
         foreach ([0, 1, 2, 3] as $grade) {
             $tile = $this->tileOfGrade('forest', $grade);
-            $table = \App\Game\Drops::table(\App\Game\Drops::GATHERING, $tile, 3);
+            $table = Drops::table(Drops::GATHERING, $tile, 3);
             $total = array_sum($table);
 
             // The windfall is the COMMON grade, on every kind of ground. A
@@ -788,20 +812,20 @@ final class GameLoopTest extends TestCase
      */
     public function test_every_bench_stock_drops_off_its_own_activity(): void
     {
-        foreach (\App\Game\Catalog::BIOMES as $biome) {
+        foreach (Catalog::BIOMES as $biome) {
             $tile = $this->tileOfGrade($biome, 0);
 
-            $mined = \App\Game\Drops::table(\App\Game\Drops::MINING, $tile, 0);
-            $hunted = \App\Game\Drops::table(\App\Game\Drops::HUNTING, $tile, 0);
-            $gathered = \App\Game\Drops::table(\App\Game\Drops::GATHERING, $tile, 0);
+            $mined = Drops::table(Drops::MINING, $tile, 0);
+            $hunted = Drops::table(Drops::HUNTING, $tile, 0);
+            $gathered = Drops::table(Drops::GATHERING, $tile, 0);
 
-            foreach (\App\Game\Components::CRAFT as $key => $def) {
+            foreach (Components::CRAFT as $key => $def) {
                 if ($def['biome'] === $biome) {
                     $this->assertArrayHasKey($key, $mined, "{$key} has no faucet");
                 }
             }
 
-            foreach (\App\Game\Alchemy::REAGENTS as $key => $def) {
+            foreach (Alchemy::REAGENTS as $key => $def) {
                 if ($def['biome'] === $biome) {
                     $this->assertArrayHasKey($key, $mined, "{$key} has no faucet");
                     $this->assertArrayHasKey($key, $gathered, "{$key} cannot be gathered");
@@ -810,7 +834,7 @@ final class GameLoopTest extends TestCase
 
             // A critter is hunted and never gathered: that is the difference
             // between the two halves of the alchemist's shelf.
-            $critter = \App\Game\Critters::BY_BIOME[$biome];
+            $critter = Critters::BY_BIOME[$biome];
             $this->assertArrayHasKey($critter, $hunted, "{$critter} has no faucet");
             $this->assertArrayNotHasKey($critter, $gathered, "{$critter} can be picked up by hand");
             $this->assertArrayNotHasKey($critter, $mined, "{$critter} is dug out of the ground");
@@ -821,11 +845,11 @@ final class GameLoopTest extends TestCase
     public function test_a_haul_is_deterministic(): void
     {
         $tile = $this->tileOfGrade('mountain', 2);
-        $table = \App\Game\Drops::table(\App\Game\Drops::MINING, $tile, 2);
+        $table = Drops::table(Drops::MINING, $tile, 2);
 
-        $first = \App\Game\Drops::roll($table, 9, 4242);
-        $again = \App\Game\Drops::roll($table, 9, 4242);
-        $other = \App\Game\Drops::roll($table, 9, 4243);
+        $first = Drops::roll($table, 9, 4242);
+        $again = Drops::roll($table, 9, 4242);
+        $other = Drops::roll($table, 9, 4243);
 
         $this->assertSame($first, $again, 'the same mine rolled twice paid differently');
         $this->assertNotSame($first, $other, 'every mine pays exactly the same haul');
@@ -847,22 +871,22 @@ final class GameLoopTest extends TestCase
 
         // Both ends inclusive, and one step past either is off.
         foreach ([[-$radius, 0], [$radius, 0], [0, -$radius], [0, $radius], [0, 0]] as [$col, $row]) {
-            $this->assertTrue(\App\Game\WorldGen::inBounds($col, $row), "{$col},{$row} should be on the map");
+            $this->assertTrue(WorldGen::inBounds($col, $row), "{$col},{$row} should be on the map");
         }
         foreach ([[-$radius - 1, 0], [$radius + 1, 0], [0, -$radius - 1], [0, $radius + 1]] as [$col, $row]) {
-            $this->assertFalse(\App\Game\WorldGen::inBounds($col, $row), "{$col},{$row} should be off the map");
+            $this->assertFalse(WorldGen::inBounds($col, $row), "{$col},{$row} should be off the map");
         }
 
         // The origin is the dead center, and the corners are the rim.
-        $this->assertSame('center', \App\Game\WorldGen::ringOf(0, 0));
-        $this->assertSame('outer', \App\Game\WorldGen::ringOf($radius, $radius));
-        $this->assertSame('outer', \App\Game\WorldGen::ringOf(-$radius, -$radius));
+        $this->assertSame('center', WorldGen::ringOf(0, 0));
+        $this->assertSame('outer', WorldGen::ringOf($radius, $radius));
+        $this->assertSame('outer', WorldGen::ringOf(-$radius, -$radius));
 
         // Opposite corners are the same distance out, which is only true if the
         // center really is the origin rather than somewhere along a signed axis.
         $this->assertEqualsWithDelta(
-            \App\Game\WorldGen::radiusOf($radius, $radius),
-            \App\Game\WorldGen::radiusOf(-$radius, -$radius),
+            WorldGen::radiusOf($radius, $radius),
+            WorldGen::radiusOf(-$radius, -$radius),
             1e-9,
         );
     }
@@ -879,24 +903,24 @@ final class GameLoopTest extends TestCase
     {
         $before = [];
         foreach ([[0, 0], [10, -14], [-33, 7]] as [$col, $row]) {
-            $before["{$col},{$row}"] = \App\Game\WorldGen::biomeOf($col, $row);
+            $before["{$col},{$row}"] = WorldGen::biomeOf($col, $row);
         }
 
         try {
             config(['game.map.seed' => '0xdeadbeef', 'game.map.radius' => 40]);
-            \App\Game\WorldGen::forget();
+            WorldGen::forget();
 
             $this->assertSame(0xdeadbeef, Balance::mapSeed(), 'the seed did not come from config');
             $this->assertSame(40, Balance::mapRadius());
             $this->assertSame(81, Balance::mapSize(), 'the count is not derived from the radius');
 
             // The edge moved with it.
-            $this->assertTrue(\App\Game\WorldGen::inBounds(40, 0));
-            $this->assertFalse(\App\Game\WorldGen::inBounds(41, 0));
+            $this->assertTrue(WorldGen::inBounds(40, 0));
+            $this->assertFalse(WorldGen::inBounds(41, 0));
 
             $after = [];
             foreach ([[0, 0], [10, -14], [-33, 7]] as [$col, $row]) {
-                $after["{$col},{$row}"] = \App\Game\WorldGen::biomeOf($col, $row);
+                $after["{$col},{$row}"] = WorldGen::biomeOf($col, $row);
             }
 
             $this->assertNotSame($before, $after, 'a new seed generated the same ground');
@@ -905,13 +929,13 @@ final class GameLoopTest extends TestCase
                 'game.map.seed' => '0x5eed1a3f',
                 'game.map.radius' => 200,
             ]);
-            \App\Game\WorldGen::forget();
+            WorldGen::forget();
         }
 
         // And the world came back, which is what makes the seed a seed.
         foreach ($before as $coord => $biome) {
             [$col, $row] = array_map('intval', explode(',', $coord));
-            $this->assertSame($biome, \App\Game\WorldGen::biomeOf($col, $row));
+            $this->assertSame($biome, WorldGen::biomeOf($col, $row));
         }
     }
 
@@ -920,20 +944,20 @@ final class GameLoopTest extends TestCase
     {
         try {
             config(['game.map.seed' => '0x5eed1a3f']);
-            \App\Game\WorldGen::forget();
+            WorldGen::forget();
             $hex = Balance::mapSeed();
 
             config(['game.map.seed' => (string) 0x5eed1a3f]);
-            \App\Game\WorldGen::forget();
+            WorldGen::forget();
             $this->assertSame($hex, Balance::mapSeed(), 'decimal and hex disagree');
 
             // Anything wider than the hash is masked, not silently divergent.
             config(['game.map.seed' => 0x1_5eed_1a3f]);
-            \App\Game\WorldGen::forget();
+            WorldGen::forget();
             $this->assertSame($hex, Balance::mapSeed(), 'the seed was not masked to 32 bits');
         } finally {
             config(['game.map.seed' => '0x5eed1a3f']);
-            \App\Game\WorldGen::forget();
+            WorldGen::forget();
         }
     }
 
@@ -952,7 +976,7 @@ final class GameLoopTest extends TestCase
         $found = 0;
         for ($col = $radius + 1; $col <= $radius + 40; $col++) {
             for ($row = -20; $row <= 20; $row++) {
-                if (\App\Game\WorldGen::settlementAt($col, $row) !== null) {
+                if (WorldGen::settlementAt($col, $row) !== null) {
                     $found++;
                 }
             }
@@ -965,7 +989,7 @@ final class GameLoopTest extends TestCase
         $inside = 0;
         for ($col = $radius - 40; $col <= $radius; $col++) {
             for ($row = -20; $row <= 20; $row++) {
-                if (\App\Game\WorldGen::settlementAt($col, $row) !== null) {
+                if (WorldGen::settlementAt($col, $row) !== null) {
                     $inside++;
                 }
             }
@@ -983,11 +1007,11 @@ final class GameLoopTest extends TestCase
      */
     public function test_every_biome_has_four_grades_and_the_weights_close(): void
     {
-        foreach (\App\Game\Catalog::BIOMES as $biome) {
-            $variants = \App\Game\Variants::BIOME_VARIANTS[$biome];
+        foreach (Catalog::BIOMES as $biome) {
+            $variants = Variants::BIOME_VARIANTS[$biome];
             $this->assertCount(4, $variants, "{$biome} does not have four variants");
             $this->assertSame(
-                \App\Game\Variants::GRADES,
+                Variants::GRADES,
                 array_column($variants, 'grade'),
                 "{$biome} is out of grade order",
             );
@@ -1018,8 +1042,8 @@ final class GameLoopTest extends TestCase
             'epic' => ['inner'],
         ];
 
-        foreach (\App\Game\Catalog::BIOMES as $biome) {
-            foreach (\App\Game\Variants::BIOME_VARIANTS[$biome] as $variant) {
+        foreach (Catalog::BIOMES as $biome) {
+            foreach (Variants::BIOME_VARIANTS[$biome] as $variant) {
                 $rings = [];
                 foreach (['outer', 'mid', 'inner'] as $ring) {
                     if ($variant['weights'][$ring] > 0) {
@@ -1036,8 +1060,8 @@ final class GameLoopTest extends TestCase
         }
 
         // §5.3 -- and the Tier 3 rate is still the one Balance names.
-        foreach (\App\Game\Catalog::BIOMES as $biome) {
-            $epic = \App\Game\Variants::BIOME_VARIANTS[$biome][3];
+        foreach (Catalog::BIOMES as $biome) {
+            $epic = Variants::BIOME_VARIANTS[$biome][3];
             $this->assertSame('epic', $epic['grade']);
             $this->assertEqualsWithDelta(
                 Balance::RARE_SPAWN_CHANCE,
@@ -1060,9 +1084,9 @@ final class GameLoopTest extends TestCase
         $materials = [];
         $tints = [];
 
-        foreach (\App\Game\Catalog::BIOMES as $biome) {
-            foreach (\App\Game\Variants::BIOME_VARIANTS[$biome] as $variant) {
-                $def = \App\Game\Catalog::material($variant['material']);
+        foreach (Catalog::BIOMES as $biome) {
+            foreach (Variants::BIOME_VARIANTS[$biome] as $variant) {
+                $def = Catalog::material($variant['material']);
                 $this->assertNotNull($def, "{$variant['key']} gives up a material nothing knows");
                 $this->assertContains($def['tier'], [1, 3], "{$variant['key']} gives up a processed material");
 
@@ -1088,18 +1112,18 @@ final class GameLoopTest extends TestCase
      */
     public function test_grade_processing_matches_the_base_ratio(): void
     {
-        $this->assertCount(10, \App\Game\Variants::PROCESSING);
+        $this->assertCount(10, Variants::PROCESSING);
 
-        foreach (\App\Game\Variants::PROCESSING as $key => $recipe) {
+        foreach (Variants::PROCESSING as $key => $recipe) {
             $this->assertSame(3, $recipe['inputQty'], "{$key} does not cost three raw");
             $this->assertSame(1, $recipe['outputQty'], "{$key} does not make one");
-            $this->assertSame(1, \App\Game\Catalog::materialTier($recipe['input']));
-            $this->assertSame(2, \App\Game\Catalog::materialTier($recipe['output']));
-            $this->assertContains($recipe['skill'], \App\Game\Catalog::SKILLS);
+            $this->assertSame(1, Catalog::materialTier($recipe['input']));
+            $this->assertSame(2, Catalog::materialTier($recipe['output']));
+            $this->assertContains($recipe['skill'], Catalog::SKILLS);
 
             // The line that gathers the raw is the line that processes it.
             $this->assertSame(
-                \App\Game\Catalog::skillForMaterial($recipe['input']),
+                Catalog::skillForMaterial($recipe['input']),
                 $recipe['skill'],
                 "{$key} is processed by the wrong line",
             );
@@ -1121,15 +1145,15 @@ final class GameLoopTest extends TestCase
 
         for ($col = 40; $col < 120; $col += 3) {
             for ($row = 40; $row < 120; $row += 3) {
-                $tile = \App\Game\WorldGen::generateTile($col, $row, 0);
+                $tile = WorldGen::generateTile($col, $row, 0);
                 if ($tile['material'] === null) {
                     continue;
                 }
 
-                $again = \App\Game\WorldGen::generateTile($col, $row, 0);
+                $again = WorldGen::generateTile($col, $row, 0);
                 $this->assertSame($tile['variant'], $again['variant'], 'the ground moved between two calls');
 
-                $variant = \App\Game\WorldGen::variantOf($col, $row, $tile['biome'], $tile['ring']);
+                $variant = WorldGen::variantOf($col, $row, $tile['biome'], $tile['ring']);
                 $this->assertSame($tile['variant'], $variant['key']);
                 $this->assertSame($variant['material'], $tile['material']);
 
@@ -1146,7 +1170,7 @@ final class GameLoopTest extends TestCase
         }
 
         // All four grades have to actually occur, or a weight is effectively zero.
-        foreach (\App\Game\Variants::GRADES as $grade) {
+        foreach (Variants::GRADES as $grade) {
             $this->assertArrayHasKey($grade, $seen, "no {$grade} ground anywhere on the map");
         }
     }
@@ -1161,13 +1185,13 @@ final class GameLoopTest extends TestCase
     public function test_every_craft_component_feeds_a_recipe(): void
     {
         $wanted = [];
-        foreach (\App\Game\Catalog::items() as $def) {
+        foreach (Catalog::items() as $def) {
             foreach (array_keys($def['inputs'] ?? []) as $input) {
                 $wanted[$input] = true;
             }
         }
 
-        foreach (array_keys(\App\Game\Components::CRAFT) as $key) {
+        foreach (array_keys(Components::CRAFT) as $key) {
             $this->assertArrayHasKey($key, $wanted, "{$key} feeds no recipe at all");
         }
     }
@@ -1189,7 +1213,7 @@ final class GameLoopTest extends TestCase
             .file_get_contents(base_path('resources/js/game/battlegear.ts'));
         $checked = 0;
 
-        foreach (\App\Game\Catalog::items() as $key => $def) {
+        foreach (Catalog::items() as $key => $def) {
             if (! isset($def['inputs']) || ! empty($def['consumable'])) {
                 continue;
             }
@@ -1269,11 +1293,11 @@ final class GameLoopTest extends TestCase
         // Every rung of the woodcutting-yield ladder at once.
         foreach (['forest_draft', 'forest_tonic', 'forest_flask', 'forest_elixir', 'forest_philtre'] as $key) {
             $character = $this->giveDrink($key);
-            \App\Models\CharacterBuff::updateOrCreate(
+            CharacterBuff::updateOrCreate(
                 ['character_id' => $character->id, 'stat' => 'yield', 'scope' => 'woodcutting'],
                 [
                     'item_key' => $key,
-                    'value' => \App\Game\Catalog::item($key)['value'],
+                    'value' => Catalog::item($key)['value'],
                 ],
             );
         }
@@ -1329,13 +1353,13 @@ final class GameLoopTest extends TestCase
     {
         $character = $this->character->fresh();
         $preview = $this->game->previewTile($character, (int) $character->col, (int) $character->row);
-        $slot = \App\Game\Catalog::slotForSkill($preview['skill'] ?? 'woodcutting');
+        $slot = Catalog::slotForSkill($preview['skill'] ?? 'woodcutting');
         $key = self::STARTER_TOOL[$slot];
 
-        \App\Models\CharacterItem::create([
+        CharacterItem::create([
             'character_id' => $this->character->id,
             'item_key' => $key,
-            'durability' => \App\Game\Catalog::item($key)['maxDurability'],
+            'durability' => Catalog::item($key)['maxDurability'],
             'equipped' => true,
             'options' => [],
         ]);
@@ -1346,7 +1370,7 @@ final class GameLoopTest extends TestCase
     /** Equip a working bow, so the hunting line has its §8.0 tool. */
     private function equipBow(): void
     {
-        \App\Models\CharacterItem::create([
+        CharacterItem::create([
             'character_id' => $this->character->id,
             'item_key' => 'crude_bow',
             'durability' => 200,
@@ -1368,7 +1392,7 @@ final class GameLoopTest extends TestCase
     {
         [$col, $row] = $this->standOnAHerd();
 
-        \App\Models\CharacterItem::create([
+        CharacterItem::create([
             'character_id' => $this->character->id,
             'item_key' => 'crude_bow',
             'durability' => 200,
@@ -1385,8 +1409,8 @@ final class GameLoopTest extends TestCase
         $this->assertSame(Balance::HERD_HP, $crude['hp']);
         $this->assertTrue($crude['able']);
 
-        \App\Models\CharacterItem::where('character_id', $this->character->id)->delete();
-        \App\Models\CharacterItem::create([
+        CharacterItem::where('character_id', $this->character->id)->delete();
+        CharacterItem::create([
             'character_id' => $this->character->id,
             'item_key' => 'recurve_bow',
             'durability' => 200,
@@ -1430,7 +1454,7 @@ final class GameLoopTest extends TestCase
             $pelt += $result['gained']['pelt'] ?? 0;
 
             // §4 -- the haul splits, but never past the strap budget.
-            $this->assertLessThanOrEqual(\App\Game\Drops::MAX_KINDS, count($result['gained']));
+            $this->assertLessThanOrEqual(Drops::MAX_KINDS, count($result['gained']));
         }
 
         // Pelt is the heaviest line in the table, so over forty hunts it
@@ -1454,16 +1478,16 @@ final class GameLoopTest extends TestCase
         }
         $this->assertNotEmpty($raid, 'no Tier 4 materials to guard');
 
-        foreach (\App\Game\Catalog::BIOMES as $biome) {
+        foreach (Catalog::BIOMES as $biome) {
             foreach ([0, 1, 2, 3] as $grade) {
                 $tile = $this->tileOfGrade($biome, $grade);
 
                 foreach ([
-                    \App\Game\Drops::MINING,
-                    \App\Game\Drops::GATHERING,
-                    \App\Game\Drops::HUNTING,
+                    Drops::MINING,
+                    Drops::GATHERING,
+                    Drops::HUNTING,
                 ] as $activity) {
-                    $table = \App\Game\Drops::table($activity, $tile, $grade);
+                    $table = Drops::table($activity, $tile, $grade);
 
                     foreach ($raid as $key) {
                         $this->assertArrayNotHasKey(
@@ -1524,7 +1548,7 @@ final class GameLoopTest extends TestCase
         try {
             $this->game->startHunt($this->character->fresh(), $col, $row);
             $this->fail('a bare-handed hunt was allowed');
-        } catch (\App\Game\GameException $e) {
+        } catch (GameException $e) {
             $this->assertStringContainsString('bow', strtolower($e->getMessage()));
         }
 
@@ -1552,7 +1576,7 @@ final class GameLoopTest extends TestCase
         foreach (['0xa', '0xb'] as $wallet) {
             $other = $this->game->createCharacter(Player::create(['wallet' => $wallet, 'session_id' => $wallet]));
             $other->update(['col' => $col, 'row' => $row]);
-            $others[] = $this->game->startMining($other->fresh(), $col, $row, \App\Game\Drops::GATHERING);
+            $others[] = $this->game->startMining($other->fresh(), $col, $row, Drops::GATHERING);
         }
         $this->assertCount(2, $others);
 
@@ -1560,7 +1584,7 @@ final class GameLoopTest extends TestCase
         // hex, and it leaves on its own clock (§5.5).
         $job->update(['ends_at' => $this->game->now() - 1]);
         $this->game->collectJob($this->character->fresh(), $job->id);
-        $this->assertSame(0, \App\Game\Tiles::state($col, $row)['taken']);
+        $this->assertSame(0, Tiles::state($col, $row)['taken']);
     }
 
     /** A person is in one place: a hunt blocks a dig, and a dig blocks a hunt. */
@@ -1573,9 +1597,9 @@ final class GameLoopTest extends TestCase
         $this->assertFalse($this->game->previewGather($this->character->fresh(), $col, $row)['canMine']);
 
         try {
-            $this->game->startMining($this->character->fresh(), $col, $row, \App\Game\Drops::GATHERING);
+            $this->game->startMining($this->character->fresh(), $col, $row, Drops::GATHERING);
             $this->fail('dug a hex while already hunting it');
-        } catch (\App\Game\GameException $e) {
+        } catch (GameException $e) {
             $this->assertSame('blocked', $e->errorCode);
         }
     }
@@ -1606,7 +1630,7 @@ final class GameLoopTest extends TestCase
         try {
             $this->game->startHunt($this->character->fresh(), $col, $row);
             $this->fail('hunted a hex with no herd on it');
-        } catch (\App\Game\GameException $e) {
+        } catch (GameException $e) {
             $this->assertSame('blocked', $e->errorCode);
         }
     }
@@ -1632,7 +1656,7 @@ final class GameLoopTest extends TestCase
 
     private function give(array $materials): void
     {
-        $add = new \ReflectionMethod($this->game, 'addMaterial');
+        $add = new ReflectionMethod($this->game, 'addMaterial');
         foreach ($materials as $key => $qty) {
             $add->invoke($this->game, $this->character->fresh(), $key, $qty);
         }
@@ -1642,7 +1666,7 @@ final class GameLoopTest extends TestCase
     private function grantNodes(array $keys): void
     {
         foreach ($keys as $key) {
-            \App\Models\CharacterNode::create([
+            CharacterNode::create([
                 'character_id' => $this->character->id,
                 'node_key' => $key,
             ]);
@@ -1672,7 +1696,7 @@ final class GameLoopTest extends TestCase
     {
         $this->character->skills()->where('skill_key', 'woodcutting')->update(['level' => 13]);
 
-        $levels = new \ReflectionMethod($this->game, 'jobLevels');
+        $levels = new ReflectionMethod($this->game, 'jobLevels');
         $this->assertSame(13, $levels->invoke($this->game, $this->character->fresh())['woodcutting']);
 
         // And no second row was invented to hold it.
@@ -1697,7 +1721,7 @@ final class GameLoopTest extends TestCase
 
         // Every yield node the Woodcutting tree carries.
         $keys = [];
-        foreach (\App\Game\Jobs::nodesFor('woodcutting') as $key => $node) {
+        foreach (Jobs::nodesFor('woodcutting') as $key => $node) {
             if ($node['effect']['kind'] === 'stat' && $node['effect']['stat'] === 'yield') {
                 $keys[] = $key;
             }
@@ -1756,7 +1780,7 @@ final class GameLoopTest extends TestCase
         try {
             $this->game->buyNode($this->character->fresh(), 'smith.hammer_sense');
             $this->fail('bought the same node twice');
-        } catch (\App\Game\GameException $e) {
+        } catch (GameException $e) {
             $this->assertSame('owned', $e->errorCode);
         }
     }
@@ -1769,7 +1793,7 @@ final class GameLoopTest extends TestCase
         try {
             $this->game->buyNode($this->character->fresh(), 'smith.cold_shut_eye');
             $this->fail('bought a node with no points left');
-        } catch (\App\Game\GameException $e) {
+        } catch (GameException $e) {
             $this->assertSame('no_points', $e->errorCode);
         }
     }
@@ -1784,7 +1808,7 @@ final class GameLoopTest extends TestCase
         try {
             $this->game->buyNode($this->character->fresh(), 'smith.anvil_song');
             $this->fail('reached a tier 2 node at job level 1');
-        } catch (\App\Game\GameException $e) {
+        } catch (GameException $e) {
             $this->assertSame('job_level', $e->errorCode);
         }
 
@@ -1803,7 +1827,7 @@ final class GameLoopTest extends TestCase
         try {
             $this->game->buyNode($this->character->fresh(), 'smith.anvil_song');
             $this->fail('bought a tier 2 node with no parent');
-        } catch (\App\Game\GameException $e) {
+        } catch (GameException $e) {
             $this->assertSame('requires', $e->errorCode);
         }
     }
@@ -1815,7 +1839,7 @@ final class GameLoopTest extends TestCase
         $this->character->save();
         $this->setJobLevel('smith', Balance::JOB_MAX_LEVEL);
 
-        $capstone = \App\Game\Jobs::node('smith.the_named_blade');
+        $capstone = Jobs::node('smith.the_named_blade');
         $this->assertCount(2, $capstone['requires']);
 
         $this->grantNodes([$capstone['requires'][0]]);
@@ -1823,7 +1847,7 @@ final class GameLoopTest extends TestCase
         try {
             $this->game->buyNode($this->character->fresh(), 'smith.the_named_blade');
             $this->fail('bought a capstone with only one parent');
-        } catch (\App\Game\GameException $e) {
+        } catch (GameException $e) {
             $this->assertSame('requires', $e->errorCode);
         }
 
@@ -1876,7 +1900,7 @@ final class GameLoopTest extends TestCase
         $this->character->update($open);
         $this->character->refresh();
 
-        $job = $this->game->startMining($this->character->fresh(), $open['col'], $open['row'], \App\Game\Drops::GATHERING);
+        $job = $this->game->startMining($this->character->fresh(), $open['col'], $open['row'], Drops::GATHERING);
         $job->update(['ends_at' => $this->game->now() - 1]);
         $this->game->collectJob($this->character->fresh(), $job->id);
 
@@ -1905,14 +1929,14 @@ final class GameLoopTest extends TestCase
         // pays out on a woodcutting mine is Woodcutting's and no other.
         $keys = [];
         foreach (['woodcutting'] as $job) {
-            foreach (array_keys(\App\Game\Jobs::nodesFor($job)) as $key) {
+            foreach (array_keys(Jobs::nodesFor($job)) as $key) {
                 $keys[] = $key;
             }
         }
         $this->grantNodes($keys);
 
         // Best-in-slot on the line, plus a running potion on the same stat.
-        \App\Models\CharacterItem::create([
+        CharacterItem::create([
             'character_id' => $this->character->id,
             'item_key' => 'ironwood_axe',
             'durability' => 200,
@@ -1954,7 +1978,7 @@ final class GameLoopTest extends TestCase
         // the discount -- a Smith's tree spends most of itself on what comes
         // off the anvil instead, which is what makes the two different trees.
         $keys = [];
-        foreach (\App\Game\Jobs::nodesFor('armorer') as $key => $node) {
+        foreach (Jobs::nodesFor('armorer') as $key => $node) {
             if ($node['effect']['kind'] === 'costReduction') {
                 $keys[] = $key;
             }
@@ -1997,14 +2021,14 @@ final class GameLoopTest extends TestCase
 
         // Scrap is worth strictly less than what the hex really holds.
         $this->assertLessThan(
-            \App\Game\Catalog::material('wood')['npcPrice'],
-            \App\Game\Catalog::material('branch')['npcPrice'],
+            Catalog::material('wood')['npcPrice'],
+            Catalog::material('branch')['npcPrice'],
         );
 
-        \App\Models\CharacterItem::create([
+        CharacterItem::create([
             'character_id' => $this->character->id,
             'item_key' => 'stone_axe',
-            'durability' => \App\Game\Catalog::item('stone_axe')['maxDurability'],
+            'durability' => Catalog::item('stone_axe')['maxDurability'],
             'equipped' => true,
         ]);
 
@@ -2021,7 +2045,7 @@ final class GameLoopTest extends TestCase
     /** §8.2 -- a snapped axe is not an axe, and it says so in those words. */
     public function test_a_broken_tool_counts_as_no_tool(): void
     {
-        \App\Models\CharacterItem::create([
+        CharacterItem::create([
             'character_id' => $this->character->id,
             'item_key' => 'stone_axe',
             'durability' => 0,
@@ -2058,7 +2082,7 @@ final class GameLoopTest extends TestCase
         $col = (int) $this->character->col;
         $row = (int) $this->character->row;
 
-        $job = $this->game->startMining($this->character, $col, $row, \App\Game\Drops::GATHERING);
+        $job = $this->game->startMining($this->character, $col, $row, Drops::GATHERING);
         $this->assertSame('mining', $job->kind);
         $this->assertTrue(Catalog::isScrap((string) $job->material_key));
 
@@ -2095,7 +2119,7 @@ final class GameLoopTest extends TestCase
     {
         [$col, $row] = $this->standOnAHerd();
 
-        \App\Models\CharacterItem::create([
+        CharacterItem::create([
             'character_id' => $this->character->id,
             'item_key' => 'crude_bow',
             'durability' => 0,
@@ -2109,7 +2133,7 @@ final class GameLoopTest extends TestCase
         try {
             $this->game->startHunt($this->character->fresh(), $col, $row);
             $this->fail('hunted with a snapped bow');
-        } catch (\App\Game\GameException $e) {
+        } catch (GameException $e) {
             $this->assertStringContainsString('bow', strtolower($e->getMessage()));
         }
 
@@ -2143,21 +2167,21 @@ final class GameLoopTest extends TestCase
     public function test_scrap_feeds_no_recipe_and_undercuts_every_raw_material(): void
     {
         $rawPrices = [];
-        foreach (\App\Game\Catalog::BIOME_MATERIAL as $key) {
-            $rawPrices[] = \App\Game\Catalog::material($key)['npcPrice'];
+        foreach (Catalog::BIOME_MATERIAL as $key) {
+            $rawPrices[] = Catalog::material($key)['npcPrice'];
         }
 
-        foreach (\App\Game\Catalog::BIOME_SCRAP as $biome => $key) {
-            $def = \App\Game\Catalog::material($key);
+        foreach (Catalog::BIOME_SCRAP as $biome => $key) {
+            $def = Catalog::material($key);
             $this->assertNotNull($def, "{$biome} has no scrap");
             $this->assertSame(0, $def['tier']);
             $this->assertGreaterThan(0, $def['npcPrice'], 'the trader refuses scrap');
             $this->assertLessThan(min($rawPrices), $def['npcPrice'], "{$key} is worth as much as a raw material");
 
-            foreach (\App\Game\Catalog::recipes() as $recipe) {
+            foreach (Catalog::recipes() as $recipe) {
                 $this->assertNotContains($key, [$recipe['input'], $recipe['secondInput'] ?? null]);
             }
-            foreach (\App\Game\Catalog::items() as $item) {
+            foreach (Catalog::items() as $item) {
                 $this->assertArrayNotHasKey($key, $item['inputs'] ?? []);
             }
         }
@@ -2194,7 +2218,7 @@ final class GameLoopTest extends TestCase
         try {
             $this->game->startMining($this->character, $col, $row);
             $this->fail('mined a hex the character was not standing on');
-        } catch (\App\Game\GameException $e) {
+        } catch (GameException $e) {
             $this->assertSame('blocked', $e->errorCode);
         }
 
@@ -2215,7 +2239,7 @@ final class GameLoopTest extends TestCase
         foreach (['0xa', '0xb'] as $wallet) {
             $other = $this->game->createCharacter(Player::create(['wallet' => $wallet]));
             $other->update(['col' => $col, 'row' => $row]);
-            $this->game->startMining($other, $col, $row, \App\Game\Drops::GATHERING);
+            $this->game->startMining($other, $col, $row, Drops::GATHERING);
         }
 
         $preview = $this->game->previewTile($this->character, $col, $row);
@@ -2228,8 +2252,8 @@ final class GameLoopTest extends TestCase
     {
         // Best tool in the game, maxed skill, best-in-slot gear on the hardest
         // hex: nowhere near the guard, so the ladder has somewhere left to go.
-        $best = \App\Game\Formulas::toolAttack(\App\Game\Catalog::item('mythril_pickaxe'));
-        $mine = \App\Game\Formulas::mineTime(
+        $best = Formulas::toolAttack(Catalog::item('mythril_pickaxe'));
+        $mine = Formulas::mineTime(
             Balance::TILE_HP_MAX,
             Balance::SKILL_MAX_LEVEL,
             Balance::STAT_CEILING,
@@ -2239,7 +2263,7 @@ final class GameLoopTest extends TestCase
         $this->assertFalse($mine['clamped'], 'the top of the tool ladder is wasted');
 
         // Even absurd inputs cannot breach it.
-        $absurd = \App\Game\Formulas::mineTime(Balance::TILE_HP_MAX, 9999, 99.0, 9999);
+        $absurd = Formulas::mineTime(Balance::TILE_HP_MAX, 9999, 99.0, 9999);
         $this->assertSame(Balance::MINING_FLOOR_SECONDS, $absurd['total']);
         $this->assertTrue($absurd['clamped']);
     }
@@ -2250,19 +2274,19 @@ final class GameLoopTest extends TestCase
      */
     public function test_bare_hands_step_a_point_every_ten_levels(): void
     {
-        $this->assertSame(Balance::BARE_HAND_ATTACK, \App\Game\Formulas::gatherAttack(0));
-        $this->assertSame(Balance::BARE_HAND_ATTACK, \App\Game\Formulas::gatherAttack(1));
-        $this->assertSame(Balance::BARE_HAND_ATTACK, \App\Game\Formulas::gatherAttack(9));
-        $this->assertSame(Balance::BARE_HAND_ATTACK + 1, \App\Game\Formulas::gatherAttack(10));
-        $this->assertSame(Balance::BARE_HAND_ATTACK + 2, \App\Game\Formulas::gatherAttack(20));
+        $this->assertSame(Balance::BARE_HAND_ATTACK, Formulas::gatherAttack(0));
+        $this->assertSame(Balance::BARE_HAND_ATTACK, Formulas::gatherAttack(1));
+        $this->assertSame(Balance::BARE_HAND_ATTACK, Formulas::gatherAttack(9));
+        $this->assertSame(Balance::BARE_HAND_ATTACK + 1, Formulas::gatherAttack(10));
+        $this->assertSame(Balance::BARE_HAND_ATTACK + 2, Formulas::gatherAttack(20));
 
         // The line skill stops where the line skill stops.
         $capped = intdiv(Balance::SKILL_MAX_LEVEL, Balance::MINING_SKILL_LEVELS_PER_ATTACK);
-        $this->assertSame($capped, \App\Game\Formulas::skillAttack(Balance::SKILL_MAX_LEVEL));
-        $this->assertSame($capped, \App\Game\Formulas::skillAttack(9999));
+        $this->assertSame($capped, Formulas::skillAttack(Balance::SKILL_MAX_LEVEL));
+        $this->assertSame($capped, Formulas::skillAttack(9999));
         $this->assertSame(
             Balance::BARE_HAND_ATTACK + $capped,
-            \App\Game\Formulas::gatherAttack(9999),
+            Formulas::gatherAttack(9999),
         );
     }
 
@@ -2291,7 +2315,7 @@ final class GameLoopTest extends TestCase
 
         // At every level of the line, and against every rung actually sold.
         foreach ([1, 10, 25, Balance::SKILL_MAX_LEVEL] as $level) {
-            $hands = \App\Game\Formulas::mineTime(
+            $hands = Formulas::mineTime(
                 $hex,
                 $level,
                 0.0,
@@ -2299,8 +2323,8 @@ final class GameLoopTest extends TestCase
             )['total'];
 
             foreach (['stone_axe', 'chipped_pick', 'crude_bow', 'iron_hatchet'] as $key) {
-                $attack = \App\Game\Formulas::toolAttack(\App\Game\Catalog::item($key));
-                $tooled = \App\Game\Formulas::mineTime($hex, $level, 0.0, $attack)['total'];
+                $attack = Formulas::toolAttack(Catalog::item($key));
+                $tooled = Formulas::mineTime($hex, $level, 0.0, $attack)['total'];
 
                 $this->assertLessThan(
                     $hands,
@@ -2324,13 +2348,13 @@ final class GameLoopTest extends TestCase
     {
         $fresh = 1;
 
-        $easy = \App\Game\Formulas::mineTime(
+        $easy = Formulas::mineTime(
             Balance::TILE_HP_MIN,
             $fresh,
             0.0,
             Balance::MINING_COMMON_ATTACK,
         );
-        $hard = \App\Game\Formulas::mineTime(
+        $hard = Formulas::mineTime(
             Balance::TILE_HP_MAX,
             $fresh,
             0.0,
@@ -2341,7 +2365,7 @@ final class GameLoopTest extends TestCase
         $this->assertSame(30 * 60, $hard['total']);
 
         // A herd is read off the same yardstick, at twenty-five.
-        $herd = \App\Game\Formulas::mineTime(
+        $herd = Formulas::mineTime(
             Balance::HERD_HP,
             $fresh,
             0.0,
@@ -2367,8 +2391,8 @@ final class GameLoopTest extends TestCase
         // Several rolls rather than one, so the assertion is about the ladder
         // rather than about whichever hex hash zero happens to produce.
         foreach ([0, 1, 7, 12345, 999983, 0xffffffff] as $hash) {
-            $base = \App\Game\Formulas::mineTime(
-                \App\Game\WorldGen::tileHp($hash, 'common'),
+            $base = Formulas::mineTime(
+                WorldGen::tileHp($hash, 'common'),
                 $fresh,
                 0.0,
                 Balance::MINING_COMMON_ATTACK,
@@ -2378,8 +2402,8 @@ final class GameLoopTest extends TestCase
             $this->assertLessThanOrEqual(30 * 60, $base);
 
             foreach (Balance::TILE_HP_GRADE_ATTACK as $grade => $attack) {
-                $own = \App\Game\Formulas::mineTime(
-                    \App\Game\WorldGen::tileHp($hash, $grade),
+                $own = Formulas::mineTime(
+                    WorldGen::tileHp($hash, $grade),
                     $fresh,
                     0.0,
                     $attack,
@@ -2407,7 +2431,7 @@ final class GameLoopTest extends TestCase
         foreach ([0, 1, 7, 12345, 999983, 0xffffffff] as $hash) {
             $previous = 0;
             foreach (array_keys(Balance::TILE_HP_GRADE_ATTACK) as $grade) {
-                $hp = \App\Game\WorldGen::tileHp($hash, $grade);
+                $hp = WorldGen::tileHp($hash, $grade);
                 $this->assertGreaterThan($previous, $hp, "{$grade} ground is no harder than the grade below it");
                 $previous = $hp;
             }
@@ -2430,8 +2454,8 @@ final class GameLoopTest extends TestCase
 
         foreach ([0, 1, 12345, 0xffffffff] as $hash) {
             $this->assertSame(
-                \App\Game\Hash::randInt($hash, Balance::TILE_HP_MIN, Balance::TILE_HP_MAX),
-                \App\Game\WorldGen::tileHp($hash, 'common'),
+                Hash::randInt($hash, Balance::TILE_HP_MIN, Balance::TILE_HP_MAX),
+                WorldGen::tileHp($hash, 'common'),
             );
         }
     }
@@ -2449,7 +2473,7 @@ final class GameLoopTest extends TestCase
         $ladder = Balance::TILE_HP_GRADE_ATTACK;
 
         $this->assertSame(
-            \App\Game\Variants::GRADES,
+            Variants::GRADES,
             array_keys($ladder),
             'the HP ladder and the variant grades have drifted apart',
         );
@@ -2460,7 +2484,7 @@ final class GameLoopTest extends TestCase
             $previous = $attack;
         }
 
-        foreach (\App\Game\Variants::BIOME_VARIANTS as $biome => $variants) {
+        foreach (Variants::BIOME_VARIANTS as $biome => $variants) {
             foreach ($variants as $variant) {
                 $this->assertArrayHasKey(
                     $variant['grade'],
@@ -2480,12 +2504,12 @@ final class GameLoopTest extends TestCase
      */
     public function test_an_unskilled_line_adds_no_attack(): void
     {
-        $this->assertSame(0, \App\Game\Formulas::skillAttack(0));
-        $this->assertSame(0, \App\Game\Formulas::skillAttack(1));
-        $this->assertSame(0, \App\Game\Formulas::skillAttack(9));
-        $this->assertSame(1, \App\Game\Formulas::skillAttack(10));
+        $this->assertSame(0, Formulas::skillAttack(0));
+        $this->assertSame(0, Formulas::skillAttack(1));
+        $this->assertSame(0, Formulas::skillAttack(9));
+        $this->assertSame(1, Formulas::skillAttack(10));
 
-        $mine = \App\Game\Formulas::mineTime(Balance::TILE_HP_MIN, 1, 0.0, 3);
+        $mine = Formulas::mineTime(Balance::TILE_HP_MIN, 1, 0.0, 3);
         $this->assertSame(0, $mine['skillAttack']);
         $this->assertSame(3.0, $mine['rate']);
     }
@@ -2499,7 +2523,7 @@ final class GameLoopTest extends TestCase
      */
     public function test_no_attack_at_all_is_a_refusal_rather_than_a_long_trip(): void
     {
-        $none = \App\Game\Formulas::mineTime(Balance::TILE_HP_MIN, 1, 0.0, 0);
+        $none = Formulas::mineTime(Balance::TILE_HP_MIN, 1, 0.0, 0);
 
         $this->assertFalse($none['able']);
         $this->assertSame(0, $none['total']);
@@ -2507,7 +2531,7 @@ final class GameLoopTest extends TestCase
         $this->assertFalse($none['clamped']);
 
         // One point of anything is enough to make it a mine again.
-        $some = \App\Game\Formulas::mineTime(Balance::TILE_HP_MIN, 1, 0.0, 1);
+        $some = Formulas::mineTime(Balance::TILE_HP_MIN, 1, 0.0, 1);
         $this->assertTrue($some['able']);
         $this->assertGreaterThan(0, $some['total']);
 
@@ -2515,7 +2539,7 @@ final class GameLoopTest extends TestCase
         // which is why the arithmetic alone is not the whole answer. §8.0 rule
         // 1 refuses the VERB without its tool, so previewTile overrides this
         // for a bare-handed dig no matter how well the line is known.
-        $learned = \App\Game\Formulas::mineTime(Balance::TILE_HP_MIN, 10, 0.0, 0);
+        $learned = Formulas::mineTime(Balance::TILE_HP_MIN, 10, 0.0, 0);
         $this->assertTrue($learned['able']);
     }
 
@@ -2557,20 +2581,20 @@ final class GameLoopTest extends TestCase
         // they last. Distinct rungs only.
         $ladder = ['stone_axe', 'hewn_axe', 'iron_hatchet', 'ironwood_axe'];
         $hex = Balance::TILE_HP_MAX;
-        $last = \App\Game\Formulas::mineTime($hex, 1, 0.0, Balance::BARE_HAND_ATTACK)['total'];
+        $last = Formulas::mineTime($hex, 1, 0.0, Balance::BARE_HAND_ATTACK)['total'];
 
         // Bare hands are the floor under the ladder and are slower than any of
         // it -- the hex is the same pile of work either way (§4.0).
         $this->assertGreaterThan(30 * 60, $last);
 
         foreach ($ladder as $key) {
-            $def = \App\Game\Catalog::item($key);
+            $def = Catalog::item($key);
             $this->assertNotNull($def, "{$key} is not in the catalog");
 
-            $attack = \App\Game\Formulas::toolAttack($def);
+            $attack = Formulas::toolAttack($def);
             $this->assertGreaterThan(0, $attack, "{$key} has no bite");
 
-            $mine = \App\Game\Formulas::mineTime($hex, 1, 0.0, $attack);
+            $mine = Formulas::mineTime($hex, 1, 0.0, $attack);
             $this->assertLessThan($last, $mine['total'], "{$key} was no faster than the rung below");
             $this->assertFalse($mine['clamped'], "{$key} is wasted on this hex");
             $last = $mine['total'];
@@ -2586,11 +2610,11 @@ final class GameLoopTest extends TestCase
      */
     public function test_stacking_the_same_item_gives_less_each_time_and_is_capped(): void
     {
-        $one = \App\Game\Formulas::aggregateStat(
+        $one = Formulas::aggregateStat(
             [['key' => 'leather_armor', 'durability' => 10, 'equipped' => true]],
             'tripReduction',
         );
-        $three = \App\Game\Formulas::aggregateStat(
+        $three = Formulas::aggregateStat(
             array_fill(0, 3, ['key' => 'leather_armor', 'durability' => 10, 'equipped' => true]),
             'tripReduction',
         );
@@ -2618,17 +2642,17 @@ final class GameLoopTest extends TestCase
 
         $this->assertGreaterThan(
             0,
-            \App\Game\Formulas::aggregateStat($kit, 'yield', 'mining'),
+            Formulas::aggregateStat($kit, 'yield', 'mining'),
             'a pickaxe did nothing on a seam',
         );
         $this->assertSame(
             0.0,
-            \App\Game\Formulas::aggregateStat($kit, 'yield', 'woodcutting'),
+            Formulas::aggregateStat($kit, 'yield', 'woodcutting'),
             'a pickaxe felled a tree',
         );
         $this->assertSame(
             0.0,
-            \App\Game\Formulas::aggregateStat($kit, 'yield'),
+            Formulas::aggregateStat($kit, 'yield'),
             'a tool counted with no line being worked',
         );
 
@@ -2636,12 +2660,12 @@ final class GameLoopTest extends TestCase
         $worn = [['key' => 'leather_armor', 'durability' => 10, 'equipped' => true]];
         $this->assertGreaterThan(
             0,
-            \App\Game\Formulas::aggregateStat($worn, 'tripReduction', 'harvesting'),
+            Formulas::aggregateStat($worn, 'tripReduction', 'harvesting'),
             'armor stopped working outside a line',
         );
         $this->assertGreaterThan(
             0,
-            \App\Game\Formulas::aggregateStat($worn, 'tripReduction'),
+            Formulas::aggregateStat($worn, 'tripReduction'),
             'armor stopped working with no line in mind',
         );
     }
@@ -2655,9 +2679,9 @@ final class GameLoopTest extends TestCase
     {
         $ceilings = [];
 
-        foreach (\App\Game\Catalog::TOOL_SLOT_SKILL as $slot => $line) {
+        foreach (Catalog::TOOL_SLOT_SKILL as $slot => $line) {
             $tools = array_filter(
-                \App\Game\Catalog::items(),
+                Catalog::items(),
                 fn (array $def) => ($def['slot'] ?? null) === $slot,
             );
 
@@ -2707,7 +2731,7 @@ final class GameLoopTest extends TestCase
             $previous = $cap;
         }
 
-        foreach (\App\Game\Catalog::items() as $key => $def) {
+        foreach (Catalog::items() as $key => $def) {
             $this->assertContains($def['rarity'], Balance::RARITIES, "{$key} has no rarity");
 
             // §8 -- a gathering tool has no percentage to out-climb anything
@@ -2731,7 +2755,7 @@ final class GameLoopTest extends TestCase
      */
     public function test_tradeable_items_are_never_dropped_rarities(): void
     {
-        foreach (\App\Game\Catalog::items() as $key => $def) {
+        foreach (Catalog::items() as $key => $def) {
             $this->assertArrayHasKey('tradeable', $def, "{$key} does not say whether it is an NFT");
 
             if ($def['tradeable']) {
@@ -2741,7 +2765,7 @@ final class GameLoopTest extends TestCase
 
                 // §3.3 -- an NFT is crafted from tier 3 + tier 4, never tier 1-2 alone.
                 $topTier = max(array_map(
-                    fn (string $m) => \App\Game\Catalog::materialTier($m),
+                    fn (string $m) => Catalog::materialTier($m),
                     array_keys($def['inputs']),
                 ));
                 $this->assertGreaterThanOrEqual(3, $topTier, "{$key} is tradeable off common materials");
@@ -2764,7 +2788,7 @@ final class GameLoopTest extends TestCase
             'options' => array_fill(0, 3, ['stat' => 'yield', 'value' => Balance::OPTION_VALUE['legendary'][1] * Balance::OPTION_SCOPED_MULTIPLIER]),
         ]);
 
-        $total = \App\Game\Formulas::aggregateStat($fat, 'yield', 'mining');
+        $total = Formulas::aggregateStat($fat, 'yield', 'mining');
 
         $this->assertLessThanOrEqual(Balance::STAT_CAP['epic'], $total, 'options beat the rarity cap');
         $this->assertLessThanOrEqual(Balance::STAT_CEILING, $total, 'options beat the global ceiling');
@@ -2786,9 +2810,9 @@ final class GameLoopTest extends TestCase
             'options' => [['stat' => 'yield', 'value' => 0.04, 'scope' => 'mining']],
         ]];
 
-        $this->assertSame(0.04, \App\Game\Formulas::aggregateStat($kit, 'yield', 'mining'));
-        $this->assertSame(0.0, \App\Game\Formulas::aggregateStat($kit, 'yield', 'woodcutting'));
-        $this->assertSame(0.0, \App\Game\Formulas::aggregateStat($kit, 'yield'));
+        $this->assertSame(0.04, Formulas::aggregateStat($kit, 'yield', 'mining'));
+        $this->assertSame(0.0, Formulas::aggregateStat($kit, 'yield', 'woodcutting'));
+        $this->assertSame(0.0, Formulas::aggregateStat($kit, 'yield'));
     }
 
     /**
@@ -2798,15 +2822,15 @@ final class GameLoopTest extends TestCase
      */
     public function test_worn_gear_rolls_scoped_lines_and_pays_them_better(): void
     {
-        $def = \App\Game\Catalog::item('ironwood_armor');
+        $def = Catalog::item('ironwood_armor');
         $scoped = 0;
         $flat = 0;
 
         for ($seed = 1; $seed <= 200; $seed++) {
-            foreach (\App\Game\Formulas::rollOptions($def, $seed) as $option) {
+            foreach (Formulas::rollOptions($def, $seed) as $option) {
                 $scope = $option['scope'] ?? null;
 
-                $tiers = \App\Game\Formulas::optionTiersFor($def['rarity']);
+                $tiers = Formulas::optionTiersFor($def['rarity']);
 
                 // §8.0.1 -- a line is either a percentage or a solid number,
                 // and the two are read off different tables.
@@ -2836,8 +2860,8 @@ final class GameLoopTest extends TestCase
                 }
 
                 $scoped++;
-                $this->assertContains($scope, \App\Game\Catalog::SKILLS);
-                $this->assertContains($option['stat'], \App\Game\Catalog::OPTION_SCOPED_STATS);
+                $this->assertContains($scope, Catalog::SKILLS);
+                $this->assertContains($option['stat'], Catalog::OPTION_SCOPED_STATS);
                 $this->assertGreaterThanOrEqual(
                     $floor * Balance::OPTION_SCOPED_MULTIPLIER,
                     $option['value'],
@@ -2865,9 +2889,9 @@ final class GameLoopTest extends TestCase
         ]];
 
         // The pickaxe is a yield tool, yet it now shaves mine time on its line.
-        $this->assertSame(0.02, \App\Game\Formulas::aggregateStat($kit, 'tripReduction', 'mining'));
+        $this->assertSame(0.02, Formulas::aggregateStat($kit, 'tripReduction', 'mining'));
         // ...and nowhere else, because options inherit the line-lock.
-        $this->assertSame(0.0, \App\Game\Formulas::aggregateStat($kit, 'tripReduction', 'woodcutting'));
+        $this->assertSame(0.0, Formulas::aggregateStat($kit, 'tripReduction', 'woodcutting'));
     }
 
     /**
@@ -2880,11 +2904,11 @@ final class GameLoopTest extends TestCase
     public function test_option_counts_never_pass_the_rarity_ceiling(): void
     {
         foreach (['common' => 'stone_axe', 'epic' => 'mythril_pickaxe'] as $rarity => $key) {
-            $def = \App\Game\Catalog::item($key);
+            $def = Catalog::item($key);
             $seen = [];
 
             for ($seed = 1; $seed <= 200; $seed++) {
-                $rolled = \App\Game\Formulas::rollOptions($def, $seed);
+                $rolled = Formulas::rollOptions($def, $seed);
                 $seen[count($rolled)] = true;
 
                 $this->assertLessThanOrEqual(
@@ -2893,7 +2917,7 @@ final class GameLoopTest extends TestCase
                     "{$key} rolled past its ceiling",
                 );
 
-                $tiers = \App\Game\Formulas::optionTiersFor($rarity);
+                $tiers = Formulas::optionTiersFor($rarity);
 
                 foreach ($rolled as $option) {
                     $table = ($option['kind'] ?? 'percent') === 'flat'
@@ -2905,7 +2929,7 @@ final class GameLoopTest extends TestCase
 
                     $this->assertGreaterThanOrEqual($table[$tiers[0]][0], $option['value']);
                     $this->assertLessThanOrEqual($table[end($tiers)][1] * $top, $option['value']);
-                    $this->assertContains($option['stat'], \App\Game\Catalog::optionStatsFor($def['slot']));
+                    $this->assertContains($option['stat'], Catalog::optionStatsFor($def['slot']));
                 }
 
                 // One line per (stat, scope): two "+2% mining yield" rows on one
@@ -2939,18 +2963,18 @@ final class GameLoopTest extends TestCase
      */
     public function test_a_line_may_be_drawn_from_any_tier_at_or_below_the_item(): void
     {
-        $this->assertSame(['common'], \App\Game\Formulas::optionTiersFor('common'));
+        $this->assertSame(['common'], Formulas::optionTiersFor('common'));
         $this->assertSame(
             ['common', 'uncommon', 'rare', 'epic'],
-            \App\Game\Formulas::optionTiersFor('epic'),
+            Formulas::optionTiersFor('epic'),
         );
 
-        $def = \App\Game\Catalog::item('mythril_pickaxe');
+        $def = Catalog::item('mythril_pickaxe');
         $low = 0;
         $high = 0;
 
         for ($seed = 1; $seed <= 400; $seed++) {
-            foreach (\App\Game\Formulas::rollOptions($def, $seed) as $option) {
+            foreach (Formulas::rollOptions($def, $seed) as $option) {
                 if ($option['value'] <= Balance::OPTION_VALUE['common'][1]) {
                     $low++;
                 }
@@ -2981,16 +3005,16 @@ final class GameLoopTest extends TestCase
             ],
         ]];
 
-        $def = \App\Game\Catalog::item('soldiers_sword');
-        $pair = \App\Game\Formulas::combatPair($kit);
+        $def = Catalog::item('soldiers_sword');
+        $pair = Formulas::combatPair($kit);
 
         $this->assertSame((int) $def['attack'] + 4, $pair['attack']);
         $this->assertSame((int) $def['defense'] + 3, $pair['defense']);
 
         // And it is nowhere near the percentage aggregate, which is a different
         // number with a ceiling on it.
-        $this->assertSame(0.0, \App\Game\Formulas::aggregateStat($kit, 'defense'));
-        $this->assertSame(0.0, \App\Game\Formulas::aggregateStat($kit, 'attack'));
+        $this->assertSame(0.0, Formulas::aggregateStat($kit, 'defense'));
+        $this->assertSame(0.0, Formulas::aggregateStat($kit, 'attack'));
     }
 
     /**
@@ -2999,7 +3023,7 @@ final class GameLoopTest extends TestCase
      */
     public function test_a_flat_line_on_a_tool_is_mining_attack_and_never_reaches_a_fight(): void
     {
-        $axe = \App\Models\CharacterItem::create([
+        $axe = CharacterItem::create([
             'character_id' => $this->character->id,
             'item_key' => 'ironwood_axe',
             'durability' => 100,
@@ -3007,8 +3031,8 @@ final class GameLoopTest extends TestCase
             'options' => [['stat' => 'attack', 'value' => 5, 'kind' => 'flat']],
         ]);
 
-        $def = \App\Game\Catalog::item('ironwood_axe');
-        $bare = \App\Game\Formulas::toolAttack($def);
+        $def = Catalog::item('ironwood_axe');
+        $bare = Formulas::toolAttack($def);
 
         $this->assertSame(
             $bare + 5,
@@ -3018,11 +3042,11 @@ final class GameLoopTest extends TestCase
 
         // A faster hex, and the same fight.
         $this->assertLessThan(
-            \App\Game\Formulas::mineTime(3600, 0, 0.0, $bare)['total'],
-            \App\Game\Formulas::mineTime(3600, 0, 0.0, $bare + 5)['total'],
+            Formulas::mineTime(3600, 0, 0.0, $bare)['total'],
+            Formulas::mineTime(3600, 0, 0.0, $bare + 5)['total'],
         );
 
-        $pair = \App\Game\Formulas::combatPair(
+        $pair = Formulas::combatPair(
             $this->character->fresh()->items->map(fn ($i) => [
                 'id' => $i->id,
                 'key' => $i->item_key,
@@ -3043,12 +3067,12 @@ final class GameLoopTest extends TestCase
      */
     public function test_a_roll_produces_both_flat_and_percentage_lines(): void
     {
-        $def = \App\Game\Catalog::item('keepers_carapace');
+        $def = Catalog::item('keepers_carapace');
         $flat = 0;
         $percent = 0;
 
         for ($seed = 1; $seed <= 300; $seed++) {
-            foreach (\App\Game\Formulas::rollOptions($def, $seed) as $option) {
+            foreach (Formulas::rollOptions($def, $seed) as $option) {
                 if (($option['kind'] ?? 'percent') === 'flat') {
                     $flat++;
                     $this->assertContains($option['stat'], ['attack', 'defense']);
@@ -3182,7 +3206,7 @@ final class GameLoopTest extends TestCase
     public function test_a_buff_cannot_push_a_stat_past_the_ceiling(): void
     {
         // Best legal gear, then drink on top of it.
-        \App\Models\CharacterItem::create([
+        CharacterItem::create([
             'character_id' => $this->character->id,
             'item_key' => 'mythril_pickaxe',
             'durability' => 100,
@@ -3206,9 +3230,9 @@ final class GameLoopTest extends TestCase
     {
         $seen = [];
 
-        foreach (\App\Game\Catalog::items() as $key => $def) {
-            $category = \App\Game\Catalog::category($def);
-            $this->assertContains($category, \App\Game\Catalog::CATEGORIES, "{$key} has no bench");
+        foreach (Catalog::items() as $key => $def) {
+            $category = Catalog::category($def);
+            $this->assertContains($category, Catalog::CATEGORIES, "{$key} has no bench");
             $seen[$category] = true;
 
             if ($category === 'consumable') {
@@ -3220,7 +3244,7 @@ final class GameLoopTest extends TestCase
         }
 
         $this->assertSame(
-            \App\Game\Catalog::CATEGORIES,
+            Catalog::CATEGORIES,
             array_keys($seen),
             'a bench has nothing on it',
         );
@@ -3238,7 +3262,7 @@ final class GameLoopTest extends TestCase
     {
         $uniques = 0;
 
-        foreach (\App\Game\Catalog::items() as $key => $def) {
+        foreach (Catalog::items() as $key => $def) {
             // Legendary MAY be defined -- §8.5's top rung of potions is -- but
             // the only bench that reaches it is a guild hall, and there are
             // none. The invariant is unreachability, not absence: a legendary
@@ -3289,10 +3313,10 @@ final class GameLoopTest extends TestCase
     {
         // Kit out two lines at once, which is the whole point of separate slots.
         foreach (['stone_axe', 'chipped_pick'] as $key) {
-            \App\Models\CharacterItem::create([
+            CharacterItem::create([
                 'character_id' => $this->character->id,
                 'item_key' => $key,
-                'durability' => \App\Game\Catalog::item($key)['maxDurability'],
+                'durability' => Catalog::item($key)['maxDurability'],
                 'equipped' => true,
             ]);
         }
@@ -3301,7 +3325,7 @@ final class GameLoopTest extends TestCase
         $col = $this->character->col;
         $row = $this->character->row;
         $tile = $this->game->buildTile($col, $row, $this->game->now());
-        $worn = \App\Game\Catalog::slotForSkill(\App\Game\Catalog::skillForMaterial($tile['material']));
+        $worn = Catalog::slotForSkill(Catalog::skillForMaterial($tile['material']));
         $this->assertSame('axe', $worn, 'spawn is no longer a forest hex');
 
         $job = $this->game->startMining($this->character->fresh(), $col, $row);
@@ -3309,7 +3333,7 @@ final class GameLoopTest extends TestCase
         $this->game->collectJob($this->character->fresh(), $job->id);
 
         foreach ($this->character->fresh()->items as $item) {
-            $def = \App\Game\Catalog::item($item->item_key);
+            $def = Catalog::item($item->item_key);
 
             if ($def['slot'] === $worn) {
                 $this->assertLessThan(
@@ -3336,7 +3360,7 @@ final class GameLoopTest extends TestCase
      */
     public function test_materials_can_be_thrown_away_anywhere_and_return_nothing(): void
     {
-        $add = new \ReflectionMethod($this->game, 'addMaterial');
+        $add = new ReflectionMethod($this->game, 'addMaterial');
         $add->setAccessible(true);
         $add->invoke($this->game, $this->character, 'branch', 20);
 
@@ -3356,7 +3380,7 @@ final class GameLoopTest extends TestCase
         try {
             $this->game->discardMaterial($this->character->fresh(), 'branch', 1);
             $this->fail('threw away material that was not held');
-        } catch (\App\Game\GameException $e) {
+        } catch (GameException $e) {
             $this->assertSame('insufficient', $e->errorCode);
         }
     }
@@ -3364,7 +3388,7 @@ final class GameLoopTest extends TestCase
     /** Anything the trader refuses can still be dropped -- that is the point. */
     public function test_unsellable_materials_can_still_be_thrown_away(): void
     {
-        $add = new \ReflectionMethod($this->game, 'addMaterial');
+        $add = new ReflectionMethod($this->game, 'addMaterial');
         $add->setAccessible(true);
         $add->invoke($this->game, $this->character, 'relic', 3);
 
@@ -3373,7 +3397,7 @@ final class GameLoopTest extends TestCase
         try {
             $this->game->sellMaterial($this->character->fresh(), 'relic', 1);
             $this->fail('the trader bought a raid material');
-        } catch (\App\Game\GameException $e) {
+        } catch (GameException $e) {
             $this->assertSame('not_sellable', $e->errorCode);
         }
 
@@ -3389,14 +3413,14 @@ final class GameLoopTest extends TestCase
         try {
             $this->game->sellMaterial($this->character, 'wood', 1);
             $this->fail('sold wood in the middle of a forest');
-        } catch (\App\Game\GameException $e) {
+        } catch (GameException $e) {
             $this->assertSame('not_at_settlement', $e->errorCode);
         }
 
         try {
             $this->game->buyItem($this->character, 'stone_axe');
             $this->fail('bought gear with no shop in sight');
-        } catch (\App\Game\GameException $e) {
+        } catch (GameException $e) {
             $this->assertSame('not_at_settlement', $e->errorCode);
         }
     }
@@ -3405,7 +3429,7 @@ final class GameLoopTest extends TestCase
     {
         $this->standAtWoodcuttingVillage();
 
-        $reflection = new \ReflectionMethod($this->game, 'addMaterial');
+        $reflection = new ReflectionMethod($this->game, 'addMaterial');
         $reflection->setAccessible(true);
         $reflection->invoke($this->game, $this->character, 'wood', 10);
 
@@ -3425,7 +3449,7 @@ final class GameLoopTest extends TestCase
         $this->assertContains('stone_axe', $this->game->shopStock($this->character));
         $this->assertNotContains('iron_hatchet', $this->game->shopStock($this->character));
 
-        $this->expectException(\App\Game\GameException::class);
+        $this->expectException(GameException::class);
         $this->game->buyItem($this->character, 'iron_hatchet');
     }
 
@@ -3435,7 +3459,7 @@ final class GameLoopTest extends TestCase
      */
     public function test_every_recipe_sits_at_a_bench_that_can_actually_make_it(): void
     {
-        foreach (\App\Game\Catalog::items() as $key => $def) {
+        foreach (Catalog::items() as $key => $def) {
             if (! isset($def['inputs'])) {
                 continue;
             }
@@ -3462,7 +3486,7 @@ final class GameLoopTest extends TestCase
         $village = $this->standAtWoodcuttingVillage();
         $this->assertSame('village', $village['tier']);
 
-        $add = new \ReflectionMethod($this->game, 'addMaterial');
+        $add = new ReflectionMethod($this->game, 'addMaterial');
         $add->setAccessible(true);
         foreach (['wood' => 40, 'ingots' => 40, 'planks' => 40, 'cloth' => 40, 'leather' => 40, 'heartknot' => 40] as $key => $qty) {
             $add->invoke($this->game, $this->character, $key, $qty);
@@ -3475,7 +3499,7 @@ final class GameLoopTest extends TestCase
         try {
             $this->game->startCraft($this->character->fresh(), 'iron_pickaxe');
             $this->fail('a village bench forged an uncommon pickaxe');
-        } catch (\App\Game\GameException $e) {
+        } catch (GameException $e) {
             $this->assertSame('station', $e->errorCode);
             $this->assertStringContainsString('city', $e->getMessage());
         }
@@ -3484,7 +3508,7 @@ final class GameLoopTest extends TestCase
     /** §3.2 -- gold stops at uncommon, at every settlement tier. */
     public function test_no_shop_anywhere_stocks_above_uncommon(): void
     {
-        foreach (\App\Game\Catalog::items() as $key => $def) {
+        foreach (Catalog::items() as $key => $def) {
             if (! isset($def['goldPrice'])) {
                 continue;
             }
@@ -3505,7 +3529,7 @@ final class GameLoopTest extends TestCase
     public function test_shop_prices_climb_with_rarity(): void
     {
         $byRarity = [];
-        foreach (\App\Game\Catalog::items() as $key => $def) {
+        foreach (Catalog::items() as $key => $def) {
             if (isset($def['goldPrice'])) {
                 $byRarity[$def['rarity']][$key] = $def['goldPrice'];
             }
@@ -3532,7 +3556,7 @@ final class GameLoopTest extends TestCase
     {
         $this->standAtWoodcuttingVillage();
 
-        $this->expectException(\App\Game\GameException::class);
+        $this->expectException(GameException::class);
         $this->expectExceptionMessage('The trader will not touch that.');
 
         $this->game->sellMaterial($this->character, 'mythril_ore', 1);
@@ -3541,7 +3565,7 @@ final class GameLoopTest extends TestCase
     /** §2 -- tier 3 materials are capped per wallet. */
     public function test_rare_materials_are_capped_per_wallet(): void
     {
-        $service = new \ReflectionMethod($this->game, 'addMaterial');
+        $service = new ReflectionMethod($this->game, 'addMaterial');
         $service->setAccessible(true);
 
         $granted = $service->invoke($this->game, $this->character, 'ironwood', Balance::RARE_WALLET_CAP + 50);
@@ -3571,7 +3595,7 @@ final class GameLoopTest extends TestCase
         $this->assertSame([], $empty['cleared']);
 
         // A live mine is the one thing that has to show up.
-        $this->game->startMining($this->character, $this->character->col, $this->character->row, \App\Game\Drops::GATHERING);
+        $this->game->startMining($this->character, $this->character->col, $this->character->row, Drops::GATHERING);
 
         $busy = $this->game->mapMutations($this->character->fresh());
         $this->assertSame(
@@ -3597,7 +3621,7 @@ final class GameLoopTest extends TestCase
         // old reach-as-sight rule would have shown and this one must not.
         $far = $this->game->createCharacter(Player::create(['wallet' => '0xfar']));
         $far->update(['col' => $this->character->col + $sight + 1, 'row' => $this->character->row]);
-        $this->game->startMining($far, (int) $far->col, (int) $far->row, \App\Game\Drops::GATHERING);
+        $this->game->startMining($far, (int) $far->col, (int) $far->row, Drops::GATHERING);
 
         $this->assertSame([], $this->game->mapMutations($this->character)['occupied']);
 
@@ -3622,7 +3646,7 @@ final class GameLoopTest extends TestCase
         // Somebody working the hex right next to you -- plainly in sight.
         $near = $this->game->createCharacter(Player::create(['wallet' => '0xnear']));
         $near->update(['col' => (int) $this->character->col + 1, 'row' => (int) $this->character->row]);
-        $this->game->startMining($near, (int) $near->col, (int) $near->row, \App\Game\Drops::GATHERING);
+        $this->game->startMining($near, (int) $near->col, (int) $near->row, Drops::GATHERING);
 
         $this->assertCount(1, $this->game->mapMutations($this->character)['occupied']);
 
@@ -3700,18 +3724,18 @@ final class GameLoopTest extends TestCase
         $radius = Balance::mapRadius();
 
         // The corners themselves are on the map, and must stay walkable.
-        $this->assertTrue(\App\Game\WorldGen::inBounds(-$radius, -$radius));
-        $this->assertTrue(\App\Game\WorldGen::inBounds($radius, $radius));
+        $this->assertTrue(WorldGen::inBounds(-$radius, -$radius));
+        $this->assertTrue(WorldGen::inBounds($radius, $radius));
 
         $off = [[-$radius - 1, 0], [$radius + 1, 0], [0, -$radius - 1], [0, $radius + 1]];
 
         foreach ($off as [$col, $row]) {
-            $this->assertFalse(\App\Game\WorldGen::inBounds($col, $row));
+            $this->assertFalse(WorldGen::inBounds($col, $row));
 
             try {
                 $this->game->travelTo($this->character->fresh(), $col, $row);
                 $this->fail("travel to {$col},{$row} was allowed off the map");
-            } catch (\App\Game\GameException $e) {
+            } catch (GameException $e) {
                 $this->assertSame('off_map', $e->errorCode);
             }
         }
@@ -3816,7 +3840,7 @@ final class GameLoopTest extends TestCase
         $this->character->update(['level' => 40]);
         $this->explorerAt(30);
 
-        $this->expectException(\App\Game\GameException::class);
+        $this->expectException(GameException::class);
         $this->game->buyNode($this->character->fresh(), 'explorer.horizon_line');
     }
 
@@ -3852,7 +3876,7 @@ final class GameLoopTest extends TestCase
         $this->explorerAt(Balance::JOB_MAX_LEVEL);
 
         $written = array_filter(
-            \App\Game\Jobs::nodesFor('explorer'),
+            Jobs::nodesFor('explorer'),
             fn (array $n) => $n['effect']['kind'] === 'stat',
         );
 
@@ -3894,21 +3918,21 @@ final class GameLoopTest extends TestCase
 
         $rows = fn () => $this->game->bag($this->character->fresh())['rows'];
 
-        foreach (array_keys(\App\Game\Catalog::materials()) as $key) {
+        foreach (array_keys(Catalog::materials()) as $key) {
             if ($rows() >= $target) {
                 return;
             }
             if (in_array($key, $except, true)) {
                 continue;
             }
-            \App\Models\CharacterMaterial::create([
+            CharacterMaterial::create([
                 'character_id' => $this->character->id,
                 'material_key' => $key,
                 'quantity' => 1,
             ]);
         }
 
-        foreach (\App\Game\Catalog::items() as $key => $def) {
+        foreach (Catalog::items() as $key => $def) {
             if ($rows() >= $target) {
                 return;
             }
@@ -3919,7 +3943,7 @@ final class GameLoopTest extends TestCase
         }
 
         while ($rows() < $target) {
-            \App\Models\CharacterItem::create([
+            CharacterItem::create([
                 'character_id' => $this->character->id,
                 'item_key' => 'stone_axe',
                 'durability' => 40,
@@ -3946,7 +3970,7 @@ final class GameLoopTest extends TestCase
     {
         $this->give(['wood' => 10, 'stone' => 5]);
         $this->character->consumables()->create(['item_key' => 'road_tonic', 'quantity' => 3]);
-        \App\Models\CharacterItem::create([
+        CharacterItem::create([
             'character_id' => $this->character->id,
             'item_key' => 'stone_axe',
             'durability' => 40,
@@ -3970,7 +3994,7 @@ final class GameLoopTest extends TestCase
      */
     public function test_equipping_takes_a_tool_out_of_the_bag(): void
     {
-        $item = \App\Models\CharacterItem::create([
+        $item = CharacterItem::create([
             'character_id' => $this->character->id,
             'item_key' => 'stone_axe',
             'durability' => 40,
@@ -3995,7 +4019,7 @@ final class GameLoopTest extends TestCase
      */
     public function test_a_full_bag_will_not_let_you_take_your_axe_off(): void
     {
-        $item = \App\Models\CharacterItem::create([
+        $item = CharacterItem::create([
             'character_id' => $this->character->id,
             'item_key' => 'stone_axe',
             'durability' => 40,
@@ -4007,7 +4031,7 @@ final class GameLoopTest extends TestCase
         try {
             $this->game->unequipItem($this->character->fresh(), $item->id);
             $this->fail('unequipped into a bag with no room');
-        } catch (\App\Game\GameException $e) {
+        } catch (GameException $e) {
             $this->assertSame('no_room', $e->errorCode);
         }
 
@@ -4029,7 +4053,7 @@ final class GameLoopTest extends TestCase
         try {
             $this->game->travelTo($this->character->fresh(), $col, $row);
             $this->fail('walked off with an overloaded bag');
-        } catch (\App\Game\GameException $e) {
+        } catch (GameException $e) {
             $this->assertSame('overloaded', $e->errorCode);
         }
 
@@ -4049,7 +4073,7 @@ final class GameLoopTest extends TestCase
      */
     public function test_a_full_bag_turns_away_a_kind_it_is_not_carrying(): void
     {
-        $spare = array_key_first(\App\Game\Catalog::materials());
+        $spare = array_key_first(Catalog::materials());
         $this->fillStraps([$spare]);
 
         $bag = $this->game->bag($this->character->fresh());
@@ -4088,7 +4112,7 @@ final class GameLoopTest extends TestCase
         try {
             $this->game->startMining($this->character->fresh(), $col, $row);
             $this->fail('started a dig with nowhere to put it');
-        } catch (\App\Game\GameException $e) {
+        } catch (GameException $e) {
             $this->assertSame('no_room', $e->errorCode);
         }
 
@@ -4177,7 +4201,7 @@ final class GameLoopTest extends TestCase
     private function openNeighbor(int $col, int $row): array
     {
         foreach ([[1, 0], [0, 1], [-1, 0], [0, -1], [1, 1], [-1, -1]] as [$dc, $dr]) {
-            if (\App\Game\WorldGen::settlementAt($col + $dc, $row + $dr) === null) {
+            if (WorldGen::settlementAt($col + $dc, $row + $dr) === null) {
                 return ['col' => $col + $dc, 'row' => $row + $dr];
             }
         }
@@ -4191,7 +4215,7 @@ final class GameLoopTest extends TestCase
 
         for ($dc = -$range; $dc <= $range; $dc++) {
             for ($dr = -$range; $dr <= $range; $dr++) {
-                $s = \App\Game\WorldGen::settlementAt($this->character->col + $dc, $this->character->row + $dr);
+                $s = WorldGen::settlementAt($this->character->col + $dc, $this->character->row + $dr);
                 if ($s && in_array('woodcutting', $s['lines'], true)) {
                     $this->character->update(['col' => $s['col'], 'row' => $s['row']]);
                     $this->character->refresh();
@@ -4231,7 +4255,7 @@ final class GameLoopTest extends TestCase
         $this->game->collectJob($this->character->fresh(), $job->id);
         $this->assertNull($this->game->miningTrip($this->character->fresh()));
 
-        \App\Game\Tiles::reset($col, $row);
+        Tiles::reset($col, $row);
         $this->assertTrue($this->game->previewTile($this->character->fresh(), $col, $row)['canMine']);
     }
 
@@ -4248,8 +4272,8 @@ final class GameLoopTest extends TestCase
         $col = (int) $this->character->col;
         $row = (int) $this->character->row;
 
-        $capacity = \App\Game\WorldGen::tileExtractions(
-            \App\Game\WorldGen::generateTile($col, $row, 0)['baseYield'],
+        $capacity = WorldGen::tileExtractions(
+            WorldGen::generateTile($col, $row, 0)['baseYield'],
         );
 
         $this->assertGreaterThanOrEqual(Balance::TILE_EXTRACTIONS_MIN, $capacity);
@@ -4260,19 +4284,19 @@ final class GameLoopTest extends TestCase
         // Every haul but the last leaves the seam open, and no two runs of the
         // same hex disagree -- there is nothing random to disagree about.
         for ($i = 1; $i < $capacity; $i++) {
-            $state = \App\Game\Tiles::take($col, $row, $capacity, $now);
+            $state = Tiles::take($col, $row, $capacity, $now);
             $this->assertSame($i, $state['taken']);
             $this->assertFalse($state['depleted'], "hex closed early, on haul {$i}");
             $this->assertSame(0, $state['regrowsAt']);
         }
 
-        $last = \App\Game\Tiles::take($col, $row, $capacity, $now);
+        $last = Tiles::take($col, $row, $capacity, $now);
         $this->assertTrue($last['depleted'], 'the last haul left the seam open');
         $this->assertSame($now + Balance::scaled(Balance::REGROW_MS), $last['regrowsAt']);
 
         // And a closed seam takes nothing more, so a double collection cannot
         // push it past its own clock.
-        $again = \App\Game\Tiles::take($col, $row, $capacity, $now);
+        $again = Tiles::take($col, $row, $capacity, $now);
         $this->assertSame($last['regrowsAt'], $again['regrowsAt']);
         $this->assertSame($capacity, $again['taken']);
     }
@@ -4290,7 +4314,7 @@ final class GameLoopTest extends TestCase
         $capacity = 8;
         $now = $this->game->now();
 
-        \App\Game\Tiles::take($col, $row, $capacity, $now);
+        Tiles::take($col, $row, $capacity, $now);
 
         $other = $this->game->createCharacter(
             Player::create(['wallet' => '0xshared', 'session_id' => '0xshared']),
@@ -4298,7 +4322,7 @@ final class GameLoopTest extends TestCase
         $other->update(['col' => $col, 'row' => $row]);
 
         // Nothing about the second character resets the seam.
-        $state = \App\Game\Tiles::take($col, $row, $capacity, $now);
+        $state = Tiles::take($col, $row, $capacity, $now);
         $this->assertSame(2, $state['taken'], 'the second character got a fresh hex');
     }
 
@@ -4315,7 +4339,7 @@ final class GameLoopTest extends TestCase
         $previous = Balance::TILE_EXTRACTIONS_MAX + 1;
 
         for ($yield = Balance::TILE_YIELD_MIN; $yield <= Balance::TILE_YIELD_MAX; $yield++) {
-            $count = \App\Game\WorldGen::tileExtractions($yield);
+            $count = WorldGen::tileExtractions($yield);
 
             $this->assertLessThanOrEqual($previous, $count, "yield {$yield} outlasts a poorer hex");
             $this->assertGreaterThanOrEqual(Balance::TILE_EXTRACTIONS_MIN, $count);
@@ -4326,11 +4350,11 @@ final class GameLoopTest extends TestCase
         // The ends of the band are the band, exactly.
         $this->assertSame(
             Balance::TILE_EXTRACTIONS_MAX,
-            \App\Game\WorldGen::tileExtractions(Balance::TILE_YIELD_MIN),
+            WorldGen::tileExtractions(Balance::TILE_YIELD_MIN),
         );
         $this->assertSame(
             Balance::TILE_EXTRACTIONS_MIN,
-            \App\Game\WorldGen::tileExtractions(Balance::TILE_YIELD_MAX),
+            WorldGen::tileExtractions(Balance::TILE_YIELD_MAX),
         );
     }
 
@@ -4345,7 +4369,7 @@ final class GameLoopTest extends TestCase
         try {
             $this->game->travelTo($this->character, $col + 1, $row);
             $this->fail('traveled away from a running mine');
-        } catch (\App\Game\GameException $e) {
+        } catch (GameException $e) {
             $this->assertSame('working', $e->errorCode);
         }
         $this->assertSame($col, $this->character->fresh()->col);
@@ -4362,7 +4386,7 @@ final class GameLoopTest extends TestCase
     {
         $settlement = $this->standAtWoodcuttingVillage();
 
-        $addMaterial = new \ReflectionMethod($this->game, 'addMaterial');
+        $addMaterial = new ReflectionMethod($this->game, 'addMaterial');
         $addMaterial->setAccessible(true);
         $addMaterial->invoke($this->game, $this->character, 'wood', 40);
 
@@ -4371,7 +4395,7 @@ final class GameLoopTest extends TestCase
         try {
             $this->game->startProcessing($this->character->fresh(), $settlement['id'], 'planks', 1);
             $this->fail('queued a second line while already helping with one');
-        } catch (\App\Game\GameException $e) {
+        } catch (GameException $e) {
             $this->assertSame('busy', $e->errorCode);
         }
     }
@@ -4387,7 +4411,7 @@ final class GameLoopTest extends TestCase
         $this->game->travelTo($this->character, $settlement['col'], $settlement['row']);
         $this->arrive($this->character);
 
-        $addMaterial = new \ReflectionMethod($this->game, 'addMaterial');
+        $addMaterial = new ReflectionMethod($this->game, 'addMaterial');
         $addMaterial->setAccessible(true);
         $addMaterial->invoke($this->game, $this->character, 'wood', 40);
 
@@ -4440,7 +4464,7 @@ final class GameLoopTest extends TestCase
             ]);
         }
 
-        $this->expectException(\App\Game\GameException::class);
+        $this->expectException(GameException::class);
         $this->game->startProcessing($this->character, $settlement['id'], 'planks', 1);
     }
 
@@ -4513,7 +4537,7 @@ final class GameLoopTest extends TestCase
      */
     public function test_a_sawyers_speed_reaches_his_own_line_and_no_other(): void
     {
-        $this->grantNodes(array_keys(\App\Game\Jobs::nodesFor('sawyer')));
+        $this->grantNodes(array_keys(Jobs::nodesFor('sawyer')));
         $character = $this->character->fresh();
 
         $sawing = $this->game->bonuses($character, 'processing', 'woodcutting')['processingSpeed'];
@@ -4540,7 +4564,7 @@ final class GameLoopTest extends TestCase
     public function test_a_full_processing_tree_thins_the_run_within_its_caps(): void
     {
         $settlement = $this->standAtWoodcuttingVillage();
-        $recipe = \App\Game\Catalog::recipe('planks');
+        $recipe = Catalog::recipe('planks');
         $batches = 4;
 
         $this->give(['wood' => 60]);
@@ -4548,7 +4572,7 @@ final class GameLoopTest extends TestCase
         $plainSpent = 60 - $this->game->held($this->character->fresh(), 'wood');
         $this->game->abandonJob($this->character->fresh(), $plain->id);
 
-        $this->grantNodes(array_keys(\App\Game\Jobs::nodesFor('sawyer')));
+        $this->grantNodes(array_keys(Jobs::nodesFor('sawyer')));
 
         $this->give(['wood' => 60 - $this->game->held($this->character->fresh(), 'wood')]);
         $skilled = $this->game->startProcessing($this->character->fresh(), $settlement['id'], 'planks', $batches);
@@ -4703,7 +4727,7 @@ final class GameLoopTest extends TestCase
     // ------------------------------------------------- selling gear back §8.2
 
     /** Buy a shop item at the village and hand back its row. */
-    private function boughtItem(string $key = 'stone_axe'): \App\Models\CharacterItem
+    private function boughtItem(string $key = 'stone_axe'): CharacterItem
     {
         $this->standAtWoodcuttingVillage();
         $this->character->gold = 500;
@@ -4722,14 +4746,14 @@ final class GameLoopTest extends TestCase
         // Full durability: exactly half, and nothing lost to rounding.
         $this->assertSame(
             (int) floor($def['goldPrice'] * Balance::RESALE_RATE),
-            \App\Game\Formulas::resaleValue($def, $def['maxDurability']),
+            Formulas::resaleValue($def, $def['maxDurability']),
         );
 
         // Half worn, so half of half.
         $item->durability = (int) ($def['maxDurability'] / 2);
         $item->save();
 
-        $expected = \App\Game\Formulas::resaleValue($def, (int) $item->durability);
+        $expected = Formulas::resaleValue($def, (int) $item->durability);
         $this->assertGreaterThan(0, $expected);
 
         $sale = $this->game->sellItem($this->character->fresh(), $item->id);
@@ -4755,7 +4779,7 @@ final class GameLoopTest extends TestCase
 
             $this->assertLessThan(
                 $def['goldPrice'],
-                \App\Game\Formulas::resaleValue($def, $def['maxDurability']),
+                Formulas::resaleValue($def, $def['maxDurability']),
                 "{$key} sells back for at least what it cost",
             );
         }
@@ -4786,7 +4810,7 @@ final class GameLoopTest extends TestCase
                 }
 
                 $repair = (int) ceil($price * ($missing / $max) * 0.6);
-                $churn = $price - \App\Game\Formulas::resaleValue($def, $durability);
+                $churn = $price - Formulas::resaleValue($def, $durability);
 
                 $this->assertGreaterThan(
                     $repair,
@@ -4812,7 +4836,7 @@ final class GameLoopTest extends TestCase
         try {
             $this->game->sellItem($this->character->fresh(), (int) $axe['itemId']);
             $this->fail('the trader bought crafted gear');
-        } catch (\App\Game\GameException $e) {
+        } catch (GameException $e) {
             $this->assertSame('not_sellable', $e->errorCode);
         }
     }
@@ -4826,7 +4850,7 @@ final class GameLoopTest extends TestCase
         try {
             $this->game->sellItem($this->character->fresh(), $item->id);
             $this->fail('sold the tool off the belt');
-        } catch (\App\Game\GameException $e) {
+        } catch (GameException $e) {
             $this->assertSame('equipped', $e->errorCode);
         }
 
@@ -4847,7 +4871,7 @@ final class GameLoopTest extends TestCase
         try {
             $this->game->sellItem($this->character->fresh(), $item->id);
             $this->fail('a broken piece was taken for nothing');
-        } catch (\App\Game\GameException $e) {
+        } catch (GameException $e) {
             $this->assertSame('worthless', $e->errorCode);
         }
 
@@ -4869,7 +4893,7 @@ final class GameLoopTest extends TestCase
         try {
             $this->game->sellItem($this->character->fresh(), $item->id);
             $this->fail('sold to nobody');
-        } catch (\App\Game\GameException $e) {
+        } catch (GameException $e) {
             $this->assertSame('not_at_settlement', $e->errorCode);
         }
     }
@@ -4884,7 +4908,7 @@ final class GameLoopTest extends TestCase
         $open = $this->openNeighbor($this->character->col, $this->character->row);
         $this->character->update($open);
 
-        $job = $this->game->startMining($this->character->fresh(), $open['col'], $open['row'], \App\Game\Drops::GATHERING);
+        $job = $this->game->startMining($this->character->fresh(), $open['col'], $open['row'], Drops::GATHERING);
         $job->update(['ends_at' => $this->game->now() - 1]);
         $result = $this->game->collectJob($this->character->fresh(), $job->id);
 
@@ -4893,7 +4917,7 @@ final class GameLoopTest extends TestCase
         $branches = (int) ($result['gained']['branch'] ?? 0);
         $this->assertGreaterThan(0, $branches, 'a bare-handed forest mine brought back no branches');
         $this->assertSame(
-            min($branches, \App\Game\Quests::DEFS['bare_hands']['goal']['target']),
+            min($branches, Quests::DEFS['bare_hands']['goal']['target']),
             $this->questProgress('bare_hands'),
             'the haul did not reach the ledger',
         );
@@ -4907,7 +4931,7 @@ final class GameLoopTest extends TestCase
      */
     public function test_a_finished_counter_stops_at_its_target(): void
     {
-        $target = \App\Game\Quests::DEFS['short_road']['goal']['target'];
+        $target = Quests::DEFS['short_road']['goal']['target'];
 
         $this->fireQuest('travel', $target * 3);
 
@@ -4945,7 +4969,7 @@ final class GameLoopTest extends TestCase
 
         $reward = $this->game->claimQuest($this->character->fresh(), 'bare_hands');
 
-        $this->assertSame(\App\Game\Quests::DEFS['bare_hands']['gold'], $reward['gold']);
+        $this->assertSame(Quests::DEFS['bare_hands']['gold'], $reward['gold']);
         $this->assertSame(
             $before + $reward['gold'],
             (int) $this->character->fresh()->gold,
@@ -4955,7 +4979,7 @@ final class GameLoopTest extends TestCase
         try {
             $this->game->claimQuest($this->character->fresh(), 'bare_hands');
             $this->fail('a quest paid twice');
-        } catch (\App\Game\GameException $e) {
+        } catch (GameException $e) {
             $this->assertSame('already_claimed', $e->errorCode);
         }
 
@@ -4969,7 +4993,7 @@ final class GameLoopTest extends TestCase
     /** §12 -- an unfinished quest is not payable, however it is asked for. */
     public function test_an_unfinished_quest_cannot_be_claimed(): void
     {
-        $this->expectException(\App\Game\GameException::class);
+        $this->expectException(GameException::class);
         $this->game->claimQuest($this->character->fresh(), 'bare_hands');
     }
 
@@ -4988,7 +5012,7 @@ final class GameLoopTest extends TestCase
         try {
             $this->game->claimQuest($this->character->fresh(), 'first_coin');
             $this->fail('claimed past a locked prerequisite');
-        } catch (\App\Game\GameException $e) {
+        } catch (GameException $e) {
             $this->assertSame('locked', $e->errorCode);
         }
 
@@ -5021,7 +5045,7 @@ final class GameLoopTest extends TestCase
         $this->character->save();
         $this->assertFalse($this->questRow('journeyman')['complete']);
 
-        $this->character->level = \App\Game\Quests::DEFS['journeyman']['goal']['target'];
+        $this->character->level = Quests::DEFS['journeyman']['goal']['target'];
         $this->character->save();
 
         $row = $this->questRow('journeyman');
@@ -5038,10 +5062,10 @@ final class GameLoopTest extends TestCase
     {
         $this->fireQuest('gather', 50, 'branch');
 
-        $request = \Illuminate\Http\Request::create('/api/quests/bare_hands/claim', 'POST');
+        $request = Request::create('/api/quests/bare_hands/claim', 'POST');
         $request->attributes->set('character', $this->character->fresh());
 
-        $payload = (new \App\Http\Controllers\Api\QuestController($this->game))
+        $payload = (new QuestController($this->game))
             ->claim($request, 'bare_hands')
             ->getData(true);
 
@@ -5049,7 +5073,7 @@ final class GameLoopTest extends TestCase
         // a toast reading "+10 gold" on top would be the same news twice.
         $this->assertNull($payload['message'], 'a claim toasted as well as paying');
         $this->assertSame('bare_hands', $payload['data']['quest']);
-        $this->assertSame(\App\Game\Quests::DEFS['bare_hands']['gold'], $payload['data']['gold']);
+        $this->assertSame(Quests::DEFS['bare_hands']['gold'], $payload['data']['gold']);
     }
 
     /**
@@ -5064,22 +5088,22 @@ final class GameLoopTest extends TestCase
     public function test_the_opening_arc_is_one_unbroken_line(): void
     {
         $this->assertFalse(
-            \Illuminate\Support\Facades\Schema::hasColumn('characters', 'tutorial_step'),
+            Schema::hasColumn('characters', 'tutorial_step'),
             'the tutorial cursor outlived the tutorial',
         );
 
         $arc = ['bare_hands', 'first_coin', 'a_stone_axe', 'on_the_belt', 'the_real_thing',
             'saw_it_down', 'hewn_axe', 'back_to_the_trees'];
 
-        $this->assertNull(\App\Game\Quests::DEFS['bare_hands']['requires'], 'nothing opens the ledger');
+        $this->assertNull(Quests::DEFS['bare_hands']['requires'], 'nothing opens the ledger');
 
         foreach ($arc as $i => $key) {
-            $this->assertArrayHasKey($key, \App\Game\Quests::DEFS, "{$key} is missing from the arc");
+            $this->assertArrayHasKey($key, Quests::DEFS, "{$key} is missing from the arc");
 
             if ($i > 0) {
                 $this->assertSame(
                     $arc[$i - 1],
-                    \App\Game\Quests::DEFS[$key]['requires'],
+                    Quests::DEFS[$key]['requires'],
                     "{$key} does not follow the step before it",
                 );
             }
@@ -5132,14 +5156,14 @@ final class GameLoopTest extends TestCase
             $this->character->fresh(),
             $open['col'],
             $open['row'],
-            \App\Game\Drops::GATHERING,
+            Drops::GATHERING,
         );
         $job->update(['ends_at' => $this->game->now() - 1]);
 
-        $request = \Illuminate\Http\Request::create("/api/jobs/{$job->id}/collect", 'POST');
+        $request = Request::create("/api/jobs/{$job->id}/collect", 'POST');
         $request->attributes->set('character', $this->character->fresh());
 
-        $payload = (new \App\Http\Controllers\Api\MiningController($this->game))
+        $payload = (new MiningController($this->game))
             ->collect($request, $job->id)
             ->getData(true);
 
@@ -5150,7 +5174,7 @@ final class GameLoopTest extends TestCase
     /** Fire a counted goal directly, standing in for the work behind it. */
     private function fireQuest(string $kind, int $amount, ?string $subject = null): void
     {
-        $fire = new \ReflectionMethod($this->game, 'fireQuest');
+        $fire = new ReflectionMethod($this->game, 'fireQuest');
         $fire->setAccessible(true);
         $fire->invoke($this->game, $this->character->fresh(), $kind, $amount, $subject);
     }
@@ -5163,10 +5187,10 @@ final class GameLoopTest extends TestCase
      */
     private function claimThrough(string $target): void
     {
-        foreach (\App\Game\Quests::DEFS as $key => $def) {
+        foreach (Quests::DEFS as $key => $def) {
             $goal = $def['goal'];
 
-            if (in_array($goal['kind'], \App\Game\Quests::COUNTED, true)) {
+            if (in_array($goal['kind'], Quests::COUNTED, true)) {
                 $this->fireQuest($goal['kind'], $goal['target'], $goal['subject']);
             } elseif ($goal['kind'] === 'level') {
                 $this->character->level = max((int) $this->character->level, $goal['target']);
