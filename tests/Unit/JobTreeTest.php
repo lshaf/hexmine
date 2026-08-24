@@ -240,23 +240,65 @@ final class JobTreeTest extends TestCase
         }
     }
 
+    /**
+     * Every kind here has a call site in GameService, and that is the whole
+     * point of the list.
+     *
+     * `unlock` used to be on it. It was collected into an array nothing read,
+     * which made a hundred nodes across eleven trees a promise rather than a
+     * skill -- and §7.4 forbids exactly that: nothing in a tree may wait on a
+     * system that does not exist, because a node is bought with one of the
+     * scarce points and the panel has no honest way to say "not yet".
+     */
     public function test_every_effect_is_a_kind_the_game_knows(): void
     {
         $known = [
-            'stat', 'unlock', 'craftOption', 'craftDurability', 'costReduction',
-            'batch', 'sight', 'bagUnits', 'bagRows',
+            'stat', 'pair', 'battleWear', 'weaponWear', 'goldFind', 'lootOption',
+            'craftOption', 'craftDurability', 'optionTier', 'brewExtra', 'stackCap',
+            'costReduction', 'batch', 'runSlot', 'presence', 'toolWear', 'depletion',
+            'sight', 'bagUnits', 'bagRows',
         ];
 
         foreach (Jobs::NODES as $key => $node) {
             $this->assertContains($node['effect']['kind'], $known, "{$key} has an unknown effect kind");
+            $this->assertGreaterThan(0, $node['effect']['value'], "{$key} is worth nothing");
 
             if ($node['effect']['kind'] === 'stat') {
                 $this->assertArrayHasKey('stat', $node['effect'], "{$key} is a stat node with no stat");
-                $this->assertGreaterThan(0, $node['effect']['value']);
             }
-            if ($node['effect']['kind'] === 'unlock') {
-                $this->assertNotSame('', $node['effect']['target'], "{$key} unlocks nothing");
-            }
+        }
+    }
+
+    /**
+     * §7.4 -- two trees of the same kind must not be the same tree with
+     * different words on it.
+     *
+     * Every gathering tree used to run one shared pattern, every processing
+     * tree another, and the three battle trees were twenty points of the pair
+     * followed by ten identical wear nodes. Reading one told you all five.
+     */
+    public function test_no_two_trees_are_the_same_tree(): void
+    {
+        $shapes = [];
+
+        foreach (array_keys(Jobs::JOBS) as $job) {
+            $kinds = array_map(
+                fn (array $n) => $n['effect']['kind'].':'.($n['effect']['stat'] ?? '').':'.$n['effect']['value'],
+                array_values(Jobs::nodesFor($job)),
+            );
+
+            $this->assertGreaterThanOrEqual(
+                3,
+                count(array_unique(array_map(
+                    fn (string $k) => implode(':', array_slice(explode(':', $k), 0, 2)),
+                    $kinds,
+                ))),
+                "{$job} spends its thirty nodes on fewer than three different things",
+            );
+
+            $shape = implode('|', $kinds);
+            $this->assertNotContains($shape, $shapes, "{$job} is another tree with different words on it");
+            $shapes[$job] = $shape;
         }
     }
 
@@ -274,7 +316,18 @@ final class JobTreeTest extends TestCase
             'costReduction' => Balance::SKILL_COST_REDUCTION_CAP,
             'craftDurability' => Balance::SKILL_DURABILITY_CAP,
             'craftOption' => Balance::SKILL_OPTION_CHANCE_CAP,
+            'optionTier' => Balance::SKILL_OPTION_TIER_CAP,
+            'brewExtra' => Balance::SKILL_BREW_EXTRA_CAP,
+            'stackCap' => Balance::SKILL_STACK_CAP,
             'batch' => Balance::SKILL_BATCH_CAP,
+            'runSlot' => Balance::SKILL_RUN_SLOT_CAP,
+            'presence' => Balance::SKILL_PRESENCE_CAP,
+            'toolWear' => Balance::SKILL_TOOL_WEAR_CAP,
+            'depletion' => Balance::SKILL_DEPLETION_CAP,
+            'battleWear' => Balance::SKILL_BATTLE_WEAR_CAP,
+            'weaponWear' => Balance::SKILL_WEAPON_WEAR_CAP,
+            'goldFind' => Balance::SKILL_GOLD_FIND_CAP,
+            'lootOption' => Balance::SKILL_LOOT_OPTION_CAP,
         ];
 
         foreach (array_keys(Jobs::JOBS) as $job) {
@@ -351,36 +404,90 @@ final class JobTreeTest extends TestCase
     }
 
     /**
-     * §7.4 -- the battle jobs are dormant, and their trees have to say so. They
-     * carry stats and ability hooks only; a battle node that made crafting
-     * cheaper would give a dormant job a live reason to be bought.
+     * §7.4 -- a battle tree does two things and nothing else: it grants the
+     * SOLID pair, and it spares the kit.
+     *
+     * Nothing in one is dormant any more. Two thirds of every battle tree used
+     * to be `power`/`defense` percentages -- which moved a common sword's 5
+     * attack to 5 -- and the last third was ability hooks waiting on parties
+     * and raids that are not designed (§14). A node nobody can feel is a node
+     * nobody should be asked to spend a point on.
      */
-    public function test_battle_trees_carry_no_crafting_effects(): void
+    public function test_battle_trees_grant_the_pair_and_spare_the_kit(): void
     {
-        // Crafting effects belong to a bench. A gathering or battle node that
-        // made crafting cheaper would give a line a reason to be taken that has
-        // nothing to do with what it is for.
-        $craftOnly = ['craftOption', 'craftDurability', 'costReduction', 'batch'];
-
         foreach (Jobs::JOBS as $job => $def) {
             if ($def['kind'] !== Jobs::BATTLE) {
                 continue;
             }
 
+            $pair = ['attack' => 0, 'defense' => 0];
+            $wear = 0.0;
+
             foreach (Jobs::nodesFor($job) as $key => $node) {
-                $this->assertNotContains(
-                    $node['effect']['kind'],
-                    $craftOnly,
-                    "{$key} is a battle node doing a crafting job's work",
+                $effect = $node['effect'];
+
+                // The pair, the two wear streams (§9.5.6), and what a fight
+                // pays (§9.5.8). Nothing here reaches a trip or a bench.
+                $this->assertContains(
+                    $effect['kind'],
+                    ['pair', 'battleWear', 'weaponWear', 'goldFind', 'lootOption'],
+                    "{$key} is a battle node doing some other job's work",
                 );
+
+                if ($effect['kind'] === 'pair') {
+                    $this->assertContains($effect['stat'], ['attack', 'defense']);
+                    $this->assertIsInt($effect['value'], "{$key} grants a fraction of a point");
+                    $pair[$effect['stat']] += $effect['value'];
+
+                    continue;
+                }
+
+                if ($effect['kind'] === 'battleWear') {
+                    $wear += $effect['value'];
+                }
             }
 
-            $unlocks = array_filter(
-                Jobs::nodesFor($job),
-                fn (array $n) => $n['effect']['kind'] === 'unlock',
+            // §7.4.3 -- neither half may pass the cap, or a node is bought and
+            // never felt.
+            $this->assertLessThanOrEqual(
+                Balance::SKILL_PAIR_CAP,
+                max($pair),
+                "{$job} pushes a stat past the pair cap",
             );
-            $this->assertCount(8, $unlocks, "{$job} should carry 8 dormant ability hooks");
+
+            // §9.5.4 -- and the same twenty points, split into the same three
+            // shapes the weapons have. A sword trades the peak for evenness,
+            // which is what balanced means.
+            $this->assertSame(20, array_sum($pair), "{$job} does not spend twenty points");
+
+            // How much of the armor bill a tree spares is now one of the things
+            // that tells the three apart: a shieldbearer buys most of the cap,
+            // a runecaster almost none of it and spends on the blade instead.
+            $this->assertGreaterThan(0, $wear, "{$job} spares nothing at all");
+            $this->assertLessThanOrEqual(
+                Balance::SKILL_BATTLE_WEAR_CAP + 1e-9,
+                $wear,
+                "{$job} passes the wear cap",
+            );
         }
+
+        // §9.5.4 -- the shield leans on the guard, the wand on the arm, and the
+        // sword is the one that is even. Read off the trees rather than
+        // asserted per job, so a retune that flattens them all fails here.
+        $lean = [];
+        foreach (['shieldbearer', 'swordhand', 'runecaster'] as $job) {
+            $sums = ['attack' => 0, 'defense' => 0];
+            foreach (Jobs::nodesFor($job) as $node) {
+                if ($node['effect']['kind'] === 'pair') {
+                    $sums[$node['effect']['stat']] += $node['effect']['value'];
+                }
+            }
+            $lean[$job] = $sums['attack'] <=> $sums['defense'];
+        }
+
+        $this->assertSame(-1, $lean['shieldbearer'], 'a shieldbearer does not lean on the guard');
+        $this->assertSame(0, $lean['swordhand'], 'a swordhand is not the even one');
+        $this->assertSame(1, $lean['runecaster'], 'a runecaster does not lean on the arm');
     }
 
     /**

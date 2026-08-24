@@ -74,9 +74,12 @@ Constants and curves only; no new behaviour.
 - Resolve unlocked nodes into an effect bundle per character.
 - `stat` nodes join `Formulas::aggregateStat` **inside** the existing falloff and
   clamp — they must not be a separate term added after it.
-- `unlock` gates recipe availability in `craftItem` and the workshop list.
-- `craftOption` / `craftDurability` / `costReduction` / `batch` apply at the
-  craft site, each clamped to its Step 1 cap.
+- Every other kind applies at the site it names — the trip, the bench, the
+  fight — each clamped to its own cap in `Balance`.
+- **An effect with no call site is not a skill.** `unlock` was one for a while:
+  collected into a bundle nothing read, so a third of some trees was a promise.
+  It is gone (CLAUDE.md §7.4.3), and `SkillEffectTest` now exercises each
+  remaining kind against the site it claims.
 
 ## Step 6 — API
 
@@ -111,6 +114,8 @@ Constants and curves only; no new behaviour.
 - [x] 7 UI — SkillsView panel: strata bands, lineage on select, sticky detail plate
 - [x] 8 Balance proof — full-tree + gear + potion still clamps at +15%; per-tree sink caps pinned
 - [x] + Explorer (§7.5) — 12th job, granted 5-node chain, XP from hexes walked, `sight` effect kind
+- [x] + Effect rework — `unlock` removed as dead, ten wired kinds added, per-job
+      effect mixes and depth-scaled values so no two trees share a shape
 
 ## Open
 
@@ -120,13 +125,12 @@ Constants and curves only; no new behaviour.
   a stat, and `JobTreeTest` exempts it from the "leave gear something to add"
   guard because of it. If travel gear is ever meant to matter again, this is the
   number to revisit, not the ceiling.
-- Battle job XP needs raid combat (§9, §14.2). Until then three of the six trees
-  are visible, gated, and unreachable — which is honest, but means half the
-  system cannot be play-tested. Each battle tree carries 8 dormant `unlock`
-  nodes named for the ability they will grant, so combat has hooks to build
-  against rather than a blank sheet.
-- The 24 ability keys are declared and resolve to nothing. When combat lands,
-  `nodeEffects()['unlocks']` is where they are already collected.
+- Battle jobs level on the road now (§9.5), so all three trees are reachable.
+  Their nodes are the solid pair, the two wear streams and what a pack pays —
+  nothing waiting on dungeon floors.
+- Dungeon combat (§9.1–§9.4) will want its own effects. They get added when the
+  system they belong to exists, not before: a node that pays out "later" costs a
+  point now.
 - Nothing verifies the PHP and TS *item* catalogs stay in sync (45 items, hand-
   kept both sides). Jobs dodge this by being served rather than mirrored, which
   is the pattern the items catalog should probably follow too.

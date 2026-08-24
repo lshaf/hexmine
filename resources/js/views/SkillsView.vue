@@ -242,9 +242,20 @@ const chosen = computed(() =>
 const EFFECT_ICON: Record<NodeEffect['kind'], string> = {
   sight: 'effectSight',
   stat: 'effectStat',
-  unlock: 'effectUnlock',
+  pair: 'effectStat',
+  battleWear: 'effectCraftDurability',
+  weaponWear: 'effectCraftDurability',
+  toolWear: 'effectCraftDurability',
+  depletion: 'effectDepletion',
+  presence: 'effectPresence',
+  runSlot: 'effectRunSlot',
+  goldFind: 'effectGold',
+  lootOption: 'effectCraftOption',
   craftOption: 'effectCraftOption',
+  optionTier: 'effectCraftOption',
   craftDurability: 'effectCraftDurability',
+  brewExtra: 'effectBrew',
+  stackCap: 'effectBagUnits',
   costReduction: 'effectCostReduction',
   batch: 'effectBatch',
   bagUnits: 'effectBagUnits',
@@ -256,12 +267,36 @@ function effectText(effect: NodeEffect): string {
   switch (effect.kind) {
     case 'stat':
       return statLine(effect.stat as StatKey, effect.value)
-    case 'unlock':
-      return 'Unlocks a raid ability'
+    case 'pair':
+      // §9.5.4 -- a whole point, said as a whole point. The percentage twins
+      // were the least legible thing in the game.
+      return `+${effect.value} ${effect.stat}`
+    case 'battleWear':
+      return `${formatPercent(-effect.value)} durability lost in a fight`
+    case 'weaponWear':
+      return `${formatPercent(-effect.value)} wear on the weapon you swing`
+    case 'toolWear':
+      return `${formatPercent(effect.value)} of trips leave the tool untouched`
+    case 'depletion':
+      return `${formatPercent(-effect.value)} chance of working the hex out`
+    case 'presence':
+      return `${formatPercent(effect.value)} faster while you stand at the bench`
+    case 'runSlot':
+      return `+${effect.value} run you can keep going at once`
+    case 'goldFind':
+      return `${formatPercent(effect.value)} gold off a pack`
+    case 'lootOption':
+      return `${formatPercent(effect.value)} chance of an extra bonus line on looted gear`
     case 'craftOption':
       return `${formatPercent(effect.value)} chance of an extra bonus line on what you make`
+    case 'optionTier':
+      return `${formatPercent(effect.value)} chance a bonus line rolls from a better grade`
     case 'craftDurability':
       return `${formatPercent(effect.value)} durability on what you make`
+    case 'brewExtra':
+      return `${formatPercent(effect.value)} chance of an extra flask off a brew`
+    case 'stackCap':
+      return `+${effect.value} of each potion you can carry`
     case 'costReduction':
       return `${formatPercent(-effect.value)} materials per craft`
     case 'batch':

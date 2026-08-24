@@ -223,11 +223,36 @@ export interface JobLevel {
 /** §7.4.3 -- what a node does. One of these kinds, and nothing else. */
 export type NodeEffect =
   | { kind: 'stat'; stat: StatKey; value: number }
-  | { kind: 'unlock'; target: string }
+  /**
+   * §9.5.4 -- the SOLID pair. Whole points of attack or defense, added to the
+   * gear before the percentages multiply, and locked to the weapon family the
+   * job is fought with. Not a percentage and not under §8.1's ceiling.
+   */
+  | { kind: 'pair'; stat: 'attack' | 'defense'; value: number }
+  /**
+   * §9.5.6 -- the two wear streams, spared. What hit you comes off the armor
+   * and what you hit comes off the blade, so a tree that wants both buys both.
+   */
+  | { kind: 'battleWear'; value: number }
+  | { kind: 'weaponWear'; value: number }
+  /** §9.5.8 -- what a pack pays: coin, and what its kit was carrying. */
+  | { kind: 'goldFind'; value: number }
+  | { kind: 'lootOption'; value: number }
   | { kind: 'craftOption'; value: number }
   | { kind: 'craftDurability'; value: number }
+  /** §8.0.1 -- a deeper reach into the bag a rolled line is drawn from. */
+  | { kind: 'optionTier'; value: number }
+  /** §8.4 -- the consumable bench: a potion has no durability and no line. */
+  | { kind: 'brewExtra'; value: number }
+  | { kind: 'stackCap'; value: number }
   | { kind: 'costReduction'; value: number }
   | { kind: 'batch'; value: number }
+  /** §6.2 -- worth more for standing there, and §6.1's second run. */
+  | { kind: 'presence'; value: number }
+  | { kind: 'runSlot'; value: number }
+  /** §7.3 + §5.1 -- the line's tool spared, and the seam left standing. */
+  | { kind: 'toolWear'; value: number }
+  | { kind: 'depletion'; value: number }
   /** §7.5 -- whole hexes of sight, on top of the base one. Not a percentage. */
   | { kind: 'sight'; value: number }
   /** §7.6 -- units and rows of bag, on top of the flat base. Counts, not stats. */
@@ -279,14 +304,16 @@ export interface SkillTree {
 export interface WorkPreview {
   canMine: boolean
   reason?: string
+  /** 0 when the verb cannot be done at all -- see `able`. */
   seconds: number
-  baseSeconds: number
   /** §7.3 -- how much work the hex is, and how fast you get through it. */
-  durability: number
+  hp: number
   toolAttack: number
   skillAttack: number
   rate: number
   clamped: boolean
+  /** §8.0 rule 1 -- false with nothing in your hands and nothing learned. */
+  able: boolean
   yield: number
   /** The line this hex belongs to, even when the haul comes back as scrap. */
   skill: SkillKey | null
@@ -352,6 +379,14 @@ export interface HuntPreview {
   canHunt: boolean
   reason?: string | null
   seconds: number
+  /** §7.3 -- a herd is a pile of work read exactly as a hex is, and the bow is
+   *  what gets through it. Same four numbers the seam reports. */
+  hp: number
+  toolAttack: number
+  skillAttack: number
+  rate: number
+  clamped: boolean
+  able: boolean
   /** Server-clock deadline the herd wanders off at, or null if there is none. */
   herdUntil: number | null
   yield: number
