@@ -21,6 +21,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ACTION_PATHS } from '@/icons/actions'
 import { MATERIALS } from '@/game/catalog'
 import { itemIcon, materialIcon } from '@/icons/procedural'
+import { FAMILY_FOR_BATTLE_JOB, fighterCrest, monsterCrest } from '@/icons/combatants'
 import SvgIcon from '@/components/SvgIcon.vue'
 import { optionStatLine } from '@/game/formulas'
 import { ITEM_BY_KEY } from '@/game/catalog'
@@ -30,6 +31,30 @@ const props = defineProps<{ battle: BattleResult }>()
 const emit = defineEmits<{ (e: 'close'): void }>()
 
 const won = computed(() => props.battle.won)
+
+/**
+ * §9.5 -- the same two faces the replay just ran, kept on the plate that
+ * replaces it.
+ *
+ * Continuity is the whole argument: the exchange ends and the receipt arrives
+ * in the same frame, so the thing you were watching has to still be the thing
+ * you are reading about. A plate that switched to a heading and a list would
+ * read as a different screen about a different fight.
+ */
+const theirCrest = computed(() =>
+  monsterCrest(
+    props.battle.monster.profile,
+    props.battle.monster.tier,
+    44,
+    // §9.5.7 -- a carrier is a monster gone still, and it stays standing after
+    // a loss: it is a debt, not a spawn.
+    Boolean(props.battle.corpse) && won.value,
+  ),
+)
+
+const myCrest = computed(() =>
+  fighterCrest(FAMILY_FOR_BATTLE_JOB[props.battle.job ?? ''] ?? null, !won.value, 44),
+)
 
 
 /** §7.4 -- the job keys are the words; there is no table to look them up in. */
@@ -78,35 +103,66 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 
     <div class="fight plate" :class="{ settled }">
       <div class="inner">
-        <span class="eyebrow label">
+        <span v-if="battle.corpse" class="eyebrow label">
           <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
                stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path :d="ACTION_PATHS.battle" />
           </svg>
-          <template v-if="battle.corpse">
-            {{ battle.corpse.mine ? 'Your corpse' : `${battle.corpse.owner ?? 'Someone'}'s corpse` }}
-            · {{ battle.monster.name }}
-          </template>
-          <template v-else>{{ battle.monster.name }} · {{ battle.monster.profile }}</template>
+          {{ battle.corpse.mine ? 'Your corpse' : `${battle.corpse.owner ?? 'Someone'}'s corpse` }}
         </span>
 
-        <p class="tally">
-          <strong class="figure" :class="won ? 'good' : 'bad'">
-            {{ won ? 'Down' : battle.died ? 'Killed' : 'Driven off' }}
-          </strong>
-        </p>
+        <!-- §9.5.5 -- the same band the replay just ran, with the outcome where
+             the round counter was. The exchange ends and this arrives in its
+             place, so the two faces have to still be there: a plate that
+             switched to a heading and a list would read as a different screen
+             about a different fight. -->
+        <div class="band">
+          <div class="corner them">
+            <SvgIcon :svg="theirCrest" class="crest" />
+            <span class="who">
+              <strong class="name">{{ battle.monster.name }}</strong>
+              <span class="tiny muted block">{{ battle.monster.profile }}</span>
+              <span class="tiny muted block mono">
+                {{ battle.monster.attack }} atk · {{ battle.monster.defense }} def
+              </span>
+            </span>
+          </div>
 
-        <!-- §9.5.5 -- the exchange, kept beside the outcome it produced. There
-             is no health bar to watch, so this is where a fight is read: how
-             long it took, and how close it was. -->
-        <p class="tiny muted odds">
-          {{ battle.rounds }} rounds · you {{ battle.attack }}/{{ battle.defense }} ·
-          it {{ battle.monster.attack }}/{{ battle.monster.defense }}
-        </p>
-        <p class="tiny muted odds">
-          You dealt {{ battle.damageDealt }} of its {{ battle.monster.hp }} ·
-          it took {{ battle.damageTaken }} of your {{ battle.pool }}
-        </p>
+          <span class="clash" aria-hidden="true" />
+
+          <div class="corner you">
+            <span class="who">
+              <strong class="name">You</strong>
+              <span class="tiny muted block">{{ jobName ?? 'bare-handed' }}</span>
+              <span class="tiny muted block mono">
+                {{ battle.attack }} atk · {{ battle.defense }} def
+              </span>
+            </span>
+            <SvgIcon :svg="myCrest" class="crest" />
+          </div>
+        </div>
+
+        <!-- §9.5.7 -- two outcomes and no third. `died` is `!won` on the server,
+             so the old "Driven off" branch could never fire: it read as a
+             third, softer kind of loss that does not exist. What losing COSTS
+             is the block at the foot of this plate; what it IS goes here. -->
+        <strong class="verdict" :class="won ? 'good' : 'bad'">
+          {{ won ? 'You win' : 'You lose' }}
+        </strong>
+
+        <!-- §9.5.5 -- how close it was, in the units the bars were drawn in, so
+             the replay and the receipt are the same two numbers twice. -->
+        <div class="pools">
+          <span class="pool left">
+            <span class="readout mono">{{ battle.damageDealt }}</span>
+            <span class="tiny muted"> / {{ battle.monster.hp }}</span>
+          </span>
+          <span class="tiny muted rounds">{{ battle.rounds }} rounds</span>
+          <span class="pool right">
+            <span class="readout mono">{{ battle.damageTaken }}</span>
+            <span class="tiny muted"> / {{ battle.pool }}</span>
+          </span>
+        </div>
 
         <!-- §9.5.8 -- gold always, and never a bag row. A loss pays nothing at
              all: losing is an exit, not a strategy (§9.5.3). -->
@@ -268,27 +324,104 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
   text-transform: capitalize;
 }
 
-.tally {
-  margin: -3px 0 0;
+/* ------------------------------------------------------------------- band */
+
+/* The two faces, with the verdict standing where the round counter was. Centre
+   column is auto so a long word ("Driven off") never squeezes a crest. */
+.band {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 9px;
 }
 
-.figure {
+.corner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.corner.you {
+  justify-content: flex-end;
+  text-align: right;
+}
+
+.crest {
+  flex: 0 0 auto;
+}
+
+.who {
+  min-width: 0;
+}
+
+/* Wraps rather than truncates. A crest says what KIND of thing this is; the
+   name is the only thing saying WHICH, and "Barrow K…" on a phone is the half
+   of it that carries no information. Two short lines cost a few pixels the
+   band has, since it is centered against a 44px crest either way. */
+.name {
+  display: block;
   font-family: var(--font-display);
-  font-size: 34px;
-  line-height: 0.9;
+  font-size: 14px;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
 }
 
-.figure.good {
+.corner .block:first-of-type {
+  text-transform: capitalize;
+}
+
+.corner .mono {
+  white-space: nowrap;
+}
+
+/* Where the round counter stood while it was still running. A hairline rather
+   than a word: the fight is over, and the thing worth saying about it is the
+   verdict below rather than a divider trying to be one. */
+.clash {
+  width: 1px;
+  height: 26px;
+  background: var(--line);
+}
+
+/* The one word the plate exists to say. Display face, tight, and the only
+   thing here allowed to be this size. */
+/* The one word the plate exists to say, and the only thing on it at this size.
+   Boldness spent in one place (§13.2's discipline): everything around it is a
+   number in a quiet row. */
+.verdict {
+  font-family: var(--font-display);
+  font-size: 30px;
+  line-height: 0.95;
+  text-align: center;
+  margin-top: -2px;
+}
+
+.verdict.good {
   color: var(--sap);
 }
 
-.figure.bad {
+.verdict.bad {
   color: var(--ember);
 }
 
-.odds {
-  margin: -6px 0 0;
-  line-height: 1.5;
+/* The exchange in the units the bars used, so the replay and the receipt are
+   the same two numbers said twice rather than two different accounts. */
+.pools {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: baseline;
+  gap: 9px;
+  margin-top: -3px;
+}
+
+.pool.right {
+  text-align: right;
+}
+
+.rounds {
+  letter-spacing: 0.1em;
+  text-align: center;
 }
 
 .ledger {
@@ -395,5 +528,12 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 .note {
   margin: 0;
   line-height: 1.5;
+}
+
+@media (max-width: 380px) {
+  .crest :deep(svg) {
+    width: 36px;
+    height: 36px;
+  }
 }
 </style>

@@ -30,6 +30,25 @@ const sellable = computed(() => {
 })
 
 /**
+ * §4.0 -- the tier-zero half of the pack, as one figure.
+ *
+ * Tier is the whole test, so it takes the five biome scrap and the five junk
+ * together: two different arguments about where a copper came from, one chore
+ * to be rid of. The server re-decides all of this on the way in; what is
+ * computed here is only whether the button is worth drawing and what it should
+ * promise.
+ */
+const scrap = computed(() => {
+  const rows = sellable.value.filter((e) => e.mat.tier === 0)
+
+  return {
+    rows: rows.length,
+    units: rows.reduce((n, e) => n + e.qty, 0),
+    gold: rows.reduce((n, e) => n + e.qty * e.mat.npcPrice, 0),
+  }
+})
+
+/**
  * Only what this settlement stocks, §3.2 -- the server decides, we render it.
  *
  * What it does not stock is not on the shelf at all. A row you cannot buy is
@@ -102,6 +121,32 @@ const owned = (key: string) => game.equipment.filter((e) => e.key === key).lengt
         <div v-if="!sellable.length && !resellable.length" class="inset empty">
           <p class="muted tiny" style="margin: 0">Nothing the trader will buy.</p>
         </div>
+
+        <!-- §4.0 -- the one row that is a chore rather than a decision. Scrap
+             and junk reach no tier and feed no recipe, so there is nothing to
+             weigh up: the only question is whether the straps are worth more
+             than the coppers, and that is answered by pressing this. -->
+        <button
+          v-if="scrap.rows"
+          class="inset row-item dump"
+          type="button"
+          :disabled="game.busy"
+          @click="game.sellAllScrap()"
+        >
+          <div class="grow">
+            <div class="row-between">
+              <strong class="tiny">Clear out the scrap</strong>
+              <span class="mono tiny take">+{{ scrap.gold }}g</span>
+            </div>
+            <!-- §4.0 is emphatic that junk is not scrap, and the button takes
+                 both, so the line under it says both. The heading keeps the
+                 word a player would use for the chore. -->
+            <div class="tiny muted">
+              Scrap and junk — {{ scrap.units }} across {{ scrap.rows }}
+              {{ scrap.rows === 1 ? 'strap' : 'straps' }}
+            </div>
+          </div>
+        </button>
 
         <div v-for="entry in sellable" :key="entry.mat.key" class="inset row-item">
           <SvgIcon :svg="materialIcon(entry.mat, 26)" boxed :size="26" />
@@ -262,5 +307,32 @@ const owned = (key: string) => game.equipment.filter((e) => e.key === key).lengt
 
 .away {
   margin: 0;
+}
+
+/*
+ * A whole row as one button, because the whole row is one decision. The
+ * per-material rows offer 1 / 10 / All and this offers nothing to choose, so
+ * giving it a button on the end would imply there was something beside it to
+ * read.
+ */
+.dump {
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--line);
+  cursor: pointer;
+}
+
+.dump:hover:not(:disabled) {
+  border-color: var(--copper);
+}
+
+.dump:disabled {
+  opacity: 0.5;
+}
+
+/* §13.3 -- gold for a coin figure. Sap is for a thing worth crossing the
+   screen for, and clearing the pack is a chore rather than good news. */
+.take {
+  color: var(--gold);
 }
 </style>

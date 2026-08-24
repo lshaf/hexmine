@@ -26,6 +26,7 @@ def batch(n): return ('batch', None, n)
 def run_slot(n): return ('runSlot', None, n)
 def presence(v): return ('presence', None, v)
 def tool_wear(v): return ('toolWear', None, v)
+def bite(n): return ('bite', None, n)
 def seam_grade(v): return ('seamGrade', None, v)
 def pair(key, n): return ('pair', key, n)
 def battle_wear(v): return ('battleWear', None, v)
@@ -39,9 +40,9 @@ def bag_rows(n): return ('bagRows', None, n)
 # What one node of each kind is worth at each of the five depths.
 VALUES = {
     'y': (stat, 'yield',           [.01, .01, .015, .015, .02]),
-    't': (stat, 'tripReduction',   [.01, .01, .015, .015, .02]),
     'p': (stat, 'processingSpeed', [.01, .01, .015, .015, .02]),
     'w': (tool_wear, None,  [.01, .015, .02, .03, .04]),
+    'k': (bite, None,       [1, 1, 1, 2, 2]),
     'd': (seam_grade, None, [.01, .015, .015, .02, .025]),
     'c': (cost, None,       [.01, .015, .02, .025, .03]),
     's': (presence, None,   [.01, .015, .015, .02, .025]),
@@ -65,6 +66,7 @@ VALUES = {
 CAPS = {
     'stat': .1275,
     'toolWear': .25,
+    'bite': 5,
     'seamGrade': .12,
     'costReduction': .15,
     'presence': .20,
@@ -86,7 +88,7 @@ CAPS = {
 # rolled an option would be a bench effect on a run that makes a material (§6.3);
 # an Alchemist node granting durability would be durability on a potion.
 ALLOWED = {
-    'gathering': set('ytwd'),
+    'gathering': set('ykwd'),
     'processing': set('pcsbr'),
     'weapon': set('pcDOT'),
     'armor': set('pcDOT'),
@@ -100,7 +102,7 @@ WOODCUTTING_NAMES = [
  ('swing_economy','Swing Economy','Fewer swings, each of them meant.'),
  ('deer_paths','Deer Paths','The animals already found the easy way through.'),
  ('limb_reading','Limb Reading','You can see where the weight is before you cut.'),
- ('two_hand_grip','Two-Hand Grip','Slide the top hand down and let the head do it.'),
+ ('two_hand_grip','Two-Hand Grip','Slide the top hand down and let the head do the work, not the edge.'),
  ('coppice_stand','Coppice Stand','Cut the same stand for years and you learn which stems were worth waiting for.'),
 
  ('grain_split','Grain Split','Follow the grain and the log opens itself.'),
@@ -110,20 +112,20 @@ WOODCUTTING_NAMES = [
  ('bucking_rhythm','Bucking Rhythm','Length after length without straightening up.'),
  ('old_growth','Old Growth','Old trees are worth the walk, and you can tell the heartwood from the outside.'),
  ('crosscut_pair','Crosscut Pair','A saw with two handles halves an afternoon.'),
- ('haul_sled','Haul Sled','Drag it, do not carry it.'),
+ ('helve_care','Helve Care','A cracked haft is found in the shed, not at the tree.'),
 
- ('ridge_route','Ridge Route','Downhill all the way back, if you plan it.'),
+ ('sheltered_draw','Sheltered Draw','A fold in the hill the weather never reached, and it shows in the timber.'),
  ('heartwood_cut','Heartwood Cut','Take the middle and leave the sap.'),
  ('kerf_control','Kerf Control','A narrow cut is a fast cut.'),
  ('burnt_stand','Burnt Stand','Char hides good wood. You have learned to look under it.'),
  ('stump_yield','Stump Yield','What is left in the ground is still timber.'),
  ('measured_felling','Measured Felling','Down in one, not worried down in six.'),
- ('skid_trail','Skid Trail','Cut the road once, use it all season.'),
+ ('stone_and_strop','Stone and Strop','Five minutes on the stone buys a week of the edge.'),
  ('river_stand','River Stand','Float the haul out and you can afford to fell the awkward one further in.'),
 
  ('quarter_sawing','Quarter Sawing','More usable board from the same trunk.'),
  ('dawn_start','Dawn Start','Cold wood cuts cleaner.'),
- ('pack_frame','Pack Frame','The load rides high and does not swing.'),
+ ('bit_guard','Bit Guard','The edge travels sheathed and arrives sharp.'),
  ('ironwood_sense','Ironwood Sense','Wood that turns an axe, met on your terms rather than the axe\'s.'),
  ('clean_stump','Clean Stump','Nothing left standing to catch a boot on next time.'),
  ('felling_line','Felling Line','A rope decides the direction, not luck.'),
@@ -135,7 +137,7 @@ WOODCUTTING_NAMES = [
 MINING_NAMES = [
  ('seam_reading','Seam Reading','The rock tells you where it wants to break.'),
  ('short_haft_work','Short-Haft Work','Close in, where the swing has nowhere to go.'),
- ('spoil_ramp','Spoil Ramp','Build the way out of what you take out.'),
+ ('outcrop_break','Outcrop Break','Crack the weathered skin off and work what is under it.'),
  ('face_squaring','Face Squaring','A square face gives up more than a ragged one.'),
  ('drive_rhythm','Drive Rhythm','Strike, reset, strike. Never rush the reset.'),
  ('shallow_adit','Shallow Adit','A side cut into an outcrop others walk past, into the part they never saw.'),
@@ -143,24 +145,24 @@ MINING_NAMES = [
  ('ore_sorting','Ore Sorting','Leave the waste at the face, not in your bag.'),
  ('wedge_lines','Wedge Lines','Split it along the marks and it comes away whole.'),
  ('prop_setting','Prop Setting','A propped roof is a roof you can work under long enough to find the good rock.'),
- ('dry_working','Dry Working','Water costs more time than rock does.'),
+ ('dry_working','Dry Working','Water costs an iron edge more than it costs the rock.'),
  ('tally_stick','Tally Stick','Know what came out before you climb up.'),
  ('deep_drift','Deep Drift','Far enough in that what you are cutting has never seen weather.'),
  ('double_jack','Double Jack','One holds the drill, one swings. Twice the depth.'),
- ('bucket_line','Bucket Line','The ore leaves without you.'),
+ ('bucket_line','Bucket Line','The ore leaves without you, and none of it is left at the bottom.'),
 
- ('shaft_ladder','Shaft Ladder','Down in a minute instead of ten.'),
+ ('helve_soaking','Helve Soaking','A swelled haft does not work loose at the head.'),
  ('vein_following','Vein Following','Chase the metal, not the plan.'),
  ('cold_chisel','Cold Chisel','For where the pick is too blunt an argument.'),
  ('flooded_level','Flooded Level','Pumped out because of what was down there, and what was down there is still down there.'),
  ('fines_recovery','Fines Recovery','The dust is ore too.'),
  ('face_lighting','Face Lighting','You cannot mine what you cannot see.'),
- ('windlass','Windlass','A crank beats a rope and a back.'),
+ ('windlass','Windlass','A crank beats a rope and a back, so the heavy blocks come up too.'),
  ('mythril_trace','Mythril Trace','The ear for a seam that hums, and the sense to take the good of it.'),
 
  ('gad_and_feather','Gad and Feather','Iron persuades stone politely.'),
  ('shift_pacing','Shift Pacing','The last hour is worth as much as the first.'),
- ('cage_hoist','Cage Hoist','Ride up instead of climbing.'),
+ ('spare_heads','Spare Heads','Two heads to a haft, and neither worked down to nothing.'),
  ('deep_shaft_right','Deep Shaft Right','Below the water table, where the rock has had no chance to go soft.'),
  ('assay_eye','Assay Eye','Worth carrying, or worth leaving.'),
  ('roof_bolting','Roof Bolting','Nothing falls on a bolted roof.'),
@@ -174,31 +176,31 @@ HUNTING_NAMES = [
  ('wind_reading','Wind Reading','Downwind or do not bother.'),
  ('game_trail','Game Trail','They walk the same ground every day.'),
  ('clean_release','Clean Release','The string leaves without a twitch.'),
- ('field_dressing','Field Dressing','Half the weight stays in the field.'),
+ ('bowstring_wax','Bowstring Wax','Waxed and cased, and it does not go slack in the wet.'),
  ('herd_ground','Herd Ground','A wintering ground the herds keep returning to. Short stalks, and an easy draw.'),
 
  ('sign_reading','Sign Reading','Tracks, droppings, bent grass. All of it talks.'),
  ('short_stalk','Short Stalk','The last twenty yards decide it.'),
- ('drag_harness','Drag Harness','A carcass moves better dragged than carried.'),
+ ('nock_check','Nock Check','A split nock found at the quiver, not at full draw.'),
  ('rut_timing','Rut Timing','They stop being careful once a year.'),
  ('blind_building','Blind Building','Sit still enough and they come to you.'),
  ('high_pasture','High Pasture','Summer ground above the tree line, where the animals are heavy.'),
  ('two_shot_draw','Two-Shot Draw','The second arrow is already nocked.'),
- ('hide_curing','Hide Curing','Salt it in the field and it does not spoil walking home.'),
+ ('limb_rest','Limb Rest','Unstrung between stalks, and the bow keeps its cast.'),
 
- ('river_crossing','River Crossing','Know the fords and the map gets smaller.'),
+ ('spare_string','Spare String','A second string, dry, against your chest.'),
  ('vital_shot','Vital Shot','One that drops it is kinder than three that do not.'),
  ('call_work','Call Work','Bring the animal to the arrow.'),
- ('marsh_edge','Marsh Edge','Wet ground the herds water at, and no arrow spent on a long shot.'),
+ ('marsh_edge','Marsh Edge','Wet ground the herds water at, and the best of them come down to it.'),
  ('bone_and_sinew','Bone and Sinew','Nothing on the animal is waste.'),
  ('patience','Patience','The hunt is mostly waiting, done well.'),
- ('pack_line','Pack Line','Load balanced, hands free.'),
- ('beast_run','Beast Run','A run where the big ones move. One draw, not six.'),
+ ('salt_lick','Salt Lick','Ground they come to on their own, and the heavy ones come first.'),
+ ('beast_run','Beast Run','A run where the big ones move, and they move along it in season.'),
 
  ('skinning_speed','Skinning Speed','Off clean, in minutes, no cuts in the hide.'),
  ('dawn_watch','Dawn Watch','They move at first light and nowhere else.'),
- ('light_kit','Light Kit','Carry only what the day needs.'),
- ('beastfang_ground','Beastfang Ground','Ground where something hunts back. Everything you carry is kept ready.'),
+ ('winter_yard','Winter Yard','Where they hole up when it turns, packed close and in prime coat.'),
+ ('beastfang_ground','Beastfang Ground','Ground where something hunts back, and what lives on it is worth the risk.'),
  ('tallow_rendering','Tallow Rendering','The fat is worth the pot it takes.'),
  ('long_shot','Long Shot','Range you can hold, not range you can reach.'),
 
@@ -209,32 +211,32 @@ HUNTING_NAMES = [
 QUARRYING_NAMES = [
  ('bedding_plane','Bedding Plane','Stone has a grain too. Find it.'),
  ('hammer_angle','Hammer Angle','Square on, or the force goes nowhere.'),
- ('scree_path','Scree Path','The loose slope is faster down than around.'),
+ ('face_sweeping','Face Sweeping','Grit under the sledge is what rounds an edge.'),
  ('block_marking','Block Marking','Chalk the line before the first blow.'),
  ('shim_work','Shim Work','Thin iron opens what a sledge cannot.'),
  ('shelf_quarry','Shelf Quarry','A terraced face worked in steps, so the good course is reached rather than guessed at.'),
 
  ('dressing_cuts','Dressing Cuts','Square it at the face, carry less home.'),
  ('sledge_relay','Sledge Relay','Two arms, alternating, all afternoon.'),
- ('roller_track','Roller Track','Logs under stone move mountains.'),
+ ('handle_seating','Handle Seating','Wedge the head tight before it works loose on you.'),
  ('frost_splitting','Frost Splitting','Let the winter make the first cut and it shows you where the sound stone is.'),
  ('spoil_sorting','Spoil Sorting','The rubble is worth something to somebody.'),
  ('deep_bench','Deep Bench','Below the weathered rock, where the face has something better than rubble in it.'),
  ('plug_and_feather','Plug and Feather','Drill, wedge, wait. It opens itself.'),
- ('sled_haul','Sled Haul','Downhill, loaded, once.'),
+ ('point_dressing','Point Dressing','The point redrawn while it is still a point.'),
 
- ('cliff_stair','Cliff Stair','Cut the steps once and use them forever.'),
+ ('tempered_iron','Tempered Iron','Hard enough to bite, soft enough not to shatter.'),
  ('true_face','True Face','Flat enough that the next cut is easy.'),
  ('crack_reading','Crack Reading','Every flaw is an invitation, and some of them open onto the good stuff.'),
  ('obsidian_flow','Obsidian Flow','A flow where the glass runs, and it takes the edge off anything hurried.'),
  ('offcut_dressing','Offcut Dressing','Small blocks are still blocks.'),
  ('bench_pacing','Bench Pacing','Stone does not reward hurry.'),
- ('crane_gin','Crane Gin','A tripod and a rope beat six men.'),
+ ('padded_haft','Padded Haft','Leather at the grip takes the shock the wood was taking.'),
  ('canyon_face','Canyon Face','A wall the weather has already opened, and it opened it at the best course.'),
 
  ('facing_stone','Facing Stone','The good side out, every time.'),
  ('dry_season_work','Dry Season Work','Wet stone is heavy stone.'),
- ('quarry_road','Quarry Road','Built once, used every haul.'),
+ ('forge_day','Forge Day','One day a month at the fire and nothing goes to the scrap pile.'),
  ('deep_badland','Deep Badland','Ground nobody has bothered to survey. You have.'),
  ('rubble_reclaim','Rubble Reclaim','What was left behind is still cut stone.'),
  ('sound_testing','Sound Testing','Tap it. Hollow stone is wasted effort.'),
@@ -248,21 +250,21 @@ HARVESTING_NAMES = [
  ('sweep_and_gather','Sweep and Gather','Cut and collect in one motion.'),
  ('field_edge','Field Edge','Work the margins where the stalks stand thickest.'),
  ('stalk_selection','Stalk Selection','Take the long ones, leave the rest to seed.'),
- ('bundle_tying','Bundle Tying','A tied sheaf carries; a loose armful does not.'),
+ ('hook_angle','Hook Angle','Set the hook right and the stalk comes away in one.'),
  ('fallow_strip','Fallow Strip','A rested strip comes back stronger, and you are the one who knows it rested.'),
 
  ('retting_pit','Retting Pit','Soak it right and the fiber lets go.'),
  ('scythe_stance','Scythe Stance','Turn from the hips, not the arms.'),
- ('cart_track','Cart Track','A wheel beats a back over open ground.'),
+ ('hook_stoning','Hook Stoning','A stone in the pocket, used at the end of every row.'),
  ('dew_cutting','Dew Cutting','Damp stalks bend instead of shattering.'),
  ('sheaf_stacking','Sheaf Stacking','Stooked upright, it dries as you work.'),
  ('river_meadow','River Meadow','Bottom land that never runs short, and the long stems are always in the same place.'),
- ('two_row_pass','Two-Row Pass','Two rows a sweep, if the blade is long enough.'),
+ ('peened_edge','Peened Edge','Hammered thin again, and it holds a week of cutting.'),
  ('seed_saving','Seed Saving','Keep the best of this year and you know the best of it when you see it again.'),
 
- ('open_ground','Open Ground','Nothing between you and the next field.'),
+ ('snath_fitting','Snath Fitting','A handle set to your own reach stops the blade fighting you.'),
  ('long_fiber','Long Fiber','Cut low and the whole stalk is usable.'),
- ('windrow_timing','Windrow Timing','Turned once at the right hour, dry by dusk.'),
+ ('dry_blade','Dry Blade','Sap left on the steel is rust by morning.'),
  ('silk_ground','Silk Ground','Tall grass something else has been spinning in. You can tell which stems it used.'),
  ('chaff_reclaim','Chaff Reclaim','Even the broken stuff sells by the sack.'),
  ('steady_pace','Steady Pace','A field is won by not stopping.'),
@@ -271,7 +273,7 @@ HARVESTING_NAMES = [
 
  ('combing_board','Combing Board','Straight fiber is worth more than tangled.'),
  ('cool_hours','Cool Hours','Cut early, rest at noon, cut again.'),
- ('light_load','Light Load','Carry the fiber, leave the water.'),
+ ('blade_case','Blade Case','The hook travels wrapped and comes out sharp.'),
  ('silkweave_run','Silkweave Run','The ground the good thread comes from, and you know the strip it comes from.'),
  ('second_cut','Second Cut','The regrowth is shorter and just as good.'),
  ('blade_setting','Blade Setting','Angle the hook and it does the work.'),
@@ -713,11 +715,11 @@ EXPLORER = [
 
 # ---------------------------------------------------------------- what they do
 CODES = {
- 'woodcutting':  'ytyytd ywtytdyt tytdywtd ywtwyt dw',
- 'mining':       'ywtytd ywdtydtt tywdytty wttdyw dw',
- 'hunting':      'ytyytw yttywywt tytwywtw tytwyw ww',
- 'quarrying':    'yttywd yttdydwt tydwyttd yttdyw dw',
- 'harvesting':   'wyyytd yttyydtd tytdytwd yttdyw dw',
+ 'woodcutting':  'ykyywd ywdykdyw dykdywwd ywwwyk dw',
+ 'mining':       'ywdykd ywdwydky wywdykyy wkwdyw dw',
+ 'hunting':      'ykyywd ykwywyww wykdywdd kyddyw ww',
+ 'quarrying':    'ykwywd ykwdydww wydwykwd ykwdyw dw',
+ 'harvesting':   'wyyykd ykwyydwd wywdykwd ykwdyw dw',
 
  'sawyer':       'pcppsc pcpsbcpc pscspbsc pscsps rr',
  'smelter':      'ccppsp pcssbcpc spcspbsc cpssps rr',
@@ -922,7 +924,7 @@ def effect_php(e):
         return "['kind' => 'stat', 'stat' => %s, 'value' => %s]" % (php_str(target), value)
     if kind == 'pair':
         return "['kind' => 'pair', 'stat' => %s, 'value' => %d]" % (php_str(target), value)
-    if kind in ('batch', 'runSlot', 'stackCap', 'sight', 'bagUnits', 'bagRows'):
+    if kind in ('batch', 'runSlot', 'stackCap', 'sight', 'bagUnits', 'bagRows', 'bite'):
         return "['kind' => %s, 'value' => %d]" % (php_str(kind), value)
     return "['kind' => %s, 'value' => %s]" % (php_str(kind), value)
 

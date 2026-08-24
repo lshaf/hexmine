@@ -259,7 +259,10 @@ const lineNames = computed(() =>
 
 const processHint = computed(() => {
   if (!lines.value.length) return 'No lines run here'
-  if (game.processingJob) return 'Already helping with a job'
+  // §6.1 + §8.4 -- work parked elsewhere is not a reason to say no here, only
+  // ten lots of it is. What is in the way at THIS settlement is the panel's to
+  // say, per line, because that is where the line is chosen.
+  if (game.workFull) return `${game.benchJobs.length} lots of work already out`
   return lineNames.value
 })
 

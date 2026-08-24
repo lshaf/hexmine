@@ -257,7 +257,7 @@ final class JobTreeTest extends TestCase
     {
         $known = [
             'stat', 'pair', 'battleWear', 'weaponWear', 'goldFind', 'lootOption',
-            'craftOption', 'craftDurability', 'optionTier', 'brewExtra', 'stackCap',
+            'craftOption', 'craftDurability', 'optionTier', 'brewExtra', 'stackCap', 'bite',
             'costReduction', 'batch', 'runSlot', 'presence', 'toolWear', 'seamGrade',
             'sight', 'bagUnits', 'bagRows',
         ];
@@ -326,6 +326,7 @@ final class JobTreeTest extends TestCase
             'runSlot' => Balance::SKILL_RUN_SLOT_CAP,
             'presence' => Balance::SKILL_PRESENCE_CAP,
             'toolWear' => Balance::SKILL_TOOL_WEAR_CAP,
+            'bite' => Balance::SKILL_BITE_CAP,
             'seamGrade' => Balance::SKILL_SEAM_GRADE_CAP,
             'battleWear' => Balance::SKILL_BATTLE_WEAR_CAP,
             'weaponWear' => Balance::SKILL_WEAPON_WEAR_CAP,
@@ -616,7 +617,7 @@ final class JobTreeTest extends TestCase
      * walking is not woodcutting -- so it could never pay out. It would have
      * been off-class if it had.
      */
-    public function test_a_gathering_tree_moves_only_trip_stats(): void
+    public function test_a_gathering_tree_moves_only_the_haul(): void
     {
         foreach (Jobs::NODES as $key => $node) {
             if ($node['effect']['kind'] !== 'stat') {
@@ -626,12 +627,58 @@ final class JobTreeTest extends TestCase
                 continue;
             }
 
-            $this->assertContains(
+            $this->assertSame(
+                'yield',
                 $node['effect']['stat'],
-                ['yield', 'tripReduction'],
                 "{$key} moves a stat a mine cannot feel",
             );
         }
+    }
+
+    /**
+     * §7.3 -- how fast a gathering tree works a hex is whole points of attack,
+     * never a percentage on the rate.
+     *
+     * It was `tripReduction` for as long as a mine had a timer to shave. That
+     * stat shares one clamp with gear, options and potions (§8.1 rule 1), so a
+     * prospector in a decent coat had already spent the ceiling and the ten
+     * nodes they had bought were worth nothing at all -- the exact shape §7.4
+     * forbids, arrived at through the clamp instead of through a missing call
+     * site. A count cannot be clamped away by a coat.
+     */
+    public function test_a_gathering_tree_buys_attack_in_whole_points(): void
+    {
+        $trees = 0;
+
+        foreach (array_keys(Jobs::JOBS) as $job) {
+            if (Jobs::JOBS[$job]['kind'] !== Jobs::GATHERING) {
+                continue;
+            }
+
+            $total = 0;
+
+            foreach (Jobs::nodesFor($job) as $key => $node) {
+                if ($node['effect']['kind'] !== 'bite') {
+                    continue;
+                }
+
+                $this->assertSame(
+                    (float) (int) $node['effect']['value'],
+                    (float) $node['effect']['value'],
+                    "{$key} buys a fraction of an attack, which no panel can print honestly",
+                );
+                $total += (int) $node['effect']['value'];
+            }
+
+            $this->assertSame(
+                Balance::SKILL_BITE_CAP,
+                $total,
+                "{$job} does not spend its whole bite budget, so the cap is not the ladder it claims to be",
+            );
+            $trees++;
+        }
+
+        $this->assertSame(5, $trees);
     }
 
     /**

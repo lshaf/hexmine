@@ -502,7 +502,23 @@ final class Formulas
         return max(1, $rounds) * Balance::BATTLE_ROUND_MS + Balance::BATTLE_TAIL_MS;
     }
 
-    /** §9.5.5 -- one blow, floored at a chip and wandering by the swing. */
+    /**
+     * §9.5.5 -- one blow, floored at a chip and wandering by the swing.
+     *
+     * THE FLOOR IS APPLIED LAST, AND THAT ORDER IS THE RULE. A blow always
+     * lands for at least BATTLE_CHIP however far the attack is under the guard
+     * -- bare hands against a Barrow Knight's 58 still take a point off it --
+     * because a wall nobody can scratch is a locked hex, and §9.5.3 says
+     * fighting is always one of the two ways out of a pin.
+     *
+     * The order also decouples the floor from BATTLE_SWING's tuning. Folding the
+     * max() inside the round() happens to agree at the current +-10%, because
+     * round(1 * 0.9) is still 1 -- but it makes the floor depend on the swing
+     * never widening past 50%, where a floored blow of 1 would round to 0 and a
+     * hopeless fight would silently become an unwinnable one. Applied last, the
+     * floor is an invariant rather than a coincidence. There is a test pinning
+     * the invariant.
+     */
     private static function strike(int $attack, int $guard, int $seed, int $round, int $side): int
     {
         $roll = Hash::rand01(Hash::hash2($seed, $round * 2 + $side, Balance::mapSeed()));
@@ -564,39 +580,55 @@ final class Formulas
     }
 
     /**
-     * §9.5.6 -- what the blade pays, and it pays for what it was swung AT.
+     * §9.5.6 -- the whole repair bill for one fight.
      *
-     * Enemy armor is what blunts a weapon, so the bill is the monster's defense
-     * spread over the rounds it took. Hitting a wall chips the edge, which is
-     * why bringing the wrong class is expensive even when it wins -- and a
-     * swift monster blunts harder than its numbers suggest, which is its whole
-     * `wearBias`.
+     * A quarter of what the fight actually took out of you, and nothing else.
+     * The health bar and the repair bill were always meant to be the same
+     * number read twice (§9.5.5); this is the reading. A player who watched
+     * their pool drop by eighty knows the bill is twenty before the plate says
+     * so, which is the point.
+     *
+     * It replaced two streams -- the whole of the damage capped at half the
+     * pool, plus a separate per-round blade bill -- that between them could
+     * exceed the damage taken and could not be predicted from the bar.
      */
-    public static function weaponWear(array $monster, int $rounds, int $maxDurability): int
+    public static function battleWearBill(int $damageTaken): int
     {
-        $perRound = max(
-            1,
-            (int) ceil((int) $monster['defense'] / Balance::WEAPON_WEAR_DIVISOR),
-        );
-
-        $wear = $perRound * max(1, $rounds) * ($monster['wearBias'] ?? 1.0);
-
-        return min(max(1, $maxDurability), max(1, (int) round($wear)));
+        return max(0, (int) round($damageTaken * Balance::BATTLE_WEAR_RATE));
     }
 
     /**
-     * §9.5.6 -- how much of a beating one fight may actually take off the kit.
+     * §9.5.6 -- which half of the kit pays most of that bill.
      *
-     * The exchange is settled on the full pool; this caps the bill. Without it
-     * one hopeless swing in the center strips a legendary set in a single go,
-     * and §8.2's warning would be the only thing between a player and a week of
-     * work. The fight is still lost either way -- the cap is on the cost.
+     * The bill lands where the fight happened. A monster leaning on its attack
+     * beat on the worn set, so armor and boots take the greater share; one
+     * leaning on its guard was a wall you spent the fight hitting, so the
+     * weapon and gloves do.
+     *
+     * `wearBias` shifts the RATIO rather than the total, which is what keeps a
+     * swift monster's "it blunts whatever it is hit with" true without letting
+     * it charge more than a quarter of the damage. A Ridge Wyrm sends half
+     * again as much of the same bill to the blade.
+     *
+     * @param  array<string,mixed>  $monster
+     * @return array{worn:float,hands:float}
      */
-    public static function cappedBattleWear(int $damageTaken, int $pool): int
+    public static function battleWearSplit(array $monster): array
     {
-        $cap = (int) floor($pool * Balance::BATTLE_POOL_WEAR_CAP);
+        $leansAttack = (int) $monster['attack'] > (int) $monster['defense'];
 
-        return max(0, min($damageTaken, $cap));
+        $hands = $leansAttack
+            ? 1 - Balance::BATTLE_WEAR_MAJOR
+            : Balance::BATTLE_WEAR_MAJOR;
+
+        // Capped short of the whole bill: every combat piece was in the fight,
+        // so no split may leave one of the two halves paying nothing at all.
+        $hands = min(
+            Balance::BATTLE_WEAR_MAJOR,
+            $hands * max(0.0, (float) ($monster['wearBias'] ?? 1.0)),
+        );
+
+        return ['worn' => 1 - $hands, 'hands' => $hands];
     }
 
     /** Salvage returned when an item is discarded, §8.2. */
@@ -659,7 +691,7 @@ final class Formulas
     /**
      * §7.3 -- a hex is an amount of WORK, and a mine is how long you take over it.
      *
-     *   rate      = (attack + skill_attack) * (1 + trip_reduction)
+     *   rate      = (attack + skill_attack + skill_bite) * (1 + trip_reduction)
      *   trip_time = clamp(hp / rate, guard, ceiling)
      *
      * `$hp` is the tile's own, rolled by the world and stored nowhere else.
@@ -679,16 +711,23 @@ final class Formulas
      * The clamp survives as a GUARD rather than a lever -- see
      * Balance::MINING_FLOOR_SECONDS. Do not apply bonuses after it.
      *
-     * @return array{hp:int,toolAttack:int,skillAttack:int,rate:float,total:int,clamped:bool,able:bool}
+     * `$skillBite` is what the LINE'S OWN TREE is worth per second (§7.4.3), in
+     * whole points like every other term here. It is capped on the way in as
+     * well as where it is aggregated, because a rate is not the place to find
+     * out that a cap was missed.
+     *
+     * @return array{hp:int,toolAttack:int,skillAttack:int,skillBite:int,rate:float,total:int,clamped:bool,able:bool}
      */
     public static function mineTime(
         int $hp,
         int $skillLevel,
         float $equipTripReduction,
         int $toolAttack = 0,
+        int $skillBite = 0,
     ): array {
         $skillAttack = self::skillAttack($skillLevel);
-        $attack = max(0, $toolAttack) + $skillAttack;
+        $bite = max(0, min($skillBite, Balance::SKILL_BITE_CAP));
+        $attack = max(0, $toolAttack) + $skillAttack + $bite;
 
         $rate = $attack * (1 + max(0.0, $equipTripReduction));
 
@@ -701,6 +740,7 @@ final class Formulas
             'hp' => $hp,
             'toolAttack' => $toolAttack,
             'skillAttack' => $skillAttack,
+            'skillBite' => $bite,
             'rate' => round($rate, 2),
             'total' => $total,
             'clamped' => $attack > 0 && $total !== $raw,

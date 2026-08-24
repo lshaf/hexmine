@@ -98,6 +98,16 @@ export const PROCESSING = {
    *  accelerates an already-capped queue, so bot value is near zero. */
   presenceSpeedBonus: 0.2,
   presenceXpPerMinute: 4,
+  /**
+   * §6.1 + §8.4 -- the most unclaimed work one character may have out at once,
+   * runs and crafts together, across the whole map. Mirrors
+   * Balance::OUTSTANDING_WORK_CAP.
+   *
+   * The per-settlement rules are the server's and are not mirrored here: what
+   * may be left in one building depends on the tree, and the station payload
+   * says so per line. This is the one figure the dock can read on its own.
+   */
+  outstandingWorkCap: 10,
 } as const
 
 /**
@@ -173,6 +183,14 @@ export const SKILLS = {
   maxLevel: 50,
   /** Cap total points so characters specialise, §7.2. */
   totalPointCap: 90,
+  /**
+   * §7.4.3 -- the most whole points of mining attack a gathering tree is worth.
+   *
+   * A count, so it has nothing to do with the stat ceiling and a good coat
+   * cannot clamp it away. Five is about one rung of §8.0's tool ladder, which
+   * is the same bargain SKILL_PAIR_CAP strikes on the combat side.
+   */
+  biteCap: 5,
   xpForLevel: (level: number) => Math.round(45 * Math.pow(level, 1.4)),
 } as const
 

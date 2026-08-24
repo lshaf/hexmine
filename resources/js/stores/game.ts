@@ -14,6 +14,7 @@ import { defineStore } from 'pinia'
 import { computed, ref, shallowRef, watch } from 'vue'
 import { api } from '@/api/client'
 import { ApiError } from '@/api/types'
+import { PROCESSING } from '@/game/balance'
 import type {
   BattleResult,
   CollectResult,
@@ -382,10 +383,6 @@ export const useGame = defineStore('game', () => {
       ) ?? null,
   )
 
-  const processingJob = computed<ProcessingJob | null>(
-    () => jobs.value.find((j): j is ProcessingJob => j.kind === 'processing') ?? null,
-  )
-
   /**
    * §6, §8.4 -- everything left in a building, soonest first.
    *
@@ -420,6 +417,15 @@ export const useGame = defineStore('game', () => {
           && j.row === character.value?.row,
       ).length,
   )
+
+  /**
+   * §6.1 + §8.4 -- the ceiling on work left in buildings anywhere.
+   *
+   * The per-settlement rules say how much may be left in ONE building and the
+   * server owns them; this is the one number the dock can read without asking a
+   * station about itself.
+   */
+  const workFull = computed(() => benchJobs.value.length >= PROCESSING.outstandingWorkCap)
 
   /** The hex underfoot, costed by the server. What the dock offers. */
   const underfoot = computed<TilePreview | null>(() => state.value?.underfoot ?? null)
@@ -866,6 +872,11 @@ export const useGame = defineStore('game', () => {
     await act(() => api.sellMaterial(material, quantity))
   }
 
+  /** §4.0 -- one trade for every tier-zero stack. What counts is the server's call. */
+  async function sellAllScrap(): Promise<void> {
+    await act(() => api.sellScrap())
+  }
+
   async function craft(itemKey: string): Promise<void> {
     await act(() => api.craftItem(itemKey))
     await loadBench()
@@ -918,7 +929,7 @@ export const useGame = defineStore('game', () => {
     consumables, buffs,
     tree, skillPoints, jobLevels, ownedNodes,
     questDefs, quests, questsReady, questReward,
-    activeJobs, fieldJob, processingJob, benchJobs, benchReady, benchHere, underfoot, selectedTile,
+    activeJobs, fieldJob, workFull, benchJobs, benchReady, benchHere, underfoot, selectedTile,
     currentSettlement, shopStock, sight, travelPerHexMs, travelEta,
     travel, travelProgress, travelHexesWalked, travelRemainingMs,
     // helpers
@@ -933,7 +944,7 @@ export const useGame = defineStore('game', () => {
     updateGuild, removeGuildMember, setGuildRole, withdrawApplication, decideApplication,
     donateToGuild, upgradeGuildFacility,
     startMining, startGathering, startHunt, collect, abandon, travelTo, cancelTravel, startProcessing, buy,
-    sell, sellItem, craft, equip, unequip, repair, discard, discardMaterial, drink, openPanel, closePanel,
+    sell, sellAllScrap, sellItem, craft, equip, unequip, repair, discard, discardMaterial, drink, openPanel, closePanel,
     loadTree, buyNode,
     loadQuests, claimQuest, clearQuestReward,
     openStation, closeStation, loadBench,

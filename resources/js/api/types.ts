@@ -252,6 +252,8 @@ export type NodeEffect =
   | { kind: 'runSlot'; value: number }
   /** §7.3 -- the line's tool spared a mine's wear. */
   | { kind: 'toolWear'; value: number }
+  /** §7.3 -- whole points of mining attack on this line. A count, not a stat. */
+  | { kind: 'bite'; value: number }
   /** §5.1 -- a mine that comes up one grade better than the tool can take. */
   | { kind: 'seamGrade'; value: number }
   /** §7.5 -- whole hexes of sight, on top of the base one. Not a percentage. */
@@ -311,6 +313,8 @@ export interface WorkPreview {
   hp: number
   toolAttack: number
   skillAttack: number
+  /** §7.4.3 -- whole points of attack off the line's own tree. */
+  skillBite: number
   rate: number
   clamped: boolean
   /** §8.0 rule 1 -- false with nothing in your hands and nothing learned. */
@@ -385,6 +389,8 @@ export interface HuntPreview {
   hp: number
   toolAttack: number
   skillAttack: number
+  /** §7.4.3 -- whole points of attack off the line's own tree. */
+  skillBite: number
   rate: number
   clamped: boolean
   able: boolean
@@ -691,6 +697,17 @@ export interface StationState {
   bench: QueueSlot[]
   /** True when the player is standing here and processing runs faster, §6.2. */
   presence: boolean
+  /**
+   * §6.3 -- your own allowance at this settlement, per line it runs.
+   *
+   * Separate from `slots`, which is everybody's congestion. The two refuse for
+   * different reasons and a panel that conflated them would tell a player to
+   * wait for a stranger when the thing in the way was their own run.
+   */
+  runs: Record<string, { going: number; allowed: number }>
+  /** §6.1 + §8.4 -- unclaimed work you have out across the whole map, and the cap. */
+  outstanding: number
+  outstandingCap: number
 }
 
 /** The one interface both drivers implement. Swapping local -> http is a
@@ -748,6 +765,8 @@ export interface GameApi {
 
   buyItem(itemKey: string): Promise<ActionResult<OwnedItem>>
   sellMaterial(material: MaterialKey, quantity: number): Promise<ActionResult<{ gold: number }>>
+  /** §4.0 -- dump every tier-zero stack at once. The server decides what counts. */
+  sellScrap(): Promise<ActionResult<{ gold: number; rows: number }>>
   /** §8.2 -- sell one piece of gear back, priced off its remaining durability. */
   sellEquipment(ownedId: string): Promise<ActionResult<{ gold: number }>>
   /** §8.4 -- returns the bench JOB, because there is no item yet. */

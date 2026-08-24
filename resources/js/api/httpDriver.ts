@@ -24,6 +24,7 @@
  *   POST   /api/inventory/drinks              {item}
  *   POST   /api/shop/purchases                {item}
  *   POST   /api/shop/sales                    {material,quantity}
+ *   POST   /api/shop/scrap-sales              {}
  *   POST   /api/crafting                      {item}
  *   POST   /api/equipment/{item}/equip
  *   POST   /api/equipment/{item}/unequip
@@ -250,6 +251,10 @@ export class HttpDriver implements GameApi {
     return post<ActionResult<{ node: string; points: SkillPoints }>>('/jobs-tree/nodes', {
       node: nodeKey,
     })
+  }
+
+  sellScrap(): Promise<ActionResult<{ gold: number; rows: number }>> {
+    return post<ActionResult<{ gold: number; rows: number }>>('/shop/scrap-sales', {})
   }
 
   sellEquipment(ownedId: string): Promise<ActionResult<{ gold: number }>> {

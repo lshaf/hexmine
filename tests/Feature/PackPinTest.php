@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Game\Balance;
+use App\Game\Catalog;
 use App\Game\Drops;
 use App\Game\GameException;
 use App\Game\GameService;
@@ -213,6 +214,20 @@ final class PackPinTest extends TestCase
     {
         $this->standOnAPack();
 
+        // §9.5.6 -- the bill is a quarter of the damage taken, so the kit has
+        // to be a real pool for there to be a bill to warn about. A lone sword
+        // is a pool of one, a quarter of which is nothing -- and nothing is
+        // exactly what would come off it, so the absence of a warning there is
+        // the rule working rather than failing.
+        foreach (['padded_jack', 'studded_boots', 'knuckle_wraps'] as $key) {
+            CharacterItem::create([
+                'character_id' => $this->character->id,
+                'item_key' => $key,
+                'durability' => Catalog::item($key)['maxDurability'],
+                'equipped' => true,
+            ]);
+        }
+
         CharacterItem::create([
             'character_id' => $this->character->id,
             'item_key' => 'tempered_sword',
@@ -223,7 +238,11 @@ final class PackPinTest extends TestCase
         $preview = $this->game->previewBattle($this->character->fresh());
 
         $this->assertNotEmpty($preview['warnings'], 'a sword at one point was not flagged');
-        $this->assertStringContainsString('will not survive', $preview['warnings'][0]);
+        $this->assertStringContainsString(
+            'will not survive',
+            implode(' ', $preview['warnings']),
+            'the piece about to be destroyed was not named',
+        );
     }
 
     /** Nothing standing here is not an error, it is an empty offer. */

@@ -46,14 +46,37 @@ const freeSlots = computed(
 )
 
 /**
- * You help one job at a time. Helping is standing there (§6.2), and a person
- * stands in one place -- so a second queued line would be a bonus nobody is
- * present for.
+ * §6.2 -- the run you are actually standing over, if any.
+ *
+ * Helping is standing there, and a person stands in one place, so this is the
+ * run at THIS settlement rather than the first one the character owns. It used
+ * to be the latter, back when a character could only have one run out anywhere;
+ * now that work is left all over the map (§8.4), "your job" without a place
+ * attached is a question with several answers.
  */
-const helping = computed(() => game.processingJob)
+const helpingHere = computed(
+  () => game.benchJobs.some((j) => j.kind === 'processing' && j.settlementId === props.settlement.id),
+)
 
-/** Whether the job being helped with is the one running *here*. */
-const helpingHere = computed(() => helping.value?.settlementId === props.settlement.id)
+/**
+ * §6.3 -- your own allowance on one line here, spent or not.
+ *
+ * Two refusals rather than one, because they are two different things in the
+ * way: `freeSlots` is a stranger's run and this is your own. Telling a player
+ * to wait for somebody else when the thing blocking them is their own pit is
+ * the worse of the two wrong answers.
+ */
+function runsLeft(recipe: Recipe): number {
+  const line = station.value?.runs?.[recipe.skill]
+  if (!line) return 1
+
+  return Math.max(0, line.allowed - line.going)
+}
+
+/** §6.1 + §8.4 -- and the ceiling on work parked anywhere at all. */
+const workFull = computed(
+  () => (station.value?.outstanding ?? 0) >= (station.value?.outstandingCap ?? Infinity),
+)
 
 function maxBatches(recipe: Recipe): number {
   const first = Math.floor(game.held(recipe.input) / recipe.inputQty)
@@ -123,9 +146,9 @@ watch(() => props.settlement.id, () => { batches.value = 1 })
       <div v-if="!onSite" class="notice tiny">
         Travel here to queue work.
       </div>
-      <div v-else-if="helping" class="notice tiny">
-        You are already helping with a job. Collect it before starting another —
-        you can only stand in one place.
+      <div v-else-if="workFull" class="notice tiny">
+        You have {{ station?.outstanding }} lots of work out across the map.
+        Collect one before leaving another behind.
       </div>
 
       <div v-for="recipe in available" :key="recipe.key" class="recipe">
@@ -147,8 +170,13 @@ watch(() => props.settlement.id, () => { batches.value = 1 })
           class="btn btn-sm"
           type="button"
           :disabled="
-            game.busy || !onSite || Boolean(helping) || freeSlots === 0
+            game.busy || !onSite || workFull || runsLeft(recipe) === 0 || freeSlots === 0
               || maxBatches(recipe) < batches
+          "
+          :title="
+            runsLeft(recipe) === 0
+              ? `You already have ${MATERIALS[recipe.output].name} going here. Collect it first.`
+              : undefined
           "
           @click="game.startProcessing(settlement.id, recipe.key, batches)"
         >

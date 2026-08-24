@@ -246,6 +246,7 @@ const EFFECT_ICON: Record<NodeEffect['kind'], string> = {
   battleWear: 'effectCraftDurability',
   weaponWear: 'effectCraftDurability',
   toolWear: 'effectCraftDurability',
+  bite: 'effectStat',
   seamGrade: 'effectSeam',
   presence: 'effectPresence',
   runSlot: 'effectRunSlot',
@@ -277,6 +278,10 @@ function effectText(effect: NodeEffect): string {
       return `${formatPercent(-effect.value)} wear on the weapon you swing`
     case 'toolWear':
       return `${formatPercent(effect.value)} of mines leave the tool untouched`
+    case 'bite':
+      // §7.3 -- a whole point of the same attack the tool carries, said the
+      // way the tool says it. There is no mine timer left to shave.
+      return `+${effect.value} attack on this line`
     case 'seamGrade':
       return `${formatPercent(effect.value)} of mines come up a grade better`
     case 'presence':

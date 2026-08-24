@@ -434,10 +434,26 @@ durability — belong to an *object*, and a run makes a material, which has
 neither.
 
 **`runSlot` is the capability a processing tree ends on**, and it is deliberately
-the last thing bought: one run at a time is the rule, and a reeve who keeps a
-second pit going has earned it on that line and on no other. §6.1's five public
-slots are untouched — the settlement is as congested as it ever was, and what
-changed is how much of the congestion one prospector may be.
+the last thing bought: **one run of a line at one settlement** is the rule, and a
+reeve who keeps a second pit going has earned it on that line and on no other.
+§6.1's five public slots are untouched — the settlement is as congested as it
+ever was, and what changed is how much of the congestion one prospector may be.
+
+**Per settlement and per line, not per character.** It was the latter, across
+the whole map: a run of planks left at a village four days' walk away refused
+every saw pit in the world — while §8.4 argued in the same breath that "the real
+limit on how much you have going at once is still the walking". Two rules about
+one thing, disagreeing, and the walking is the one worth keeping. A capital
+running all five lines therefore holds five of one prospector's runs, one to a
+bench, which is most of what a capital is for (§6).
+
+**The ceiling is ten, and it is the only global number.** `OUTSTANDING_WORK_CAP`
+counts processing runs and bench crafts together, because to a player they are
+one thing: something left in a building that has to be walked back to. Ten so
+the walking is the limit right up until the bookkeeping would be — and a cap
+rather than none at all, because §2 assumes thousands of bots and an unbounded
+queue of parked work is a wallet running two hundred benches it never walks
+between. Ten is a route a person plans; two hundred is a spreadsheet.
 
 ---
 
@@ -1427,7 +1443,7 @@ exactly the way §6.1's processing line does: five slots, first-come-first-serve
 shared by everybody at that settlement, so a busy capital is busy at the anvil as
 well as at the saw pit. What stays personal is the one bench each — you cannot
 stack your own work five deep, and the real limit on how much you have going at
-once is still the walking.
+once is still the walking, up to §6.3's ten.
 
 **The two banks are counted apart**, because they are two buildings. A run of
 planks must never close the forge, and while both were counted off one number it

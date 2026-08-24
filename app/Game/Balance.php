@@ -393,24 +393,37 @@ final class Balance
     public const BATTLE_MAX_ROUNDS = 60;
 
     /**
-     * §9.5.6 -- most of the pool one fight may take, however badly it went.
+     * §9.5.6 -- the share of a beating that comes off the kit.
      *
-     * Now that the pool IS the gear, an uncapped exchange would let a single
-     * hopeless swing at a center-ring monster strip a whole legendary kit in
-     * one go. The fight is still lost -- the cap is on the bill, not on the
-     * outcome, so a beating stays a beating and §8.2's warning still has
-     * something to warn about.
+     * ONE bill, taken off what the fight actually took out of you. It used to
+     * be two streams -- the whole of the damage capped at half the pool, plus a
+     * separate blade bill for the rounds spent hitting armor -- which meant the
+     * repair bill and the health bar were the same number only by accident.
+     * A quarter of what you took is the bill, and nothing else is added to it.
+     *
+     * Anchored to damage TAKEN, which has a known consequence: a monster that
+     * barely touches you barely costs you, however long it took to put down. A
+     * seven-round grind against a Thornback runs to three points where it used
+     * to run to forty. That is the deliberate trade for a bill a player can do
+     * in their head off the bar they just watched drain.
      */
-    public const BATTLE_POOL_WEAR_CAP = 0.5;
+    public const BATTLE_WEAR_RATE = 0.25;
 
     /**
-     * §9.5.6 -- how hard a monster's armor is on the blade that hits it.
+     * §9.5.6 -- and which half of the kit pays most of it.
      *
-     * A blade pays for what it is swung AT rather than for what it takes: a
-     * round against a 58-defense Barrow Knight costs seven, one against a Moss
-     * Hound costs one. Bringing the wrong thing is expensive even when it wins.
+     * The bill lands where the fight actually happened. A monster that leans on
+     * its attack beats on the worn set, so armor and boots take the greater
+     * share; one that leans on its guard is a wall you spent the fight hitting,
+     * so the weapon and gloves do. Seventy against thirty rather than all or
+     * nothing, because every piece was in the fight and the split says which
+     * part of it was the work.
+     *
+     * This is the surviving half of the old two-stream model: "what hit you is
+     * on the armor, what you hit is on the blade" is now a ratio inside one
+     * bill rather than a second bill of its own.
      */
-    public const WEAPON_WEAR_DIVISOR = 8;
+    public const BATTLE_WEAR_MAJOR = 0.70;
 
     /**
      * §9.5.4 -- the slots that are in a fight at all.
@@ -565,15 +578,20 @@ final class Balance
      *
      * The fight is settled the instant you close (§9.5.5), so this is not a
      * cooldown and it is not deciding anything: it is how fast the thing that
-     * already happened is drawn. A short fight is two seconds and the longest
-     * possible one is under fifteen.
+     * already happened is drawn.
+     *
+     * ONE SECOND A ROUND, so the exchange reads at the pace a person counts
+     * rather than as a flicker. A rout is over in a couple of seconds; a grind
+     * against a wall takes as long as the grind was, which is the whole reason
+     * to watch one -- a fight that cost you a legendary should take longer to
+     * watch than a fight that cost you nothing.
      *
      * Deliberately NOT through `scaled()`, and it is the one clock in the game
      * that is not. `GAME_TIME_SCALE` compresses the game's hours so a tester
      * does not wait them out; this is not an hour, it is an animation, and a
      * 60x clock would collapse it to nothing.
      */
-    public const BATTLE_ROUND_MS = 220;
+    public const BATTLE_ROUND_MS = 1000;
 
     /** A beat at the end so the last blow is read rather than glimpsed. */
     public const BATTLE_TAIL_MS = 450;
@@ -639,6 +657,26 @@ final class Balance
      * forge -- which is what happened while both were counted off one number.
      */
     public const BENCH_SLOTS = 5;
+
+    /**
+     * §6.1 + §8.4 -- the most unclaimed work one character may have out at once,
+     * counting processing runs and bench crafts together across the whole map.
+     *
+     * The per-settlement rules say how much you may leave in ONE building; this
+     * says how much you may have scattered over all of them. It used to be
+     * neither: a processing run was capped at one PER CHARACTER anywhere, which
+     * meant a run left at a village four days' walk away closed every saw pit
+     * on the map -- while §8.4 was arguing in the same breath that "the real
+     * limit on how much you have going at once is still the walking". Two rules
+     * about the same thing, disagreeing.
+     *
+     * Ten, so the walking is the limit right up until the bookkeeping would be.
+     * A cap is still needed rather than none at all: §2 assumes thousands of
+     * bots, and an unbounded queue of parked work is a wallet running two
+     * hundred benches it never has to walk between. Ten is a route a person
+     * plans; two hundred is a spreadsheet.
+     */
+    public const OUTSTANDING_WORK_CAP = 10;
 
     /** Speed multiplier by settlement tier -- lower is faster. */
     public const SPEED_VILLAGE = 1.0;
@@ -749,6 +787,28 @@ final class Balance
     public const SKILL_BATCH_CAP = 2;
 
     public const SKILL_TOOL_WEAR_CAP = 0.25;
+
+    /**
+     * §7.3 + §7.4.3 -- whole points of MINING attack off a gathering tree.
+     *
+     * There is no mine timer to shave any more: a hex is HP and a tool is a
+     * rate, so the only honest thing a gathering tree can sell is a faster
+     * rate. It used to sell `tripReduction`, which was a percentage on that
+     * rate and shared one clamp with gear, options and potions -- so a
+     * prospector in a decent coat had already spent the ceiling and the ten
+     * nodes they bought did nothing at all.
+     *
+     * Five, and the number is the ladder rather than a feeling: the widest
+     * single rung of §8.0's tool ladder is four (rare 10 to epic 14), and the
+     * line skill itself is worth five at level fifty. So a maxed tree is worth
+     * about a rung of gear and never a tier of it, which is the same argument
+     * SKILL_PAIR_CAP makes on the combat side.
+     *
+     * A COUNT, so it has nothing to do with STAT_CEILING and cannot be clamped
+     * away by a good coat. Being flat is what makes it felt at the bottom of
+     * the ladder, where the percentage never was.
+     */
+    public const SKILL_BITE_CAP = 5;
 
     /**
      * §5.3 + §7.4.3 -- how often a gathering tree takes the better thing off

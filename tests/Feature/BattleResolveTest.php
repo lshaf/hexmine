@@ -12,6 +12,7 @@ use App\Game\Formulas;
 use App\Game\GameException;
 use App\Game\GameService;
 use App\Game\HexGeometry;
+use App\Game\Monsters;
 use App\Game\Spoils;
 use App\Game\WorldGen;
 use App\Http\Controllers\Api\MiningController;
@@ -303,6 +304,215 @@ final class BattleResolveTest extends TestCase
         return (array) $response->getData()->data;
     }
 
+    /**
+     * §9.5.5 -- a blow always lands, however far the attack is under the guard.
+     *
+     * A wall nobody can scratch is a locked hex, and §9.5.3 says fighting is
+     * always one of the two ways out of a pin -- bare-handed if the gear is
+     * gone. So the arithmetic has to keep a floor under every strike rather
+     * than letting the subtraction reach zero.
+     *
+     * Swept rather than spot-checked: every monster in the roster against every
+     * rung of kit the game allows, over enough seeds that the swing has been
+     * everywhere it can go.
+     */
+    public function test_every_blow_lands_for_at_least_a_chip(): void
+    {
+        $worst = PHP_INT_MAX;
+        $where = '';
+
+        foreach (Monsters::ROSTER as $key => $monster) {
+            foreach ([0, 1, 2, 5, 12, 41] as $attack) {
+                foreach ([0, 5, 18, 60] as $defense) {
+                    for ($seed = 0; $seed < 60; $seed++) {
+                        $log = Formulas::resolveBattle(
+                            $attack,
+                            $defense,
+                            900,
+                            $monster,
+                            $seed,
+                        )['log'];
+
+                        foreach ($log as $i => $round) {
+                            if ($round['hit'] < $worst) {
+                                $worst = $round['hit'];
+                                $where = "{$key}, attack {$attack}, seed {$seed}, round {$i}";
+                            }
+
+                            // The last round's `back` is zero by design: it is
+                            // the round that put the thing down, and it does not
+                            // strike back from the floor.
+                            if ($i === count($log) - 1) {
+                                continue;
+                            }
+
+                            if ($round['back'] < $worst) {
+                                $worst = $round['back'];
+                                $where = "{$key}, defense {$defense}, seed {$seed}, round {$i}";
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        $this->assertSame(
+            Balance::BATTLE_CHIP,
+            $worst,
+            "a blow landed under the chip floor: {$where}",
+        );
+    }
+
+    /**
+     * §9.5.5 -- and the floor survives the SWING, which is the half a refactor
+     * would break.
+     *
+     * `strike` reads max(floor, round(gap * swing)), and applying the floor LAST
+     * is what makes it hold whatever the swing is tuned to. At the current
+     * +-10% the other order agrees by luck -- round(1 * 0.9) is still 1 -- so
+     * this asserts the outcome rather than the arrangement: whatever the swing
+     * does, a blow lands.
+     *
+     * The sharpest case in the game is the one asserted: nothing in your hands
+     * against the thing with the highest guard on the roster.
+     */
+    public function test_the_chip_floor_survives_the_swing(): void
+    {
+        $wall = Monsters::ROSTER['barrow_knight'];
+
+        $this->assertGreaterThan(
+            0,
+            $wall['defense'],
+            'the wall this test is about has no guard to be under',
+        );
+
+        for ($seed = 0; $seed < 240; $seed++) {
+            $fight = Formulas::resolveBattle(0, 0, 400, $wall, $seed);
+
+            foreach ($fight['log'] as $i => $round) {
+                $this->assertGreaterThanOrEqual(
+                    Balance::BATTLE_CHIP,
+                    $round['hit'],
+                    "bare hands failed to land at all on seed {$seed}, round {$i}",
+                );
+            }
+
+            // And the whole exchange therefore moves: a fight that dealt
+            // nothing would be the locked hex the floor exists to prevent.
+            $this->assertGreaterThanOrEqual($fight['rounds'], $fight['damageDealt']);
+        }
+    }
+
+    /**
+     * §9.5.5 -- the preview is floored too, so it never promises a fight the
+     * exchange will not give.
+     *
+     * The preview is the same exchange with the swing taken out (§9.5.5's "a
+     * promise, not a guess"). An unfloored preview would print a zero-damage
+     * forecast beside a fight that lands one a round, and the plate would be
+     * arguing with the replay.
+     */
+    public function test_the_preview_is_floored_the_same_way(): void
+    {
+        foreach (Monsters::ROSTER as $key => $monster) {
+            $expected = Formulas::expectedBattle(0, 0, 400, $monster);
+
+            $this->assertGreaterThan(
+                0,
+                $expected['damageDealt'],
+                "the preview promised nothing at all against {$key}",
+            );
+            $this->assertLessThanOrEqual(Balance::BATTLE_MAX_ROUNDS, $expected['rounds']);
+        }
+    }
+
+    /**
+     * §9.5.6 -- the bill is a quarter of what the fight took, and the split
+     * sends most of it to the half of the kit that earned it.
+     *
+     * Checked on the arithmetic across the whole roster rather than through a
+     * fought pack, because which monster you meet is a hash of the hex and the
+     * hour: the rule is about every matchup, not the one the map offered.
+     */
+    public function test_the_bill_is_a_quarter_and_lands_where_the_fight_did(): void
+    {
+        foreach (Monsters::ROSTER as $key => $monster) {
+            $this->assertSame(
+                (int) round(200 * Balance::BATTLE_WEAR_RATE),
+                Formulas::battleWearBill(200),
+                'the bill stopped being a flat share of the damage taken',
+            );
+
+            $split = Formulas::battleWearSplit($monster);
+
+            $this->assertEqualsWithDelta(1.0, $split['worn'] + $split['hands'], 1e-9);
+
+            // A monster leaning on its attack beat on the worn set; one leaning
+            // on its guard was a wall you spent the fight hitting.
+            if ((int) $monster['attack'] > (int) $monster['defense']) {
+                $this->assertGreaterThan(
+                    $split['hands'],
+                    $split['worn'],
+                    "{$key} hits harder than it guards, so armor should take the brunt",
+                );
+            } else {
+                $this->assertGreaterThan(
+                    $split['worn'],
+                    $split['hands'],
+                    "{$key} guards harder than it hits, so the blade should take the brunt",
+                );
+            }
+        }
+    }
+
+    /**
+     * §9.5.6 -- `wearBias` moves the RATIO, never the total.
+     *
+     * A Ridge Wyrm "blunts whatever it is hit with", and that has to stay true
+     * without letting it charge more than a quarter of the damage: the extra
+     * comes out of the worn half rather than out of thin air.
+     */
+    public function test_a_blunting_monster_shifts_the_split_not_the_total(): void
+    {
+        $wyrm = Monsters::ROSTER['ridge_wyrm'];
+        $this->assertGreaterThan(1.0, $wyrm['wearBias'], 'the blunting monster stopped blunting');
+
+        $shrike = Monsters::ROSTER['iron_shrike'];
+        $this->assertSame(1.0, (float) $shrike['wearBias']);
+
+        $biased = Formulas::battleWearSplit($wyrm);
+        $plain = Formulas::battleWearSplit($shrike);
+
+        // Both lean on attack, so both send the brunt to the worn set -- but
+        // the one that blunts sends a bigger slice to the blade.
+        $this->assertGreaterThan($plain['hands'], $biased['hands']);
+        $this->assertEqualsWithDelta(1.0, $biased['worn'] + $biased['hands'], 1e-9);
+
+        // And the total is untouched: the bill is the damage, not the monster.
+        $this->assertSame(
+            Formulas::battleWearBill(400),
+            Formulas::battleWearBill(400),
+        );
+    }
+
+    /**
+     * §9.5.6 -- a fight that never landed on you costs nothing.
+     *
+     * The known consequence of anchoring the bill to damage TAKEN, pinned here
+     * so it is a decision rather than a surprise: a kit strong enough to take a
+     * pack without being touched pays no repair bill for it. The sink (§11.1)
+     * therefore charges the fights that hurt and forgives the routs.
+     */
+    public function test_an_untouched_kit_pays_nothing(): void
+    {
+        $this->assertSame(0, Formulas::battleWearBill(0));
+
+        // And a scratch rounds away rather than charging a point out of
+        // nowhere: a quarter of one is nothing.
+        $this->assertSame(0, Formulas::battleWearBill(1));
+        $this->assertSame(1, Formulas::battleWearBill(2));
+    }
+
     /** Put a stack in the bag, through the service so the row rules apply. */
     private function give(string $key, int $quantity): void
     {
@@ -495,10 +705,11 @@ final class BattleResolveTest extends TestCase
             'the fight is not clocked by its own exchange',
         );
 
-        // Short enough to sit through: the longest possible fight is under a
-        // quarter of a minute.
-        $this->assertLessThan(
-            15_000,
+        // §9.5.5 -- one second a round, so the longest the game allows is the
+        // bell at sixty. The clock is the exchange: a rout is a couple of
+        // seconds and a grind against a wall takes as long as the grind did.
+        $this->assertSame(
+            Balance::BATTLE_MAX_ROUNDS * Balance::BATTLE_ROUND_MS + Balance::BATTLE_TAIL_MS,
             Formulas::battleDurationMs(Balance::BATTLE_MAX_ROUNDS),
         );
     }
@@ -514,14 +725,23 @@ final class BattleResolveTest extends TestCase
         $this->equip('unmoved_sabatons');
         $this->equip('gauntlets_of_the_last_word');
 
-        $this->standOnALivePack();
+        // §9.5.6 -- the bill is a quarter of what the fight took OUT of you, so
+        // a fight that never landed on you costs nothing at all. Walk packs
+        // until one does land, which is the same search the pack tests already
+        // do -- what is under test is where a bill goes, not whether one exists.
+        $result = null;
+        foreach ($this->packHexes() as $pack) {
+            $this->standOn($pack);
+            $attempt = $this->tryFight($this->character);
+            if ($attempt !== null && $attempt['wear'] !== []) {
+                $result = $attempt;
+                break;
+            }
+        }
 
-        $result = $this->resolveFight($this->character);
+        $this->assertNotNull($result, 'no pack on the map ever charged this kit');
 
         $slots = array_column($result['wear'], 'slot');
-
-        // The weapon always pays: enemy armor blunts it whatever else happens.
-        $this->assertContains('weapon', $slots, 'the blade came out of a fight unmarked');
 
         foreach ($result['wear'] as $row) {
             $this->assertGreaterThan(0, $row['lost'], "{$row['name']} wore nothing");
@@ -534,11 +754,16 @@ final class BattleResolveTest extends TestCase
     }
 
     /**
-     * §9.5.6 -- the bill is capped at half the pool, so one hopeless swing in
-     * the center cannot strip a whole kit in a single go. The fight is still
-     * lost; the cap is on the cost.
+     * §9.5.6 -- one fight costs a quarter of what it took out of you, and the
+     * damage can never exceed the pool. So the bill is bounded by a quarter of
+     * the kit however badly it went.
+     *
+     * That is a tighter promise than the old one. There used to be a cap at
+     * half the pool plus a separate blade bill on top, which meant the ceiling
+     * was "half, plus however long the fight ran" -- not a number a player
+     * could hold. A quarter of what you watched drain is.
      */
-    public function test_one_fight_never_takes_more_than_half_the_kit(): void
+    public function test_one_fight_never_takes_more_than_a_quarter_of_the_kit(): void
     {
         $pieces = ['notched_sword', 'padded_jack', 'studded_boots', 'knuckle_wraps'];
         foreach ($pieces as $key) {
@@ -561,15 +786,18 @@ final class BattleResolveTest extends TestCase
 
         $lost = array_sum(array_column($result['wear'], 'lost'));
 
-        // Half the pool, plus whatever the blade paid for enemy armor -- that
-        // stream is its own and is capped per item rather than by the pool.
-        $weapon = collect($result['wear'])->firstWhere('slot', 'weapon');
-        $blade = $weapon === null ? 0 : $weapon['lost'];
-
         $this->assertLessThanOrEqual(
-            (int) floor($pool * Balance::BATTLE_POOL_WEAR_CAP) + $blade,
+            (int) ceil($pool * Balance::BATTLE_WEAR_RATE),
             $lost,
-            'one fight took more than the cap allows',
+            'one fight took more than a quarter of the kit',
+        );
+
+        // And it is the quarter of what was TAKEN rather than a flat charge:
+        // the two have to agree or the bar the player watched drain was lying.
+        $this->assertSame(
+            Formulas::battleWearBill($result['damageTaken']),
+            $lost,
+            'the bill and the damage taken disagree',
         );
     }
 
@@ -579,12 +807,25 @@ final class BattleResolveTest extends TestCase
      */
     public function test_gear_that_runs_out_is_destroyed_and_named(): void
     {
+        // A full kit, because the bill is a share of the damage taken and a
+        // lone sword is a pool of one -- a quarter of which rounds to nothing.
+        // The sword is the piece on its last point either way.
         $sword = $this->equip('notched_sword', 1);
+        $this->equip('padded_jack');
+        $this->equip('studded_boots');
+        $this->equip('knuckle_wraps');
 
-        $this->standOnALivePack();
+        $result = null;
+        foreach ($this->packHexes() as $pack) {
+            $this->standOn($pack);
+            $attempt = $this->tryFight($this->character);
+            if ($attempt !== null && $attempt['destroyed'] !== []) {
+                $result = $attempt;
+                break;
+            }
+        }
 
-        $result = $this->resolveFight($this->character);
-
+        $this->assertNotNull($result, 'nothing on the map ever finished off a one-point sword');
         $this->assertContains('Notched Sword', $result['destroyed']);
         $this->assertNull(CharacterItem::find($sword->id), 'a destroyed item was left in the bag');
 

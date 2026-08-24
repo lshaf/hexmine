@@ -2303,6 +2303,44 @@ final class GameLoopTest extends TestCase
      * became gathering's whole rate, four against a Stone Axe's three meant
      * buying your first axe made the hex SLOWER, which is §12 step 5 inverted.
      */
+    /**
+     * §7.3 + §7.4.3 -- the gathering tree is whole points of the same attack
+     * the tool carries, and it lands on the rate rather than beside it.
+     *
+     * Flat rather than a percentage, which inverts who it is worth most to: a
+     * Stone Axe gains proportionally far more from five points than a Mythril
+     * Pickaxe does. That is deliberate and it is the opposite of gear -- §8.1
+     * rule 4 keeps the whole ladder twelve points wide precisely so a tree can
+     * be a different road to the top rather than a longer one.
+     */
+    public function test_the_line_tree_is_whole_points_of_the_mine_rate(): void
+    {
+        $hex = Balance::TILE_HP_MIN;
+        $level = 20;
+
+        $plain = Formulas::mineTime($hex, $level, 0.0, Balance::MINING_COMMON_ATTACK);
+        $tree = Formulas::mineTime($hex, $level, 0.0, Balance::MINING_COMMON_ATTACK, Balance::SKILL_BITE_CAP);
+
+        $this->assertSame(
+            $plain['rate'] + Balance::SKILL_BITE_CAP,
+            $tree['rate'],
+            'the tree does not reach the rate the mine is actually run at',
+        );
+        $this->assertLessThan($plain['total'], $tree['total']);
+
+        // The cap is enforced where the rate is built, not only where the
+        // nodes are added up. A rate is a bad place to find out a cap was
+        // missed somewhere upstream.
+        $overrun = Formulas::mineTime($hex, $level, 0.0, Balance::MINING_COMMON_ATTACK, 99);
+        $this->assertSame($tree['rate'], $overrun['rate'], 'the mine rate does not enforce SKILL_BITE_CAP');
+
+        // A count, so a maxed coat cannot clamp it away -- which is the whole
+        // reason it stopped being tripReduction.
+        $capped = Formulas::mineTime($hex, $level, Balance::STAT_CEILING, Balance::MINING_COMMON_ATTACK);
+        $both = Formulas::mineTime($hex, $level, Balance::STAT_CEILING, Balance::MINING_COMMON_ATTACK, Balance::SKILL_BITE_CAP);
+        $this->assertGreaterThan($capped['rate'], $both['rate']);
+    }
+
     public function test_bare_hands_are_the_floor_under_the_tool_ladder(): void
     {
         $this->assertLessThan(
@@ -4381,8 +4419,8 @@ final class GameLoopTest extends TestCase
         $this->assertSame($col + 1, $this->character->fresh()->col);
     }
 
-    /** §6.2 -- helping is standing there, and you can only stand in one place. */
-    public function test_only_one_processing_job_at_a_time(): void
+    /** §6.3 -- one run of a line at one settlement, unless the tree bought more. */
+    public function test_only_one_run_of_a_line_at_one_settlement(): void
     {
         $settlement = $this->standAtWoodcuttingVillage();
 
@@ -4398,6 +4436,125 @@ final class GameLoopTest extends TestCase
         } catch (GameException $e) {
             $this->assertSame('busy', $e->errorCode);
         }
+    }
+
+    /**
+     * §6.1 + §8.4 -- work left at one settlement never closes another.
+     *
+     * The run cap used to be per CHARACTER across the whole map, so a run of
+     * planks left at a village four days' walk away refused every saw pit in
+     * the world -- while §8.4 argued in the same breath that "the real limit on
+     * how much you have going at once is still the walking". Two rules about
+     * one thing, disagreeing. The walking is the limit now.
+     */
+    public function test_work_left_behind_does_not_close_the_next_settlement(): void
+    {
+        $first = $this->standAtWoodcuttingVillage();
+        $this->give(['wood' => 80, 'planks' => 8, 'heartknot' => 4]);
+
+        $this->game->startProcessing($this->character->fresh(), $first['id'], 'planks', 1);
+
+        $second = $this->anotherWoodcuttingSettlement($first);
+        $this->character->update(['col' => $second['col'], 'row' => $second['row']]);
+
+        $job = $this->game->startProcessing($this->character->fresh(), $second['id'], 'planks', 1);
+        $this->assertSame('processing', $job->kind);
+        $this->assertSame(
+            2,
+            $this->character->fresh()->jobs()->where('kind', 'processing')->count(),
+            'a run at one village refused a run at another',
+        );
+
+        // And the bench is a different building again: the run parked here does
+        // not stop a craft here, and neither of them stops the other's bank.
+        $craft = $this->game->startCraft($this->character->fresh(), 'hewn_axe');
+        $this->assertSame('craft', $craft->kind);
+    }
+
+    /**
+     * §6.1 + §8.4 -- and the ceiling on how much may be out at once.
+     *
+     * A cap is still needed rather than none at all: §2 assumes thousands of
+     * bots, and an unbounded queue of parked work is a wallet running two
+     * hundred benches it never walks between.
+     */
+    public function test_ten_lots_of_work_is_the_ceiling(): void
+    {
+        $this->standAtWoodcuttingVillage();
+        $this->give(['wood' => 400]);
+
+        $where = $this->woodcuttingSettlements(Balance::OUTSTANDING_WORK_CAP + 1);
+
+        for ($i = 0; $i < Balance::OUTSTANDING_WORK_CAP; $i++) {
+            $this->character->update(['col' => $where[$i]['col'], 'row' => $where[$i]['row']]);
+            $this->game->startProcessing($this->character->fresh(), $where[$i]['id'], 'planks', 1);
+        }
+
+        $this->assertSame(
+            Balance::OUTSTANDING_WORK_CAP,
+            $this->game->outstandingWork($this->character->fresh()),
+            'ten separate settlements did not each take a run',
+        );
+
+        // The eleventh is refused, and refused at a settlement with nothing of
+        // yours in it -- so it is the ceiling talking rather than the bench.
+        $last = $where[Balance::OUTSTANDING_WORK_CAP];
+        $this->character->update(['col' => $last['col'], 'row' => $last['row']]);
+
+        try {
+            $this->game->startProcessing($this->character->fresh(), $last['id'], 'planks', 1);
+            $this->fail('an eleventh lot of work was left behind');
+        } catch (GameException $e) {
+            $this->assertSame('busy', $e->errorCode);
+            $this->assertStringContainsString('10', $e->getMessage());
+        }
+    }
+
+    /**
+     * The nearest N settlements that run the woodcutting line, character first.
+     *
+     * @return list<array<string,mixed>>
+     */
+    private function woodcuttingSettlements(int $want): array
+    {
+        $found = [];
+
+        for ($radius = 0; $radius <= 100 && count($found) < $want; $radius++) {
+            for ($dc = -$radius; $dc <= $radius; $dc++) {
+                for ($dr = -$radius; $dr <= $radius; $dr++) {
+                    $s = WorldGen::settlementAt((int) $this->character->col + $dc, (int) $this->character->row + $dr);
+                    if ($s && in_array('woodcutting', $s['lines'], true)) {
+                        $found[$s['id']] = $s;
+                    }
+                }
+            }
+        }
+
+        $this->assertGreaterThanOrEqual($want, count($found), 'not enough woodcutting settlements to test the ceiling');
+
+        return array_slice(array_values($found), 0, $want);
+    }
+
+    /**
+     * A settlement running the same line as this one, and never this one.
+     *
+     * @param  array<string,mixed>  $not
+     * @return array<string,mixed>
+     */
+    private function anotherWoodcuttingSettlement(array $not): array
+    {
+        for ($radius = 1; $radius <= 40; $radius++) {
+            for ($dc = -$radius; $dc <= $radius; $dc++) {
+                for ($dr = -$radius; $dr <= $radius; $dr++) {
+                    $s = WorldGen::settlementAt((int) $not['col'] + $dc, (int) $not['row'] + $dr);
+                    if ($s && $s['id'] !== $not['id'] && in_array('woodcutting', $s['lines'], true)) {
+                        return $s;
+                    }
+                }
+            }
+        }
+
+        $this->fail('no second woodcutting settlement anywhere near the spawn');
     }
 
     /** §6.2 -- the helper bonus only covers the time you actually stood there. */
@@ -4734,6 +4891,58 @@ final class GameLoopTest extends TestCase
         $this->character->save();
 
         return $this->game->buyItem($this->character->fresh(), $key);
+    }
+
+    /**
+     * §4.0 -- one trade empties the pack of everything that reaches no tier.
+     *
+     * Tier zero is the whole test, so it takes the five biome scrap and the
+     * five junk together. They are two different arguments about where a copper
+     * came from and one chore to be rid of, and a button that cleared only half
+     * the coppers would be a button you still had to finish by hand.
+     */
+    public function test_clearing_the_scrap_takes_every_tier_zero_stack(): void
+    {
+        $this->standAtWoodcuttingVillage();
+        $this->give(['branch' => 4, 'thistle' => 3, 'wood' => 5, 'toadstool' => 2]);
+
+        $before = (int) $this->character->fresh()->gold;
+        $sale = $this->game->sellScrap($this->character->fresh());
+
+        $this->assertSame(7, $sale['units']);
+        $this->assertSame(2, $sale['rows'], 'scrap and junk are one chore, whatever else they are');
+        $this->assertSame(7, $sale['gold'], 'tier zero is a copper each, §4.0');
+        $this->assertSame($before + 7, (int) $this->character->fresh()->gold);
+
+        $held = $this->character->fresh()->materials()->pluck('quantity', 'material_key');
+        $this->assertSame(0, (int) ($held['branch'] ?? 0));
+        $this->assertSame(0, (int) ($held['thistle'] ?? 0));
+
+        // Everything that reaches a tier is left exactly where it was. The
+        // trader pays badly for raw stock (§3.2) and whether that is worth
+        // taking is a decision, not a chore.
+        $this->assertSame(5, (int) $held['wood']);
+        $this->assertSame(2, (int) $held['toadstool']);
+    }
+
+    /** An empty pack is told so, rather than answering with a sale of nothing. */
+    public function test_clearing_the_scrap_refuses_when_there_is_none(): void
+    {
+        $this->standAtWoodcuttingVillage();
+        $this->give(['wood' => 3]);
+
+        $this->expectException(GameException::class);
+        $this->game->sellScrap($this->character->fresh());
+    }
+
+    /** §3.2 -- the trader is an NPC who stands somewhere. So is this. */
+    public function test_clearing_the_scrap_needs_a_settlement(): void
+    {
+        $this->give(['branch' => 4]);
+        $this->assertNull($this->game->currentSettlement($this->character->fresh()));
+
+        $this->expectException(GameException::class);
+        $this->game->sellScrap($this->character->fresh());
     }
 
     /** §8.2 -- half the shelf price, and wear comes off the top. */

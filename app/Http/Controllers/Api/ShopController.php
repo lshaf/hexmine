@@ -57,6 +57,29 @@ class ShopController extends GameController
     }
 
     /**
+     * §4.0 -- dump every tier-zero stack in one trade.
+     *
+     * Its own route rather than a flag on sell(), for the same reason
+     * sellEquipment() has one: sell() names a material and a quantity because
+     * the player picked both, and here they picked neither. The server decides
+     * what counts as scrap, which is the only place that question has an
+     * honest answer (§16).
+     */
+    public function sellScrap(Request $request): JsonResponse
+    {
+        $character = $this->character($request);
+        $sale = $this->game->sellScrap($character);
+
+        $what = $sale['units'] === 1 ? 'one piece of scrap' : "{$sale['units']} pieces of scrap";
+
+        return $this->respond(
+            $character,
+            ['gold' => $sale['gold'], 'rows' => $sale['rows']],
+            "Sold {$what} for {$sale['gold']} gold.",
+        );
+    }
+
+    /**
      * §8.2 -- sell one piece of gear back, at half its shelf price scaled by
      * what is left of it.
      *

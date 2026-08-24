@@ -431,6 +431,61 @@ class GameService
     }
 
     /**
+     * §9.5.6 -- one bill, aimed at the half of the kit that earned it.
+     *
+     * Two calls to wearShares rather than one, and whatever a half cannot
+     * absorb spills to the other: a fighter with no gloves does not get a
+     * discount, the rest of the kit pays it instead. That is the same rule the
+     * per-piece pass already follows -- nothing goes missing from the
+     * arithmetic just because a slot is empty.
+     *
+     * The two skill families stay in their own halves. `battleWear` spares a
+     * share of the whole bill, because it is about taking a beating well;
+     * `weaponWear` spares a share of the hands' portion, because it is about
+     * what you are swinging.
+     *
+     * @param  array<int,array<string,mixed>>  $items
+     * @param  array<string,mixed>  $monster
+     * @return array<int,int> item id -> durability lost
+     */
+    private function battleWear(
+        array $items,
+        array $monster,
+        int $damageTaken,
+        float $wearSpared,
+        float $weaponSpared,
+    ): array {
+        $bill = (int) round(
+            Formulas::battleWearBill($damageTaken) * (1 - max(0.0, $wearSpared)),
+        );
+
+        if ($bill <= 0) {
+            return [];
+        }
+
+        $split = Formulas::battleWearSplit($monster);
+
+        $hands = (int) round($bill * $split['hands'] * (1 - max(0.0, $weaponSpared)));
+        $worn = $bill - $hands;
+
+        $handsShare = $this->wearShares($items, $hands, ['weapon', 'gloves']);
+        $worn += $hands - array_sum($handsShare);
+
+        $wornShare = $this->wearShares($items, $worn, ['armor', 'boots']);
+        $spill = $worn - array_sum($wornShare);
+
+        // Anything the worn half could not take goes back to the hands, which
+        // is the only place left for it.
+        if ($spill > 0) {
+            foreach ($this->wearShares($items, $spill, ['weapon', 'gloves']) as $id => $extra) {
+                $handsShare[$id] = ($handsShare[$id] ?? 0) + $extra;
+            }
+        }
+
+        return $handsShare + $wornShare;
+    }
+
+    /**
      * §9.5.6 -- how a beating is spread across the kit that took it.
      *
      * By how much each piece was built to soak rather than by how much is left
@@ -439,19 +494,26 @@ class GameService
      * the others, which is what lets a fight empty the pool without any of the
      * arithmetic going missing.
      *
+     * §9.5.6 -- `$slots` aims the bill at half the kit. The split sends the
+     * greater share to whichever half the fight actually happened in, and each
+     * half is then spread by what its pieces were built to soak.
+     *
      * @param  array<int,array<string,mixed>>  $items
+     * @param  list<string>|null  $slots
      * @return array<int,int> item id -> durability lost
      */
-    private function wearShares(array $items, int $damage): array
+    private function wearShares(array $items, int $damage, ?array $slots = null): array
     {
-        $combat = array_values(array_filter($items, static function (array $item): bool {
+        $allowed = $slots ?? Balance::COMBAT_SLOTS;
+
+        $combat = array_values(array_filter($items, static function (array $item) use ($allowed): bool {
             if (! $item['equipped'] || $item['durability'] <= 0) {
                 return false;
             }
 
             $def = Catalog::item($item['key']);
 
-            return $def !== null && in_array($def['slot'] ?? '', Balance::COMBAT_SLOTS, true);
+            return $def !== null && in_array($def['slot'] ?? '', $allowed, true);
         }));
 
         if ($combat === [] || $damage <= 0) {
@@ -1612,13 +1674,18 @@ class GameService
         $pool = Formulas::battlePool($items);
         $expected = Formulas::expectedBattle($pair['attack'], $pair['defense'], $pool, $monster);
 
-        $bill = (int) round(
-            Formulas::cappedBattleWear($expected['damageTaken'], $pool) * (1 - $tree['wear']),
+        // §9.5.6 -- the same one bill the fight will charge, so the preview and
+        // the receipt cannot disagree about what this is going to cost.
+        $share = $this->battleWear(
+            $items,
+            $monster,
+            $expected['damageTaken'],
+            $tree['wear'],
+            $tree['weaponWear'],
         );
-        $share = $this->wearShares($items, $bill);
 
         $warnings = [];
-        $wear = ['pool' => $pool, 'taken' => $bill, 'weapon' => 0];
+        $wear = ['pool' => $pool, 'taken' => array_sum($share), 'weapon' => 0];
 
         foreach ($items as $item) {
             if (! $item['equipped'] || $item['durability'] <= 0) {
@@ -1633,15 +1700,8 @@ class GameService
 
             $cost = $share[$item['id']] ?? 0;
 
-            // §9.5.6 -- the blade pays separately, and it pays for what it is
-            // swung at rather than for what it takes.
             if ($slot === 'weapon') {
-                $wear['weapon'] = (int) round(Formulas::weaponWear(
-                    $monster,
-                    $expected['rounds'],
-                    (int) ($def['maxDurability'] ?? 1),
-                ) * (1 - $tree['weaponWear']));
-                $cost += $wear['weapon'];
+                $wear['weapon'] = $cost;
             }
 
             // The warning is built on what the arithmetic says plus the swing
@@ -1930,13 +1990,14 @@ class GameService
         $wear = [];
         $rounds = (int) ($payload['rounds'] ?? 1);
         $pool = (int) ($payload['pool'] ?? 0);
-        $bill = (int) round(
-            Formulas::cappedBattleWear((int) ($payload['damageTaken'] ?? 0), $pool)
-                * (1 - (float) ($payload['wearSpared'] ?? 0.0)),
-        );
 
-        $items = $this->itemRows($character);
-        $share = $this->wearShares($items, $bill);
+        $share = $this->battleWear(
+            $this->itemRows($character),
+            $monster,
+            (int) ($payload['damageTaken'] ?? 0),
+            (float) ($payload['wearSpared'] ?? 0.0),
+            (float) ($payload['weaponSpared'] ?? 0.0),
+        );
 
         $byId = [];
         foreach ($character->items as $item) {
@@ -1949,26 +2010,6 @@ class GameService
             }
 
             $wear[] = $this->wearInFight($byId[$id], $amount);
-        }
-
-        // §9.5.6 -- and the blade pays separately, for what it was swung AT.
-        // Enemy armor is what blunts a weapon, so a wall costs an edge even
-        // when the edge wins.
-        foreach ($character->items as $item) {
-            if (! $item->equipped || $item->durability <= 0) {
-                continue;
-            }
-
-            $def = Catalog::item($item->item_key);
-            if (($def['slot'] ?? null) !== 'weapon') {
-                continue;
-            }
-
-            $wear[] = $this->wearInFight($item, (int) round(Formulas::weaponWear(
-                $monster,
-                $rounds,
-                (int) ($def['maxDurability'] ?? 1),
-            ) * (1 - (float) ($payload['weaponSpared'] ?? 0.0))));
         }
 
         // §9.5.8 -- gold needs no bag row, which is what makes it the right
@@ -2519,6 +2560,7 @@ class GameService
                 'hp' => 0,
                 'toolAttack' => 0,
                 'skillAttack' => 0,
+                'skillBite' => 0,
                 'rate' => 0.0,
                 'clamped' => false,
                 'able' => false,
@@ -2554,6 +2596,7 @@ class GameService
             'hp' => $tile['hp'],
             'toolAttack' => 0,
             'skillAttack' => 0,
+            'skillBite' => 0,
             'rate' => 0.0,
             'clamped' => false,
             'able' => false,
@@ -2671,6 +2714,11 @@ class GameService
             $skillLevel,
             $bonuses['tripReduction'],
             $gathering ? Balance::BARE_HAND_ATTACK : $this->lineToolAttack($character, $skillKey),
+            // §7.4.3 -- the line's own tree, in whole points of the same attack
+            // the tool carries. It counts bare-handed too: gathering a forest
+            // hex is woodcutting whether or not there is an axe on your back,
+            // and §4.0 gives up the tool, not what you know about trees.
+            (int) $this->jobEffects($character, $skillKey)['bite'],
         );
 
         // §8.2 -- nothing is destroyed without warning, and a mine wears gear
@@ -2709,6 +2757,7 @@ class GameService
             'hp' => $mine['hp'],
             'toolAttack' => $mine['toolAttack'],
             'skillAttack' => $mine['skillAttack'],
+            'skillBite' => $mine['skillBite'],
             'rate' => $mine['rate'],
             'clamped' => $mine['clamped'],
             // §8.0 rule 1 -- the verb is refused without its tool, not merely
@@ -2822,6 +2871,7 @@ class GameService
             'hp' => Balance::HERD_HP,
             'toolAttack' => 0,
             'skillAttack' => 0,
+            'skillBite' => 0,
             'rate' => 0.0,
             'clamped' => false,
             'able' => false,
@@ -2896,12 +2946,14 @@ class GameService
             $skillLevel,
             $bonuses['tripReduction'],
             $this->lineToolAttack($character, 'hunting'),
+            (int) $this->jobEffects($character, 'hunting')['bite'],
         );
 
         $base['seconds'] = $mine['total'];
         $base['hp'] = $mine['hp'];
         $base['toolAttack'] = $mine['toolAttack'];
         $base['skillAttack'] = $mine['skillAttack'];
+        $base['skillBite'] = $mine['skillBite'];
         $base['rate'] = $mine['rate'];
         $base['clamped'] = $mine['clamped'];
         $base['able'] = $mine['able'];
@@ -4109,11 +4161,25 @@ class GameService
             ->orderBy('started_at')
             ->get();
 
+        // §6.3 -- and what YOU may have going here, per line, so the panel can
+        // refuse before the materials are spent rather than after. The public
+        // slots above are everybody's congestion; this is your own allowance,
+        // and the two refuse for different reasons.
+        $runs = [];
+        foreach ($settlement['lines'] as $line) {
+            $runs[$line] = $this->runsFor($character, $settlementId, $line);
+        }
+
         return [
             'settlement' => $settlement,
             'slots' => $this->queueSlots($character, $jobs, 'processing', Balance::PUBLIC_SLOTS),
             'bench' => $this->queueSlots($character, $jobs, 'craft', Balance::BENCH_SLOTS),
             'presence' => $character->presence_settlement_id === $settlementId,
+            'runs' => $runs,
+            // §6.1 + §8.4 -- the ceiling across the whole map, so the panel can
+            // say "you have ten lots of work out" rather than only "not here".
+            'outstanding' => $this->outstandingWork($character),
+            'outstandingCap' => Balance::OUTSTANDING_WORK_CAP,
         ];
     }
 
@@ -4159,22 +4225,30 @@ class GameService
                 throw new GameException('You have to be at the settlement.', 'not_present');
             }
 
-            // §7.4.3 -- one run at a time, plus whatever this line's own tree
-            // has bought. A `runSlot` node is the capability a processing tree
-            // ends on: the reeve who keeps a second pit going while they work
-            // the first. It is read from the line being started, so a Sawyer's
-            // second pit is a pit and not a tannery.
-            $running = $character->jobs()->where('kind', 'processing')->count();
-            $allowed = 1 + (int) $this->jobEffects($character, $this->jobForLine($recipe['skill']))['runSlot'];
+            // §7.4.3 -- one run of this line at THIS settlement, plus whatever
+            // the line's own tree has bought. A `runSlot` node is the capability
+            // a processing tree ends on: the reeve who keeps a second pit going
+            // while they work the first.
+            //
+            // Per settlement and per line, not per character. It was per
+            // character across the whole map, which meant a run of planks left
+            // at a village four days away closed every saw pit in the world --
+            // and §8.4 was arguing in the same breath that the real limit on
+            // how much you have going at once is the walking. The walking is
+            // the limit now, up to Balance::OUTSTANDING_WORK_CAP.
+            $runs = $this->runsFor($character, $settlementId, $recipe['skill']);
 
-            if ($running >= $allowed) {
+            if ($runs['going'] >= $runs['allowed']) {
+                $line = Catalog::skills()[$recipe['skill']]['name'] ?? $recipe['skill'];
                 throw new GameException(
-                    $allowed === 1
-                        ? 'You are already helping with a job. Collect that one first.'
-                        : "You are already helping with {$running} jobs. Collect one first.",
+                    $runs['allowed'] === 1
+                        ? "You already have {$line} going at {$settlement['name']}. Collect it before starting another."
+                        : "You already have {$runs['going']} {$line} runs going at {$settlement['name']}.",
                     'busy',
                 );
             }
+
+            $this->requireWorkRoom($character);
 
             // §6.1 -- the processing bank only. A craft on the anvil is not a
             // slot at the saw pit (§8.4).
@@ -4755,6 +4829,56 @@ class GameService
         });
     }
 
+    /**
+     * §4.0 -- empty the pack of everything that reaches no tier, in one trade.
+     *
+     * Tier zero is the whole test, so it takes the five biome scrap and the five
+     * junk together. They are two different arguments (§4.0 keeps them apart
+     * because one is what a MISSING TOOL costs you and the other is rubbish
+     * carried out alongside), but they are one chore: a copper each, wanted by
+     * no recipe anywhere, and taking up straps §7.6 charges for.
+     *
+     * One transaction and one figure rather than ten sales, because the player
+     * is doing one thing. Ten calls would also be ten quest fires and ten full
+     * state payloads for a decision made once.
+     *
+     * @return array{gold:int,rows:int,units:int}
+     */
+    public function sellScrap(Character $character): array
+    {
+        return DB::transaction(function () use ($character) {
+            $this->requireSettlement($character, 'trade');
+
+            $gold = 0;
+            $rows = 0;
+            $units = 0;
+
+            foreach ($character->materials()->where('quantity', '>', 0)->get() as $stack) {
+                $def = Catalog::material($stack->material_key);
+                if ($def === null || ($def['tier'] ?? 0) !== 0 || ($def['npcPrice'] ?? 0) <= 0) {
+                    continue;
+                }
+
+                $count = (int) $stack->quantity;
+                $this->takeMaterial($character, $stack->material_key, $count);
+
+                $gold += (int) $def['npcPrice'] * $count;
+                $units += $count;
+                $rows++;
+            }
+
+            if ($rows === 0) {
+                throw new GameException('Nothing in the pack the trader would call scrap.', 'not_sellable');
+            }
+
+            $character->gold += $gold;
+            $this->fireQuest($character, 'sell', $gold);
+            $character->save();
+
+            return ['gold' => $gold, 'rows' => $rows, 'units' => $units];
+        });
+    }
+
     // ------------------------------------------------------------------- craft
 
     /** @return CharacterItem|CharacterConsumable a new object, or the grown stack */
@@ -4843,6 +4967,12 @@ class GameService
                 );
             }
 
+            // §6.1 + §8.4 -- and the ceiling on how much may be out anywhere.
+            // A craft and a processing run count against one number, because to
+            // the player they are one thing: something left behind that has to
+            // be walked back to.
+            $this->requireWorkRoom($character);
+
             // §8.4 + §6.1 -- the benches queue like the lines do: five slots,
             // first-come-first-served, shared by everybody standing here. It is
             // their own bank, so a busy saw pit never closes the forge.
@@ -4916,6 +5046,64 @@ class GameService
                 'ends_at' => $now + Balance::scaled($seconds * 1000),
             ]);
         });
+    }
+
+    /**
+     * §6.1 + §8.4 -- how much unclaimed work this character has out, everywhere.
+     *
+     * Processing runs and bench crafts together, because they are the same
+     * thing to a player: something left in a building that has to be walked
+     * back to. A mine, a hunt and a fight are not counted -- those are on your
+     * own body and are already one at a time.
+     */
+    public function outstandingWork(Character $character): int
+    {
+        return $character->jobs()
+            ->whereIn('kind', ['processing', 'craft'])
+            ->count();
+    }
+
+    /**
+     * §6.3 -- how many runs of one line this character may keep going at ONE
+     * settlement, and how many are going there now.
+     *
+     * Per settlement and per line, which is what makes `runSlot` mean the
+     * sentence §6.3 writes: the reeve who keeps a second pit going has earned it
+     * on that line and on no other. A capital running all five lines therefore
+     * lets one prospector have five runs in it, one to a bench, which is most of
+     * what a capital is for (§6).
+     *
+     * @return array{going:int,allowed:int}
+     */
+    public function runsFor(Character $character, string $settlementId, string $line): array
+    {
+        return [
+            'going' => $character->jobs()
+                ->where('kind', 'processing')
+                ->where('settlement_id', $settlementId)
+                ->where('skill_key', $line)
+                ->count(),
+            'allowed' => 1 + (int) $this->jobEffects($character, $this->jobForLine($line))['runSlot'],
+        ];
+    }
+
+    /**
+     * §6.1 + §8.4 -- the one refusal both banks share.
+     *
+     * Said before anything is spent, like every other refusal at a bench, and
+     * said with the number in it: "ten" is actionable where "too much work out"
+     * is a shrug.
+     */
+    private function requireWorkRoom(Character $character): void
+    {
+        $out = $this->outstandingWork($character);
+
+        if ($out >= Balance::OUTSTANDING_WORK_CAP) {
+            throw new GameException(
+                "You have {$out} lots of work out already. Collect one before leaving another behind.",
+                'busy',
+            );
+        }
     }
 
     /** §8.4 -- what this character has on the bench at one settlement. */
@@ -5346,6 +5534,7 @@ class GameService
             'stackCap' => Balance::SKILL_STACK_CAP,
             'batch' => Balance::SKILL_BATCH_CAP,
             'toolWear' => Balance::SKILL_TOOL_WEAR_CAP,
+            'bite' => Balance::SKILL_BITE_CAP,
             'seamGrade' => Balance::SKILL_SEAM_GRADE_CAP,
             'presence' => Balance::SKILL_PRESENCE_CAP,
             'runSlot' => Balance::SKILL_RUN_SLOT_CAP,
@@ -5413,6 +5602,7 @@ class GameService
             'stackCap' => 0.0,
             'batch' => 0.0,
             'toolWear' => 0.0,
+            'bite' => 0.0,
             'seamGrade' => 0.0,
             'presence' => 0.0,
             'runSlot' => 0.0,
