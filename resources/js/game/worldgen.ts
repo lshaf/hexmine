@@ -50,6 +50,11 @@ export interface WorldConfig {
   /** §5.3 -- the tool rung each grade of ground is measured at. */
   hpGradeAttack: Record<string, number>
   commonAttack: number
+  /** §5.1 -- the haul band, and how many hauls a hex holds across it. */
+  yieldMin: number
+  yieldMax: number
+  extractionsMin: number
+  extractionsMax: number
   rareSpawnChance: number
   slotsPerTile: number
   herdLifetimeMs: number
@@ -696,6 +701,8 @@ function packAt(col: number, row: number, ring: Ring, now: number): Pack | undef
 export interface TileMutation {
   slotsUsed?: number
   regrowsAt?: number
+  /** §5.1 -- hauls already off this hex. Shared, and the seed cannot know it. */
+  taken?: number
   /**
    * §9.5.1 -- somebody already fought the pack standing here this bucket. The
    * one thing about a pack the seed cannot know, folded in here so every reader
@@ -749,6 +756,25 @@ export function tileHp(hash: number, grade: string): number {
   return Math.floor((roll * attack) / c.commonAttack)
 }
 
+/**
+ * §5.1 -- how many hauls this hex has in it, from what one haul is worth.
+ *
+ * Mirrors WorldGen::tileExtractions(). Inverse and linear across the band: the
+ * richest ground gives up the fewest hauls and the poorest the most, so what a
+ * hex is worth over its life comes out roughly level and what a better hex buys
+ * is FEWER WALKS for the same total.
+ *
+ * Integer arithmetic, so the two generators cannot round apart.
+ */
+export function tileExtractions(baseYield: number): number {
+  const c = cfg()
+  const span = c.yieldMax - c.yieldMin
+  const drop = c.extractionsMax - c.extractionsMin
+  const over = Math.max(0, Math.min(span, baseYield - c.yieldMin))
+
+  return c.extractionsMax - Math.floor((over * drop) / span)
+}
+
 /** Build a tile. `mutation` is the only server-owned state a tile can carry. */
 export function generateTile(
   col: number,
@@ -764,6 +790,7 @@ export function generateTile(
 
   const hTime = hash2(col, row, c.seed ^ 0xa1)
   const hYield = hash2(col, row, c.seed ^ 0xb2)
+  const baseYield = randInt(hYield, c.yieldMin, c.yieldMax)
 
   // §5.2 -- the capital ring is barren of resources. That is the pressure that
   // forces traffic outward for materials and inward for processing.
@@ -793,8 +820,10 @@ export function generateTile(
     ring,
     material,
     hp: tileHp(hTime, grade),
-    baseYield: randInt(hYield, 3, 8),
+    baseYield,
+    extractions: tileExtractions(baseYield),
     slotsUsed: mutation?.slotsUsed ?? 0,
+    taken: mutation?.taken ?? 0,
     regrowsAt: mutation?.regrowsAt ?? 0,
     settlement,
     dungeon,

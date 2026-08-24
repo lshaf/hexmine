@@ -29,6 +29,15 @@
    * "done, and in your favor" is drawn in.
    */
   --sap: #8fbf7f;
+
+  /* §8.1 -- one hex per rung, so a name, an icon frame and a rule that has to
+     be *drawn* in a rung's color all read from the same value. */
+  --rarity-common: #8d948e;
+  --rarity-uncommon: #6f9a5e;
+  --rarity-rare: #6f9ec4;
+  --rarity-epic: #a186c8;
+  --rarity-legendary: #d8b34a;
+  --rarity-unique: #d4726c;
   --gold: #d8b34a;
   --violet: #7d5fa8;
 
@@ -271,22 +280,22 @@ button:focus-visible,
  * that names an item should tint it: rarity is the thing players scan for.
  */
 .rarity-common {
-  color: #8d948e;
+  color: var(--rarity-common);
 }
 .rarity-uncommon {
-  color: #6f9a5e;
+  color: var(--rarity-uncommon);
 }
 .rarity-rare {
-  color: #6f9ec4;
+  color: var(--rarity-rare);
 }
 .rarity-epic {
-  color: #a186c8;
+  color: var(--rarity-epic);
 }
 .rarity-legendary {
-  color: var(--gold);
+  color: var(--rarity-legendary);
 }
 .rarity-unique {
-  color: #d4726c;
+  color: var(--rarity-unique);
 }
 
 .chip-off {

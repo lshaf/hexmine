@@ -19,7 +19,6 @@ use App\Models\Guild;
 use App\Models\GuildApplication;
 use App\Models\GuildMember;
 use App\Models\Player;
-use App\Models\TileState;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 
@@ -954,18 +953,6 @@ class GameService
     }
 
     /**
-     * §5.1 + §7.4.3 -- how likely this trip is to work the hex out.
-     *
-     * A gathering tree buys the seam back a little at a time. It is a share of
-     * the world's own chance rather than a stat, which is why it is capped on
-     * its own: what it thins is the depletion clock, not a power curve.
-     */
-    private function depleteChance(Character $character, string $line): float
-    {
-        return max(0.0, Balance::DEPLETE_CHANCE - (float) $this->jobEffects($character, $line)['depletion']);
-    }
-
-    /**
      * §7.4.3 -- what this trip takes off the line's tool, after the tree.
      *
      * A gathering node spares the whole of one trip's wear or none of it,
@@ -1270,8 +1257,14 @@ class GameService
 
     public function buildTile(int $col, int $row, int $now): array
     {
-        $regrowsAt = (int) (TileState::where('col', $col)->where('row', $row)->value('regrows_at') ?? 0);
-        $tile = WorldGen::generateTile($col, $row, $now, ['regrowsAt' => $regrowsAt]);
+        // §5.1 -- the seed says how many hauls this hex holds; the cache says how
+        // many are gone. Folding both in here means no reader downstream has to
+        // remember to ask, exactly as with a cleared pack below.
+        $worked = Tiles::state($col, $row);
+        $tile = WorldGen::generateTile($col, $row, $now, [
+            'regrowsAt' => $worked['regrowsAt'],
+            'taken' => $worked['taken'],
+        ]);
 
         // §9.5.1 -- the seed says a pack is standing here; the cache says
         // whether anybody has already settled it. Win or lose it is gone, and
@@ -1322,6 +1315,13 @@ class GameService
             // mirrored, the numbers are not.
             'hpGradeAttack' => Balance::TILE_HP_GRADE_ATTACK,
             'commonAttack' => Balance::MINING_COMMON_ATTACK,
+            // §5.1 -- the haul band and how many hauls a hex holds across it.
+            // The client derives the count so a card can say "three of eight"
+            // without asking; how many are GONE is the server's to send.
+            'yieldMin' => Balance::TILE_YIELD_MIN,
+            'yieldMax' => Balance::TILE_YIELD_MAX,
+            'extractionsMin' => Balance::TILE_EXTRACTIONS_MIN,
+            'extractionsMax' => Balance::TILE_EXTRACTIONS_MAX,
             'rareSpawnChance' => Balance::RARE_SPAWN_CHANCE,
             'slotsPerTile' => Balance::SLOTS_PER_TILE,
             'herdLifetimeMs' => Balance::scaled(Balance::HERD_LIFETIME_MS),
@@ -1399,14 +1399,26 @@ class GameService
         $inSight = fn (int $col, int $row): bool =>
             HexGeometry::distance($centerCol, $centerRow, $col, $row) <= $range;
 
-        $depleted = TileState::whereBetween('col', [$minCol, $maxCol])
-            ->whereBetween('row', [$minRow, $maxRow])
-            ->where('regrows_at', '>', $now)
-            ->get()
-            ->filter(fn ($tile) => $inSight((int) $tile->col, (int) $tile->row))
-            ->map(fn ($tile) => [(int) $tile->col, (int) $tile->row, (int) $tile->regrows_at])
-            ->values()
-            ->all();
+        // §5.1 -- one MGET over the sight disc, where this used to be an index
+        // scan over a `tile_states` box. Thirty-seven hexes at the very most,
+        // because sight caps at three (§5.6).
+        $disc = [];
+        for ($col = $minCol; $col <= $maxCol; $col++) {
+            for ($row = $minRow; $row <= $maxRow; $row++) {
+                if ($inSight($col, $row)) {
+                    $disc[] = [$col, $row];
+                }
+            }
+        }
+
+        $depleted = [];
+        foreach (Tiles::statesAmong($disc) as $at => $state) {
+            if ($state['regrowsAt'] <= $now) {
+                continue;
+            }
+            [$col, $row] = array_map('intval', explode(',', $at));
+            $depleted[] = [$col, $row, $state['regrowsAt']];
+        }
 
         $occupied = GameJob::where('status', 'active')
             ->whereNotNull('col')
@@ -3100,18 +3112,17 @@ class GameService
                     $destroyed,
                 );
 
-                // §5.1 -- worked-out tiles regrow rather than dying, and a line
-                // worked carefully leaves more of the seam standing.
-                $exhausted = Hash::rand01(
-                    Hash::hash2($job->col + $now, $job->row, Balance::mapSeed() ^ 0xdeed)
-                ) < $this->depleteChance($character, (string) $job->skill_key);
-
-                if ($exhausted) {
-                    TileState::updateOrCreate(
-                        ['col' => $job->col, 'row' => $job->row],
-                        ['regrows_at' => $now + Balance::scaled(Balance::REGROW_MS)],
-                    );
-                }
+                // §5.1 -- one haul off a hex that holds a known number of them,
+                // shared with everybody who works it. Worked-out tiles regrow
+                // rather than dying; nothing here is rolled.
+                Tiles::take(
+                    (int) $job->col,
+                    (int) $job->row,
+                    WorldGen::tileExtractions(
+                        WorldGen::generateTile((int) $job->col, (int) $job->row, $now)['baseYield'],
+                    ),
+                    $now,
+                );
 
             } elseif ($job->kind === 'hunting') {
                 [$gained, $lostToOverflow] = $this->grantHaul($character, $job);
@@ -3130,8 +3141,8 @@ class GameService
                     $destroyed,
                 );
 
-                // No depletion and no TileState row: the herd was the resource,
-                // and it leaves on its own clock whatever anybody does here.
+                // Nothing comes off the hex: a herd is not a seam, and it
+                // leaves on its own clock whatever anybody does here.
             } elseif ($job->kind === 'craft') {
                 // §8.4 -- the bench hands over one thing, not a haul. Nothing
                 // here goes through the material ledger, so `gained` stays
@@ -4078,8 +4089,15 @@ class GameService
     }
 
     /**
-     * §6.1 -- five open slots per feature, first-come-first-served, shared by
-     * every player. Real congestion, counted from real jobs.
+     * §6.1 + §8.4 -- two queues at one settlement, counted separately.
+     *
+     * Five open slots per processing feature and five at the benches, both
+     * first-come-first-served and both shared by every player. Real congestion,
+     * counted from real jobs.
+     *
+     * Two banks rather than one because they are two buildings: a saw pit and
+     * an anvil are not the same queue, and while both were counted off
+     * PUBLIC_SLOTS a settlement running four crafts refused a run of planks.
      */
     public function station(Character $character, string $settlementId): array
     {
@@ -4090,8 +4108,25 @@ class GameService
             ->orderBy('started_at')
             ->get();
 
+        return [
+            'settlement' => $settlement,
+            'slots' => $this->queueSlots($character, $jobs, 'processing', Balance::PUBLIC_SLOTS),
+            'bench' => $this->queueSlots($character, $jobs, 'craft', Balance::BENCH_SLOTS),
+            'presence' => $character->presence_settlement_id === $settlementId,
+        ];
+    }
+
+    /**
+     * One bank of slots: the jobs of that kind, oldest first, then the gaps.
+     *
+     * @param  \Illuminate\Support\Collection<int,GameJob>  $jobs
+     * @return list<array<string,mixed>>
+     */
+    private function queueSlots(Character $character, $jobs, string $kind, int $size): array
+    {
         $slots = [];
-        foreach ($jobs->take(Balance::PUBLIC_SLOTS) as $index => $job) {
+
+        foreach ($jobs->where('kind', $kind)->take($size)->values() as $index => $job) {
             $mine = $job->character_id === $character->id;
             $slots[] = [
                 'index' => $index,
@@ -4099,15 +4134,12 @@ class GameService
                 'owner' => $mine ? 'you' : 'another player',
             ];
         }
-        for ($i = count($slots); $i < Balance::PUBLIC_SLOTS; $i++) {
+
+        for ($i = count($slots); $i < $size; $i++) {
             $slots[] = ['index' => $i, 'job' => null, 'owner' => null];
         }
 
-        return [
-            'settlement' => $settlement,
-            'slots' => $slots,
-            'presence' => $character->presence_settlement_id === $settlementId,
-        ];
+        return $slots;
     }
 
     public function startProcessing(Character $character, string $settlementId, string $recipeKey, int $batches): GameJob
@@ -4143,7 +4175,12 @@ class GameService
                 );
             }
 
-            $busy = GameJob::where('settlement_id', $settlementId)->where('status', 'active')->count();
+            // §6.1 -- the processing bank only. A craft on the anvil is not a
+            // slot at the saw pit (§8.4).
+            $busy = GameJob::where('settlement_id', $settlementId)
+                ->where('status', 'active')
+                ->where('kind', 'processing')
+                ->count();
             if ($busy >= Balance::PUBLIC_SLOTS) {
                 throw new GameException('Every slot here is busy. Wait, or try another settlement.', 'queue_full');
             }
@@ -4805,6 +4842,21 @@ class GameService
                 );
             }
 
+            // §8.4 + §6.1 -- the benches queue like the lines do: five slots,
+            // first-come-first-served, shared by everybody standing here. It is
+            // their own bank, so a busy saw pit never closes the forge.
+            $onBenches = GameJob::where('settlement_id', $here['id'])
+                ->where('status', 'active')
+                ->where('kind', 'craft')
+                ->count();
+
+            if ($onBenches >= Balance::BENCH_SLOTS) {
+                throw new GameException(
+                    "Every bench at {$here['name']} is busy. Wait, or try another settlement.",
+                    'queue_full',
+                );
+            }
+
             // §7.6 -- a potion joins a shelf it may already have; anything with
             // a slot is a new row every time, because gear does not stack. Asked
             // now AND again on collection: an hour is long enough to fill a bag.
@@ -5293,7 +5345,7 @@ class GameService
             'stackCap' => Balance::SKILL_STACK_CAP,
             'batch' => Balance::SKILL_BATCH_CAP,
             'toolWear' => Balance::SKILL_TOOL_WEAR_CAP,
-            'depletion' => Balance::SKILL_DEPLETION_CAP,
+            'seamGrade' => Balance::SKILL_SEAM_GRADE_CAP,
             'presence' => Balance::SKILL_PRESENCE_CAP,
             'runSlot' => Balance::SKILL_RUN_SLOT_CAP,
             'weaponWear' => Balance::SKILL_WEAPON_WEAR_CAP,
@@ -5360,7 +5412,7 @@ class GameService
             'stackCap' => 0.0,
             'batch' => 0.0,
             'toolWear' => 0.0,
-            'depletion' => 0.0,
+            'seamGrade' => 0.0,
             'presence' => 0.0,
             'runSlot' => 0.0,
             'weaponWear' => 0.0,

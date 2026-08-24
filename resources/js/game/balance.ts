@@ -55,6 +55,12 @@ export const MINING = {
    *  the common rung and comes through untouched; every grade above it costs
    *  what its own rung is worth, so better ground asks for a better tool. */
   hpGradeAttack: { common: 3, uncommon: 6, rare: 10, epic: 14 },
+  /** §5.1 -- hauls a hex holds, inversely to what one haul is worth. A count,
+   *  never a chance: a seam you can read is a seam you can decide about. */
+  extractionsMin: 6,
+  extractionsMax: 10,
+  yieldMin: 3,
+  yieldMax: 8,
   /** clamp() bounds. The floor is a guard, not a lever -- §7.3. */
   floorSeconds: 60,
   ceilingSeconds: 60 * 60,
@@ -103,6 +109,8 @@ export const PROCESSING = {
  * "is it worth starting here"; the exact figure arrives with the job.
  */
 export const CRAFT = {
+  /** §8.4 -- five slots at the benches, counted apart from §6.1's five. */
+  benchSlots: 5,
   seconds: {
     common: 8 * 60,
     uncommon: 14 * 60,

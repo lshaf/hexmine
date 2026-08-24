@@ -1556,10 +1556,11 @@ final class GameLoopTest extends TestCase
         }
         $this->assertCount(2, $others);
 
-        // And collecting the hunt never writes a depletion row.
+        // And collecting the hunt takes nothing off the seam: a herd is not a
+        // hex, and it leaves on its own clock (§5.5).
         $job->update(['ends_at' => $this->game->now() - 1]);
         $this->game->collectJob($this->character->fresh(), $job->id);
-        $this->assertSame(0, \App\Models\TileState::where('col', $col)->where('row', $row)->count());
+        $this->assertSame(0, \App\Game\Tiles::state($col, $row)['taken']);
     }
 
     /** A person is in one place: a hunt blocks a dig, and a dig blocks a hunt. */
@@ -4224,13 +4225,113 @@ final class GameLoopTest extends TestCase
         $this->assertStringContainsString('Claim it', $preview['reason']);
 
         // Collecting clears the trip. Whether the hex survived it is a separate
-        // roll (§5.1), so assert the gate rather than the tile, then clear any
-        // depletion so the gate is what the last check is actually measuring.
+        // question (§5.1 -- one haul off a counted seam), so assert the gate
+        // rather than the tile, then put the seam back so the gate is what the
+        // last check is actually measuring.
         $this->game->collectJob($this->character->fresh(), $job->id);
         $this->assertNull($this->game->miningTrip($this->character->fresh()));
 
-        \App\Models\TileState::query()->delete();
+        \App\Game\Tiles::reset($col, $row);
         $this->assertTrue($this->game->previewTile($this->character->fresh(), $col, $row)['canMine']);
+    }
+
+    /**
+     * §5.1 -- a hex holds a known number of hauls, and the count is not a roll.
+     *
+     * This is the whole of what replaced a 34% chance per trip. The interesting
+     * property is that it is KNOWABLE: the client derives the capacity from the
+     * seed, so a card can say "three of eight taken" and a prospector can decide
+     * whether the seam is worth the walk back.
+     */
+    public function test_a_hex_holds_a_counted_number_of_hauls(): void
+    {
+        $col = (int) $this->character->col;
+        $row = (int) $this->character->row;
+
+        $capacity = \App\Game\WorldGen::tileExtractions(
+            \App\Game\WorldGen::generateTile($col, $row, 0)['baseYield'],
+        );
+
+        $this->assertGreaterThanOrEqual(Balance::TILE_EXTRACTIONS_MIN, $capacity);
+        $this->assertLessThanOrEqual(Balance::TILE_EXTRACTIONS_MAX, $capacity);
+
+        $now = $this->game->now();
+
+        // Every haul but the last leaves the seam open, and no two runs of the
+        // same hex disagree -- there is nothing random to disagree about.
+        for ($i = 1; $i < $capacity; $i++) {
+            $state = \App\Game\Tiles::take($col, $row, $capacity, $now);
+            $this->assertSame($i, $state['taken']);
+            $this->assertFalse($state['depleted'], "hex closed early, on haul {$i}");
+            $this->assertSame(0, $state['regrowsAt']);
+        }
+
+        $last = \App\Game\Tiles::take($col, $row, $capacity, $now);
+        $this->assertTrue($last['depleted'], 'the last haul left the seam open');
+        $this->assertSame($now + Balance::scaled(Balance::REGROW_MS), $last['regrowsAt']);
+
+        // And a closed seam takes nothing more, so a double collection cannot
+        // push it past its own clock.
+        $again = \App\Game\Tiles::take($col, $row, $capacity, $now);
+        $this->assertSame($last['regrowsAt'], $again['regrowsAt']);
+        $this->assertSame($capacity, $again['taken']);
+    }
+
+    /**
+     * §5.1 -- the count is SHARED. Everybody's trips come off the same seam.
+     *
+     * The anti-farm rule, and the same one that keeps a cleared pack cleared
+     * for everybody (§9.5.1): you cannot have a hex to yourself.
+     */
+    public function test_the_seam_is_shared_between_characters(): void
+    {
+        $col = (int) $this->character->col;
+        $row = (int) $this->character->row;
+        $capacity = 8;
+        $now = $this->game->now();
+
+        \App\Game\Tiles::take($col, $row, $capacity, $now);
+
+        $other = $this->game->createCharacter(
+            Player::create(['wallet' => '0xshared', 'session_id' => '0xshared']),
+        );
+        $other->update(['col' => $col, 'row' => $row]);
+
+        // Nothing about the second character resets the seam.
+        $state = \App\Game\Tiles::take($col, $row, $capacity, $now);
+        $this->assertSame(2, $state['taken'], 'the second character got a fresh hex');
+    }
+
+    /**
+     * §5.1 -- what a hex is worth over its life is roughly level; what differs
+     * is how many walks it costs to collect.
+     *
+     * The richest ground is emptied fastest, on purpose: a good hex is not a hex
+     * you can sit on. Without the inverse the best seam on the map would be both
+     * the biggest haul AND the longest-lived, which is a camp rather than a find.
+     */
+    public function test_a_richer_hex_is_worked_out_faster(): void
+    {
+        $previous = Balance::TILE_EXTRACTIONS_MAX + 1;
+
+        for ($yield = Balance::TILE_YIELD_MIN; $yield <= Balance::TILE_YIELD_MAX; $yield++) {
+            $count = \App\Game\WorldGen::tileExtractions($yield);
+
+            $this->assertLessThanOrEqual($previous, $count, "yield {$yield} outlasts a poorer hex");
+            $this->assertGreaterThanOrEqual(Balance::TILE_EXTRACTIONS_MIN, $count);
+            $this->assertLessThanOrEqual(Balance::TILE_EXTRACTIONS_MAX, $count);
+            $previous = $count;
+        }
+
+        // The ends of the band are the band, exactly.
+        $this->assertSame(
+            Balance::TILE_EXTRACTIONS_MAX,
+            \App\Game\WorldGen::tileExtractions(Balance::TILE_YIELD_MIN),
+        );
+        $this->assertSame(
+            Balance::TILE_EXTRACTIONS_MIN,
+            \App\Game\WorldGen::tileExtractions(Balance::TILE_YIELD_MAX),
+        );
     }
 
     /** A trip pins you to the hex you are working. */

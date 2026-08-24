@@ -127,6 +127,91 @@ final class BenchJobTest extends TestCase
     }
 
     /**
+     * §8.4 + §6.1 -- the benches queue the way the lines do: five slots, shared,
+     * first-come-first-served.
+     */
+    public function test_the_bench_queue_fills_up_and_refuses(): void
+    {
+        $bench = $this->standAtVillage();
+        $this->stockForAxe();
+
+        // Five foreign crafts take the whole bank. They belong to other players
+        // because one of the character's own would trip the one-bench-each rule
+        // first, and the queue would never be tested.
+        for ($i = 0; $i < Balance::BENCH_SLOTS; $i++) {
+            $other = $this->game->createCharacter(
+                \App\Models\Player::create(['wallet' => "0xbench{$i}"]),
+            );
+
+            \App\Models\GameJob::create([
+                'character_id' => $other->id,
+                'kind' => 'craft',
+                'status' => 'active',
+                'settlement_id' => $bench['id'],
+                'output_key' => 'hewn_axe',
+                'quantity' => 1,
+                'skill_key' => 'woodcutting',
+                'started_at' => $this->game->now(),
+                'ends_at' => $this->game->now() + 60000,
+            ]);
+        }
+
+        try {
+            $this->game->startCraft($this->character->fresh(), 'hewn_axe');
+            $this->fail('a sixth bench was handed out');
+        } catch (GameException $e) {
+            $this->assertSame('queue_full', $e->errorCode);
+        }
+
+        // And the queue is drawn from the same count the refusal used.
+        $station = $this->game->station($this->character->fresh(), $bench['id']);
+        $this->assertCount(Balance::BENCH_SLOTS, $station['bench']);
+        $this->assertSame(
+            Balance::BENCH_SLOTS,
+            count(array_filter($station['bench'], fn (array $s) => $s['owner'] !== null)),
+        );
+    }
+
+    /**
+     * §8.4 -- and the two banks are counted apart. A busy forge is not a busy
+     * saw pit, which is what a single count made it.
+     */
+    public function test_a_craft_never_takes_a_processing_slot(): void
+    {
+        $bench = $this->standAtVillage();
+        $this->stockForAxe();
+        $this->give(['wood' => 40]);
+
+        for ($i = 0; $i < Balance::BENCH_SLOTS; $i++) {
+            $other = $this->game->createCharacter(
+                \App\Models\Player::create(['wallet' => "0xmix{$i}"]),
+            );
+
+            \App\Models\GameJob::create([
+                'character_id' => $other->id,
+                'kind' => 'craft',
+                'status' => 'active',
+                'settlement_id' => $bench['id'],
+                'output_key' => 'hewn_axe',
+                'quantity' => 1,
+                'skill_key' => 'woodcutting',
+                'started_at' => $this->game->now(),
+                'ends_at' => $this->game->now() + 60000,
+            ]);
+        }
+
+        $job = $this->game->startProcessing($this->character->fresh(), $bench['id'], 'planks', 1);
+        $this->assertSame('processing', $job->kind);
+
+        $station = $this->game->station($this->character->fresh(), $bench['id']);
+        $this->assertSame(
+            1,
+            count(array_filter($station['slots'], fn (array $s) => $s['owner'] !== null)),
+            'a craft was counted against the processing queue',
+        );
+    }
+
+    /**
      * §8.4 -- the rule that makes the bench a location rather than a mailbox.
      */
     public function test_a_finished_craft_is_claimed_at_the_bench_that_made_it(): void

@@ -208,8 +208,34 @@ final class Balance
     /** Depleted tiles regrow after ~9h, §5.1. */
     public const REGROW_MS = 9 * self::HOUR;
 
-    /** Chance a collected tile is worked out and enters regrowth. */
-    public const DEPLETE_CHANCE = 0.34;
+    /**
+     * §5.1 -- how many hauls a hex has in it before it is worked out.
+     *
+     * A COUNT, not a chance. It used to be a 34% roll at the end of every trip,
+     * which made the one fact a prospector most wanted to know -- is this seam
+     * worth coming back to -- unknowable in principle. A hex that says "three of
+     * eight taken" is a decision; a hex with a hidden third of a coin behind it
+     * is a slot machine.
+     *
+     * Inversely to the haul, and that is the whole shape of it: a rich hex is
+     * emptied in six trips and a poor one takes ten, so what a hex is worth over
+     * its life comes out roughly level and what differs is how many walks it
+     * costs you to collect. The richest ground is not the ground you can sit on.
+     *
+     * The count is SHARED, like the two mining slots and like a cleared pack
+     * (§9.5.1): everybody's trips come off the same seam. That is the anti-farm
+     * rule -- you cannot re-roll a hex, and you cannot have one to yourself.
+     */
+    public const TILE_EXTRACTIONS_MIN = 6;
+    public const TILE_EXTRACTIONS_MAX = 10;
+
+    /**
+     * §5.1 -- the haul band a hex rolls in, and the yardstick the count above
+     * is read against. Both generators draw from it (WorldGen::generateTile),
+     * so the band is stated once rather than spelled into each of them.
+     */
+    public const TILE_YIELD_MIN = 3;
+    public const TILE_YIELD_MAX = 8;
 
     /** Chance an inner-ring tile carries its rare variant, §5.2 / §4. */
     public const RARE_SPAWN_CHANCE = 0.18;
@@ -604,6 +630,16 @@ final class Balance
     /** Five open slots per feature, first-come-first-served, §6.1. */
     public const PUBLIC_SLOTS = 5;
 
+    /**
+     * §8.4 -- and five at the benches, counted separately.
+     *
+     * The three craft benches are their own building. A queue of their own is
+     * what makes a busy capital busy at the anvil as well as at the saw pit,
+     * and keeping the two banks apart is what stops a run of planks closing the
+     * forge -- which is what happened while both were counted off one number.
+     */
+    public const BENCH_SLOTS = 5;
+
     /** Speed multiplier by settlement tier -- lower is faster. */
     public const SPEED_VILLAGE = 1.0;
     public const SPEED_CITY = 0.75;
@@ -714,7 +750,21 @@ final class Balance
 
     public const SKILL_TOOL_WEAR_CAP = 0.25;
 
-    public const SKILL_DEPLETION_CAP = 0.12;
+    /**
+     * §5.3 + §7.4.3 -- how often a gathering tree takes the better thing off
+     * ground that carries it.
+     *
+     * A COUNT of grades, rolled: on a hit the trip reaches one grade past what
+     * the tool can reliably take, and never past what the hex actually holds. So
+     * it is capability rather than power -- nothing here feeds the stat ceiling,
+     * which has no room left in it anyway.
+     *
+     * Twelve per cent, and low on purpose. §8.0 rule 4 makes the tool the ladder
+     * and the skill point cap the specialisation; one trip in eight coming up a
+     * grade better is knowing your ground, while a guaranteed grade would be a
+     * free rung of tool and would make the ladder optional.
+     */
+    public const SKILL_SEAM_GRADE_CAP = 0.12;
 
     public const SKILL_PRESENCE_CAP = 0.20;
 

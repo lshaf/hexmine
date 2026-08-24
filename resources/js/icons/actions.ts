@@ -41,8 +41,8 @@ export const ACTION_PATHS: Record<string, string> = {
   /* §7.4.3 -- one glyph per effect kind. What a node *does* is the only thing
      worth encoding on 180 nodes; drawing 180 pictures would say less. */
   effectStat: 'M4 18h16 M7 14.5l4-5 3 3 4.5-6.5',
-  /* §5.1 -- ground that comes back: two leaves off a cut stem. */
-  effectDepletion: 'M4 20h16 M12 20v-7 M12 13c-3 0-4.5-1.8-4.5-4.4C10.3 8.6 12 10.5 12 13Z M12 13c3 0 4.5-1.8 4.5-4.4C13.7 8.6 12 10.5 12 13Z',
+  /* §5.1 -- knowing the ground: two leaves off a cut stem. */
+  effectSeam: 'M4 20h16 M12 20v-7 M12 13c-3 0-4.5-1.8-4.5-4.4C10.3 8.6 12 10.5 12 13Z M12 13c3 0 4.5-1.8 4.5-4.4C13.7 8.6 12 10.5 12 13Z',
   /* §6.2 -- somebody standing at a bench, which is the whole of presence. */
   effectPresence: 'M12 4.4a2 2 0 1 0 0 4 2 2 0 0 0 0-4 M12 8.4v6 M9 20l3-5.6 3 5.6 M4 12.4h4 M16 12.4h4',
   /* §6.1 -- a second run going beside the first. */

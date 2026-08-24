@@ -782,6 +782,27 @@ final class WorldGen
     }
 
     /**
+     * §5.1 -- how many hauls this hex has in it, from what one haul is worth.
+     *
+     * Inverse and linear across the band: the richest ground gives up
+     * TILE_EXTRACTIONS_MIN hauls and the poorest TILE_EXTRACTIONS_MAX. What a
+     * hex is worth over its whole life therefore comes out roughly level, and
+     * what a better hex actually buys is FEWER WALKS for the same total -- which
+     * is the thing a map this size can charge for.
+     *
+     * Integer arithmetic, so the two generators cannot round apart
+     * (scripts/parity.ts).
+     */
+    public static function tileExtractions(int $baseYield): int
+    {
+        $span = Balance::TILE_YIELD_MAX - Balance::TILE_YIELD_MIN;
+        $drop = Balance::TILE_EXTRACTIONS_MAX - Balance::TILE_EXTRACTIONS_MIN;
+        $over = max(0, min($span, $baseYield - Balance::TILE_YIELD_MIN));
+
+        return Balance::TILE_EXTRACTIONS_MAX - intdiv($over * $drop, $span);
+    }
+
+    /**
      * Build a tile. $mutation carries the only server-owned state a tile has;
      * everything else is derived.
      *
@@ -796,6 +817,7 @@ final class WorldGen
 
         $hTime = Hash::hash2($col, $row, Balance::mapSeed() ^ 0xa1);
         $hYield = Hash::hash2($col, $row, Balance::mapSeed() ^ 0xb2);
+        $baseYield = Hash::randInt($hYield, Balance::TILE_YIELD_MIN, Balance::TILE_YIELD_MAX);
 
         // §5.2 -- the capital ring is barren. That is the pressure that forces
         // traffic outward for materials and inward for processing.
@@ -828,7 +850,8 @@ final class WorldGen
             'ring' => $ring,
             'material' => $material,
             'hp' => self::tileHp($hTime, $variant['grade'] ?? 'common'),
-            'baseYield' => Hash::randInt($hYield, 3, 8),
+            'baseYield' => $baseYield,
+            'extractions' => self::tileExtractions($baseYield),
             'slotsUsed' => $mutation['slotsUsed'] ?? 0,
             'regrowsAt' => $regrowsAt,
             'settlement' => $settlement,

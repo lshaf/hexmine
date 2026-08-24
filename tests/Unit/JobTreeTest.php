@@ -255,7 +255,7 @@ final class JobTreeTest extends TestCase
         $known = [
             'stat', 'pair', 'battleWear', 'weaponWear', 'goldFind', 'lootOption',
             'craftOption', 'craftDurability', 'optionTier', 'brewExtra', 'stackCap',
-            'costReduction', 'batch', 'runSlot', 'presence', 'toolWear', 'depletion',
+            'costReduction', 'batch', 'runSlot', 'presence', 'toolWear', 'seamGrade',
             'sight', 'bagUnits', 'bagRows',
         ];
 
@@ -323,7 +323,7 @@ final class JobTreeTest extends TestCase
             'runSlot' => Balance::SKILL_RUN_SLOT_CAP,
             'presence' => Balance::SKILL_PRESENCE_CAP,
             'toolWear' => Balance::SKILL_TOOL_WEAR_CAP,
-            'depletion' => Balance::SKILL_DEPLETION_CAP,
+            'seamGrade' => Balance::SKILL_SEAM_GRADE_CAP,
             'battleWear' => Balance::SKILL_BATTLE_WEAR_CAP,
             'weaponWear' => Balance::SKILL_WEAPON_WEAR_CAP,
             'goldFind' => Balance::SKILL_GOLD_FIND_CAP,

@@ -134,27 +134,30 @@ final class SkillEffectTest extends TestCase
         $this->assertGreaterThan($spared, $paid, 'the tool is spared more often than it is worn');
     }
 
-    /** §5.1 + §7.4.3 -- and it leaves more of the seam standing. */
-    public function test_a_gathering_tree_thins_the_depletion_clock(): void
+    /**
+     * §5.1 + §7.4.3 -- what a gathering tree knows about the ground it works.
+     *
+     * `seamGrade` is a rolled COUNT of grades rather than a percentage, so what
+     * is pinned here is the aggregate and its cap: the roll itself belongs to
+     * the trip, and the line-lock is the same one every other tree effect has.
+     */
+    public function test_a_gathering_tree_reads_the_seam_within_its_cap(): void
     {
-        $bare = $this->invoke('depleteChance', [$this->character->fresh(), 'quarrying']);
-        $this->assertSame(Balance::DEPLETE_CHANCE, $bare);
+        $bare = $this->invoke('jobEffects', [$this->character->fresh(), 'quarrying']);
+        $this->assertSame(0.0, (float) $bare['seamGrade']);
 
-        $this->assertGreaterThan(0, $this->grantKind('quarrying', 'depletion'));
+        $this->assertGreaterThan(0, $this->grantKind('quarrying', 'seamGrade'));
 
-        $after = $this->invoke('depleteChance', [$this->character->fresh(), 'quarrying']);
+        $after = (float) $this->invoke('jobEffects', [$this->character->fresh(), 'quarrying'])['seamGrade'];
 
-        $this->assertLessThan($bare, $after, 'a maxed quarrying tree changed nothing about the face');
-        $this->assertGreaterThanOrEqual(
-            Balance::DEPLETE_CHANCE - Balance::SKILL_DEPLETION_CAP,
-            $after,
-            'the tree passed its cap',
-        );
+        $this->assertGreaterThan(0, $after, 'a maxed quarrying tree reads no better');
+        $this->assertLessThanOrEqual(Balance::SKILL_SEAM_GRADE_CAP, $after, 'the tree passed its cap');
 
-        // Line-locked like everything else: a mason works stone, in a shed.
+        // Line-locked like everything else: a quarrying node is worth nothing
+        // in a forest.
         $this->assertSame(
-            Balance::DEPLETE_CHANCE,
-            $this->invoke('depleteChance', [$this->character->fresh(), 'woodcutting']),
+            0.0,
+            (float) $this->invoke('jobEffects', [$this->character->fresh(), 'woodcutting'])['seamGrade'],
         );
     }
 

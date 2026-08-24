@@ -196,9 +196,10 @@ cross-map travel — same design pressure as biome-locked mining.
 - **Exactly 2 mining slots per hex.** When both are full, the tile is closed to others.
 - Tiles are **depletable**, then **regrow after ~9h** (tune). Depleted tiles keep their
   biome color (drained, not dead) and show remnant/sapling props.
-- **A gathering tree can leave more of the seam standing** (`depletion`, §7.4.3),
-  never all of it: the cap is a share of the world's own chance, so a worked hex
-  still closes and the map still turns over.
+- **A gathering tree can leave more of the seam standing** (`depletion`, §7.4.3):
+  a share of trips take their haul without spending one of the hex's hauls.
+  Capped, and shared like the count itself — what one prospector spares is
+  spared for whoever works the hex next, and a hammered seam still closes.
 
 ### 5.2 Ring layout (concentric, drives generation)
 | Ring | Contents |
@@ -751,7 +752,7 @@ a matter of judgment. A node's effect must be one of these, and nothing else:
 | `goldFind` | More of what a pack pays (§9.5.8) | `SKILL_GOLD_FIND_CAP` (25%) |
 | `lootOption` | Chance of an extra rolled option on looted gear | `SKILL_LOOT_OPTION_CAP` (25%) |
 | `toolWear` | Share of trips that leave the line's tool untouched | `SKILL_TOOL_WEAR_CAP` (25%) |
-| `depletion` | Taken off the chance a trip works the hex out (§5.1) | `SKILL_DEPLETION_CAP` (12%) |
+| `depletion` | Share of trips that take their haul off a hex without spending one of its hauls (§5.1) | `SKILL_DEPLETION_CAP` (12%) |
 | `presence` | Added to the §6.2 presence bonus, on that line's bench | `SKILL_PRESENCE_CAP` (20%) |
 | `runSlot` | Runs of that line you may keep going at once | `SKILL_RUN_SLOT_CAP` (+2) |
 | `craftOption` | Chance of an extra rolled option (§8.0.1) on what you make | `SKILL_OPTION_CHANCE_CAP` |
@@ -815,8 +816,8 @@ rule 4 stays true.
 
 The caps that are not the stat ceiling exist to protect §11 and §5.6, not §8.
 `costReduction`, `batch` and `brewExtra` thin a materials sink; `craftDurability`
-and both wear kinds thin the repair sink; `depletion` thins the regrowth clock and
-`stackCap` the bag pressure §7.6 runs on. Left uncapped, a maxed specialist would
+and both wear kinds thin the repair sink; `depletion` slows how fast a hex is
+worked out and `stackCap` thins the bag pressure §7.6 runs on. Left uncapped, a maxed specialist would
 quietly switch off the loss the whole economy is balanced around.
 
 `bagUnits` and `bagRows` are the same argument in counts rather than
@@ -1345,6 +1346,29 @@ disagree.
 | Armor | armor · boots · gloves | Worn gear, never line-locked |
 | Consumable | *none* | Having no slot is exactly what makes it the third category |
 
+**The bench queue is drawn by the same component the processing queue is.**
+Two banks of shared slots under one rule (§6.1) were drawn twice and drifted
+into two visual ideas; they are one drawing now, so a slot means the same thing
+at the saw pit and at the anvil.
+
+**And the panel says nothing a prospector cannot act on.** What the header
+carries is the rungs this bench *makes* and the smallest settlement that makes
+the next one. Guild halls are named only to somebody in a guild (§10.5), and
+unique is never named at all — it is never crafted (§8.0), so a rung for it on a
+bench screen is a row of noise about somebody else's business.
+
+**On screen it is four lists, not three, and that is not a fourth bench.** A
+tool and a sword come off the same anvil and teach the same Smith, but they
+answer two questions that have nothing to do with each other — *which of my five
+lines do I upgrade* and *what do I carry into a fight* — and one merged list
+buried the axe rungs among the shield rungs. So the panel filters Tools ·
+Weapons · Armor · Drafts, and inside each the axis is the thing actually being
+chosen between: the **line** for a tool (§8 rule 4 promises all five the same
+ladder), the **family** for a weapon (§9.5.4), the **slot** for worn gear, and
+the **action** a draft arms (§8.5). Rarity is never the axis; it is a rung drawn
+down the edge of each card, and how far the bench itself reaches (§8.0) is the
+one row of six caps at the top of the panel.
+
 **A bench takes time, and it hands over where it was left.** Crafting used to be
 instant, which made a capital a vending machine: carry the materials in, walk
 out with the item. Two rules turn it back into a place.
@@ -1366,8 +1390,16 @@ purpose: a run is a step, a craft is the thing itself.
 bench's reach (§8.0), the strap the output will need (§7.6), and the stock. What
 happens afterwards is only the clock.
 
-**One craft per settlement.** A bench is a place, not a queue you can stack five
-deep — and the real limit is not that number, it is the walking.
+**One craft per settlement, and five benches to stand at.** The bank queues
+exactly the way §6.1's processing line does: five slots, first-come-first-served,
+shared by everybody at that settlement, so a busy capital is busy at the anvil as
+well as at the saw pit. What stays personal is the one bench each — you cannot
+stack your own work five deep, and the real limit on how much you have going at
+once is still the walking.
+
+**The two banks are counted apart**, because they are two buildings. A run of
+planks must never close the forge, and while both were counted off one number it
+did exactly that.
 
 #### The claim happens at the bench
 
@@ -1386,7 +1418,7 @@ Two consequences follow, and both are the point:
   refusal rather than a lost item: it stays on the bench until there is room.
 
 Nothing here touches §6.1's five public slots. Those are the processing lines;
-the three benches are their own building and queue against nobody.
+the benches have five of their own, counted separately and refused separately.
 
 ### 8.5 Consumables — potions and buffs
 

@@ -26,7 +26,7 @@ def batch(n): return ('batch', None, n)
 def run_slot(n): return ('runSlot', None, n)
 def presence(v): return ('presence', None, v)
 def tool_wear(v): return ('toolWear', None, v)
-def depletion(v): return ('depletion', None, v)
+def seam_grade(v): return ('seamGrade', None, v)
 def pair(key, n): return ('pair', key, n)
 def battle_wear(v): return ('battleWear', None, v)
 def weapon_wear(v): return ('weaponWear', None, v)
@@ -42,7 +42,7 @@ VALUES = {
     't': (stat, 'tripReduction',   [.01, .01, .015, .015, .02]),
     'p': (stat, 'processingSpeed', [.01, .01, .015, .015, .02]),
     'w': (tool_wear, None,  [.01, .015, .02, .03, .04]),
-    'd': (depletion, None,  [.01, .015, .015, .02, .025]),
+    'd': (seam_grade, None, [.01, .015, .015, .02, .025]),
     'c': (cost, None,       [.01, .015, .02, .025, .03]),
     's': (presence, None,   [.01, .015, .015, .02, .025]),
     'b': (batch, None,      [1, 1, 1, 1, 1]),
@@ -65,7 +65,7 @@ VALUES = {
 CAPS = {
     'stat': .1275,
     'toolWear': .25,
-    'depletion': .12,
+    'seamGrade': .12,
     'costReduction': .15,
     'presence': .20,
     'batch': 2,
@@ -101,25 +101,25 @@ WOODCUTTING_NAMES = [
  ('deer_paths','Deer Paths','The animals already found the easy way through.'),
  ('limb_reading','Limb Reading','You can see where the weight is before you cut.'),
  ('two_hand_grip','Two-Hand Grip','Slide the top hand down and let the head do it.'),
- ('coppice_stand','Coppice Stand','Cut on a rotation and the stand is still standing next season.'),
+ ('coppice_stand','Coppice Stand','Cut the same stand for years and you learn which stems were worth waiting for.'),
 
  ('grain_split','Grain Split','Follow the grain and the log opens itself.'),
  ('wedge_and_maul','Wedge and Maul','What the axe will not part, the wedge will.'),
  ('windfall_sense','Windfall Sense','Storms leave good timber lying down.'),
  ('sap_timing','Sap Timing','Cut it dry and it weighs half as much home.'),
  ('bucking_rhythm','Bucking Rhythm','Length after length without straightening up.'),
- ('old_growth','Old Growth','Old trees are worth the walk, and one felling does not empty the stand.'),
+ ('old_growth','Old Growth','Old trees are worth the walk, and you can tell the heartwood from the outside.'),
  ('crosscut_pair','Crosscut Pair','A saw with two handles halves an afternoon.'),
  ('haul_sled','Haul Sled','Drag it, do not carry it.'),
 
  ('ridge_route','Ridge Route','Downhill all the way back, if you plan it.'),
  ('heartwood_cut','Heartwood Cut','Take the middle and leave the sap.'),
  ('kerf_control','Kerf Control','A narrow cut is a fast cut.'),
- ('burnt_stand','Burnt Stand','Char hides good wood, and a burnt stand gives up less of itself at once.'),
+ ('burnt_stand','Burnt Stand','Char hides good wood. You have learned to look under it.'),
  ('stump_yield','Stump Yield','What is left in the ground is still timber.'),
  ('measured_felling','Measured Felling','Down in one, not worried down in six.'),
  ('skid_trail','Skid Trail','Cut the road once, use it all season.'),
- ('river_stand','River Stand','Float the haul out and nothing is dragged across what is left growing.'),
+ ('river_stand','River Stand','Float the haul out and you can afford to fell the awkward one further in.'),
 
  ('quarter_sawing','Quarter Sawing','More usable board from the same trunk.'),
  ('dawn_start','Dawn Start','Cold wood cuts cleaner.'),
@@ -128,7 +128,7 @@ WOODCUTTING_NAMES = [
  ('clean_stump','Clean Stump','Nothing left standing to trip over next trip.'),
  ('felling_line','Felling Line','A rope decides the direction, not luck.'),
 
- ('the_marked_grove','The Marked Grove','A stand only you have bothered to map, worked slowly enough to keep.'),
+ ('the_marked_grove','The Marked Grove','A stand only you have bothered to map, and you know which tree is which.'),
  ('woodward','Woodward','The warden\'s habit: the edge checked before the walk, not after the day.'),
 ]
 
@@ -138,21 +138,21 @@ MINING_NAMES = [
  ('spoil_ramp','Spoil Ramp','Build the way out of what you take out.'),
  ('face_squaring','Face Squaring','A square face gives up more than a ragged one.'),
  ('drive_rhythm','Drive Rhythm','Strike, reset, strike. Never rush the reset.'),
- ('shallow_adit','Shallow Adit','A side cut into an outcrop others walk past. It gives up a little at a time.'),
+ ('shallow_adit','Shallow Adit','A side cut into an outcrop others walk past, into the part they never saw.'),
 
  ('ore_sorting','Ore Sorting','Leave the waste at the face, not in your bag.'),
  ('wedge_lines','Wedge Lines','Split it along the marks and it comes away whole.'),
- ('prop_setting','Prop Setting','A propped roof is a roof you come back under.'),
+ ('prop_setting','Prop Setting','A propped roof is a roof you can work under long enough to find the good rock.'),
  ('dry_working','Dry Working','Water costs more time than rock does.'),
  ('tally_stick','Tally Stick','Know what came out before you climb up.'),
- ('deep_drift','Deep Drift','Far enough in to be quiet, and far enough from the face to leave it standing.'),
+ ('deep_drift','Deep Drift','Far enough in that what you are cutting has never seen weather.'),
  ('double_jack','Double Jack','One holds the drill, one swings. Twice the depth.'),
  ('bucket_line','Bucket Line','The ore leaves without you.'),
 
  ('shaft_ladder','Shaft Ladder','Down in a minute instead of ten.'),
  ('vein_following','Vein Following','Chase the metal, not the plan.'),
  ('cold_chisel','Cold Chisel','For where the pick is too blunt an argument.'),
- ('flooded_level','Flooded Level','Pumped out and worked gently, because a level like this is not opened twice.'),
+ ('flooded_level','Flooded Level','Pumped out because of what was down there, and what was down there is still down there.'),
  ('fines_recovery','Fines Recovery','The dust is ore too.'),
  ('face_lighting','Face Lighting','You cannot mine what you cannot see.'),
  ('windlass','Windlass','A crank beats a rope and a back.'),
@@ -161,11 +161,11 @@ MINING_NAMES = [
  ('gad_and_feather','Gad and Feather','Iron persuades stone politely.'),
  ('shift_pacing','Shift Pacing','The last hour is worth as much as the first.'),
  ('cage_hoist','Cage Hoist','Ride up instead of climbing.'),
- ('deep_shaft_right','Deep Shaft Right','Below the water table, where the rock is worked slowly and lasts.'),
+ ('deep_shaft_right','Deep Shaft Right','Below the water table, where the rock has had no chance to go soft.'),
  ('assay_eye','Assay Eye','Worth carrying, or worth leaving.'),
  ('roof_bolting','Roof Bolting','Nothing falls on a bolted roof.'),
 
- ('the_named_seam','The Named Seam','A seam that carries your name on the map, and is still there when you go back.'),
+ ('the_named_seam','The Named Seam','A seam that carries your name on the map, and you know where it runs richest.'),
  ('shift_captain','Shift Captain','The tools go up the shaft with you, cleaned, and come back down whole.'),
 ]
 
@@ -212,34 +212,34 @@ QUARRYING_NAMES = [
  ('scree_path','Scree Path','The loose slope is faster down than around.'),
  ('block_marking','Block Marking','Chalk the line before the first blow.'),
  ('shim_work','Shim Work','Thin iron opens what a sledge cannot.'),
- ('shelf_quarry','Shelf Quarry','A terraced face worked in steps. Nothing is torn out of it at once.'),
+ ('shelf_quarry','Shelf Quarry','A terraced face worked in steps, so the good course is reached rather than guessed at.'),
 
  ('dressing_cuts','Dressing Cuts','Square it at the face, carry less home.'),
  ('sledge_relay','Sledge Relay','Two arms, alternating, all afternoon.'),
  ('roller_track','Roller Track','Logs under stone move mountains.'),
- ('frost_splitting','Frost Splitting','Let the winter do the first cut.'),
+ ('frost_splitting','Frost Splitting','Let the winter make the first cut and it shows you where the sound stone is.'),
  ('spoil_sorting','Spoil Sorting','The rubble is worth something to somebody.'),
- ('deep_bench','Deep Bench','Below the weathered rock, where the face keeps giving.'),
+ ('deep_bench','Deep Bench','Below the weathered rock, where the face has something better than rubble in it.'),
  ('plug_and_feather','Plug and Feather','Drill, wedge, wait. It opens itself.'),
  ('sled_haul','Sled Haul','Downhill, loaded, once.'),
 
  ('cliff_stair','Cliff Stair','Cut the steps once and use them forever.'),
  ('true_face','True Face','Flat enough that the next cut is easy.'),
- ('crack_reading','Crack Reading','Every flaw is an invitation.'),
+ ('crack_reading','Crack Reading','Every flaw is an invitation, and some of them open onto the good stuff.'),
  ('obsidian_flow','Obsidian Flow','A flow where the glass runs, and it takes the edge off anything hurried.'),
  ('offcut_dressing','Offcut Dressing','Small blocks are still blocks.'),
  ('bench_pacing','Bench Pacing','Stone does not reward hurry.'),
  ('crane_gin','Crane Gin','A tripod and a rope beat six men.'),
- ('canyon_face','Canyon Face','A wall the weather has already opened. It opens further on its own.'),
+ ('canyon_face','Canyon Face','A wall the weather has already opened, and it opened it at the best course.'),
 
  ('facing_stone','Facing Stone','The good side out, every time.'),
  ('dry_season_work','Dry Season Work','Wet stone is heavy stone.'),
  ('quarry_road','Quarry Road','Built once, used every haul.'),
- ('deep_badland','Deep Badland','Ground nobody has bothered to survey, worked at a pace that keeps it.'),
+ ('deep_badland','Deep Badland','Ground nobody has bothered to survey. You have.'),
  ('rubble_reclaim','Rubble Reclaim','What was left behind is still cut stone.'),
  ('sound_testing','Sound Testing','Tap it. Hollow stone is wasted effort.'),
 
- ('the_great_bench','The Great Bench','A face that takes a season to work out, and gives all season.'),
+ ('the_great_bench','The Great Bench','A face that takes a season to work, and you know every course in it by name.'),
  ('quarrymaster','Quarrymaster','Sledges dressed, wedges seated, and nothing broken at the face.'),
 ]
 
@@ -249,34 +249,34 @@ HARVESTING_NAMES = [
  ('field_edge','Field Edge','Work the margins where the stalks stand thickest.'),
  ('stalk_selection','Stalk Selection','Take the long ones, leave the rest to seed.'),
  ('bundle_tying','Bundle Tying','A tied sheaf carries; a loose armful does not.'),
- ('fallow_strip','Fallow Strip','A rested strip comes back stronger, and it is rested because you left it so.'),
+ ('fallow_strip','Fallow Strip','A rested strip comes back stronger, and you are the one who knows it rested.'),
 
  ('retting_pit','Retting Pit','Soak it right and the fiber lets go.'),
  ('scythe_stance','Scythe Stance','Turn from the hips, not the arms.'),
  ('cart_track','Cart Track','A wheel beats a back over open ground.'),
  ('dew_cutting','Dew Cutting','Damp stalks bend instead of shattering.'),
  ('sheaf_stacking','Sheaf Stacking','Stooked upright, it dries as you work.'),
- ('river_meadow','River Meadow','Bottom land that never runs short, cut so that it does not.'),
+ ('river_meadow','River Meadow','Bottom land that never runs short, and the long stems are always in the same place.'),
  ('two_row_pass','Two-Row Pass','Two rows a sweep, if the blade is long enough.'),
- ('seed_saving','Seed Saving','Next season starts this one.'),
+ ('seed_saving','Seed Saving','Keep the best of this year and you know the best of it when you see it again.'),
 
  ('open_ground','Open Ground','Nothing between you and the next field.'),
  ('long_fiber','Long Fiber','Cut low and the whole stalk is usable.'),
  ('windrow_timing','Windrow Timing','Turned once at the right hour, dry by dusk.'),
- ('silk_ground','Silk Ground','Tall grass something else has been spinning in. Take it lightly.'),
+ ('silk_ground','Silk Ground','Tall grass something else has been spinning in. You can tell which stems it used.'),
  ('chaff_reclaim','Chaff Reclaim','Even the broken stuff sells by the sack.'),
  ('steady_pace','Steady Pace','A field is won by not stopping.'),
  ('handcart','Handcart','One trip instead of four.'),
- ('storm_meadow','Storm Meadow','A meadow the weather keeps others out of, and keeps growing.'),
+ ('storm_meadow','Storm Meadow','A meadow the weather keeps others out of, so nobody has taken the best of it.'),
 
  ('combing_board','Combing Board','Straight fiber is worth more than tangled.'),
  ('cool_hours','Cool Hours','Cut early, rest at noon, cut again.'),
  ('light_load','Light Load','Carry the fiber, leave the water.'),
- ('silkweave_run','Silkweave Run','The ground the good thread comes from, cut a strip at a time.'),
+ ('silkweave_run','Silkweave Run','The ground the good thread comes from, and you know the strip it comes from.'),
  ('second_cut','Second Cut','The regrowth is shorter and just as good.'),
  ('blade_setting','Blade Setting','Angle the hook and it does the work.'),
 
- ('the_long_field','The Long Field','A field big enough to lose a day in, and to leave standing behind you.'),
+ ('the_long_field','The Long Field','A field big enough to lose a day in, and you know the corner worth the day.'),
  ('field_reeve','Field Reeve','The reeve\'s habit: the hook stoned every evening, whatever the day was.'),
 ]
 

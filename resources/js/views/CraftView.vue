@@ -7,39 +7,94 @@
  * power curve (§8.1 rule 4) -- what changes is how fast you get there and what
  * it costs to keep running.
  */
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useGame } from '@/stores/game'
 import {
-  CATEGORIES,
-  CATEGORY_LABEL,
   MATERIALS,
   RARITIES,
   RARITY_LABEL,
+  RARITY_RANK,
   SCOPE_ACTION,
+  SKILL_LIST,
+  SLOT_LABEL,
   STATION_RANK,
-  categoryForSlot,
   craftableItems,
+  skillForSlot,
+  slotForSkill,
+  stationForRarity,
   stationReaches,
 } from '@/game/catalog'
-import type { Category } from '@/game/catalog'
 import { formatDuration, placeLabel } from '@/game/formulas'
-import { CRAFT, EQUIPMENT, PROCESSING } from '@/game/balance'
+import { CRAFT, PROCESSING } from '@/game/balance'
 import { itemIcon, materialIcon } from '@/icons/procedural'
 import SvgIcon from '@/components/SvgIcon.vue'
 import StatChips from '@/components/StatChips.vue'
-import type { ItemDef, MaterialKey, Rarity } from '@/game/types'
+import QueueBar from '@/components/QueueBar.vue'
+import type { BuffScope, EquipSlot, ItemDef, MaterialKey, Rarity } from '@/game/types'
 
 const game = useGame()
 
-/** §8.1 -- what each rung of the ladder is, in one line each. */
-const RARITY_NOTE: Record<Rarity, string> = {
-  common: 'Tier 2 materials, no gold. Outlasts anything the trader sells.',
-  uncommon: 'Tier 2 materials. Where a line starts paying for itself.',
-  rare: 'Tier 1–2 materials, and the best a village workshop will ever manage.',
-  epic: 'Tier 3 + tier 4 only. Tradeable, and capped at the same ceiling as everything else.',
-  legendary: 'Guild halls only, once guilds exist.',
-  unique: 'Never crafted. Dungeon drops only, and soulbound when it lands.',
+/**
+ * §8.4 -- what a player is shopping *for*, which is four things and not three.
+ *
+ * The bench count is still three: a tool and a sword are the same anvil and the
+ * same Smith (§8.4). But "tools & weapons" is one tab holding two decisions that
+ * have nothing to do with each other -- which of my five lines to upgrade, and
+ * what to carry into a fight -- and the axe rung was buried in the middle of the
+ * shield rungs. The tab strip is a filter, not a claim about buildings.
+ */
+type Tab = 'tool' | 'weapon' | 'armor' | 'consumable'
+
+const TABS: Tab[] = ['tool', 'weapon', 'armor', 'consumable']
+
+const TAB_LABEL: Record<Tab, string> = {
+  tool: 'Tools',
+  weapon: 'Weapons',
+  armor: 'Armor',
+  consumable: 'Drafts',
 }
+
+const tab = ref<Tab>('tool')
+
+/** §9.5.4 -- the three families, and the job each one levels. */
+const FAMILY_LABEL: Record<string, string> = {
+  shield: 'Shield',
+  sword: 'Sword',
+  focus: 'Focus',
+}
+
+const FAMILY_NOTE: Record<string, string> = {
+  shield: 'Levels Shieldbearer · two thirds guard',
+  sword: 'Levels Swordhand · even split',
+  focus: 'Levels Runecaster · four fifths arm',
+}
+
+/** What each worn slot is actually for, which is how they differ at the bench. */
+const WORN_NOTE: Record<string, string> = {
+  armor: 'Counts on all five lines',
+  boots: 'Counts on the road',
+  gloves: 'Counts at the bench',
+}
+
+const station = computed(() => game.currentSettlement)
+
+/**
+ * §8.4 -- the bench bank, which queues the way §6.1's lines do.
+ *
+ * Five slots, first-come-first-served, shared by everybody standing here, and
+ * counted apart from the processing queue: a run of planks and a sword are two
+ * different buildings, so a busy saw pit never closes the forge.
+ */
+const benchSlots = computed(() => game.bench)
+
+const freeBenches = computed(() => benchSlots.value.filter((s) => s.owner === null).length)
+
+const mineHere = computed(() => benchSlots.value.some((s) => s.owner === 'you'))
+
+const benchFull = computed(() => benchSlots.value.length > 0 && freeBenches.value === 0)
+
+onMounted(() => void game.loadBench())
+watch(() => station.value?.id, () => void game.loadBench())
 
 /**
  * Only what this workbench can actually make.
@@ -47,39 +102,134 @@ const RARITY_NOTE: Record<Rarity, string> = {
  * A recipe you cannot reach here is hidden outright rather than grayed: a
  * village will never craft an epic, so listing it is a permanent row of noise on
  * the screen a player uses most. Missing *materials* is a different thing and
- * stays visible — that is the shopping list, and hiding it would remove the only
+ * stays visible -- that is the shopping list, and hiding it would remove the only
  * reason to go and gather.
  */
-/**
- * §8.4 -- three benches, and within each one the rarity ladder. Category first
- * because it is what a player is shopping *for*; rarity second because it is how
- * far up they can reach today.
- */
-const tab = ref<Category>('weapon')
-
 const reachable = computed(() => craftableItems().filter(hasStation))
 
-const byCategory = computed(() => {
-  const groups = {} as Record<Category, ItemDef[]>
-  for (const category of CATEGORIES) groups[category] = []
-  for (const item of reachable.value) groups[categoryForSlot(item.slot)].push(item)
-  return groups
+function tabFor(item: ItemDef): Tab {
+  if (item.consumable) return 'consumable'
+  if (item.slot && skillForSlot(item.slot) !== null) return 'tool'
+
+  return item.slot === 'weapon' ? 'weapon' : 'armor'
+}
+
+const byTab = computed(() => {
+  const out = { tool: [], weapon: [], armor: [], consumable: [] } as Record<Tab, ItemDef[]>
+  for (const item of reachable.value) out[tabFor(item)].push(item)
+  return out
 })
 
-const byRarity = computed(() => {
-  const groups = {} as Record<Rarity, ItemDef[]>
-  for (const rarity of RARITIES) groups[rarity] = []
-  for (const item of byCategory.value[tab.value]) groups[item.rarity]?.push(item)
-  return groups
+const rung = (a: ItemDef, b: ItemDef) =>
+  RARITY_RANK[a.rarity] - RARITY_RANK[b.rarity] || a.name.localeCompare(b.name)
+
+/**
+ * §8 rule 4 -- every line gets the same ladder, so the axis inside a tab is
+ * never rarity. It is the line for a tool, the family for a weapon, the slot for
+ * worn gear and the action for a draft: the thing being chosen between.
+ */
+interface Group {
+  key: string
+  label: string
+  note: string
+  items: ItemDef[]
+}
+
+const groups = computed<Group[]>(() => {
+  const items = byTab.value[tab.value]
+
+  if (tab.value === 'tool') {
+    return SKILL_LIST.map((skill) => {
+      const slot = slotForSkill(skill.key)
+
+      return {
+        key: skill.key,
+        label: skill.name,
+        note: `${SLOT_LABEL[slot]} · ${MATERIALS[skill.material as MaterialKey]?.name ?? ''}`,
+        items: items.filter((i) => i.slot === slot).sort(rung),
+      }
+    }).filter((g) => g.items.length > 0)
+  }
+
+  if (tab.value === 'weapon') {
+    return Object.keys(FAMILY_LABEL)
+      .map((family) => ({
+        key: family,
+        label: FAMILY_LABEL[family]!,
+        note: FAMILY_NOTE[family]!,
+        items: items.filter((i) => i.family === family).sort(rung),
+      }))
+      .filter((g) => g.items.length > 0)
+  }
+
+  if (tab.value === 'armor') {
+    return (['armor', 'boots', 'gloves'] as EquipSlot[])
+      .map((slot) => ({
+        key: slot,
+        label: SLOT_LABEL[slot],
+        note: WORN_NOTE[slot] ?? '',
+        items: items.filter((i) => i.slot === slot).sort(rung),
+      }))
+      .filter((g) => g.items.length > 0)
+  }
+
+  const scopes = [...new Set(items.map((i) => i.scope ?? 'global'))] as Array<BuffScope | 'global'>
+
+  return scopes
+    .sort((a, b) => order(a) - order(b))
+    .map((scope) => ({
+      key: scope,
+      label: SCOPE_ACTION[scope],
+      note: 'One charge, spent on the next one',
+      items: items.filter((i) => (i.scope ?? 'global') === scope).sort(rung),
+    }))
 })
 
-const craftableRarities = computed(() =>
-  RARITIES.filter((r) => byRarity.value[r].length > 0),
-)
+/** Lines first, then the road, the bench and the fight -- §8.5's own order. */
+function order(scope: BuffScope | 'global'): number {
+  const all = Object.keys(SCOPE_ACTION) as Array<BuffScope | 'global'>
+
+  return all.indexOf(scope)
+}
 
 const nothingHere = computed(() => reachable.value.length === 0)
 
-const station = computed(() => game.currentSettlement)
+/**
+ * §8.0 -- what this bench reaches, said as the rungs it can actually make.
+ *
+ * Only those. A row of six caps with four of them dark was a ladder mostly
+ * about what you cannot do here, and the sentence under it talked about guild
+ * halls to players with no guild and about unique gear nobody ever crafts.
+ * What is worth a line is the rung above this one and where it is made.
+ */
+const reaches = (rarity: Rarity) =>
+  station.value !== null && stationReaches(station.value.tier, rarity) && rarity !== 'unique'
+
+/** Everything up to and including the top rung this bench makes. */
+const rungs = computed(() => RARITIES.filter(reaches))
+
+/** The next rung up, and the smallest place that makes it. Null at the top. */
+const nextStep = computed(() => {
+  if (!station.value) return null
+
+  const next = RARITIES.find((r) => !reaches(r) && r !== 'unique' && r !== 'legendary')
+  const where = next ? stationForRarity(next) : null
+
+  return next && where ? `A ${where} bench reaches ${RARITY_LABEL[next].toLowerCase()}.` : null
+})
+
+/**
+ * §10.5 -- and the rung above every settlement, which is a guild's business
+ * and is said to nobody else. A prospector with no hall cannot act on it.
+ */
+const hallNote = computed(() => {
+  const guild = game.guild
+  if (!guild) return null
+
+  return game.atGuildHall
+    ? `${guild.name}'s bench reaches ${guild.benchReach}.`
+    : `Legendary is ${guild.name}'s hall, once its bench is built that far.`
+})
 
 /**
  * §8.0 -- can this bench make it? Rarity decides, not the item's own `station`
@@ -89,8 +239,8 @@ function hasStation(item: ItemDef): boolean {
   const here = station.value
   if (!here) return false
   if (!stationReaches(here.tier, item.rarity)) return false
-  // §8.0 -- the guild hall does not exist, so nothing that needs one is
-  // craftable from any settlement a player can be standing in.
+  // §8.0 -- the guild hall is a building a guild puts inside a settlement, so
+  // nothing that needs one is craftable from a settlement alone.
   if (item.station === 'guild') return false
 
   return !item.station || STATION_RANK[here.tier] >= STATION_RANK[item.station]
@@ -104,11 +254,31 @@ function inputs(item: ItemDef): Array<{ key: MaterialKey; need: number; have: nu
   }))
 }
 
-const hasMaterials = (item: ItemDef) => inputs(item).every((i) => i.have >= i.need)
+const stocked = (item: ItemDef) => inputs(item).every((i) => i.have >= i.need)
 
-/** Anything station-blocked is already hidden, so this only ever reports stock. */
-function blockedReason(item: ItemDef): string | null {
-  return hasMaterials(item) ? null : 'Missing materials.'
+/** Stock, a free bench, and nothing of yours already on one here (§8.4). */
+const ready = (item: ItemDef) => stocked(item) && !benchFull.value && !mineHere.value
+
+/**
+ * Name the shortfall. "Missing materials" is a state; this is a shopping list.
+ *
+ * Counts stay on the pills, which already carry them in ember. Repeating them
+ * here produced "1 planks short", because a material name is not a countable
+ * noun -- what the player needs from this line is *which* materials.
+ */
+function shortfall(item: ItemDef): string | null {
+  if (mineHere.value) return 'Your bench here is busy'
+  if (benchFull.value) return 'Every bench here is busy'
+
+  const short = inputs(item)
+    .filter((i) => i.have < i.need)
+    .map((i) => MATERIALS[i.key].name.toLowerCase())
+
+  if (!short.length) return null
+  if (short.length === 1) return `Short on ${short[0]}`
+  if (short.length === 2) return `Short on ${short[0]} and ${short[1]}`
+
+  return `Short on ${short.length} materials`
 }
 
 /**
@@ -116,10 +286,9 @@ function blockedReason(item: ItemDef): string | null {
  * are the §11.1 sink, so both belong in the same spot on the row.
  */
 function lifespan(item: ItemDef): string {
-  if (item.consumable) {
-    return `one ${SCOPE_ACTION[item.scope ?? 'global']}`
-  }
-  return `${item.maxDurability} durability`
+  if (item.consumable) return `one ${SCOPE_ACTION[item.scope ?? 'global']}`
+
+  return `${item.maxDurability} dur`
 }
 
 /**
@@ -134,40 +303,76 @@ function benchTime(item: ItemDef): string {
 
   return formatDuration((seconds / game.timeScale) * 1000)
 }
+
+/** The empty tab is worth a sentence about where the thing IS made. */
+const emptyNote = computed(() => {
+  const tier = station.value?.tier ?? 'village'
+
+  if (tab.value === 'tool') return `No line's tools are made at a ${tier} bench.`
+  if (tab.value === 'weapon') return `No weapon is made at a ${tier} bench.`
+  if (tab.value === 'armor') return `No worn gear is made at a ${tier} bench.`
+
+  return `No draft is brewed at a ${tier} bench.`
+})
 </script>
 
 <template>
   <div class="page">
-    <div class="inset where">
-      <div class="row-between">
-        <div>
-          <span class="label">Workbench</span>
-          <div class="tiny" style="margin-top: 3px">
-            <template v-if="station">
-              {{ placeLabel(station.name, station.col, station.row) }}
-              <span class="muted">· {{ station.tier }}</span>
-            </template>
-            <span v-else class="muted">You have left the settlement.</span>
-          </div>
+    <header class="bench inset">
+      <div>
+        <span class="label">Workbench</span>
+        <div class="tiny place">
+          <template v-if="station">
+            {{ placeLabel(station.name, station.col, station.row) }}
+            <span class="muted">· {{ station.tier }}</span>
+          </template>
+          <span v-else class="muted">You have left the settlement.</span>
         </div>
-        <span class="chip">falloff ×{{ EQUIPMENT.stackFalloff }}</span>
       </div>
-    </div>
 
-    <!-- §8.4 -- the three benches. Counts sit on the tabs so an empty one is
-         obvious before you open it. -->
-    <div v-if="!nothingHere" class="switch">
-      <button
-        v-for="category in CATEGORIES"
-        :key="category"
-        type="button"
-        :class="{ on: tab === category }"
-        @click="tab = category"
+      <div v-if="station" class="rungs">
+        <span class="tiny muted">Makes</span>
+        <span
+          v-for="rarity in rungs"
+          :key="rarity"
+          class="chip tiny"
+          :class="`rarity-${rarity}`"
+        >{{ RARITY_LABEL[rarity] }}</span>
+        <span v-if="!rungs.length" class="tiny muted">nothing at this tier</span>
+      </div>
+
+      <p v-if="nextStep || hallNote" class="tiny muted reach-note">
+        {{ [nextStep, hallNote].filter(Boolean).join(' ') }}
+      </p>
+
+      <!-- §8.4 -- the bench bank, drawn by the same component §6.1's is. -->
+      <QueueBar
+        v-if="station"
+        class="queue"
+        label="Bench queue"
+        :slots="benchSlots"
+        full-note="Every bench here is busy. Congestion at a popular settlement is the point — try a quieter one, or wait for a slot."
       >
-        {{ CATEGORY_LABEL[category] }}
-        <span class="tiny muted">{{ byCategory[category].length }}</span>
+        <p v-if="mineHere && !benchFull" class="tiny muted queue-note">
+          Something of yours is on a bench here. Collect it before starting
+          another — one bench each, per settlement.
+        </p>
+      </QueueBar>
+    </header>
+
+    <nav v-if="!nothingHere" class="tabs">
+      <button
+        v-for="t in TABS"
+        :key="t"
+        type="button"
+        :class="{ on: tab === t }"
+        :aria-pressed="tab === t"
+        @click="tab = t"
+      >
+        <span>{{ TAB_LABEL[t] }}</span>
+        <span class="count mono">{{ byTab[t].length }}</span>
       </button>
-    </div>
+    </nav>
 
     <!-- Nothing reachable here. Say where to go, not just that there is nothing. -->
     <div v-if="nothingHere" class="inset empty">
@@ -182,75 +387,76 @@ function benchTime(item: ItemDef): string {
       </p>
     </div>
 
-    <!-- A bench this settlement can reach, but nothing in this category on it. -->
-    <div v-if="!nothingHere && !craftableRarities.length" class="inset empty">
-      <p class="tiny muted" style="margin: 0">
-        <template v-if="tab === 'consumable'">
-          Potions and buffs are not built yet. This bench will make them.
-        </template>
-        <template v-else>Nothing in this category is made at a {{ station?.tier }}.</template>
-      </p>
+    <div v-else-if="!groups.length" class="inset empty">
+      <p class="tiny muted" style="margin: 0">{{ emptyNote }}</p>
     </div>
 
-    <section v-for="rarity in craftableRarities" :key="rarity" class="section">
-      <div class="row" style="gap: 8px; margin-bottom: 3px">
-        <h3 class="head" :class="`rarity-${rarity}`">{{ RARITY_LABEL[rarity] }}</h3>
-        <span v-if="byRarity[rarity][0]?.tradeable" class="chip chip-nft tiny">tradeable</span>
+    <section v-for="group in groups" :key="group.key" class="group">
+      <div class="eyebrow">
+        <h3 class="g-label">{{ group.label }}</h3>
+        <span class="hair" aria-hidden="true" />
+        <span class="tiny muted g-note">{{ group.note }}</span>
       </div>
-      <p class="tiny muted note">{{ RARITY_NOTE[rarity] }}</p>
 
-      <div v-for="item in byRarity[rarity]" :key="item.key" class="recipe panel">
-        <div class="row" style="align-items: flex-start">
+      <article
+        v-for="item in group.items"
+        :key="item.key"
+        class="recipe"
+        :class="{ ready: ready(item) }"
+        :data-rarity="item.rarity"
+      >
+        <div class="head">
           <SvgIcon
-            :svg="itemIcon({ slot: item.slot, family: item.family, rarity: item.rarity, palette: item.palette, size: 34 })"
+            :svg="itemIcon({ slot: item.slot, family: item.family, rarity: item.rarity, palette: item.palette, size: 32 })"
             boxed
-            :size="34"
+            :size="32"
           />
           <div class="grow">
             <div class="row-between">
-              <strong class="tiny" :class="`rarity-${item.rarity}`">{{ item.name }}</strong>
-              <span v-if="item.tradeable" class="chip tiny chip-nft">NFT</span>
+              <strong class="name" :class="`rarity-${item.rarity}`">{{ item.name }}</strong>
+              <span class="rung" :class="`rarity-${item.rarity}`">{{ RARITY_LABEL[item.rarity] }}</span>
             </div>
             <!-- §9.5.4 -- a bench is where a shield and a wand are actually
-                 chosen between, and the chips are the choice. -->
-            <div class="row tiny" style="gap: 4px; margin-top: 3px">
+                 chosen between, and the chips are the choice. One component
+                 draws them everywhere, so a piece reads the same on every screen. -->
+            <div class="row tiny stats">
               <StatChips :def="item" />
+              <span class="chip tiny">{{ lifespan(item) }}</span>
+              <span v-if="item.tradeable" class="chip tiny chip-nft">NFT</span>
             </div>
-            <div class="tiny muted">{{ item.description }}</div>
           </div>
         </div>
 
+        <p class="tiny muted blurb">{{ item.description }}</p>
+
         <div class="inputs">
-          <div
+          <span
             v-for="input in inputs(item)"
             :key="input.key"
             class="input"
             :class="{ short: input.have < input.need }"
           >
-            <SvgIcon :svg="materialIcon(MATERIALS[input.key], 18)" />
+            <SvgIcon :svg="materialIcon(MATERIALS[input.key], 16)" />
             <span class="tiny mono">{{ input.have }}/{{ input.need }}</span>
-            <span class="tiny muted name">{{ MATERIALS[input.key].name }}</span>
-          </div>
+            <span class="tiny muted iname">{{ MATERIALS[input.key].name }}</span>
+          </span>
         </div>
 
         <div class="row-between foot">
-          <!-- A potion has no durability to quote; what it has is a clock.
-               §8.4 -- and every craft now has a second one: how long the bench
-               holds it, which is the thing to know BEFORE pressing. -->
-          <span class="tiny muted">
-            {{ blockedReason(item) ?? `${lifespan(item)} · ${benchTime(item)} on the bench` }}
+          <span class="tiny" :class="ready(item) ? 'muted' : 'lack'">
+            {{ shortfall(item) ?? `${benchTime(item)} on the bench` }}
           </span>
           <button
             class="btn btn-sm"
-            :class="{ 'btn-primary': !blockedReason(item) }"
+            :class="{ 'btn-primary': ready(item) }"
             type="button"
-            :disabled="game.busy || Boolean(blockedReason(item))"
+            :disabled="game.busy || !ready(item)"
             @click="game.craft(item.key)"
           >
             Craft
           </button>
         </div>
-      </div>
+      </article>
     </section>
 
     <p class="tiny muted footnote">
@@ -267,8 +473,83 @@ function benchTime(item: ItemDef): string {
   padding: 0;
 }
 
-.where {
+.bench {
+  margin-bottom: 14px;
+}
+
+.place {
+  margin-top: 3px;
+}
+
+/* What this bench makes, in the rung's own color. Nothing about the rungs it
+   does not: a chip you cannot act on is a chip in the way. */
+.rungs {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 10px 0 7px;
+}
+
+.reach-note {
+  margin: 0;
+  line-height: 1.45;
+}
+
+.queue {
+  margin-top: 11px;
+}
+
+.queue-note {
+  margin: 7px 0 0;
+  line-height: 1.45;
+}
+
+/* Four filters, two by two: four across is 78px a label on a phone, which is
+   where "Consumables" started truncating into a different word. */
+.tabs {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
   margin-bottom: 16px;
+}
+
+@media (min-width: 420px) {
+  .tabs {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.tabs button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 6px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: var(--ink-panel);
+  color: var(--vellum-dim);
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.tabs button.on {
+  background: var(--ink-raised);
+  border-color: var(--copper);
+  color: var(--vellum);
+}
+
+.tabs .count {
+  font-size: 10px;
+  color: #7b8580;
+}
+
+.tabs button.on .count {
+  color: var(--copper);
 }
 
 .empty {
@@ -277,69 +558,137 @@ function benchTime(item: ItemDef): string {
   line-height: 1.5;
 }
 
-/* Three benches. Labels wrap on narrow phones rather than truncating, because
-   "Tools & weapons" losing its tail reads as a different category. */
-.switch {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
-  margin-bottom: 16px;
+.group + .group {
+  margin-top: 22px;
 }
 
-.switch button {
+.eyebrow {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  padding: 8px 4px;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.g-label {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--vellum);
+  white-space: nowrap;
+}
+
+.hair {
+  flex: 1 1 auto;
+  height: 1px;
+  background: var(--line);
+}
+
+.g-note {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 52%;
+}
+
+/* One card a recipe, with the rung drawn down its left edge: the rarity is the
+   thing players scan for, and a spine is readable at a glance where a word in
+   a header is not. */
+.recipe {
+  position: relative;
+  padding: 10px 12px 10px 14px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--line);
   background: var(--ink-panel);
-  color: var(--vellum-dim);
-  font-weight: 700;
-  font-size: 10.5px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  line-height: 1.25;
-  cursor: pointer;
+  overflow: hidden;
 }
 
-.switch button.on {
-  background: var(--ink-raised);
-  border-color: var(--copper);
-  color: var(--vellum);
+.recipe::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--rung, var(--line));
 }
 
-.section + .section {
-  margin-top: 20px;
+.recipe[data-rarity='common'] {
+  --rung: var(--rarity-common);
+}
+.recipe[data-rarity='uncommon'] {
+  --rung: var(--rarity-uncommon);
+}
+.recipe[data-rarity='rare'] {
+  --rung: var(--rarity-rare);
+}
+.recipe[data-rarity='epic'] {
+  --rung: var(--rarity-epic);
+}
+.recipe[data-rarity='legendary'] {
+  --rung: var(--rarity-legendary);
+}
+.recipe[data-rarity='unique'] {
+  --rung: var(--rarity-unique);
 }
 
-.head {
-  font-size: 14px;
+/* §13.3 -- sap is for a state worth crossing the screen for, and "you can make
+   this right now" is the only one this screen has. */
+.recipe.ready {
+  border-color: #47563f;
 }
 
-.note {
-  margin: 0 0 9px;
-  line-height: 1.45;
-}
-
-.recipe {
-  padding: 11px 12px;
+.recipe.ready::before {
+  background: linear-gradient(var(--sap) 22px, var(--rung) 22px);
 }
 
 .recipe + .recipe {
   margin-top: 8px;
 }
 
+.head {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+}
+
+.name {
+  font-family: var(--font-display);
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+.rung {
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  opacity: 0.85;
+  white-space: nowrap;
+}
+
+.stats {
+  gap: 4px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+
+.blurb {
+  margin: 7px 0 0;
+  line-height: 1.45;
+}
+
 .inputs {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin: 10px 0 9px;
+  margin: 9px 0;
 }
 
 .input {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 5px;
   padding: 4px 8px 4px 5px;
@@ -356,7 +705,7 @@ function benchTime(item: ItemDef): string {
   color: #e58c86;
 }
 
-.input .name {
+.input .iname {
   max-width: 92px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -364,8 +713,12 @@ function benchTime(item: ItemDef): string {
 }
 
 .foot {
-  padding-top: 9px;
+  padding-top: 8px;
   border-top: 1px solid var(--line);
+}
+
+.lack {
+  color: #e58c86;
 }
 
 .footnote {

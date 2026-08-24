@@ -633,8 +633,18 @@ export interface Tile {
   hp: number
   /** Units yielded per trip before bonuses. */
   baseYield: number
+  /**
+   * §5.1 -- how many hauls this hex holds before it is worked out.
+   *
+   * Derived from `baseYield`, inversely: a rich hex is emptied in six trips and
+   * a poor one takes ten. Not a chance -- the count is knowable, which is what
+   * makes "is this seam worth coming back to" a decision rather than a guess.
+   */
+  extractions: number
   /** Both slots full closes the tile to everyone else, §5.1. */
   slotsUsed: number
+  /** §5.1 -- hauls already taken off this hex, by anybody. Shared. */
+  taken: number
   /** Unix ms when a depleted tile regrows; 0 when live. §5.1 */
   regrowsAt: number
   settlement?: Settlement

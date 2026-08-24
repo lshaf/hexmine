@@ -246,7 +246,7 @@ const EFFECT_ICON: Record<NodeEffect['kind'], string> = {
   battleWear: 'effectCraftDurability',
   weaponWear: 'effectCraftDurability',
   toolWear: 'effectCraftDurability',
-  depletion: 'effectDepletion',
+  seamGrade: 'effectSeam',
   presence: 'effectPresence',
   runSlot: 'effectRunSlot',
   goldFind: 'effectGold',
@@ -277,8 +277,8 @@ function effectText(effect: NodeEffect): string {
       return `${formatPercent(-effect.value)} wear on the weapon you swing`
     case 'toolWear':
       return `${formatPercent(effect.value)} of trips leave the tool untouched`
-    case 'depletion':
-      return `${formatPercent(-effect.value)} chance of working the hex out`
+    case 'seamGrade':
+      return `${formatPercent(effect.value)} of trips come up a grade better`
     case 'presence':
       return `${formatPercent(effect.value)} faster while you stand at the bench`
     case 'runSlot':

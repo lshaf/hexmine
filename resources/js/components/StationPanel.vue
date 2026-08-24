@@ -13,6 +13,7 @@ import { formatSpan, processingTime } from '@/game/formulas'
 import { PROCESSING } from '@/game/balance'
 import { materialIcon } from '@/icons/procedural'
 import SvgIcon from './SvgIcon.vue'
+import QueueBar from './QueueBar.vue'
 import type { Recipe, Settlement } from '@/game/types'
 
 const props = defineProps<{ settlement: Settlement }>()
@@ -94,28 +95,11 @@ watch(() => props.settlement.id, () => { batches.value = 1 })
     </div>
 
     <!-- Public queue, §6.1 -->
-    <div class="queue">
-      <div class="row-between" style="margin-bottom: 6px">
-        <span class="label">Public queue</span>
-        <span class="tiny mono muted">{{ freeSlots }} of {{ PROCESSING.publicSlots }} free</span>
-      </div>
-      <div class="slots">
-        <div
-          v-for="slot in station?.slots ?? []"
-          :key="slot.index"
-          class="slot"
-          :class="{
-            mine: slot.owner === 'you',
-            taken: slot.owner !== null && slot.owner !== 'you',
-          }"
-          :title="slot.owner ? `Taken by ${slot.owner}` : 'Open'"
-        />
-      </div>
-      <p v-if="freeSlots === 0" class="tiny warn">
-        Every slot is busy. Congestion at popular settlements is intended — try a
-        quieter village, or wait.
-      </p>
-    </div>
+    <QueueBar
+      label="Public queue"
+      :slots="station?.slots ?? []"
+      full-note="Every slot is busy. Congestion at popular settlements is intended — try a quieter village, or wait."
+    />
 
     <!-- Presence bonus, §6.2. A readout, not a control: presence is simply
          where you are standing, so there is nothing here to switch on. -->
@@ -198,42 +182,6 @@ watch(() => props.settlement.id, () => { batches.value = 1 })
   display: flex;
   align-items: center;
   gap: 9px;
-}
-
-.queue {
-  padding: 9px 11px;
-  border-radius: var(--radius-sm);
-  background: var(--ink);
-  border: 1px solid var(--line);
-}
-
-.slots {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 5px;
-}
-
-.slot {
-  height: 8px;
-  border-radius: 3px;
-  background: #0f1512;
-  border: 1px solid var(--line);
-}
-
-.slot.taken {
-  background: #4a4034;
-  border-color: #6b5a3e;
-}
-
-.slot.mine {
-  background: var(--copper);
-  border-color: #d98d4f;
-}
-
-.warn {
-  margin: 7px 0 0;
-  color: #e8a06a;
-  line-height: 1.45;
 }
 
 .presence {

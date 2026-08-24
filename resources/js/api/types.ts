@@ -250,9 +250,10 @@ export type NodeEffect =
   /** §6.2 -- worth more for standing there, and §6.1's second run. */
   | { kind: 'presence'; value: number }
   | { kind: 'runSlot'; value: number }
-  /** §7.3 + §5.1 -- the line's tool spared, and the seam left standing. */
+  /** §7.3 -- the line's tool spared a trip's wear. */
   | { kind: 'toolWear'; value: number }
-  | { kind: 'depletion'; value: number }
+  /** §5.1 -- a trip that comes up one grade better than the tool can take. */
+  | { kind: 'seamGrade'; value: number }
   /** §7.5 -- whole hexes of sight, on top of the base one. Not a percentage. */
   | { kind: 'sight'; value: number }
   /** §7.6 -- units and rows of bag, on top of the flat base. Counts, not stats. */
@@ -686,6 +687,8 @@ export interface QueueSlot {
 export interface StationState {
   settlement: Settlement
   slots: QueueSlot[]
+  /** §8.4 -- the benches queue like the lines do, in a bank of their own. */
+  bench: QueueSlot[]
   /** True when the player is standing here and processing runs faster, §6.2. */
   presence: boolean
 }

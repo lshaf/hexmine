@@ -10,8 +10,8 @@ use App\Game\WorldGen;
 use App\Models\Character;
 use App\Models\GameJob;
 use App\Models\Player;
-use App\Models\TileState;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -53,7 +53,6 @@ class RebuildWorld extends Command
             $dry ? ' DRY RUN -- nothing will be written.' : '',
         ));
 
-        $tiles = TileState::count();
         $jobs = GameJob::count();
 
         $moves = [];
@@ -80,7 +79,6 @@ class RebuildWorld extends Command
             ], $moves),
         );
 
-        $this->line("tile_states to clear: {$tiles}");
         $this->line("jobs to abandon: {$jobs}");
 
         if ($dry) {
@@ -89,10 +87,15 @@ class RebuildWorld extends Command
             return self::SUCCESS;
         }
 
-        DB::transaction(function () use ($moves) {
-            // Depletion is a fact about a material that is no longer there.
-            TileState::query()->delete();
+        // §5.1 -- depletion is a fact about a material that is no longer there,
+        // and it lives in the cache rather than a table now (Game\Tiles). There
+        // is no key pattern to walk, so the whole store goes: everything in it
+        // is derived world state with a clock on it, and the worst a flush costs
+        // is a few seams and packs regrowing early.
+        Cache::flush();
+        $this->line('cleared the derived world cache: depletion and settled packs.');
 
+        DB::transaction(function () use ($moves) {
             // A trip is pinned to a hex and a processing run to a settlement.
             // Both may now be somewhere else, or nowhere, so neither can be
             // collected honestly. Deleted, not flagged: that is what abandoning

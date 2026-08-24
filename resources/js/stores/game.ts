@@ -22,6 +22,7 @@ import type {
   GuildRole,
   MapMutations,
   PlayerState,
+  QueueSlot,
   QuestDef,
   QuestReward,
   SkillTree,
@@ -69,6 +70,7 @@ export const useGame = defineStore('game', () => {
   // ------------------------------------------------------------ raw state
   const state = ref<PlayerState | null>(null)
   const station = ref<StationState | null>(null)
+  const bench = ref<QueueSlot[]>([])
   const preview = ref<TilePreview | null>(null)
 
   const panel = ref<PanelKey | null>(null)
@@ -575,6 +577,24 @@ export const useGame = defineStore('game', () => {
     preview.value = await api.previewTile(col, row)
   }
 
+  /**
+   * §8.4 -- the bench bank at the settlement underfoot, for the craft panel.
+   *
+   * Kept apart from `station` on purpose: that ref is what App.vue draws the
+   * settlement overlay from, so filling it to read five slot pips would open a
+   * panel nobody asked for the moment the craft panel closed.
+   */
+  async function loadBench(): Promise<void> {
+    const here = currentSettlement.value
+    if (!here) {
+      bench.value = []
+
+      return
+    }
+
+    bench.value = (await api.getStation(here.id)).bench
+  }
+
   /** §6.1 -- the shared processing queue, for the settlement underfoot. */
   async function openStation(): Promise<void> {
     const here = currentSettlement.value
@@ -848,6 +868,7 @@ export const useGame = defineStore('game', () => {
 
   async function craft(itemKey: string): Promise<void> {
     await act(() => api.craftItem(itemKey))
+    await loadBench()
   }
 
   async function equip(ownedId: string): Promise<void> {
@@ -891,7 +912,7 @@ export const useGame = defineStore('game', () => {
 
   return {
     // state
-    state, station, preview, panel, selected, busy, booted, log, now, view, tiles,
+    state, station, bench, preview, panel, selected, busy, booted, log, now, view, tiles,
     // derived
     character, timeScale, bag, bagFull, inventory, equipment, skills, bonuses, toolYield, jobs, readyJobs,
     consumables, buffs,
@@ -915,6 +936,6 @@ export const useGame = defineStore('game', () => {
     sell, sellItem, craft, equip, unequip, repair, discard, discardMaterial, drink, openPanel, closePanel,
     loadTree, buyNode,
     loadQuests, claimQuest, clearQuestReward,
-    openStation, closeStation,
+    openStation, closeStation, loadBench,
   }
 })

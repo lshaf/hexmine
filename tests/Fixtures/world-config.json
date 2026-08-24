@@ -18,6 +18,10 @@
         "epic": 14
     },
     "commonAttack": 3,
+    "yieldMin": 3,
+    "yieldMax": 8,
+    "extractionsMin": 6,
+    "extractionsMax": 10,
     "rareSpawnChance": 0.18,
     "slotsPerTile": 2,
     "herdLifetimeMs": 240000,
