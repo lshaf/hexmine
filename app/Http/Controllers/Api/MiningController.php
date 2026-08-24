@@ -10,7 +10,7 @@ use Illuminate\Http\Request;
 
 class MiningController extends GameController
 {
-    /** Start a trip, §7.3. The client sends a tile, never a duration. */
+    /** Start a mine, §7.3. The client sends a tile, never a duration. */
     public function store(Request $request): JsonResponse
     {
         $character = $this->character($request);
@@ -25,7 +25,7 @@ class MiningController extends GameController
         return $this->respond(
             $character,
             $this->game->jobPayload($job),
-            "Trip started at {$validated['col']},{$validated['row']}.",
+            "Mine started at {$validated['col']},{$validated['row']}.",
         );
     }
 
@@ -73,7 +73,7 @@ class MiningController extends GameController
     }
 
     /**
-     * §4 -- collect a finished trip.
+     * §4 -- collect a finished mine.
      *
      * Answers with no message on purpose. The client opens the haul receipt over
      * this, and that plate carries the whole of it: every stack, the assay bar,
@@ -86,9 +86,17 @@ class MiningController extends GameController
     {
         $character = $this->character($request);
         $result = $this->game->collectJob($character, $job);
+
         // Cast so an empty haul serialises as {} rather than [], which is what
         // the client's Record<MaterialKey, number> expects.
-        $result['gained'] = (object) $result['gained'];
+        //
+        // Guarded because this one endpoint collects every kind of job, and a
+        // fight is the one that comes back with no haul in it at all (§9.5.5):
+        // its receipt is an exchange and a set of consequences, with no material
+        // ledger anywhere in it.
+        if (array_key_exists('gained', $result)) {
+            $result['gained'] = (object) $result['gained'];
+        }
 
         return $this->respond($character, $result);
     }
@@ -99,6 +107,6 @@ class MiningController extends GameController
         $character = $this->character($request);
         $this->game->abandonJob($character, $job);
 
-        return $this->respond($character, null, 'Trip abandoned. The partial reward is lost.');
+        return $this->respond($character, null, 'Mine abandoned. The partial reward is lost.');
     }
 }

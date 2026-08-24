@@ -225,7 +225,7 @@ final class Catalog
     /**
      * §8.0.1 -- what a rolled line may land on.
      *
-     * A line-locked tool draws from trip stats only. Rolling `travelSpeed` onto
+     * A line-locked tool draws from mine stats only. Rolling `travelSpeed` onto
      * an axe would be worth nothing (walking is not woodcutting) *and* would
      * invite equipping all five tools to stack five travel lines -- the exact
      * hole the line-lock exists to close.
@@ -242,7 +242,7 @@ final class Catalog
      * 1), so its yield is its line's yield and a scope would only be a second
      * place for the two to disagree. Worn gear works every line at once, which
      * is exactly why a narrower line is worth more there -- see
-     * Balance::OPTION_SCOPED_MIN. Scoping only reaches the two trip stats:
+     * Balance::OPTION_SCOPED_MIN. Scoping only reaches the two mine stats:
      * `travelSpeed` has no line to belong to, and processing is scoped by the
      * recipe already.
      */
@@ -345,8 +345,8 @@ final class Catalog
     /**
      * Gathering tool slots, §8. One implement per skill line -- an axe is no use
      * on a seam and a bow is no use on a tree, so each line has its own slot and
-     * its own ladder. A tool contributes its stat *only* on trips for its own
-     * line, and only that tool takes durability for the trip.
+     * its own ladder. A tool contributes its stat *only* on mines for its own
+     * line, and only that tool takes durability for the mine.
      *
      * `weapon` is deliberately not in here: that slot is raid combat, and combat
      * gear must never be able to stand in for a gathering tool.
@@ -403,7 +403,7 @@ final class Catalog
             'iron_sledge' => ['name' => 'Iron Sledge', 'slot' => 'hammer', 'rarity' => 'uncommon', 'tradeable' => false, 'attack' => 6, 'palette' => 'iron', 'goldPrice' => 98, 'maxDurability' => 70, 'station' => 'city', 'description' => 'Heavy enough that the stone does most of the arguing.'],
             'steel_sickle' => ['name' => 'Steel Sickle', 'slot' => 'sickle', 'rarity' => 'uncommon', 'tradeable' => false, 'attack' => 6, 'palette' => 'iron', 'goldPrice' => 98, 'maxDurability' => 70, 'station' => 'city', 'description' => 'Holds an edge through a full field, then wants a stone.'],
 
-            'travel_cloak' => ['name' => 'Travel Cloak', 'slot' => 'armor', 'rarity' => 'common', 'tradeable' => false, 'stat' => 'tripReduction', 'value' => 0.02, 'attack' => 0, 'defense' => 2, 'palette' => 'fiber', 'goldPrice' => 26, 'maxDurability' => 60, 'station' => 'village', 'description' => 'Keeps the weather off. Shaves a little off every trip.'],
+            'travel_cloak' => ['name' => 'Travel Cloak', 'slot' => 'armor', 'rarity' => 'common', 'tradeable' => false, 'stat' => 'tripReduction', 'value' => 0.02, 'attack' => 0, 'defense' => 2, 'palette' => 'fiber', 'goldPrice' => 26, 'maxDurability' => 60, 'station' => 'village', 'description' => 'Keeps the weather off. Shaves a little off every mine.'],
             'hide_shoes' => ['name' => 'Hide Shoes', 'slot' => 'boots', 'rarity' => 'uncommon', 'tradeable' => false, 'stat' => 'travelSpeed', 'value' => 0.04, 'attack' => 0, 'defense' => 2, 'palette' => 'pelt', 'goldPrice' => 70, 'maxDurability' => 50, 'station' => 'city', 'description' => 'Soft-soled and quiet. Not built for the badlands.'],
 
             // ------------------------- Crafted starter -- raw + one refined, +4%

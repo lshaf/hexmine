@@ -34,7 +34,7 @@ class MapController extends GameController
         return response()->json($this->game->mapMutations($this->character($request)));
     }
 
-    /** What a trip on this tile would cost and give, computed server-side. */
+    /** What a mine on this tile would cost and give, computed server-side. */
     public function preview(Request $request, int $col, int $row): JsonResponse
     {
         $character = $this->character($request);

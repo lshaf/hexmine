@@ -125,7 +125,7 @@ WOODCUTTING_NAMES = [
  ('dawn_start','Dawn Start','Cold wood cuts cleaner.'),
  ('pack_frame','Pack Frame','The load rides high and does not swing.'),
  ('ironwood_sense','Ironwood Sense','Wood that turns an axe, met on your terms rather than the axe\'s.'),
- ('clean_stump','Clean Stump','Nothing left standing to trip over next trip.'),
+ ('clean_stump','Clean Stump','Nothing left standing to catch a boot on next time.'),
  ('felling_line','Felling Line','A rope decides the direction, not luck.'),
 
  ('the_marked_grove','The Marked Grove','A stand only you have bothered to map, and you know which tree is which.'),
@@ -266,7 +266,7 @@ HARVESTING_NAMES = [
  ('silk_ground','Silk Ground','Tall grass something else has been spinning in. You can tell which stems it used.'),
  ('chaff_reclaim','Chaff Reclaim','Even the broken stuff sells by the sack.'),
  ('steady_pace','Steady Pace','A field is won by not stopping.'),
- ('handcart','Handcart','One trip instead of four.'),
+ ('handcart','Handcart','One mine instead of four.'),
  ('storm_meadow','Storm Meadow','A meadow the weather keeps others out of, so nobody has taken the best of it.'),
 
  ('combing_board','Combing Board','Straight fiber is worth more than tangled.'),
@@ -801,7 +801,7 @@ TREES = {
 JOBS = [
     ('explorer', 'Explorer', 'wayfaring', 'travel', 'fiber', 'Levels by walking, and by nothing else. Its skills are not bought -- they arrive as you go.'),
 
-    ('woodcutting', 'Woodcutting', 'gathering', 'woodcutting', 'wood', 'Forest work. Its level is the skill you already carry, and it still takes time off the trip.'),
+    ('woodcutting', 'Woodcutting', 'gathering', 'woodcutting', 'wood', 'Forest work. Its level is the skill you already carry, and it still takes time off the mine.'),
     ('mining', 'Mining', 'gathering', 'mining', 'iron', 'Mountain seams, and the patience a shaft asks for.'),
     ('hunting', 'Hunting', 'gathering', 'hunting', 'pelt', 'Any ground a herd wanders onto. Pelt, horn, sinew, and the animal itself.'),
     ('quarrying', 'Quarrying', 'gathering', 'quarrying', 'stone', 'Badlands stone, cut square at the face.'),
@@ -984,7 +984,7 @@ final class Jobs
      * §7.2 -- the five material lines, now jobs in their own right.
      *
      * Their job level is not a new number: it is the skill level they have
-     * always had, which both drives §7.3 trip reduction and gates the tree. One
+     * always had, which both drives §7.3 mine reduction and gates the tree. One
      * number, so there is nothing for two systems to disagree about.
      *
      * Their `stat` nodes are line-locked, exactly as tools are (§8 rule 1): a

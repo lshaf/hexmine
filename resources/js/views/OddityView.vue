@@ -140,7 +140,7 @@ const LEGEND: Array<{ feature: Feature; name: string; note: string }> = [
 const ASKS = [
   {
     ask: 'More materials in every tier; every hex has oddity drops',
-    how: 'A second roll per trip against the tile’s own oddity table. Twenty-two new materials across T0–T3; T4 reached through Essence traces.',
+    how: 'A second roll per mine against the tile’s own oddity table. Twenty-two new materials across T0–T3; T4 reached through Essence traces.',
     at: '§4, §5.1',
   },
   {
@@ -150,7 +150,7 @@ const ASKS = [
   },
   {
     ask: 'Yield boost becomes cooldown reduction',
-    how: 'yield retired as a gear stat. A new cooldown stat multiplies trip time; the §7.3 floor drops 30 min → 20 min so it has room to work.',
+    how: 'yield retired as a gear stat. A new cooldown stat multiplies mine time; the §7.3 floor drops 30 min → 20 min so it has room to work.',
     at: '§7.3, §8.1',
   },
   {
@@ -296,7 +296,7 @@ const TOOL_MATRIX = [
 const FORAGE = [
   { of: 'Needs a tool', work: 'no — bare hands pay scrap', forage: 'never looks', mark: true },
   { of: 'Returns', work: 'biome material + oddity roll', forage: 'reagent + scrap', mark: false },
-  { of: 'Trip time', work: '30–60 min, §7.3', forage: '15 min, flat', mark: false },
+  { of: 'Mine time', work: '30–60 min, §7.3', forage: '15 min, flat', mark: false },
   { of: 'AP', work: '2', forage: '1', mark: false },
   { of: 'Depletes the tile', work: 'yes', forage: 'no', mark: true },
   { of: 'Occupies a slot', work: 'yes, 1 of 2', forage: 'no', mark: true },
@@ -307,7 +307,7 @@ const MIGRATION = [
   { where: 'Catalog::items()', rows: '32', what: "'stat' => 'yield' becomes 'cooldown', values re-pitched to the new curve" },
   { where: 'Jobs::NODES', rows: '57', what: 'Regenerated from gen_jobs.py; gathering trees rebalance across cooldown and oddity' },
   { where: 'OPTION_STATS_TOOL / _WORN', rows: '2', what: 'Swap yield for cooldown, add oddity' },
-  { where: 'Formulas::tripYield / tripTime', rows: '2', what: 'Drop the equip term from yield; add the multiplier to time' },
+  { where: 'Formulas::mineYield / mineTime', rows: '2', what: 'Drop the equip term from yield; add the multiplier to time' },
   { where: 'State payload', rows: '1', what: 'toolYield becomes toolCooldown; client types and the Hero sheet follow' },
   { where: 'balance.ts, catalog.ts', rows: '~40', what: 'Hand-kept mirror — the drift risk the jobs plan already flags as overdue' },
 ]
@@ -370,8 +370,8 @@ const SUMMARY = [
 const DECISIONS = [
   {
     q: 'Which cooldown, and does the §7.3 floor move?',
-    body: '“Cooldown” could mean the trip timer, the tile’s nine-hour regrow, or a new between-trips wait. Regrow is shared world state, so one player’s boots would change a tile for everyone. A new wait would be adding friction in order to sell the removal of it.',
-    rec: 'The trip timer, and yes — floor 30 min → 20 min, or the stat does nothing at best-in-slot.',
+    body: '“Cooldown” could mean the mine timer, the tile’s nine-hour regrow, or a new between-mines wait. Regrow is shared world state, so one player’s boots would change a tile for everyone. A new wait would be adding friction in order to sell the removal of it.',
+    rec: 'The mine timer, and yes — floor 30 min → 20 min, or the stat does nothing at best-in-slot.',
   },
   {
     q: 'Accept that value moves from idle players to active ones?',
@@ -400,7 +400,7 @@ const DECISIONS = [
   },
   {
     q: 'Forage as a separate verb, or a mode of mining?',
-    body: 'A separate verb needs a second action on the hex, a second job kind in the trip system, and its own UI. A mode would be cheaper — but it means unequipping, which §8.0 rule 3 forbids by name.',
+    body: 'A separate verb needs a second action on the hex, a second job kind in the mine system, and its own UI. A mode would be cheaper — but it means unequipping, which §8.0 rule 3 forbids by name.',
     rec: 'Separate verb. The more expensive build, and the only one that does not contradict a mandatory rule.',
   },
   {
@@ -584,9 +584,9 @@ const PHASES = [
         </header>
 
         <p class="tiny muted prose">
-          A trip returns what it returns today — the biome material, sized by
-          <code>tripYield()</code> — and then rolls <strong>once</strong> against the tile’s
-          oddity table. At most one oddity per trip. That cap is what keeps this a
+          A mine returns what it returns today — the biome material, sized by
+          <code>mineYield()</code> — and then rolls <strong>once</strong> against the tile’s
+          oddity table. At most one oddity per mine. That cap is what keeps this a
           texture change rather than a second economy: the main haul stays the thing you
           plan around, and the oddity is the reason one hex quietly beats its neighbor
           without ever looking different from it.
@@ -759,7 +759,7 @@ const PHASES = [
           </table>
         </div>
 
-        <h3 class="sub">Grade oddities — the T1 raws a trip turns up</h3>
+        <h3 class="sub">Grade oddities — the T1 raws a mine turns up</h3>
         <p class="tiny muted prose">
           Non-tradeable, and they take up a strap like every other raw. Each refines into
           exactly one T2 below, which gives them a processing sink from day one rather than
@@ -1045,7 +1045,7 @@ const PHASES = [
         <p class="tiny muted prose">
           The ask was that gathering without a tool stay necessary now that potions exist.
           The obvious build — <em>unequip to forage</em> — is the one thing §8.0 rule 3
-          forbids by name, because swapping gear before every trip is friction rather than
+          forbids by name, because swapping gear before every mine is friction rather than
           a decision. So this is not a mode of mining. It is a
           <strong>second verb on the hex</strong>, beside Work, that never looks at your slots.
         </p>
@@ -1096,7 +1096,7 @@ const PHASES = [
 
         <pre class="formula">raw    = base − skill_reduction − equip_reduction     // unchanged, §7.3
 timed  = raw × (1 − cooldown)                        // new, cooldown ≤ 0.15
-trip   = clamp(timed, FLOOR, CEILING)                // FLOOR 30 min → 20 min</pre>
+mine   = clamp(timed, FLOOR, CEILING)                // FLOOR 30 min → 20 min</pre>
 
         <ul class="rules">
           <li class="on">
@@ -1108,12 +1108,12 @@ trip   = clamp(timed, FLOOR, CEILING)                // FLOOR 30 min → 20 min<
           </li>
           <li class="on">
             <strong>Skill still pays in yield.</strong> The <em>+50% at max skill</em> inside
-            <code>tripYield()</code> is untouched. What retires is the gear and potion
+            <code>mineYield()</code> is untouched. What retires is the gear and potion
             contribution only.
           </li>
           <li class="on">
             <strong>At best-in-slot the swap is close to economically neutral.</strong>
-            Today: 2 trips/hour × 1.15 haul = 2.30. After: 60 ÷ 25.5 = 2.35 trips/hour ×
+            Today: 2 mines/hour × 1.15 haul = 2.30. After: 60 ÷ 25.5 = 2.35 mines/hour ×
             1.00 = 2.35. A 2% faucet increase, which §11 absorbs without retuning.
           </li>
         </ul>
@@ -1124,7 +1124,7 @@ trip   = clamp(timed, FLOOR, CEILING)                // FLOOR 30 min → 20 min<
             <strong>Yield rewards the idle player; cooldown rewards the active one.</strong>
             Someone who opens the game twice a day gets two hauls either way and simply
             loses the 15%. Someone who plays in sessions converts the whole reduction into
-            extra trips. In a game whose north star is idle play, that is a real
+            extra mines. In a game whose north star is idle play, that is a real
             redistribution, and it is worth saying out loud before spending 89 rows of
             migration on it. Skill-based yield surviving is what keeps it from being a
             straight loss for idle players.
@@ -1305,7 +1305,7 @@ trip   = clamp(timed, FLOOR, CEILING)                // FLOOR 30 min → 20 min<
         Proposal for CLAUDE.md — nothing here is implemented, and none of these twenty-two
         materials exist in <code>catalog.ts</code>. Every number is a starting value for
         tuning, per the design doc’s own standing rule. Percentages in the oddity tables
-        are per trip, before the <code>oddity</code> stat is applied.
+        are per mine, before the <code>oddity</code> stat is applied.
       </footer>
 
     </div>

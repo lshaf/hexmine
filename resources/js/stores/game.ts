@@ -80,7 +80,7 @@ export const useGame = defineStore('game', () => {
    * §4 -- the last haul, held until the player dismisses its receipt.
    *
    * Kept in the store rather than in the component that claimed it, because
-   * the claim button lives in the trip stack and the receipt belongs over the
+   * the claim button lives in the mine stack and the receipt belongs over the
    * whole map. Null when there is nothing to show.
    */
   const haul = ref<CollectResult | null>(null)
@@ -369,8 +369,8 @@ export const useGame = defineStore('game', () => {
   const jobs = computed<Job[]>(() => state.value?.jobs ?? [])
 
   /**
-    * One trip out and one processing job at a time, so both of these are a
-    * single job or nothing. A trip pins the character to its hex, whether it is
+    * One mine out and one processing job at a time, so both of these are a
+    * single job or nothing. A mine pins the character to its hex, whether it is
     * a seam, a herd (§5.5) or a fight (§9.5.5); processing is the NPC's work,
     * which the player only helps along by being there (§6.2).
     */
@@ -644,7 +644,7 @@ export const useGame = defineStore('game', () => {
   /**
    * §4 -- the haul, and the one moment in an idle game where something happened.
    *
-   * A trip now comes back as several stacks off the hex's own table, which a
+   * A mine now comes back as several stacks off the hex's own table, which a
    * toast cannot carry: it would either truncate the haul or stack five
    * notifications up the screen. The result is held for the modal instead, and
    * everything the player is owed -- what dropped, both XP ladders, tool wear,

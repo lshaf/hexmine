@@ -3,7 +3,7 @@
  * Root of the oddity-drops proposal page.
  *
  * Same shape as the almanac and for the same reason: this is a document, not a
- * screen you open mid-trip. It takes no character, makes no request, and has no
+ * screen you open mid-mine. It takes no character, makes no request, and has no
  * business loading the map to be read.
  *
  * The one thing the strip has that the almanac's does not is the status stamp.

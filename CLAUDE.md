@@ -197,7 +197,7 @@ cross-map travel — same design pressure as biome-locked mining.
 - Tiles are **depletable**, then **regrow after ~9h** (tune). Depleted tiles keep their
   biome color (drained, not dead) and show remnant/sapling props.
 - **A gathering tree can leave more of the seam standing** (`depletion`, §7.4.3):
-  a share of trips take their haul without spending one of the hex's hauls.
+  a share of mines take their haul without spending one of the hex's hauls.
   Capped, and shared like the count itself — what one prospector spares is
   spared for whoever works the hex next, and a hammered seam still closes.
 
@@ -273,7 +273,7 @@ market square is the same category error as a monster camped on the only
 five-line bench in the region. They decay after ~4h. Yields Pelt, the plains animal parts (horn, sinew), the biome's critter and a little of
 whatever grows there. No party, no raid charge, just time — and the bow decides
 how much of it, because a herd is a pile of work read exactly as a hex is
-(§7.3). A crude bow is the 25-minute reference trip; a Beastfang Bow is five,
+(§7.3). A crude bow is the 25-minute reference mine; a Beastfang Bow is five,
 and there is no bare-handed hunt to fall back on.
 
 **No Tier 4, and that is a §2 rule rather than a tuning value.** Essence used to be
@@ -435,11 +435,11 @@ things, not the character — this prevents power-account selling.
 Level unlocks **capacity, not power**: access to higher-tier hexes and dungeon
 floors. A whale can out-scale logistics but never out-damage a grinder.
 
-> **Action points are gone.** AP gated a trip on a pool that refilled on a
-> clock, which put a second timer underneath the one the trip already runs. A
+> **Action points are gone.** AP gated a mine on a pool that refilled on a
+> clock, which put a second timer underneath the one the mine already runs. A
 > limit on how much can be done in a day will come back, but it is not going to
 > be that one, so the pool and its columns were removed rather than left
-> dormant and half-true. Nothing currently rations how many trips a day a
+> dormant and half-true. Nothing currently rations how many mines a day a
 > character may take — that is a known gap, not an oversight.
 
 Three things are deliberately *not* on that list. Travel range, because there is
@@ -452,7 +452,7 @@ and walking is the one reward in the game that cannot be bought.
 ### 7.2 Gathering lines (5, one per material line)
 Woodcutting · Mining · Hunting · Quarrying · Harvesting
 
-Each reduces trip time / boosts yield **for its own material only**. XP comes from mining
+Each reduces mine time / boosts yield **for its own material only**. XP comes from mining
 that material *and* from presence during its processing — so no single grind path maxes a
 tree alone.
 
@@ -497,19 +497,19 @@ the model.
 
 **The tool is the rate, not a bonus on top of one.** Mining and hunting never
 read the bare-handed number: §8.0 rule 1 refuses the verb outright without its
-tool and points at the gather button instead, so a trip is worked with the tool
+tool and points at the gather button instead, so a mine is worked with the tool
 or with the hands and **never with both**. That is what makes a pickaxe's attack
 mean something plain — six times a Stone Axe is six times the rate, not 1.6
 times it once a shared base is added underneath.
 
-**Zero attack is a refusal, not a very long trip.** Nothing in your hands and
+**Zero attack is a refusal, not a very long mine.** Nothing in your hands and
 nothing learned means the ground does not move, so the arithmetic has no answer
-to give: the trip reports `able: false`, and the card says so where the clock
+to give: the mine reports `able: false`, and the card says so where the clock
 would have been. A number nobody can reach is worse than an honest no.
 
 **A line you have not learned adds nothing.** `floor`, not `ceil` — the skill
 term used to hand the very first level of a line a free point, so a panel
-describing what your skill was worth to this trip printed **+1** at a character
+describing what your skill was worth to this mine printed **+1** at a character
 who had never swung an axe.
 
 **Bare hands must stay under the cheapest tool, and that is a rule rather than a
@@ -521,7 +521,7 @@ minutes against a Stone Axe's fifteen, which turns §12 step 5 — buy the axe,
 work the same hex, see the payoff — into a hex that got **slower**. There is a
 test asserting every tool in the game beats bare hands at every level.
 
-*(The trip used to subtract flat minutes — twenty for skill, ten for
+*(The mine used to subtract flat minutes — twenty for skill, ten for
 best-in-slot. That made a good tool worth exactly as much on a poor hex as on a
 rich one, which is backwards: the ladder should pay most where the ground is
 hardest.)*
@@ -620,10 +620,10 @@ a Sawyer leans on the clock; a Smelter and a Weaver on fuel and stock.
 
 **A processing job's level comes from finished runs, paid on what came off the
 bench.** A bigger batch is more work and teaches more; a run walked away from
-teaches nothing, exactly as an abandoned trip pays nothing (§11.1).
+teaches nothing, exactly as an abandoned mine pays nothing (§11.1).
 
 **A gathering job's level is not a new number.** It is the §7.2 skill level that
-line has always had — the same figure that takes up to 20 minutes off a trip
+line has always had — the same figure that takes up to 20 minutes off a mine
 (§7.3). One number, so there is never a second opinion about how good a
 woodcutter someone is, and the five gathering trees are playable the moment they
 exist rather than waiting on a new grind.
@@ -633,7 +633,7 @@ That makes gathering the one kind whose level *does* grant power. It always did;
 
 **EVERY `stat` node is locked to its own class. There is no global one.** A
 tree makes you better at the work its job is about and at nothing else — without
-that, a character takes three trees and stacks all of them on one trip, which is
+that, a character takes three trees and stacks all of them on one mine, which is
 the shortcut the line-locked tool ladder (§8 rule 1) exists to close, arrived at
 through the skill panel instead.
 
@@ -646,7 +646,7 @@ through the skill panel instead.
 
 **A forest and a saw pit are two different pieces of work on the same word**, so
 the lock is on the pair rather than the line: a Woodcutting node pays out on a
-felling trip and a Sawyer node at the pit, and neither reaches the other. This
+felling mine and a Sawyer node at the pit, and neither reaches the other. This
 is the one place where the *action* being costed and the *material line* under
 it are two things rather than one.
 
@@ -655,7 +655,7 @@ already makes the family in the slot your class; anything less would let a tree
 bought for one weapon pay out through another.
 
 *(Two whole classes of node were paying out off-class before this. Craft trees
-handed out yield, trip time and travel speed, so an Armorer's tree made somebody
+handed out yield, mine time and travel speed, so an Armorer's tree made somebody
 faster at **mining** — a craft job improving work it has nothing to do with. And
 every gathering tree carried `travelSpeed` nodes that were dead weight twice
 over: filed under a line, they only counted on that line's work, and walking is
@@ -665,7 +665,7 @@ not woodcutting, so they could never pay out at all.)*
 
 | Kind | Stat | And the rest of the tree |
 |---|---|---|
-| gathering | `yield`, `tripReduction` — the two things a trip has | `toolWear`, `depletion` |
+| gathering | `yield`, `tripReduction` — the two things a mine has | `toolWear`, `depletion` |
 | processing | `processingSpeed` — the one thing a bench clock reads (§8.4) | `costReduction`, `batch`, `presence`, `runSlot` |
 | craft | `processingSpeed` | `costReduction`, and what the bench makes: `craftDurability`, `craftOption`, `optionTier` — or, at the consumable bench, `batch`, `brewExtra`, `stackCap` |
 | battle | none — the pair is solid (§9.5.4) | `pair`, `battleWear`, `weaponWear`, `goldFind`, `lootOption` |
@@ -751,8 +751,8 @@ a matter of judgment. A node's effect must be one of these, and nothing else:
 | `weaponWear` | The same for the blade, which pays its own stream (§9.5.6) | `SKILL_WEAPON_WEAR_CAP` (15%) |
 | `goldFind` | More of what a pack pays (§9.5.8) | `SKILL_GOLD_FIND_CAP` (25%) |
 | `lootOption` | Chance of an extra rolled option on looted gear | `SKILL_LOOT_OPTION_CAP` (25%) |
-| `toolWear` | Share of trips that leave the line's tool untouched | `SKILL_TOOL_WEAR_CAP` (25%) |
-| `depletion` | Share of trips that take their haul off a hex without spending one of its hauls (§5.1) | `SKILL_DEPLETION_CAP` (12%) |
+| `toolWear` | Share of mines that leave the line's tool untouched | `SKILL_TOOL_WEAR_CAP` (25%) |
+| `depletion` | Share of mines that take their haul off a hex without spending one of its hauls (§5.1) | `SKILL_DEPLETION_CAP` (12%) |
 | `presence` | Added to the §6.2 presence bonus, on that line's bench | `SKILL_PRESENCE_CAP` (20%) |
 | `runSlot` | Runs of that line you may keep going at once | `SKILL_RUN_SLOT_CAP` (+2) |
 | `craftOption` | Chance of an extra rolled option (§8.0.1) on what you make | `SKILL_OPTION_CHANCE_CAP` |
@@ -777,7 +777,7 @@ That is not a missing feature, it is the thing §7.4 already forbids: **nothing 
 a tree may wait on a system that does not exist.** A node is a point spent, and
 the panel has no honest way to say *not yet*. So the kind is gone rather than
 dormant, and what replaced it is the work each job actually does — a seam that
-survives the trip, a tool that outlasts it, a second pit going, a deeper draw on
+survives the mine, a tool that outlasts it, a second pit going, a deeper draw on
 what the bench rolls. When a system arrives that genuinely needs gating, it
 arrives with a gate that gates something.
 
@@ -844,25 +844,25 @@ keeps a point spent on a tree worth something the day it is spent.
 
 The target is **level 100 after roughly 180 days of unbroken play at game speed
 1**. Measured against real income — a career averages about 1,080 character XP a
-day, from 28 trips a day early and 48 late — that sizes the curve at:
+day, from 28 mines a day early and 48 late — that sizes the curve at:
 
 ```
 xp_for_level(L) = round(40 + 2.1 * L^1.7)     // ~197,000 XP total, ~182 days
 job_xp_for_level(L) = round(17 * L^1.5)       // ~32,000 XP, ~1,600 crafts to job 30
 ```
 
-The `40` floor is there so the first level costs about three mining trips rather
+The `40` floor is there so the first level costs about three mines rather
 than half of one.
 
 **Open, and it is the one thing §7.3 knocked over.** That income was measured
-when a trip clamped at 30 minutes. A geared prospector now works a hex in five
-to ten, so the late-career trip rate is several times what the curve was sized
+when a mine clamped at 30 minutes. A geared prospector now works a hex in five
+to ten, so the late-career mine rate is several times what the curve was sized
 against and six months is no longer what it buys. The curve has deliberately
 **not** been re-fitted: how fast a well-equipped character should level is a
 pacing decision, not a consequence of removing a timer.
 
 **XP is never passed through `Balance::scaled()`, and must never be.** Timers
-compress with `GAME_TIME_SCALE`; XP does not. A trip pays the same XP at speed 1
+compress with `GAME_TIME_SCALE`; XP does not. A mine pays the same XP at speed 1
 and at speed 100 — which is what makes a fast clock a *testing* tool rather than
 a progression cheat, and what keeps the six-month figure meaningful. There is a
 test for this.
@@ -1158,7 +1158,7 @@ it, *+2% everywhere* against *+4% mining* is a real choice for a prospector who
 knows which line they actually work. It is the same argument §8.5 makes for
 scoping potions — seventy flat drafts would be a power ladder you can drink.
 
-**Only the two trip stats scope**, `yield` and `tripReduction`: `travelSpeed`
+**Only the two mine stats scope**, `yield` and `tripReduction`: `travelSpeed`
 has no line to belong to, and processing is scoped by the recipe already.
 
 **Tools never carry a scope.** An axe is line-locked by its slot (§8 rule 1), so
@@ -1189,7 +1189,7 @@ Rules, all mandatory:
    sink therefore scales with how much that line is actually played, not with how many
    tools are equipped.
 3. **All five slots may be equipped at once.** This is an idle game; forcing a swap
-   before every trip is friction, not a decision. The interesting decision is which
+   before every mine is friction, not a decision. The interesting decision is which
    lines you *invest* in — that is already capped by §7.2 skill points.
 4. **Every line gets the same ladder** — village basic, city basic, crafted starter,
    crafted, NFT — and the same ceiling. Specialisation must come from the skill point
@@ -1252,7 +1252,7 @@ the game, §11.1.)*
   action that could take the last of it says so first — the fight preview
   (§9.5.5) and the hex preview alike. An idle game may take something expensive
   from a player; it may never take it by surprise.
-- **It reaches the trip, not only the fight.** Mining and hunting wear the
+- **It reaches the mine, not only the fight.** Mining and hunting wear the
   line's tool, and at zero that tool is gone the same way a weapon is. The
   warning is line-locked exactly as the wear is: the axe on your back is not at
   risk while you are down a mine.
@@ -1269,10 +1269,10 @@ now does the thing it is named after.
 
 Worn gear:
 ```
-Leather Armor     = 6 Leather + 2 Cloth                        → +6% trip reduction
+Leather Armor     = 6 Leather + 2 Cloth                        → +6% mine time
 Reinforced Boots  = 4 Cut Stone + 3 Leather                    → +8% travel speed
 Work Gloves       = 3 Cloth + 2 Planks                         → +4% processing speed
-Ironwood Armor    = 3 Ironwood + 2 Silkweave + 1 Shard         → +12% trip    [NFT]
+Ironwood Armor    = 3 Ironwood + 2 Silkweave + 1 Shard         → +12% mine time [NFT]
 Beastfang Boots   = 2 Beastfang + 1 Obsidian + 1 Relic         → +15% travel  [NFT]
 ```
 
@@ -1330,7 +1330,7 @@ Beastfang Bow     = 3 Beastfang + 2 Silkweave + 1 Sanguine Shard          [NFT]
 ```
 
 Every NFT tool wants its line's rare material **and** its line's dungeon shard, so
-kitting out a second line is a cross-map project, not a shopping trip — the same
+kitting out a second line is a cross-map project, not an errand — the same
 pressure §4 puts on Shards.
 
 ### 8.4 Three craft benches
@@ -1431,7 +1431,7 @@ the benches have five of their own, counted separately and refused separately.
   `battle` (§9.5.8) — the last of them the only place `power` and `defense` are
   worth drinking for.
 - **A charge waits, and taking the action spends it** — the first woodcutting
-  trip after the draft, whenever that is. It does not run on a clock.
+  mine after the draft, whenever that is. It does not run on a clock.
 
   *(It used to. A 30-minute window meant a woodcutting draft drunk in the
   mountains was simply thrown away, which made scoping a trap rather than a
@@ -1447,7 +1447,7 @@ the benches have five of their own, counted separately and refused separately.
 - **When they are the same thing twice, the stronger wins.** Charges on a stat
   contribute their **highest** value, never their sum — so no combination of
   potions is a way of buying the ceiling in installments, and a `global` charge
-  cannot quietly double up with a line-scoped one on the same trip.
+  cannot quietly double up with a line-scoped one on the same mine.
 - **A weaker draft is refused before the flask is opened.** Pouring a common
   draft on top of a legendary philtre would be paid for and never felt, and an
   idle game must not take something away for nothing. The refusal reads as *you
@@ -1461,7 +1461,7 @@ the benches have five of their own, counted separately and refused separately.
   any one action is exactly what it was, because the clamp applies to that
   action's aggregate alone.
 - **Seventy of them, fourteen a rung**, across the five rungs a bench can
-  reach: yield and trip time on each of the five lines, plus the road, the
+  reach: yield and mine time on each of the five lines, plus the road, the
   bench, and the fight — `power` and `defense` scoped to `battle` (§9.5.8).
   Scoping is what makes that many potions safe; seventy flat stat boosts would
   be a power ladder you can drink.
@@ -1497,7 +1497,7 @@ Combat is **PvE only** — no player-vs-player fighting anywhere in the game. Th
 removes the snowball problem (winners farming losers' gear) entirely, leaving
 only loot-table tuning.
 
-It happens in two places. **Dungeons** (§9.1–§9.4) are the deliberate trip: you
+It happens in two places. **Dungeons** (§9.1–§9.4) are the deliberate expedition: you
 kit up, spend a charge, and go. **The road** (§9.5) is the other one, and it
 comes to you — packs stand on hexes and stop travelers. Dungeons are the ladder
 the map points inward at; the road is what teaches you to climb it.
@@ -1773,7 +1773,7 @@ durability in the center where a legendary wand pays 145. Survivability is not
 free; it is paid at the repair bench instead of on the odds.
 
 That is the intended shape of the walk inward: it is a kit decision rather than
-a level one, and giving up trip time and travel speed is not optional past the
+a level one, and giving up mine time and travel speed is not optional past the
 mid ring — it is the only way through.
 
 **Every worn piece carries the pair, at every rung including the top two.** The
@@ -1863,7 +1863,7 @@ receipt — reopening catches the bars up to where the clock says the fight is.
 Three things follow, and all three are the same rule the rest of the game runs
 on:
 
-- **The exchange is run when you close, and stored.** Exactly as a trip records
+- **The exchange is run when you close, and stored.** Exactly as a mine records
   the material its tool could reach: the kit that took the fight is the kit that
   fought it, and swapping to a better sword while the timer runs buys nothing.
 - **The pack is spent on engagement, not on resolution.** While you are swinging
@@ -2337,7 +2337,7 @@ satisfy quests would be a second game played beside this one.
 
 | Goal kind | Counts | Narrowed by |
 |---|---|---|
-| `gather` | units that **landed in the bag** off a trip | a material, or any |
+| `gather` | units that **landed in the bag** off a mine | a material, or any |
 | `process` | refined units off a bench | a line, or any |
 | `craft` | things made | a bench category, or any |
 | `travel` | hexes actually crossed | — |

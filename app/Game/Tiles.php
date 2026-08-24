@@ -24,7 +24,7 @@ use Illuminate\Support\Facades\Cache;
  * in tests, and nothing here cares which. A flush refreshes every worked hex on
  * the map, which costs a few seams that were going to regrow on their own.
  *
- * The count is SHARED. Everybody's trips come off the same seam, the way the
+ * The count is SHARED. Everybody's mines come off the same seam, the way the
  * two mining slots are shared and the way clearing a pack clears it for
  * everybody (§9.5.1). That is the anti-farm rule: you cannot have a hex to
  * yourself, and you cannot re-roll one, because there is nothing to roll.

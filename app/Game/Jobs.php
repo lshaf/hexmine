@@ -54,7 +54,7 @@ final class Jobs
      * §7.2 -- the five material lines, now jobs in their own right.
      *
      * Their job level is not a new number: it is the skill level they have
-     * always had, which both drives §7.3 trip reduction and gates the tree. One
+     * always had, which both drives §7.3 mine reduction and gates the tree. One
      * number, so there is nothing for two systems to disagree about.
      *
      * Their `stat` nodes are line-locked, exactly as tools are (§8 rule 1): a
@@ -116,7 +116,7 @@ final class Jobs
      */
     public const JOBS = [
         'explorer' => ['name' => 'Explorer', 'kind' => self::WAYFARING, 'source' => 'travel', 'palette' => 'fiber', 'description' => 'Levels by walking, and by nothing else. Its skills are not bought -- they arrive as you go.'],
-        'woodcutting' => ['name' => 'Woodcutting', 'kind' => self::GATHERING, 'source' => 'woodcutting', 'palette' => 'wood', 'description' => 'Forest work. Its level is the skill you already carry, and it still takes time off the trip.'],
+        'woodcutting' => ['name' => 'Woodcutting', 'kind' => self::GATHERING, 'source' => 'woodcutting', 'palette' => 'wood', 'description' => 'Forest work. Its level is the skill you already carry, and it still takes time off the mine.'],
         'mining' => ['name' => 'Mining', 'kind' => self::GATHERING, 'source' => 'mining', 'palette' => 'iron', 'description' => 'Mountain seams, and the patience a shaft asks for.'],
         'hunting' => ['name' => 'Hunting', 'kind' => self::GATHERING, 'source' => 'hunting', 'palette' => 'pelt', 'description' => 'Any ground a herd wanders onto. Pelt, horn, sinew, and the animal itself.'],
         'quarrying' => ['name' => 'Quarrying', 'kind' => self::GATHERING, 'source' => 'quarrying', 'palette' => 'stone', 'description' => 'Badlands stone, cut square at the face.'],
@@ -225,7 +225,7 @@ final class Jobs
         'woodcutting.dawn_start' => ['job' => 'woodcutting', 'tier' => 4, 'jobLevel' => 20, 'name' => 'Dawn Start', 'effect' => ['kind' => 'toolWear', 'value' => 0.03], 'requires' => ['woodcutting.heartwood_cut'], 'description' => 'Cold wood cuts cleaner.'],
         'woodcutting.pack_frame' => ['job' => 'woodcutting', 'tier' => 4, 'jobLevel' => 20, 'name' => 'Pack Frame', 'effect' => ['kind' => 'stat', 'stat' => 'tripReduction', 'value' => 0.015], 'requires' => ['woodcutting.kerf_control'], 'description' => 'The load rides high and does not swing.'],
         'woodcutting.ironwood_sense' => ['job' => 'woodcutting', 'tier' => 4, 'jobLevel' => 20, 'name' => 'Ironwood Sense', 'effect' => ['kind' => 'toolWear', 'value' => 0.03], 'requires' => ['woodcutting.burnt_stand'], 'description' => 'Wood that turns an axe, met on your terms rather than the axe\'s.'],
-        'woodcutting.clean_stump' => ['job' => 'woodcutting', 'tier' => 4, 'jobLevel' => 20, 'name' => 'Clean Stump', 'effect' => ['kind' => 'stat', 'stat' => 'yield', 'value' => 0.015], 'requires' => ['woodcutting.stump_yield'], 'description' => 'Nothing left standing to trip over next trip.'],
+        'woodcutting.clean_stump' => ['job' => 'woodcutting', 'tier' => 4, 'jobLevel' => 20, 'name' => 'Clean Stump', 'effect' => ['kind' => 'stat', 'stat' => 'yield', 'value' => 0.015], 'requires' => ['woodcutting.stump_yield'], 'description' => 'Nothing left standing to catch a boot on next time.'],
         'woodcutting.felling_line' => ['job' => 'woodcutting', 'tier' => 4, 'jobLevel' => 20, 'name' => 'Felling Line', 'effect' => ['kind' => 'stat', 'stat' => 'tripReduction', 'value' => 0.015], 'requires' => ['woodcutting.measured_felling'], 'description' => 'A rope decides the direction, not luck.'],
         'woodcutting.the_marked_grove' => ['job' => 'woodcutting', 'tier' => 5, 'jobLevel' => 28, 'name' => 'The Marked Grove', 'effect' => ['kind' => 'seamGrade', 'value' => 0.025], 'requires' => ['woodcutting.quarter_sawing', 'woodcutting.dawn_start'], 'description' => 'A stand only you have bothered to map, and you know which tree is which.'],
         'woodcutting.woodward' => ['job' => 'woodcutting', 'tier' => 5, 'jobLevel' => 28, 'name' => 'Woodward', 'effect' => ['kind' => 'toolWear', 'value' => 0.04], 'requires' => ['woodcutting.clean_stump', 'woodcutting.felling_line'], 'description' => 'The warden\'s habit: the edge checked before the walk, not after the day.'],
@@ -343,7 +343,7 @@ final class Jobs
         'harvesting.silk_ground' => ['job' => 'harvesting', 'tier' => 3, 'jobLevel' => 12, 'name' => 'Silk Ground', 'effect' => ['kind' => 'seamGrade', 'value' => 0.015], 'requires' => ['harvesting.dew_cutting'], 'description' => 'Tall grass something else has been spinning in. You can tell which stems it used.'],
         'harvesting.chaff_reclaim' => ['job' => 'harvesting', 'tier' => 3, 'jobLevel' => 12, 'name' => 'Chaff Reclaim', 'effect' => ['kind' => 'stat', 'stat' => 'yield', 'value' => 0.015], 'requires' => ['harvesting.sheaf_stacking'], 'description' => 'Even the broken stuff sells by the sack.'],
         'harvesting.steady_pace' => ['job' => 'harvesting', 'tier' => 3, 'jobLevel' => 12, 'name' => 'Steady Pace', 'effect' => ['kind' => 'stat', 'stat' => 'tripReduction', 'value' => 0.015], 'requires' => ['harvesting.river_meadow'], 'description' => 'A field is won by not stopping.'],
-        'harvesting.handcart' => ['job' => 'harvesting', 'tier' => 3, 'jobLevel' => 12, 'name' => 'Handcart', 'effect' => ['kind' => 'toolWear', 'value' => 0.02], 'requires' => ['harvesting.two_row_pass'], 'description' => 'One trip instead of four.'],
+        'harvesting.handcart' => ['job' => 'harvesting', 'tier' => 3, 'jobLevel' => 12, 'name' => 'Handcart', 'effect' => ['kind' => 'toolWear', 'value' => 0.02], 'requires' => ['harvesting.two_row_pass'], 'description' => 'One mine instead of four.'],
         'harvesting.storm_meadow' => ['job' => 'harvesting', 'tier' => 3, 'jobLevel' => 12, 'name' => 'Storm Meadow', 'effect' => ['kind' => 'seamGrade', 'value' => 0.015], 'requires' => ['harvesting.seed_saving'], 'description' => 'A meadow the weather keeps others out of, so nobody has taken the best of it.'],
         'harvesting.combing_board' => ['job' => 'harvesting', 'tier' => 4, 'jobLevel' => 20, 'name' => 'Combing Board', 'effect' => ['kind' => 'stat', 'stat' => 'yield', 'value' => 0.015], 'requires' => ['harvesting.open_ground'], 'description' => 'Straight fiber is worth more than tangled.'],
         'harvesting.cool_hours' => ['job' => 'harvesting', 'tier' => 4, 'jobLevel' => 20, 'name' => 'Cool Hours', 'effect' => ['kind' => 'stat', 'stat' => 'tripReduction', 'value' => 0.015], 'requires' => ['harvesting.long_fiber'], 'description' => 'Cut early, rest at noon, cut again.'],

@@ -136,7 +136,7 @@ final class BenchJobTest extends TestCase
         $this->stockForAxe();
 
         // Five foreign crafts take the whole bank. They belong to other players
-        // because one of the character's own would trip the one-bench-each rule
+        // because one of the character's own would mine the one-bench-each rule
         // first, and the queue would never be tested.
         for ($i = 0; $i < Balance::BENCH_SLOTS; $i++) {
             $other = $this->game->createCharacter(

@@ -127,9 +127,9 @@ export const CHARACTER = {
    * §7.4.4 -- sized against measured income, not picked. ~197,000 XP to level
    * 100 against a career average of ~1,080 char XP a day is roughly 182 days of
    * unbroken play at game speed 1. The flat 40 is a floor so the first level
-   * costs about three mining trips rather than half of one.
+   * costs about three mines rather than half of one.
    *
-   * XP is never scaled by the game clock: a trip pays the same at speed 1 and
+   * XP is never scaled by the game clock: a mine pays the same at speed 1 and
    * speed 100, which is what keeps a fast clock a testing tool.
    */
   xpForLevel: (level: number) => Math.round(40 + 2.1 * Math.pow(level, 1.7)),

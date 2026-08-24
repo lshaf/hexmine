@@ -22,7 +22,7 @@ use Illuminate\Support\Facades\DB;
  * coordinate go stale the moment it changes. Three kinds:
  *
  *   tile_states   depletion timers on hexes whose material has changed
- *   jobs_queue    trips pinned to a tile, and processing runs pinned to a
+ *   jobs_queue    mines pinned to a tile, and processing runs pinned to a
  *                 settlement that may no longer stand
  *   characters    standing somewhere that may now be off the map entirely
  *
@@ -96,7 +96,7 @@ class RebuildWorld extends Command
         $this->line('cleared the derived world cache: depletion and settled packs.');
 
         DB::transaction(function () use ($moves) {
-            // A trip is pinned to a hex and a processing run to a settlement.
+            // A mine is pinned to a hex and a processing run to a settlement.
             // Both may now be somewhere else, or nowhere, so neither can be
             // collected honestly. Deleted, not flagged: that is what abandoning
             // a job already does (§11.1 forfeits the partial yield), and a

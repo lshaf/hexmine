@@ -252,7 +252,7 @@ export interface Skill {
 /**
  * Slots, §8. The five gathering slots are one implement per skill line -- an axe
  * is no use on a seam and a bow is no use on a tree -- so a line-locked tool
- * only counts on its own trips. `weapon` is raid combat and never gathers.
+ * only counts on its own mines. `weapon` is raid combat and never gathers.
  */
 export type GatherSlot = 'axe' | 'pickaxe' | 'bow' | 'hammer' | 'sickle'
 export type EquipSlot = GatherSlot | 'armor' | 'boots' | 'gloves' | 'weapon'
@@ -288,7 +288,7 @@ export type StatKey =
  * §8.5 -- what a buff can be pointed at.
  *
  * The five gathering lines are the §7.2 skills, so a line-scoped buff lands on
- * exactly the trips that line already governs. `travel` and `processing` are
+ * exactly the mines that line already governs. `travel` and `processing` are
  * the two other things a character spends real time on, and `battle` (§9.5) is
  * the one that is not work at all -- the only place `power` and `defense` are
  * worth drinking for.
@@ -488,7 +488,7 @@ export type JobKind = 'mining' | 'hunting' | 'processing' | 'craft' | 'battle'
 export type JobStatus = 'active' | 'ready'
 
 /**
- * A trip out on a hex, §5. Mining and hunting are the same job to everything
+ * A mine out on a hex, §5. Mining and hunting are the same job to everything
  * that reads one -- both pin the character to a hex until it is claimed or
  * dropped -- and they differ only in what the haul is drawn from (§4).
  */
@@ -504,7 +504,7 @@ export interface FieldJob {
   quantity: number
   startedAt: number
   endsAt: number
-  /** Skill the trip trains, so the client can show what it feeds. */
+  /** Skill the mine trains, so the client can show what it feeds. */
   skill: SkillKey
 }
 
@@ -553,7 +553,7 @@ export interface CraftJob extends BenchJob {
 /**
  * §9.5.5 -- a fight under way.
  *
- * On a hex like a trip and pinning you the same way, and it carries the whole
+ * On a hex like a mine and pinning you the same way, and it carries the whole
  * exchange: the fight is settled the instant you close (§9.5.5), and what runs
  * on screen is a REPLAY of it rather than a countdown to it.
  *
@@ -631,12 +631,12 @@ export interface Tile {
   material?: MaterialKey
   /** §7.3 -- how much work this hex is. The world rolls HP and nothing else. */
   hp: number
-  /** Units yielded per trip before bonuses. */
+  /** Units yielded per mine before bonuses. */
   baseYield: number
   /**
    * §5.1 -- how many hauls this hex holds before it is worked out.
    *
-   * Derived from `baseYield`, inversely: a rich hex is emptied in six trips and
+   * Derived from `baseYield`, inversely: a rich hex is emptied in six mines and
    * a poor one takes ten. Not a chance -- the count is knowable, which is what
    * makes "is this seam worth coming back to" a decision rather than a guess.
    */

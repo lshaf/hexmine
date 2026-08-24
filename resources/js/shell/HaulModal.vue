@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * What a finished trip brought back, §4.
+ * What a finished mine brought back, §4.
  *
  * A haul used to be one stack, so a toast could carry it: "+7 Wood" said
  * everything there was to say. It is several stacks now, drawn from the hex's
@@ -194,7 +194,7 @@ onBeforeUnmount(() => {
           {{ haul.lostToOverflow }} units would not fit and were left behind.
         </p>
 
-        <!-- §8.2 -- at zero the thing is gone, on a trip exactly as in a fight.
+        <!-- §8.2 -- at zero the thing is gone, on a mine exactly as in a fight.
              Named here because nothing may be taken quietly. -->
         <p v-if="haul.destroyed?.length" class="tiny note bad">
           {{ haul.destroyed.join(', ') }} wore through and

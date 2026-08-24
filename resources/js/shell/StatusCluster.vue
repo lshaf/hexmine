@@ -109,7 +109,7 @@ const charges = computed(() =>
 /**
  * The readout opens as a card under the plate rather than inside it: the
  * cluster is a fixed instrument and a panel that grew out of it would push the
- * trip stack down the screen every time someone checked what they had drunk.
+ * travel stack down the screen every time someone checked what they had drunk.
  *
  * Teleported to the body for the same reason the bag's popup is -- the plate
  * carries a backdrop-filter, which would otherwise become the containing block

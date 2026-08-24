@@ -207,6 +207,73 @@ final class BattleResolveTest extends TestCase
         }
     }
 
+    /**
+     * §9.5.5 -- a fight is collected through the same endpoint as a haul, and
+     * the endpoint has to survive that.
+     *
+     * One route claims every kind of job, and a battle is the only one whose
+     * receipt carries no material ledger at all: `finishBattle` returns an
+     * exchange and its consequences, with no `gained` in it. The controller
+     * casts that key so an empty haul serialises as {} rather than [], and doing
+     * so unguarded made every won fight a 500.
+     *
+     * At the HTTP layer on purpose. Every other battle test calls the service
+     * directly, which is exactly why this went unnoticed -- the service was
+     * always right and the controller was always wrong.
+     */
+    public function test_a_fight_can_be_collected_through_the_jobs_endpoint(): void
+    {
+        $this->standOnALivePack();
+
+        $job = $this->game->startBattle($this->character->fresh());
+        $job->update(['ends_at' => $this->game->now() - 1]);
+
+        $response = $this->withSession(['_token' => 'test'])
+            ->postJson("/api/jobs/{$job->id}/collect");
+
+        $response->assertOk();
+
+        // The receipt is a fight's, not a haul's: it says how the exchange went
+        // and never pretends to a material ledger it does not have.
+        $response->assertJsonPath('result.won', fn ($won) => is_bool($won));
+        $this->assertArrayNotHasKey('gained', $response->json('result'));
+    }
+
+    /**
+     * And the other side of the same endpoint: a haul still serialises as an
+     * object, so an empty one is {} rather than [].
+     *
+     * The guard added for the fight above must not quietly stop casting on the
+     * path that needed the cast in the first place.
+     */
+    public function test_a_haul_is_still_collected_as_an_object(): void
+    {
+        $col = (int) $this->character->col;
+        $row = (int) $this->character->row;
+
+        $job = \App\Models\GameJob::create([
+            'character_id' => $this->character->id,
+            'kind' => 'mining',
+            'status' => 'active',
+            'col' => $col,
+            'row' => $row,
+            'slot' => 0,
+            'material_key' => \App\Game\Catalog::BIOME_SCRAP[
+                WorldGen::generateTile($col, $row, $this->game->now())['biome']
+            ],
+            'quantity' => 2,
+            'skill_key' => 'woodcutting',
+            'started_at' => $this->game->now() - 10,
+            'ends_at' => $this->game->now() - 1,
+        ]);
+
+        $response = $this->withSession(['_token' => 'test'])
+            ->postJson("/api/jobs/{$job->id}/collect");
+
+        $response->assertOk();
+        $this->assertIsArray($response->json('result.gained'));
+    }
+
     /** Put a stack in the bag, through the service so the row rules apply. */
     private function give(string $key, int $quantity): void
     {

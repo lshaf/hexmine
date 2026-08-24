@@ -146,7 +146,7 @@ FLAVOUR_SPEED = {
 
 
 def consumables():
-    """Fourteen per rank: yield and trip time on each of the five lines, plus the
+    """Fourteen per rank: yield and mine time on each of the five lines, plus the
     road, the bench and the fight. Seventy in all, every one action-locked."""
     out = []
 

@@ -14,7 +14,7 @@ withDefaults(
     primary?: boolean
     /** Explains a disabled cell on hover and to screen readers. */
     hint?: string
-    /** Marks a destructive cell -- dropping a trip forfeits the haul. */
+    /** Marks a destructive cell -- dropping a mine forfeits the haul. */
     danger?: boolean
     /** A secondary cell, for actions that are not the dock's main business. */
     small?: boolean

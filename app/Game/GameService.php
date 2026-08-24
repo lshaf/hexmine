@@ -555,13 +555,13 @@ class GameService
      *
      * `$action` is what is being costed, and it is one of the seven §8.5 names:
      * a gathering line, `travel`, or `processing`. §8 gathering tools only count
-     * for their own line, so a trip must say which one it is, and a read with no
+     * for their own line, so a mine must say which one it is, and a read with no
      * action in mind (the hero sheet) gets only the gear that works everywhere.
      *
      * `$line` is the *material* line underneath that action, and it exists
      * because §6 processing has both: sawing planks is the action `processing`
      * on the line `woodcutting`. Gear and potions are scoped by the action, a
-     * line-locked tree node by the line. For a gathering trip the two are the
+     * line-locked tree node by the line. For a gathering mine the two are the
      * same word and the second argument is left off.
      *
      * @return array<string,float>
@@ -585,7 +585,7 @@ class GameService
         // hold as many different effects as they like, but two charges on the
         // same stat are the same effect twice: the better draft wins and the
         // other is simply not felt. Summing would let a `global` charge and a
-        // line-scoped one quietly double up on one trip, which is the stack the
+        // line-scoped one quietly double up on one mine, which is the stack the
         // rung ladder exists to prevent -- twelve potions a rung would otherwise
         // be a way of buying the ceiling in installments.
         $buffs = [];
@@ -609,7 +609,7 @@ class GameService
         // A line-locked node -- gathering or processing -- only counts on its
         // own line's work, so these join the sum only when a line is being asked
         // about. The bucket is the action and the line together, which is what
-        // keeps a Sawyer's speed off a woodcutting trip: both are `woodcutting`
+        // keeps a Sawyer's speed off a woodcutting mine: both are `woodcutting`
         // work and only one of them happens at a saw pit.
         $nodeLine = $line === null ? $action : $action.':'.$line;
         if ($nodeLine !== null) {
@@ -850,7 +850,7 @@ class GameService
     }
 
     /**
-     * What each line's equipped tool is worth on its own trips, §8. The hero
+     * What each line's equipped tool is worth on its own mines, §8. The hero
      * sheet needs all five at once; there is no single "yield bonus" any more.
      *
      * @return array<string,float>
@@ -899,9 +899,9 @@ class GameService
      * Wear on the gear that did the work. §8 gathering tools are line-locked, so
      * only the tool for `$line` wears -- the axe on your back does not blunt
      * itself while you are down a mine. Everything worn on the body wears every
-     * trip regardless.
+     * mine regardless.
      *
-     * §8.2 -- AT ZERO THE THING IS GONE, on a trip exactly as in a fight. It
+     * §8.2 -- AT ZERO THE THING IS GONE, on a mine exactly as in a fight. It
      * used to go inactive and wait for a repair, which made repair optional: an
      * item at zero cost nothing to leave at zero, so the sink only ever
      * collected from players who wanted their gear back. Destruction moves the
@@ -909,7 +909,7 @@ class GameService
      * and that is what makes it the largest sink in the game (§11.1).
      *
      * Destroyed items are named through `$destroyed`, because nothing may be
-     * taken quietly. The trip preview says it first (§9.5.5's rule, applied to
+     * taken quietly. The mine preview says it first (§9.5.5's rule, applied to
      * a hex): an hour of work that ends in a lost axe must be a decision the
      * player made, not one they discovered.
      *
@@ -953,9 +953,9 @@ class GameService
     }
 
     /**
-     * §7.4.3 -- what this trip takes off the line's tool, after the tree.
+     * §7.4.3 -- what this mine takes off the line's tool, after the tree.
      *
-     * A gathering node spares the whole of one trip's wear or none of it,
+     * A gathering node spares the whole of one mine's wear or none of it,
      * rolled from the job rather than the clock: DRAIN_PER_MINE is one point,
      * and a fraction of one point is nothing a player could ever read off the
      * item. Seeded like every other outcome (§16), so collecting twice cannot
@@ -1233,7 +1233,7 @@ class GameService
     }
 
     /**
-     * One trip at a time.
+     * One mine at a time.
      *
      * A character works a single hex, standing on it, and cannot leave until the
      * haul is claimed or dropped. That single rule is what makes the dock read
@@ -1730,11 +1730,11 @@ class GameService
      * It used to be instant, which made a pack a button rather than an
      * engagement: tap, read the plate, walk on. A clock is what turns it into
      * something you are DOING -- you are held on that hex while it runs, the
-     * same way a trip holds you, and the pack's own two-hour clock (§9.5.3) is
+     * same way a mine holds you, and the pack's own two-hour clock (§9.5.3) is
      * running underneath it.
      *
      * WHAT IS DECIDED HERE AND WHAT IS NOT. The roll happens now and is stored,
-     * exactly as a trip stores the material its tool could reach: the kit that
+     * exactly as a mine stores the material its tool could reach: the kit that
      * took the fight is the kit that fought it, and swapping to a better sword
      * while the timer runs must buy nothing. What is spent now is the pack --
      * you are engaged with it, so nobody else gets it -- and the charge, whose
@@ -1899,7 +1899,7 @@ class GameService
      *
      * Everything here was decided when it started; what happens now is the
      * spending. Wear falls on the kit that is on your back when it is over,
-     * the same way a trip wears the tool it is collected with.
+     * the same way a mine wears the tool it is collected with.
      *
      * @return array<string,mixed>
      */
@@ -2487,7 +2487,7 @@ class GameService
     }
 
     /**
-     * Server-computed preview of what a trip here would cost and give.
+     * Server-computed preview of what a mine here would cost and give.
      *
      * Bounded by sight (§5.6), and that bound is the point: a costed hex names
      * its material, its haul and how many people are already on it, which is
@@ -2611,7 +2611,7 @@ class GameService
 
         // §8 -- the only tool that counts here is the one for this tile's line,
         // and a gather uses none: bare hands are bare hands whatever is on the
-        // belt, so the line-locked tool and its nodes sit this trip out.
+        // belt, so the line-locked tool and its nodes sit this mine out.
         $bonuses = $this->bonuses($character, $gathering ? null : $skillKey);
 
         // §4.0 -- the hex is never blocked for want of a tool. It is the VERB
@@ -2663,16 +2663,16 @@ class GameService
         //
         // §7.3 -- the attack passed here is the WHOLE base rate, not a bonus on
         // top of one. Mining never reads BARE_HAND_ATTACK: without a pick the
-        // verb is refused rather than downgraded, so a trip is worked with the
+        // verb is refused rather than downgraded, so a mine is worked with the
         // tool or with the hands and never with both.
-        $trip = Formulas::tripTime(
+        $mine = Formulas::mineTime(
             $tile['hp'],
             $skillLevel,
             $bonuses['tripReduction'],
             $gathering ? Balance::BARE_HAND_ATTACK : $this->lineToolAttack($character, $skillKey),
         );
 
-        // §8.2 -- nothing is destroyed without warning, and a trip wears gear
+        // §8.2 -- nothing is destroyed without warning, and a mine wears gear
         // like a fight does. An hour of work that ends in a lost axe has to be
         // a decision the player made rather than one they discovered.
         $warnings = $gathering ? [] : $this->wearWarnings($character, $skillKey);
@@ -2680,7 +2680,7 @@ class GameService
         // You work the hex you are standing on -- there is no reaching across the
         // map for a seam. Everything above is a fact about the tile and holds
         // wherever it is read from, so a hex you are only scouting still reports
-        // its haul and trip time; what changes is whether you may act on it.
+        // its haul and mine time; what changes is whether you may act on it.
         $reason = null;
         $working = $this->miningTrip($character);
 
@@ -2695,7 +2695,7 @@ class GameService
         } elseif (! $gathering && $bare) {
             // §8.0 rule 1 -- the tool is what makes this mining rather than
             // rummaging, so without it the verb has nothing behind it. The hex
-            // stays open: gathering is the same trip on the same ground, and
+            // stays open: gathering is the same mine on the same ground, and
             // §4.0 is satisfied by the button beside this one, not by quietly
             // handing back scrap from the one that was pressed.
             $reason = $note;
@@ -2704,18 +2704,18 @@ class GameService
         return [
             'canMine' => $reason === null,
             'reason' => $reason,
-            'seconds' => $trip['total'],
-            'hp' => $trip['hp'],
-            'toolAttack' => $trip['toolAttack'],
-            'skillAttack' => $trip['skillAttack'],
-            'rate' => $trip['rate'],
-            'clamped' => $trip['clamped'],
+            'seconds' => $mine['total'],
+            'hp' => $mine['hp'],
+            'toolAttack' => $mine['toolAttack'],
+            'skillAttack' => $mine['skillAttack'],
+            'rate' => $mine['rate'],
+            'clamped' => $mine['clamped'],
             // §8.0 rule 1 -- the verb is refused without its tool, not merely
             // slowed. Skill alone puts a point a second behind an empty hand,
             // which would otherwise print a clock beside a dead button for
             // anybody past level ten of the line.
-            'able' => $trip['able'] && ! ($bare && ! $gathering),
-            'yield' => Formulas::tripYield(
+            'able' => $mine['able'] && ! ($bare && ! $gathering),
+            'yield' => Formulas::mineYield(
                 $tile['baseYield'],
                 $skillLevel,
                 $bonuses['yield'],
@@ -2727,7 +2727,7 @@ class GameService
             // are deliberately absent: naming them would turn a hex into a
             // spreadsheet and the decision into arithmetic. What a prospector
             // is owed is what is here, which is a fact about the place; how
-            // often is what the trip is for.
+            // often is what the mine is for.
             'drops' => Drops::kinds($activity, $tile, $gathering ? 0 : $reach),
             'activity' => $activity,
             // The line stays the tile's own even on a gathered haul: swinging
@@ -2739,13 +2739,13 @@ class GameService
             // §9.5.3 -- nothing is standing on you, or this return was never
             // reached: the pin refuses above, before any of this is costed.
             'pinned' => false,
-            // §8.2 -- what this trip would finish off.
+            // §8.2 -- what this mine would finish off.
             'warnings' => $warnings,
         ];
     }
 
     /**
-     * §8.2 -- gear a trip on this line would wear out entirely.
+     * §8.2 -- gear a mine on this line would wear out entirely.
      *
      * The same promise the fight preview makes (§9.5.5), kept on the other
      * verb: destruction is the largest sink in the game and it may never be a
@@ -2774,7 +2774,7 @@ class GameService
             }
 
             if ((int) $item->durability <= Balance::DRAIN_PER_MINE) {
-                $out[] = $def['name'].' will not survive this trip.';
+                $out[] = $def['name'].' will not survive this mine.';
             }
         }
 
@@ -2890,24 +2890,24 @@ class GameService
         // §7.3 -- a herd is a pile of work like a hex is, and the bow is what
         // gets through it. It was a flat 25 minutes for as long as the floor
         // clamp would have swallowed the difference; it no longer would.
-        $trip = Formulas::tripTime(
+        $mine = Formulas::mineTime(
             Balance::HERD_HP,
             $skillLevel,
             $bonuses['tripReduction'],
             $this->lineToolAttack($character, 'hunting'),
         );
 
-        $base['seconds'] = $trip['total'];
-        $base['hp'] = $trip['hp'];
-        $base['toolAttack'] = $trip['toolAttack'];
-        $base['skillAttack'] = $trip['skillAttack'];
-        $base['rate'] = $trip['rate'];
-        $base['clamped'] = $trip['clamped'];
-        $base['able'] = $trip['able'];
+        $base['seconds'] = $mine['total'];
+        $base['hp'] = $mine['hp'];
+        $base['toolAttack'] = $mine['toolAttack'];
+        $base['skillAttack'] = $mine['skillAttack'];
+        $base['rate'] = $mine['rate'];
+        $base['clamped'] = $mine['clamped'];
+        $base['able'] = $mine['able'];
 
         $base['material'] = $material;
         $base['scrap'] = $bare;
-        $base['yield'] = Formulas::tripYield(
+        $base['yield'] = Formulas::mineYield(
             $rolled,
             $skillLevel,
             $bonuses['yield'],
@@ -2980,7 +2980,7 @@ class GameService
     /**
      * Work the hex underfoot, §5.1.
      *
-     * One method for both verbs, because everything that makes a trip a trip is
+     * One method for both verbs, because everything that makes a mine a mine is
      * the same either way: a tile slot, a bag row, a clock and a charge. What
      * the verb decides is the table the haul comes off (§4) and whether a tool
      * is required, and both of those are already settled by the preview.
@@ -3035,7 +3035,7 @@ class GameService
             $this->spendBuffs($character, $preview['skill']);
 
             // Nobody moves here: the character was already standing on this hex
-            // before the trip could start, and stays on it while the timer runs.
+            // before the mine could start, and stays on it while the timer runs.
             // Position changes only through explicit travel.
             $character->save();
 
@@ -3080,14 +3080,14 @@ class GameService
 
             // §9.5.5 -- a fight answers with its own report. Nothing here is a
             // haul: there is no material, no tile and no XP ladder in common
-            // with a trip, so it returns before any of that is assembled.
+            // with a mine, so it returns before any of that is assembled.
             if ($job->kind === 'battle') {
                 return $this->finishBattle($character, $job);
             }
 
             $gained = [];
             $durabilityLost = 0;
-            // §8.2 -- anything the trip wore out entirely, named in the result
+            // §8.2 -- anything the mine wore out entirely, named in the result
             // that killed it.
             $destroyed = [];
 
@@ -3221,9 +3221,9 @@ class GameService
     }
 
     /**
-     * Turn a finished trip into a haul, §4.
+     * Turn a finished mine into a haul, §4.
      *
-     * The job already records the material its trip resolved to, and that key
+     * The job already records the material its mine resolved to, and that key
      * is the grade the tool could reach -- so the table is rebuilt from the job
      * rather than from whatever is on the belt now, and swapping to a better
      * tool while the timer runs buys nothing.
@@ -4333,12 +4333,12 @@ class GameService
 
     public function travelTo(Character $character, int $col, int $row): array
     {
-        // A trip pins you to the hex you are working. Dropping it is the way out,
+        // A mine pins you to the hex you are working. Dropping it is the way out,
         // and it forfeits the haul (§11.1) -- say so, or the lock reads as a bug.
-        $trip = $this->miningTrip($character);
-        if ($trip !== null) {
+        $mine = $this->miningTrip($character);
+        if ($mine !== null) {
             throw new GameException(
-                $trip->isReady($this->now())
+                $mine->isReady($this->now())
                     ? 'Claim your reward before you move on.'
                     : 'You are working this hex. Claim it when it finishes, or drop it.',
                 'working',
@@ -4746,7 +4746,7 @@ class GameService
             $gold = $def['npcPrice'] * $count;
             $character->gold += $gold;
             // §12 -- counted in gold taken rather than stacks sold, so a
-            // quest about the trader is about the rate rather than the trips.
+            // quest about the trader is about the rate rather than the mines.
             $this->fireQuest($character, 'sell', $gold);
             $character->save();
 
@@ -5059,7 +5059,7 @@ class GameService
      *
      * Two sources on purpose. Craft and battle jobs keep their own row; the five
      * gathering jobs read the skill level they have always had (§7.2), which is
-     * the same number that takes time off a trip (§7.3). Reusing it means a
+     * the same number that takes time off a mine (§7.3). Reusing it means a
      * gathering tree is playable the moment it exists, and means there is never
      * a second opinion about how good a woodcutter someone is.
      */
@@ -5210,7 +5210,7 @@ class GameService
      * The key is the same shape `bonuses()` builds when it is asked about an
      * action: the action, and the thing under it when there is one.
      *
-     *   gathering    woodcutting        the trip, on that line
+     *   gathering    woodcutting        the mine, on that line
      *   processing   processing:wood…   the run, at that line's bench
      *   craft        processing:weapon  the craft clock, at that bench only
      *   battle       battle:sword       the fight, and only with that in hand
@@ -5271,7 +5271,7 @@ class GameService
                 case 'stat':
                     // §8 rule 1 again: a gathering node pays out on its own line
                     // and no other, exactly as that line's tool does. Three
-                    // gathering trees must not stack yield on every trip.
+                    // gathering trees must not stack yield on every mine.
                     //
                     // §6 -- a processing node is line-locked by the same rule
                     // and for the same reason: a Sawyer is faster at a saw pit,
@@ -5279,16 +5279,16 @@ class GameService
                     // rather than the bare line, because a saw pit and a forest
                     // are two different pieces of work on the same word --
                     // filing both under `woodcutting` would pay a Sawyer out on
-                    // a felling trip.
+                    // a felling mine.
                     // §7.4 -- EVERY stat node is locked to the work its job is
                     // about. A tree makes you better at its own class and at
                     // nothing else; the alternative is a character taking three
-                    // trees and stacking all of them on one trip.
+                    // trees and stacking all of them on one mine.
                     //
                     // The bucket is the ACTION and the thing under it, because
                     // a forest and a saw pit are two different pieces of work
                     // on the same word: filing both under `woodcutting` would
-                    // pay a Sawyer out on a felling trip.
+                    // pay a Sawyer out on a felling mine.
                     $bucket = $this->nodeBucket($job);
                     if ($bucket !== null) {
                         $byLine[$bucket][$effect['stat']] =
@@ -5675,7 +5675,7 @@ class GameService
             'skill' => $job->skill_key,
         ];
 
-        // §9.5.5 -- a fight is on a hex like a trip, and names what it is
+        // §9.5.5 -- a fight is on a hex like a mine, and names what it is
         // swinging at. It also carries the exchange, round by round, because
         // the screen draws the FIGHT rather than a countdown to it.
         //

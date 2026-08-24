@@ -21,7 +21,7 @@ import { onMounted, onBeforeUnmount, computed, ref, watch } from 'vue'
 import { useGame } from '@/stores/game'
 import HexMap from '@/map/HexMap.vue'
 import StatusCluster from '@/shell/StatusCluster.vue'
-import TripStack from '@/shell/TripStack.vue'
+import TravelStack from '@/shell/TravelStack.vue'
 import ActionDock from '@/shell/ActionDock.vue'
 import HexAction from '@/shell/HexAction.vue'
 import { placeLabel } from '@/game/formulas'
@@ -139,7 +139,7 @@ onMounted(() => {
       <!-- ------------------------------------------------------- top left -->
       <div class="corner top-left">
         <StatusCluster />
-        <TripStack />
+        <TravelStack />
       </div>
 
       <!-- ------------------------------------------------------ top right -->
@@ -257,7 +257,7 @@ onMounted(() => {
            survives someone editing the z-index out. -->
       <Toasts />
 
-      <!-- §4 -- the receipt for a finished trip. Over everything, because it
+      <!-- §4 -- the receipt for a finished mine. Over everything, because it
            is the one moment in an idle game where something happened. -->
       <HaulModal v-if="game.haul" :haul="game.haul" @close="game.clearHaul()" />
       <!-- §9.5.5 -- the exchange while it is drawn, then the receipt it
@@ -421,7 +421,7 @@ onMounted(() => {
 }
 
 /*
- * Phones: the dock needs the full width, and the trip stack has to yield to it
+ * Phones: the dock needs the full width, and the mine stack has to yield to it
  * rather than stacking a column down the middle of the screen.
  */
 @media (max-width: 560px) {

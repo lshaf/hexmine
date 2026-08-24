@@ -34,7 +34,7 @@ Constants and curves only; no new behaviour.
   `SKILL_COST_REDUCTION_CAP`, `SKILL_BATCH_CAP`.
 - Mirror all of it in `resources/js/game/balance.ts`.
 - Tests: the curve reaches 100 in the intended window; **XP never passes through
-  `Balance::scaled()`** — a trip pays the same at speed 1 and speed 100.
+  `Balance::scaled()`** — a mine pays the same at speed 1 and speed 100.
 
 ## Step 2 — Job and node catalog
 
@@ -74,7 +74,7 @@ Constants and curves only; no new behaviour.
 - Resolve unlocked nodes into an effect bundle per character.
 - `stat` nodes join `Formulas::aggregateStat` **inside** the existing falloff and
   clamp — they must not be a separate term added after it.
-- Every other kind applies at the site it names — the trip, the bench, the
+- Every other kind applies at the site it names — the mine, the bench, the
   fight — each clamped to its own cap in `Balance`.
 - **An effect with no call site is not a skill.** `unlock` was one for a while:
   collected into a bundle nothing read, so a third of some trees was a promise.

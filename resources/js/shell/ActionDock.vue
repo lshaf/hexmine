@@ -6,8 +6,8 @@
  * one that happens to be selected -- aiming at a hex is the tile card's job, and
  * so is traveling to it. The dock is only ever about the ground you stand on.
  *
- * Mining is one trip at a time and it pins you in place until you deal with it,
- * so Mine and Claim are a single slot at two moments of the same trip rather
+ * Mining is one mine at a time and it pins you in place until you deal with it,
+ * so Mine and Claim are a single slot at two moments of the same mine rather
  * than two buttons competing for attention. Trading, crafting and processing
  * appear only at a settlement (§6) -- there is no trader in the middle of a
  * forest, and graying one out would imply there could be.
@@ -54,13 +54,13 @@ const placeName = computed(() => {
 })
 
 /**
- * One trip at a time, so this is a single job or nothing -- and a hunt is a
- * trip. Both pin you to the hex until you claim or drop, so both have to reach
+ * One mine at a time, so this is a single job or nothing -- and a hunt is a
+ * mine. Both pin you to the hex until you claim or drop, so both have to reach
  * this slot; reading only the mining job left a finished hunt with no way to
  * claim it and nothing on the dock saying why everything else was refused.
  */
-const trip = computed(() => game.fieldJob)
-const ready = computed(() => Boolean(trip.value && trip.value.endsAt <= game.now))
+const working = computed(() => game.fieldJob)
+const ready = computed(() => Boolean(working.value && working.value.endsAt <= game.now))
 
 /** Ground worth working. Settlement tiles and the barren center have neither. */
 const seam = computed(() => Boolean(underfoot.value?.material))
@@ -84,7 +84,7 @@ const gather = computed(() => underfoot.value?.gather)
  * dock is the hex genuinely not having it: no seam, or no herd.
  */
 /**
- * §8.2 -- a trip that would finish a tool off says so on the button.
+ * §8.2 -- a mine that would finish a tool off says so on the button.
  *
  * The same promise the fight preview makes, on the other verb: destruction is
  * the largest sink in the game and it may never be a surprise. It outranks the
@@ -110,12 +110,12 @@ const herd = computed(() => Boolean(hunt.value?.herdUntil))
  * is not yours: a seam waits, a herd leaves (§5.5). That is the whole reason
  * the cell earns a countdown when Mine never has.
  *
- * Hidden while a trip runs -- one trip at a time means the herd is unactionable
+ * Hidden while a mine runs -- one mine at a time means the herd is unactionable
  * then, and a countdown you cannot act on is noise.
  */
 const herdLeaves = computed(() => {
   const until = hunt.value?.herdUntil
-  if (!until || trip.value) return null
+  if (!until || working.value) return null
 
   return formatDuration(until - game.now)
 })
@@ -236,16 +236,16 @@ const huntHint = computed(() => {
 })
 
 const claimHint = computed(() => {
-  if (!trip.value) return ''
+  if (!working.value) return ''
 
   // §9.5.5 -- a fight has no units and no partial anything. What is waiting is
   // the answer to a question you already asked.
-  if (trip.value.kind === 'battle') {
+  if (working.value.kind === 'battle') {
     return ready.value ? 'See how it went' : 'Still swinging'
   }
 
-  if (ready.value) return `${trip.value.quantity} units waiting`
-  return trip.value.kind === 'hunting' ? 'Still working this herd' : 'Still working this hex'
+  if (ready.value) return `${working.value.quantity} units waiting`
+  return working.value.kind === 'hunting' ? 'Still working this herd' : 'Still working this hex'
 })
 
 /** Processing lines this settlement runs, §6. */
@@ -264,17 +264,17 @@ const processHint = computed(() => {
 })
 
 /**
- * What you are doing here, under where you are. A trip locks you to this hex,
+ * What you are doing here, under where you are. A mine locks you to this hex,
  * so its countdown belongs on the dock rather than hidden in a tooltip.
  */
 const doing = computed(() => {
-  if (!trip.value) return null
-  if (ready.value) return trip.value.kind === 'battle' ? 'The fight is over' : 'Reward ready'
+  if (!working.value) return null
+  if (ready.value) return working.value.kind === 'battle' ? 'The fight is over' : 'Reward ready'
 
   const verb =
-    trip.value.kind === 'battle' ? 'Fighting' : trip.value.kind === 'hunting' ? 'Hunting' : 'Working'
+    working.value.kind === 'battle' ? 'Fighting' : working.value.kind === 'hunting' ? 'Hunting' : 'Working'
 
-  return `${verb} · ${formatDuration(trip.value.endsAt - game.now)}`
+  return `${verb} · ${formatDuration(working.value.endsAt - game.now)}`
 })
 
 function mine(): void {
@@ -319,29 +319,29 @@ function hunted(): void {
       </div>
 
       <div class="actions">
-        <!-- Mine and Claim are the same slot at two moments of one trip. -->
-        <template v-if="trip">
+        <!-- Mine and Claim are the same slot at two moments of one mine. -->
+        <template v-if="working">
           <HexAction
             small
-            :icon="trip.kind === 'battle' ? 'battle' : 'claim'"
-            :label="trip.kind === 'battle' ? 'Result' : 'Claim'"
+            :icon="working.kind === 'battle' ? 'battle' : 'claim'"
+            :label="working.kind === 'battle' ? 'Result' : 'Claim'"
             :primary="ready"
             :disabled="!ready || game.busy"
             :hint="claimHint"
-            @activate="game.collect(trip.id)"
+            @activate="game.collect(working.id)"
           />
           <!-- §9.5.5 -- a fight is not one of the things you may walk away
                from. §9.5.3 offers two exits from a pack and once the first is
                chosen there is no third. -->
           <HexAction
-            v-if="trip.kind !== 'battle'"
+            v-if="working.kind !== 'battle'"
             small
             icon="drop"
             label="Drop"
             danger
             :disabled="game.busy"
             hint="Forfeits the reward, and frees you to move"
-            @activate="game.abandon(trip.id)"
+            @activate="game.abandon(working.id)"
           />
         </template>
 
@@ -432,7 +432,7 @@ function hunted(): void {
         <!-- Settlement-only. Absent in the field rather than grayed: the point
              is that these people are not out here. -->
         <template v-if="here">
-          <span v-if="trip || seam || herd" class="rule" aria-hidden="true" />
+          <span v-if="working || seam || herd" class="rule" aria-hidden="true" />
           <HexAction small icon="trade" label="Trade" @activate="game.openPanel('shop')" />
           <HexAction small icon="craft" label="Craft" @activate="game.openPanel('craft')" />
           <HexAction
@@ -559,7 +559,7 @@ function hunted(): void {
 
 /*
  * Phones keep the same shape rather than stacking. Three cells is the most the
- * dock ever shows at once -- a settlement has no seam to mine, and a trip can
+ * dock ever shows at once -- a settlement has no seam to mine, and a mine can
  * only run out in the field -- so where-you-are and what-you-can-do still fit
  * on one line, and the dock stays a band rather than growing into a panel.
  */

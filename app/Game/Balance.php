@@ -12,7 +12,7 @@ namespace App\Game;
  * never turns into a grep across the codebase.
  *
  * These MUST stay in step with the frontend copy: the client uses its own copy
- * to render predictions (trip times, queue durations) before the server answers.
+ * to render predictions (mine times, queue durations) before the server answers.
  * The server is still the authority -- a drift shows up as a UI number that does
  * not match the result, not as an exploit.
  */
@@ -182,7 +182,7 @@ final class Balance
      * minutes against a Stone Axe's fifteen, which made §12's step 5 -- buy the
      * axe, work the same hex, see the payoff -- a hex that got slower.
      */
-    public const BARE_HAND_ATTACK = 2;
+    public const BARE_HAND_ATTACK = 3;
 
     /**
      * §7.3 -- how many levels of the line buy one more point a second.
@@ -211,19 +211,19 @@ final class Balance
     /**
      * §5.1 -- how many hauls a hex has in it before it is worked out.
      *
-     * A COUNT, not a chance. It used to be a 34% roll at the end of every trip,
+     * A COUNT, not a chance. It used to be a 34% roll at the end of every mine,
      * which made the one fact a prospector most wanted to know -- is this seam
      * worth coming back to -- unknowable in principle. A hex that says "three of
      * eight taken" is a decision; a hex with a hidden third of a coin behind it
      * is a slot machine.
      *
      * Inversely to the haul, and that is the whole shape of it: a rich hex is
-     * emptied in six trips and a poor one takes ten, so what a hex is worth over
+     * emptied in six mines and a poor one takes ten, so what a hex is worth over
      * its life comes out roughly level and what differs is how many walks it
      * costs you to collect. The richest ground is not the ground you can sit on.
      *
      * The count is SHARED, like the two mining slots and like a cleared pack
-     * (§9.5.1): everybody's trips come off the same seam. That is the anti-farm
+     * (§9.5.1): everybody's mines come off the same seam. That is the anti-farm
      * rule -- you cannot re-roll a hex, and you cannot have one to yourself.
      */
     public const TILE_EXTRACTIONS_MIN = 6;
@@ -315,7 +315,7 @@ final class Balance
      * pin it puts on a prospector can last.
      *
      * Scaled like every other clock, so a fast test clock shortens the wait as
-     * well as the trip. Battle XP is NOT scaled and never will be (§7.4.4).
+     * well as the mine. Battle XP is NOT scaled and never will be (§7.4.4).
      */
     public const PACK_LIFETIME_MS = 2 * self::HOUR;
 
@@ -334,7 +334,7 @@ final class Balance
      * scout the number and you either always win or never engage, and there is
      * nothing left to choose. The band makes it a KNOWN RISK instead, and the
      * clamp means never certain and never hopeless -- the same instinct as
-     * §7.3's floor on a trip.
+     * §7.3's floor on a mine.
      */
     /**
      * §9.5.5 -- how many points of margin span hopeless to certain.
@@ -549,7 +549,7 @@ final class Balance
      * §9.5.5 -- how long a fight takes.
      *
      * It is a skirmish on a road, not a project: shorter than the shortest
-     * bench run (§8.4) and far shorter than a trip, because the pin (§9.5.3)
+     * bench run (§8.4) and far shorter than a mine, because the pin (§9.5.3)
      * already holds you in place while it runs and a long clock on top would
      * make one pack a lost afternoon.
      *
@@ -615,7 +615,7 @@ final class Balance
      * A herd's HP, read exactly as a tile's is (§7.3). 4,500 is twenty-five
      * minutes for a fresh hunter with a crude bow, which is what a hunt has
      * always cost; what is new is that the bow now shortens it. It used to be a
-     * flat duration sitting outside Formulas::tripTime() because the old floor
+     * flat duration sitting outside Formulas::mineTime() because the old floor
      * clamp would have rounded the difference away.
      */
     public const HERD_HP = 4500;
@@ -684,7 +684,7 @@ final class Balance
      *
      * Thirty is deliberately roomy against a catalog of twenty-nine materials
      * and five drafts: the straps are not meant to be the thing that bites on
-     * an ordinary trip. They are the ceiling on carrying *one of everything* --
+     * an ordinary mine. They are the ceiling on carrying *one of everything* --
      * a prospector who never chooses a line still runs out of places to put
      * things -- while `BAG_UNITS` is what actually decides when a haul has to be
      * dealt with. Two limits, and only one of them is felt every day.
@@ -735,7 +735,7 @@ final class Balance
      * These can, though, and each one thins a §11 sink rather than a power
      * curve -- cheaper crafts and bigger batches drain the materials sink,
      * tougher gear and a spared tool drain the repair sink, and a seam that
-     * survives its trip drains the depletion clock. Uncapped, a maxed
+     * survives its mine drains the depletion clock. Uncapped, a maxed
      * specialist would quietly switch off the loss the whole economy is
      * balanced around. The bag and sight caps below are the same argument in
      * counts rather than percentages.
@@ -754,13 +754,13 @@ final class Balance
      * §5.3 + §7.4.3 -- how often a gathering tree takes the better thing off
      * ground that carries it.
      *
-     * A COUNT of grades, rolled: on a hit the trip reaches one grade past what
+     * A COUNT of grades, rolled: on a hit the mine reaches one grade past what
      * the tool can reliably take, and never past what the hex actually holds. So
      * it is capability rather than power -- nothing here feeds the stat ceiling,
      * which has no room left in it anyway.
      *
      * Twelve per cent, and low on purpose. §8.0 rule 4 makes the tool the ladder
-     * and the skill point cap the specialisation; one trip in eight coming up a
+     * and the skill point cap the specialisation; one mine in eight coming up a
      * grade better is knowing your ground, while a guaranteed grade would be a
      * free rung of tool and would make the ladder optional.
      */
@@ -1130,17 +1130,17 @@ final class Balance
      * §7.4.4 -- sized against measured income, not picked.
      *
      * A career averages ~1,080 character XP a day at game speed 1 (28 mining
-     * trips a day unequipped, 48 on the old 30-minute floor, plus the processing
+     * mines a day unequipped, 48 on the old 30-minute floor, plus the processing
      * those hauls feed). ~197,000 XP total against that rate puts level 100 at
      * roughly 182 days of unbroken play, which is the six-month target.
      *
-     * OPEN: that income was measured when §7.3 clamped a trip at 30 minutes.
+     * OPEN: that income was measured when §7.3 clamped a mine at 30 minutes.
      * The clamp is a guard at 3 minutes now and a geared prospector works a hex
-     * in 5-10, so the late-career trip rate is several times what this was
+     * in 5-10, so the late-career mine rate is several times what this was
      * sized against. The curve has not been re-fitted -- doing so is a
      * deliberate pacing decision, not a side effect of the mining change.
      *
-     * The flat 40 is a floor so the first level costs about three mining trips
+     * The flat 40 is a floor so the first level costs about three mines
      * rather than half of one.
      */
     public static function xpForLevel(int $level): int

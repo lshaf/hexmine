@@ -9,6 +9,7 @@
 import { EQUIPMENT, MINING, PROCESSING, SKILLS } from './balance'
 import { ITEM_BY_KEY, LINE_STAT_LABEL, SKILL_BY_KEY, STAT_LABEL, skillForSlot } from './catalog'
 import type {
+  BuffScope,
   Rarity,
   ItemDef,
   ItemOption,
@@ -136,7 +137,7 @@ export interface TripBreakdown {
 }
 
 /**
- * §7.3 -- a hex is an amount of WORK, and a trip is how long you take over it.
+ * §7.3 -- a hex is an amount of WORK, and a mine is how long you take over it.
  *
  *   rate      = (attack + skill_attack) * (1 + trip_reduction)
  *   trip_time = clamp(hp / rate, guard, ceiling)
@@ -146,10 +147,10 @@ export interface TripBreakdown {
  * to add to. Gathering passes MINING.bareHandAttack, because for that one verb
  * your hands are the tool.
  *
- * At zero attack there is no trip at all -- `able` is false and the caller says
+ * At zero attack there is no mine at all -- `able` is false and the caller says
  * so, rather than printing a clock nobody can reach.
  */
-export function tripTime(
+export function mineTime(
   hp: number,
   skillLevel: number,
   equipTripReduction: number,
@@ -188,7 +189,7 @@ export function skillAttack(skillLevel: number): number {
  * §4.0 -- what a pair of hands manages per second, all in.
  *
  * GATHERING's rate and nothing else's. Mining and hunting are refused without
- * their tool rather than downgraded, so no trip mixes hands and a tool.
+ * their tool rather than downgraded, so no mine mixes hands and a tool.
  */
 export function gatherAttack(skillLevel: number): number {
   return MINING.bareHandAttack + skillAttack(skillLevel)
@@ -205,8 +206,8 @@ export function toolAttack(def: Pick<ItemDef, 'attack'>): number {
   return def.attack ?? 0
 }
 
-/** Yield for one trip. Skill and equipment both add; ring adds the risk premium. */
-export function tripYield(
+/** Yield for one mine. Skill and equipment both add; ring adds the risk premium. */
+export function mineYield(
   baseYield: number,
   skillLevel: number,
   equipYieldBonus: number,
@@ -289,7 +290,7 @@ export const formatPercent = (value: number): string =>
 
 /**
  * The stats stored as a reduction. There is one, and the screen has to turn it
- * over: a trip cut by three minutes in ten is `-3% trip time`, and printing the
+ * over: a mine cut by three minutes in ten is `-3% mine time`, and printing the
  * stored `+3%` next to the word "time" says the opposite of what it does.
  */
 const REDUCTION_STATS = new Set<StatKey>(['tripReduction'])
@@ -393,14 +394,35 @@ export interface StatChip {
 
 const PAIR_STATS = new Set<StatKey>(['power', 'defense'])
 
+/**
+ * §8.5 -- the gathering line a buff scope names, or null.
+ *
+ * `travel`, `processing` and `battle` are actions without a line, so they get
+ * the plain stat label: there is no "travel travel speed" to print.
+ */
+function lineScope(scope: BuffScope | undefined): SkillKey | null {
+  return scope !== undefined && scope in SKILL_BY_KEY ? (scope as SkillKey) : null
+}
+
 export function statChips(def: ItemDef, options: ItemOption[] = []): StatChip[] {
   const chips: StatChip[] = []
-  const line = def.slot ? skillForSlot(def.slot) : null
+  // A tool reads its line off its slot (§8.0.1); a potion has no slot and reads
+  // it off the action it is armed for (§8.5). Both are line-locked and both
+  // have to say so -- a Forest Draft that printed "+3% yield" would be claiming
+  // to work five lines when it works one, and the whole reason seventy potions
+  // are safe to exist is that each is bought for one thing you do.
+  const line = def.slot ? skillForSlot(def.slot) : lineScope(def.scope)
 
   // The work stat, when the piece has one worth saying. A tool has none at all
   // (its base is the attack below), and a weapon's `power` is not one worth
-  // saying either: the pair is what that stat means.
-  if (def.stat !== undefined && def.value !== undefined && !PAIR_STATS.has(def.stat)) {
+  // saying either: the pair is what that stat means, and it is drawn below.
+  //
+  // A DRAFT is the exception, because it has no pair to be said in. §8.5's
+  // battle drafts move `power` and `defense` and nothing else, so suppressing
+  // the percentage there left the chip row empty -- a flask that told you
+  // nothing at all about what it did.
+  const pairSaidBelow = PAIR_STATS.has(def.stat as StatKey) && !def.consumable
+  if (def.stat !== undefined && def.value !== undefined && !pairSaidBelow) {
     chips.push({ label: null, value: statLine(def.stat, def.value, line) })
   }
 

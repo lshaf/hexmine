@@ -84,7 +84,7 @@ export interface PlayerState {
    *  its own drift measurement -- it never trusts Date.now() alone. */
   serverTime: number
   /**
-   * How much the server compresses game timers (1 = real 30-60 minute trips).
+   * How much the server compresses game timers (1 = real 30-60 minute mines).
    * Published rather than configured on both sides, so predicted durations and
    * real countdowns cannot drift apart.
    */
@@ -147,7 +147,7 @@ export interface PlayerState {
    * are reported per line in `toolYield`.
    */
   bonuses: Record<StatKey, number>
-  /** What each line's equipped tool is worth on its own trips, §8. */
+  /** What each line's equipped tool is worth on its own mines, §8. */
   toolYield: Record<SkillKey, number>
   /** §8.5 -- potions on the shelf, keyed by item. */
   consumables: Record<string, number>
@@ -250,9 +250,9 @@ export type NodeEffect =
   /** §6.2 -- worth more for standing there, and §6.1's second run. */
   | { kind: 'presence'; value: number }
   | { kind: 'runSlot'; value: number }
-  /** §7.3 -- the line's tool spared a trip's wear. */
+  /** §7.3 -- the line's tool spared a mine's wear. */
   | { kind: 'toolWear'; value: number }
-  /** §5.1 -- a trip that comes up one grade better than the tool can take. */
+  /** §5.1 -- a mine that comes up one grade better than the tool can take. */
   | { kind: 'seamGrade'; value: number }
   /** §7.5 -- whole hexes of sight, on top of the base one. Not a percentage. */
   | { kind: 'sight'; value: number }
@@ -293,11 +293,11 @@ export interface SkillTree {
   jobMaxLevel: number
 }
 
-/** Server-computed preview of what a trip on this tile would cost and give. */
+/** Server-computed preview of what a mine on this tile would cost and give. */
 /**
  * What one verb on one hex would cost and give, §7.3.
  *
- * Mining and gathering are the same shape because they are the same trip on
+ * Mining and gathering are the same shape because they are the same mine on
  * the same ground -- a tile slot, a bag row, a clock and a haul. What differs
  * is the table the haul comes off and whether a tool is required, and both of
  * those are already answered by the fields below.
@@ -331,7 +331,7 @@ export interface WorkPreview {
    * The ODDS are deliberately absent. Naming them would turn a hex into a
    * spreadsheet and the decision into arithmetic; what a prospector is owed is
    * what is here, which is a fact about the place, and how often is what the
-   * trip is for.
+   * mine is for.
    */
   drops: MaterialKey[]
   /** Which of the three verbs this costing is for. */
@@ -344,7 +344,7 @@ export interface WorkPreview {
    */
   pinned: boolean
   /**
-   * §8.2 -- gear this trip would wear out entirely, named before it happens.
+   * §8.2 -- gear this mine would wear out entirely, named before it happens.
    * Line-locked like the wear: the axe on your back is not at risk in a mine.
    */
   warnings: string[]
@@ -577,7 +577,7 @@ export interface CollectResult {
   characterXp: number
   levelsGained: number
   durabilityLost: number
-  /** §8.2 -- gear the trip finished off. Named, because nothing goes quietly. */
+  /** §8.2 -- gear the mine finished off. Named, because nothing goes quietly. */
   destroyed: string[]
 }
 

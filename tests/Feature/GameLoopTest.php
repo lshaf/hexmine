@@ -18,7 +18,7 @@ use Tests\TestCase;
  * The core loop, driven through the service rather than HTTP so the rules are
  * tested rather than the routing.
  *
- * These assert the invariants the design doc calls mandatory -- the trip-time
+ * These assert the invariants the design doc calls mandatory -- the mine-time
  * clamp, the two-slot limit, per-wallet caps on rare materials, and the fact
  * that gold can never buy anything tradeable.
  */
@@ -236,7 +236,7 @@ final class GameLoopTest extends TestCase
 
         $job = $this->game->startMining($this->character, $col, $row);
 
-        // A trip never moves anyone: you were standing here to start it.
+        // A mine never moves anyone: you were standing here to start it.
         $this->assertSame($col, $this->character->col);
         $this->assertSame($row, $this->character->row);
 
@@ -287,7 +287,7 @@ final class GameLoopTest extends TestCase
 
         config(['game.time_scale' => 1]);
 
-        $this->assertGreaterThan(0, $earned[1], 'a finished trip paid no XP at all');
+        $this->assertGreaterThan(0, $earned[1], 'a finished mine paid no XP at all');
         $this->assertSame(
             $earned[1],
             $earned[100],
@@ -300,7 +300,7 @@ final class GameLoopTest extends TestCase
      * it should have to argue with this test rather than slip through.
      *
      * ~1,080 character XP a day is what an unbroken career averages at speed 1
-     * (28 mining trips a day unequipped, 48 on the old 30-minute floor, plus the
+     * (28 mines a day unequipped, 48 on the old 30-minute floor, plus the
      * processing those hauls feed). The target is level 100 at about six months.
      *
      * The divisor is a measurement rather than a derivation, which is why this
@@ -320,13 +320,13 @@ final class GameLoopTest extends TestCase
         $this->assertGreaterThan(150, $days, "level 100 reachable in only {$days} days");
         $this->assertLessThan(220, $days, "level 100 takes {$days} days, well past six months");
 
-        // The first level should cost a few trips, not a fraction of one: a
+        // The first level should cost a few mines, not a fraction of one: a
         // character that gains four levels on its first haul has no curve at all.
         $firstTrip = 5 * 4 * 0.6;
         $this->assertGreaterThan(
             2 * $firstTrip,
             Balance::xpForLevel(1),
-            'level 2 arrives in under two mining trips',
+            'level 2 arrives in under two mines',
         );
 
         // Monotonic, or later levels would be cheaper than earlier ones.
@@ -679,7 +679,7 @@ final class GameLoopTest extends TestCase
     /**
      * §4 -- a haul is the size the tile card promised, whatever shape it takes.
      *
-     * The whole point of splitting a trip across a table is that the total does
+     * The whole point of splitting a mine across a table is that the total does
      * not move: a player reads a number off the hex before committing an hour
      * to it, and the drop system is not allowed to make that number a lie.
      */
@@ -817,7 +817,7 @@ final class GameLoopTest extends TestCase
         }
     }
 
-    /** A haul is settled once: claiming the same trip twice cannot re-roll it. */
+    /** A haul is settled once: claiming the same mine twice cannot re-roll it. */
     public function test_a_haul_is_deterministic(): void
     {
         $tile = $this->tileOfGrade('mountain', 2);
@@ -827,8 +827,8 @@ final class GameLoopTest extends TestCase
         $again = \App\Game\Drops::roll($table, 9, 4242);
         $other = \App\Game\Drops::roll($table, 9, 4243);
 
-        $this->assertSame($first, $again, 'the same trip rolled twice paid differently');
-        $this->assertNotSame($first, $other, 'every trip pays exactly the same haul');
+        $this->assertSame($first, $again, 'the same mine rolled twice paid differently');
+        $this->assertNotSame($first, $other, 'every mine pays exactly the same haul');
     }
 
     /**
@@ -1229,7 +1229,7 @@ final class GameLoopTest extends TestCase
         $iron = $this->game->bonuses($this->character->fresh(), 'mining');
 
         $this->assertEqualsWithDelta(0.03, $wood['yield'], 0.0001, 'the draft did nothing for its own line');
-        $this->assertEqualsWithDelta(0.0, $iron['yield'], 0.0001, 'a woodcutting draft helped a mining trip');
+        $this->assertEqualsWithDelta(0.0, $iron['yield'], 0.0001, 'a woodcutting draft helped a mine');
     }
 
     /**
@@ -1362,7 +1362,7 @@ final class GameLoopTest extends TestCase
      * It was a flat twenty-five minutes for as long as §7.3's clamp would have
      * rounded any difference away. The floor is a guard now, so the hunting
      * line has the same ladder every other line has: the crude bow is the
-     * reference trip and everything above it is felt on the clock.
+     * reference mine and everything above it is felt on the clock.
      */
     public function test_a_better_bow_works_a_herd_faster(): void
     {
@@ -1478,7 +1478,7 @@ final class GameLoopTest extends TestCase
     }
 
     /**
-     * A hunt is a trip, and the client has to be able to see one.
+     * A hunt is a mine, and the client has to be able to see one.
      *
      * The payload used to branch on 'mining' alone, so a hunting job came back
      * shaped like a processing job -- no hex, no material, and matching neither
@@ -1686,7 +1686,7 @@ final class GameLoopTest extends TestCase
      * §8 rule 1, applied to trees. A Woodcutting node pays out in a forest and
      * nowhere else, exactly as an axe does.
      *
-     * Without this, three gathering trees would stack yield on every trip at
+     * Without this, three gathering trees would stack yield on every mine at
      * once -- which is precisely the shortcut the line-locked tool ladder is
      * built to prevent.
      */
@@ -1902,7 +1902,7 @@ final class GameLoopTest extends TestCase
 
         // Every node in the tree that carries `yield` on this line, bought
         // outright. §7.4 locks a stat node to its own class, so the tree that
-        // pays out on a woodcutting trip is Woodcutting's and no other.
+        // pays out on a woodcutting mine is Woodcutting's and no other.
         $keys = [];
         foreach (['woodcutting'] as $job) {
             foreach (array_keys(\App\Game\Jobs::nodesFor($job)) as $key) {
@@ -2186,7 +2186,7 @@ final class GameLoopTest extends TestCase
         $this->assertFalse($preview['canMine']);
         $this->assertStringContainsString('standing elsewhere', $preview['reason']);
 
-        // Still a scouting report: the haul and the trip are known from afar,
+        // Still a scouting report: the haul and the mine are known from afar,
         // which is what makes the travel decision worth anything.
         $this->assertGreaterThan(0, $preview['seconds']);
         $this->assertGreaterThan(0, $preview['yield']);
@@ -2229,17 +2229,17 @@ final class GameLoopTest extends TestCase
         // Best tool in the game, maxed skill, best-in-slot gear on the hardest
         // hex: nowhere near the guard, so the ladder has somewhere left to go.
         $best = \App\Game\Formulas::toolAttack(\App\Game\Catalog::item('mythril_pickaxe'));
-        $trip = \App\Game\Formulas::tripTime(
+        $mine = \App\Game\Formulas::mineTime(
             Balance::TILE_HP_MAX,
             Balance::SKILL_MAX_LEVEL,
             Balance::STAT_CEILING,
             $best,
         );
-        $this->assertGreaterThan(Balance::MINING_FLOOR_SECONDS, $trip['total']);
-        $this->assertFalse($trip['clamped'], 'the top of the tool ladder is wasted');
+        $this->assertGreaterThan(Balance::MINING_FLOOR_SECONDS, $mine['total']);
+        $this->assertFalse($mine['clamped'], 'the top of the tool ladder is wasted');
 
         // Even absurd inputs cannot breach it.
-        $absurd = \App\Game\Formulas::tripTime(Balance::TILE_HP_MAX, 9999, 99.0, 9999);
+        $absurd = \App\Game\Formulas::mineTime(Balance::TILE_HP_MAX, 9999, 99.0, 9999);
         $this->assertSame(Balance::MINING_FLOOR_SECONDS, $absurd['total']);
         $this->assertTrue($absurd['clamped']);
     }
@@ -2267,10 +2267,10 @@ final class GameLoopTest extends TestCase
     }
 
     /**
-     * §4.0 / §8.0 rule 1 -- no trip in the game mixes hands and a tool.
+     * §4.0 / §8.0 rule 1 -- no mine in the game mixes hands and a tool.
      *
      * Mining and hunting are refused without their tool rather than downgraded,
-     * so the attack a trip runs on is the tool's OR the hands', never a sum.
+     * so the attack a mine runs on is the tool's OR the hands', never a sum.
      * The consequence that has to hold is the direction: bare hands are the
      * FLOOR under the ladder, so the very cheapest tool must still beat them.
      *
@@ -2291,7 +2291,7 @@ final class GameLoopTest extends TestCase
 
         // At every level of the line, and against every rung actually sold.
         foreach ([1, 10, 25, Balance::SKILL_MAX_LEVEL] as $level) {
-            $hands = \App\Game\Formulas::tripTime(
+            $hands = \App\Game\Formulas::mineTime(
                 $hex,
                 $level,
                 0.0,
@@ -2300,7 +2300,7 @@ final class GameLoopTest extends TestCase
 
             foreach (['stone_axe', 'chipped_pick', 'crude_bow', 'iron_hatchet'] as $key) {
                 $attack = \App\Game\Formulas::toolAttack(\App\Game\Catalog::item($key));
-                $tooled = \App\Game\Formulas::tripTime($hex, $level, 0.0, $attack)['total'];
+                $tooled = \App\Game\Formulas::mineTime($hex, $level, 0.0, $attack)['total'];
 
                 $this->assertLessThan(
                     $hands,
@@ -2324,13 +2324,13 @@ final class GameLoopTest extends TestCase
     {
         $fresh = 1;
 
-        $easy = \App\Game\Formulas::tripTime(
+        $easy = \App\Game\Formulas::mineTime(
             Balance::TILE_HP_MIN,
             $fresh,
             0.0,
             Balance::MINING_COMMON_ATTACK,
         );
-        $hard = \App\Game\Formulas::tripTime(
+        $hard = \App\Game\Formulas::mineTime(
             Balance::TILE_HP_MAX,
             $fresh,
             0.0,
@@ -2341,7 +2341,7 @@ final class GameLoopTest extends TestCase
         $this->assertSame(30 * 60, $hard['total']);
 
         // A herd is read off the same yardstick, at twenty-five.
-        $herd = \App\Game\Formulas::tripTime(
+        $herd = \App\Game\Formulas::mineTime(
             Balance::HERD_HP,
             $fresh,
             0.0,
@@ -2367,7 +2367,7 @@ final class GameLoopTest extends TestCase
         // Several rolls rather than one, so the assertion is about the ladder
         // rather than about whichever hex hash zero happens to produce.
         foreach ([0, 1, 7, 12345, 999983, 0xffffffff] as $hash) {
-            $base = \App\Game\Formulas::tripTime(
+            $base = \App\Game\Formulas::mineTime(
                 \App\Game\WorldGen::tileHp($hash, 'common'),
                 $fresh,
                 0.0,
@@ -2378,7 +2378,7 @@ final class GameLoopTest extends TestCase
             $this->assertLessThanOrEqual(30 * 60, $base);
 
             foreach (Balance::TILE_HP_GRADE_ATTACK as $grade => $attack) {
-                $own = \App\Game\Formulas::tripTime(
+                $own = \App\Game\Formulas::mineTime(
                     \App\Game\WorldGen::tileHp($hash, $grade),
                     $fresh,
                     0.0,
@@ -2476,7 +2476,7 @@ final class GameLoopTest extends TestCase
      *
      * The skill term was `ceil(level / 10)`, which handed the very first level
      * of a line a free point: a panel describing what your skill was worth to
-     * this trip printed "+1" at somebody who had never swung an axe.
+     * this mine printed "+1" at somebody who had never swung an axe.
      */
     public function test_an_unskilled_line_adds_no_attack(): void
     {
@@ -2485,13 +2485,13 @@ final class GameLoopTest extends TestCase
         $this->assertSame(0, \App\Game\Formulas::skillAttack(9));
         $this->assertSame(1, \App\Game\Formulas::skillAttack(10));
 
-        $trip = \App\Game\Formulas::tripTime(Balance::TILE_HP_MIN, 1, 0.0, 3);
-        $this->assertSame(0, $trip['skillAttack']);
-        $this->assertSame(3.0, $trip['rate']);
+        $mine = \App\Game\Formulas::mineTime(Balance::TILE_HP_MIN, 1, 0.0, 3);
+        $this->assertSame(0, $mine['skillAttack']);
+        $this->assertSame(3.0, $mine['rate']);
     }
 
     /**
-     * §8.0 rule 1 -- nothing in your hands and nothing learned is NO trip.
+     * §8.0 rule 1 -- nothing in your hands and nothing learned is NO mine.
      *
      * Not a very long one. The rate is zero, so the arithmetic has no answer,
      * and what the card owes the player is a refusal rather than a clock nobody
@@ -2499,15 +2499,15 @@ final class GameLoopTest extends TestCase
      */
     public function test_no_attack_at_all_is_a_refusal_rather_than_a_long_trip(): void
     {
-        $none = \App\Game\Formulas::tripTime(Balance::TILE_HP_MIN, 1, 0.0, 0);
+        $none = \App\Game\Formulas::mineTime(Balance::TILE_HP_MIN, 1, 0.0, 0);
 
         $this->assertFalse($none['able']);
         $this->assertSame(0, $none['total']);
         $this->assertSame(0.0, $none['rate']);
         $this->assertFalse($none['clamped']);
 
-        // One point of anything is enough to make it a trip again.
-        $some = \App\Game\Formulas::tripTime(Balance::TILE_HP_MIN, 1, 0.0, 1);
+        // One point of anything is enough to make it a mine again.
+        $some = \App\Game\Formulas::mineTime(Balance::TILE_HP_MIN, 1, 0.0, 1);
         $this->assertTrue($some['able']);
         $this->assertGreaterThan(0, $some['total']);
 
@@ -2515,7 +2515,7 @@ final class GameLoopTest extends TestCase
         // which is why the arithmetic alone is not the whole answer. §8.0 rule
         // 1 refuses the VERB without its tool, so previewTile overrides this
         // for a bare-handed dig no matter how well the line is known.
-        $learned = \App\Game\Formulas::tripTime(Balance::TILE_HP_MIN, 10, 0.0, 0);
+        $learned = \App\Game\Formulas::mineTime(Balance::TILE_HP_MIN, 10, 0.0, 0);
         $this->assertTrue($learned['able']);
     }
 
@@ -2537,7 +2537,7 @@ final class GameLoopTest extends TestCase
 
         $mine = $this->game->previewTile($this->character->fresh(), $col, $row);
         $this->assertTrue($mine['bare'], 'the character found a tool somewhere');
-        $this->assertFalse($mine['able'], 'a bare-handed dig was costed as a trip');
+        $this->assertFalse($mine['able'], 'a bare-handed dig was costed as a mine');
         $this->assertFalse($mine['canMine']);
 
         // The floor under it is still open, and it IS able: hands are a rate.
@@ -2557,7 +2557,7 @@ final class GameLoopTest extends TestCase
         // they last. Distinct rungs only.
         $ladder = ['stone_axe', 'hewn_axe', 'iron_hatchet', 'ironwood_axe'];
         $hex = Balance::TILE_HP_MAX;
-        $last = \App\Game\Formulas::tripTime($hex, 1, 0.0, Balance::BARE_HAND_ATTACK)['total'];
+        $last = \App\Game\Formulas::mineTime($hex, 1, 0.0, Balance::BARE_HAND_ATTACK)['total'];
 
         // Bare hands are the floor under the ladder and are slower than any of
         // it -- the hex is the same pile of work either way (§4.0).
@@ -2570,10 +2570,10 @@ final class GameLoopTest extends TestCase
             $attack = \App\Game\Formulas::toolAttack($def);
             $this->assertGreaterThan(0, $attack, "{$key} has no bite");
 
-            $trip = \App\Game\Formulas::tripTime($hex, 1, 0.0, $attack);
-            $this->assertLessThan($last, $trip['total'], "{$key} was no faster than the rung below");
-            $this->assertFalse($trip['clamped'], "{$key} is wasted on this hex");
-            $last = $trip['total'];
+            $mine = \App\Game\Formulas::mineTime($hex, 1, 0.0, $attack);
+            $this->assertLessThan($last, $mine['total'], "{$key} was no faster than the rung below");
+            $this->assertFalse($mine['clamped'], "{$key} is wasted on this hex");
+            $last = $mine['total'];
         }
     }
 
@@ -2864,7 +2864,7 @@ final class GameLoopTest extends TestCase
             'options' => [['stat' => 'tripReduction', 'value' => 0.02]],
         ]];
 
-        // The pickaxe is a yield tool, yet it now shaves trip time on its line.
+        // The pickaxe is a yield tool, yet it now shaves mine time on its line.
         $this->assertSame(0.02, \App\Game\Formulas::aggregateStat($kit, 'tripReduction', 'mining'));
         // ...and nowhere else, because options inherit the line-lock.
         $this->assertSame(0.0, \App\Game\Formulas::aggregateStat($kit, 'tripReduction', 'woodcutting'));
@@ -3018,8 +3018,8 @@ final class GameLoopTest extends TestCase
 
         // A faster hex, and the same fight.
         $this->assertLessThan(
-            \App\Game\Formulas::tripTime(3600, 0, 0.0, $bare)['total'],
-            \App\Game\Formulas::tripTime(3600, 0, 0.0, $bare + 5)['total'],
+            \App\Game\Formulas::mineTime(3600, 0, 0.0, $bare)['total'],
+            \App\Game\Formulas::mineTime(3600, 0, 0.0, $bare + 5)['total'],
         );
 
         $pair = \App\Game\Formulas::combatPair(
@@ -3297,7 +3297,7 @@ final class GameLoopTest extends TestCase
             ]);
         }
 
-        // Spawn is forest (§12 step 1), so this trip is the axe's line.
+        // Spawn is forest (§12 step 1), so this mine is the axe's line.
         $col = $this->character->col;
         $row = $this->character->row;
         $tile = $this->game->buildTile($col, $row, $this->game->now());
@@ -3570,7 +3570,7 @@ final class GameLoopTest extends TestCase
         // Nothing has been fought yet, so nothing is subtracted.
         $this->assertSame([], $empty['cleared']);
 
-        // A live trip is the one thing that has to show up.
+        // A live mine is the one thing that has to show up.
         $this->game->startMining($this->character, $this->character->col, $this->character->row, \App\Game\Drops::GATHERING);
 
         $busy = $this->game->mapMutations($this->character->fresh());
@@ -4218,13 +4218,13 @@ final class GameLoopTest extends TestCase
         $this->assertFalse($preview['canMine']);
         $this->assertStringContainsString('Finish that one first', $preview['reason']);
 
-        // Finishing is not claiming: the trip still occupies you until collected.
+        // Finishing is not claiming: the mine still occupies you until collected.
         $job->update(['ends_at' => $this->game->now() - 1]);
         $preview = $this->game->previewTile($this->character->fresh(), $col, $row);
         $this->assertFalse($preview['canMine']);
         $this->assertStringContainsString('Claim it', $preview['reason']);
 
-        // Collecting clears the trip. Whether the hex survived it is a separate
+        // Collecting clears the mine. Whether the hex survived it is a separate
         // question (§5.1 -- one haul off a counted seam), so assert the gate
         // rather than the tile, then put the seam back so the gate is what the
         // last check is actually measuring.
@@ -4238,7 +4238,7 @@ final class GameLoopTest extends TestCase
     /**
      * §5.1 -- a hex holds a known number of hauls, and the count is not a roll.
      *
-     * This is the whole of what replaced a 34% chance per trip. The interesting
+     * This is the whole of what replaced a 34% chance per mine. The interesting
      * property is that it is KNOWABLE: the client derives the capacity from the
      * seed, so a card can say "three of eight taken" and a prospector can decide
      * whether the seam is worth the walk back.
@@ -4278,7 +4278,7 @@ final class GameLoopTest extends TestCase
     }
 
     /**
-     * §5.1 -- the count is SHARED. Everybody's trips come off the same seam.
+     * §5.1 -- the count is SHARED. Everybody's mines come off the same seam.
      *
      * The anti-farm rule, and the same one that keeps a cleared pack cleared
      * for everybody (§9.5.1): you cannot have a hex to yourself.
@@ -4334,7 +4334,7 @@ final class GameLoopTest extends TestCase
         );
     }
 
-    /** A trip pins you to the hex you are working. */
+    /** A mine pins you to the hex you are working. */
     public function test_a_trip_stops_you_traveling(): void
     {
         $this->equipToolForHere();
@@ -4344,13 +4344,13 @@ final class GameLoopTest extends TestCase
 
         try {
             $this->game->travelTo($this->character, $col + 1, $row);
-            $this->fail('traveled away from a running trip');
+            $this->fail('traveled away from a running mine');
         } catch (\App\Game\GameException $e) {
             $this->assertSame('working', $e->errorCode);
         }
         $this->assertSame($col, $this->character->fresh()->col);
 
-        // Dropping the trip forfeits the haul (§11.1) and frees you to move.
+        // Dropping the mine forfeits the haul (§11.1) and frees you to move.
         $this->game->abandonJob($this->character, $job->id);
         $this->game->travelTo($this->character, $col + 1, $row);
         $this->arrive($this->character);
@@ -4421,7 +4421,7 @@ final class GameLoopTest extends TestCase
         $settlement = $this->standAtWoodcuttingVillage();
 
         // Five foreign jobs occupy the whole public line. They have to belong to
-        // other players: one of the character's own would trip the
+        // other players: one of the character's own would mine the
         // one-job-at-a-time rule first, and the queue would never be tested.
         for ($i = 0; $i < Balance::PUBLIC_SLOTS; $i++) {
             $other = $this->game->createCharacter(Player::create(['wallet' => "0xq{$i}"]));
@@ -4526,7 +4526,7 @@ final class GameLoopTest extends TestCase
         $this->assertSame(
             0.0,
             $this->game->bonuses($character, 'woodcutting')['processingSpeed'],
-            'a processing node paid out on a mining trip',
+            'a processing node paid out on a mine',
         );
     }
 
@@ -4888,10 +4888,10 @@ final class GameLoopTest extends TestCase
         $job->update(['ends_at' => $this->game->now() - 1]);
         $result = $this->game->collectJob($this->character->fresh(), $job->id);
 
-        // Only what the quest actually names: a bare-handed forest trip brings
+        // Only what the quest actually names: a bare-handed forest mine brings
         // back rubbish alongside the branches, and none of it counts here.
         $branches = (int) ($result['gained']['branch'] ?? 0);
-        $this->assertGreaterThan(0, $branches, 'a bare-handed forest trip brought back no branches');
+        $this->assertGreaterThan(0, $branches, 'a bare-handed forest mine brought back no branches');
         $this->assertSame(
             min($branches, \App\Game\Quests::DEFS['bare_hands']['goal']['target']),
             $this->questProgress('bare_hands'),
@@ -5126,7 +5126,7 @@ final class GameLoopTest extends TestCase
         $open = $this->openNeighbor($this->character->col, $this->character->row);
         $this->character->update($open);
 
-        // Bare-handed, so the trip needs no tool on the belt. §4.0 pays scrap
+        // Bare-handed, so the mine needs no tool on the belt. §4.0 pays scrap
         // rather than refusing, and a receipt for scrap is still a receipt.
         $job = $this->game->startMining(
             $this->character->fresh(),

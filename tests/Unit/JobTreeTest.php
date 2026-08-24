@@ -366,7 +366,7 @@ final class JobTreeTest extends TestCase
      * the same clamp as everything else, which
      * test_a_maxed_explorer_still_stops_at_the_ceiling pins at runtime. What is
      * relaxed here is the "leave gear something to add" guard, and only for the
-     * one stat that no longer touches yield, trips or any §11 sink.
+     * one stat that no longer touches yield, mines or any §11 sink.
      */
     public function test_no_tree_spends_the_whole_stat_ceiling(): void
     {
@@ -427,7 +427,7 @@ final class JobTreeTest extends TestCase
                 $effect = $node['effect'];
 
                 // The pair, the two wear streams (§9.5.6), and what a fight
-                // pays (§9.5.8). Nothing here reaches a trip or a bench.
+                // pays (§9.5.8). Nothing here reaches a mine or a bench.
                 $this->assertContains(
                     $effect['kind'],
                     ['pair', 'battleWear', 'weaponWear', 'goldFind', 'lootOption'],
@@ -564,7 +564,7 @@ final class JobTreeTest extends TestCase
      *
      * Every `stat` node belongs to a bucket, and there is no global one. Left
      * unlocked, a character could take three trees and stack all of them on one
-     * trip -- which is the shortcut the line-locked tool ladder exists to close,
+     * mine -- which is the shortcut the line-locked tool ladder exists to close,
      * arrived at through the skill panel instead.
      */
     public function test_every_stat_node_is_locked_to_its_own_class(): void
@@ -606,7 +606,7 @@ final class JobTreeTest extends TestCase
     }
 
     /**
-     * §7.4 -- a gathering tree moves the two stats a TRIP has, and no others.
+     * §7.4 -- a gathering tree moves the two stats a MINE has, and no others.
      *
      * `travelSpeed` used to be a third of them and was dead weight twice over:
      * a node is filed under its line and only counts on that line's work, and
@@ -626,17 +626,17 @@ final class JobTreeTest extends TestCase
             $this->assertContains(
                 $node['effect']['stat'],
                 ['yield', 'tripReduction'],
-                "{$key} moves a stat a trip cannot feel",
+                "{$key} moves a stat a mine cannot feel",
             );
         }
     }
 
     /**
      * §8.4 -- a craft tree moves the one stat a bench clock reads, and nothing
-     * a trip would feel.
+     * a mine would feel.
      *
-     * It used to hand out yield, trip time and travel speed, which made an
-     * Armorer's tree pay out on somebody's mining trips.
+     * It used to hand out yield, mine time and travel speed, which made an
+     * Armorer's tree pay out on somebody's mines.
      */
     public function test_a_craft_tree_moves_only_the_bench_clock(): void
     {

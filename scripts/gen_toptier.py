@@ -49,7 +49,7 @@ SLOTS = dict(LINES, **WORN)
 
 # §8 -- a gathering tool's base is its ATTACK, and it has no percentage at all.
 # A tool used to lead with "+14% yield", which conflated the two halves of a
-# trip: attack is how fast you work through a hex (§7.3) and yield is how big
+# mine: attack is how fast you work through a hex (§7.3) and yield is how big
 # the haul is. Worn gear keeps a percentage, because a coat has no attack of its
 # own to lead with.
 STAT = {
@@ -67,7 +67,7 @@ TOOL_ATTACK = {'legendary': 17, 'unique': 19}
 #
 # Deliberately far under the battle rung of the same rarity (legendary battle
 # armor is 2/18 against 1/9 here). That gap IS §9.5.4's shape: work gear reaches
-# the contested ring, the center asks for battle gear, and giving up trip time
+# the contested ring, the center asks for battle gear, and giving up mine time
 # and travel speed is the decision rather than a level being.
 #
 # The five gathering tools stay at nothing HERE, because §8 rule 5 keeps combat

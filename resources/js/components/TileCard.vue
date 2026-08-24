@@ -5,13 +5,13 @@
  * Deliberately separate from the dock: the dock answers "what can I do here",
  * this answers "what am I pointing at, and is it worth walking to". Travel lives
  * here rather than in the dock for exactly that reason -- it is the one action
- * that is about somewhere else, and putting it beside the haul and trip time is
+ * that is about somewhere else, and putting it beside the haul and mine time is
  * what turns those numbers into a decision.
  *
  * Compact by default, and disclosed twice over. The card opens to what this
  * ground is worth; each verb on it then opens to how its clock was arrived at,
  * because that matters exactly once -- the first time a better tool does not
- * shorten a trip as much as expected and the rate has to explain itself.
+ * shorten a mine as much as expected and the rate has to explain itself.
  */
 import { computed, ref, watch } from 'vue'
 import { useGame } from '@/stores/game'
@@ -66,7 +66,7 @@ const unseen = computed(() => distance.value > game.sight)
 /**
  * §5.1 -- this hex has something to work, whether or not you may work it now.
  *
- * Deliberately not `trip`: a trip is priced at zero the moment a verb is
+ * Deliberately not `mine`: a mine is priced at zero the moment a verb is
  * refused, which took the slot count off the plate exactly when it was most
  * worth reading. Two seats are a fact about the GROUND, shared with everybody,
  * and they hold whether the belt is ready or not -- so the plate keeps saying
@@ -149,11 +149,11 @@ const toggleVerb = (key: string) => {
 }
 
 /**
- * The server costs a trip for any workable hex in sight, standing on it or not,
+ * The server costs a mine for any workable hex in sight, standing on it or not,
  * so the card can be read as a scouting report: what this seam is worth, and
  * what it would take. Whether you may act on it is a separate line.
  */
-const trip = computed(() =>
+const mine = computed(() =>
   !unseen.value && preview.value && preview.value.seconds > 0 ? preview.value : null,
 )
 
@@ -170,7 +170,7 @@ const onSelected = computed(() => {
   return Boolean(char && tile.value && char.col === tile.value.col && char.row === tile.value.row)
 })
 
-/** A trip pins you to the hex you are working until you claim or drop it. */
+/** A mine pins you to the hex you are working until you claim or drop it. */
 const working = computed(() => game.fieldJob)
 
 /** §7.6 -- too much in the bag and the road is shut until it is not. */
@@ -278,8 +278,8 @@ watch(open, (isOpen) => {
 
                Slots stays because it is a fact about the HEX rather than about
                a verb: two seats, shared with everybody, whatever you came here
-               to do. Which is also why it no longer hangs off the trip -- a
-               trip prices at zero the moment a verb is refused, so the one
+               to do. Which is also why it no longer hangs off the mine -- a
+               mine prices at zero the moment a verb is refused, so the one
                moment the plate went quiet was the moment you had no tool, and
                it filled the gap with a sentence the button beside it was
                already saying. -->
@@ -311,7 +311,7 @@ watch(open, (isOpen) => {
 
           <span v-else class="reason tiny">{{ preview?.reason }}</span>
 
-          <span v-if="trip || tables.length" class="chevron" :class="{ open }" aria-hidden="true">
+          <span v-if="mine || tables.length" class="chevron" :class="{ open }" aria-hidden="true">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
               <path d="m6 15 6-6 6 6" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
@@ -323,18 +323,18 @@ watch(open, (isOpen) => {
           small
           icon="travel"
           label="Travel"
-          :primary="canTravel && Boolean(trip)"
+          :primary="canTravel && Boolean(mine)"
           :disabled="!canTravel || game.busy"
           :hint="travelHint"
           @activate="tile && game.travelTo(tile.col, tile.row)"
         />
         </div>
 
-        <div v-if="open && (tables.length || (trip && mat))" class="detail">
+        <div v-if="open && (tables.length || (mine && mat))" class="detail">
           <!-- The line comes from the server, not from the material: a scrap
                haul still belongs to the hex's own line, §4.0. -->
-          <p v-if="trip && mat" class="tiny muted lede">
-            {{ mat.name }} · trains {{ SKILL_BY_KEY[trip.skill ?? skillForMaterial(mat.key)].name }}
+          <p v-if="mine && mat" class="tiny muted lede">
+            {{ mat.name }} · trains {{ SKILL_BY_KEY[mine.skill ?? skillForMaterial(mat.key)].name }}
           </p>
 
           <!-- §4 / §7.3 -- one price line per verb, because this hex answers to
@@ -358,7 +358,7 @@ watch(open, (isOpen) => {
               <span class="label muted">{{ t.label }}</span>
               <span class="leader" aria-hidden="true" />
               <!-- §8.0 rule 1 -- nothing in your hands and nothing learned is
-                   not a very long trip, it is no trip. A clock here would be a
+                   not a very long mine, it is no mine. A clock here would be a
                    number that cannot be reached. -->
               <span v-if="t.cost.able" class="readout clock">
                 {{ formatSpan(wallTime(t.cost.seconds)) }}
@@ -382,7 +382,7 @@ watch(open, (isOpen) => {
                  
                  Two terms, never three: the first line is the tool OR the
                  hands, because §4.0 gives gathering no tool and §8.0 rule 1
-                 gives the other two no bare-handed mode. A trip is worked with
+                 gives the other two no bare-handed mode. A mine is worked with
                  one or the other and never with both. -->
             <div v-if="openVerb === t.key" :id="`verb-${t.key}`" class="rates tiny">
               <div class="row-between">

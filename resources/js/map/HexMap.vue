@@ -104,7 +104,7 @@ function onResize(el: Element | null) {
   if (!rect.width || !rect.height) return
 
   // Only write when the size actually changed. Assigning unconditionally feeds
-  // the observer its own resize and trips "ResizeObserver loop completed with
+  // the observer its own resize and mines "ResizeObserver loop completed with
   // undelivered notifications" every frame.
   const { w, h } = viewport.value
   if (Math.abs(w - rect.width) < 0.5 && Math.abs(h - rect.height) < 0.5) return

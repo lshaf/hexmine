@@ -358,14 +358,14 @@ export const SCOPE_LABEL: Record<BuffScope | 'global', string> = {
 /**
  * §8.5 -- the same action named as the thing you do, rather than as a place a
  * bonus applies. A charge is spent by one of these, so anything counting them
- * ("one woodcutting trip", "one journey") needs the noun, not the clause.
+ * ("one woodcutting mine", "one journey") needs the noun, not the clause.
  */
 export const SCOPE_ACTION: Record<BuffScope | 'global', string> = {
-  woodcutting: 'woodcutting trip',
-  mining: 'mining trip',
+  woodcutting: 'woodcutting mine',
+  mining: 'mine',
   hunting: 'hunt',
-  quarrying: 'quarrying trip',
-  harvesting: 'harvesting trip',
+  quarrying: 'quarrying mine',
+  harvesting: 'harvesting mine',
   travel: 'journey',
   processing: 'bench run',
   battle: 'fight',
@@ -375,9 +375,9 @@ export const SCOPE_ACTION: Record<BuffScope | 'global', string> = {
 export const STAT_LABEL: Record<StatKey, string> = {
   yield: 'yield',
   // The stat is stored as a reduction and said with a minus, so the words are
-  // the plain thing it moves: "-3% trip time" rather than "+3% off mine time".
+  // the plain thing it moves: "-3% mine time" rather than "+3% off the clock".
   // Every screen goes through statLine(), which owns that sign.
-  tripReduction: 'trip time',
+  tripReduction: 'mine time',
   travelSpeed: 'travel speed',
   processingSpeed: 'processing speed',
   power: 'power',
@@ -388,7 +388,7 @@ export const STAT_LABEL: Record<StatKey, string> = {
  * The same stats said against one gathering line, §8.
  *
  * Shorter than the unscoped label rather than longer: a line name already says
- * that this is a trip, so "mining time" beats "mining trip time".
+ * that this is a mine, so "mining time" beats "mine time".
  */
 export const LINE_STAT_LABEL: Partial<Record<StatKey, string>> = {
   yield: 'yield',
@@ -398,8 +398,8 @@ export const LINE_STAT_LABEL: Partial<Record<StatKey, string>> = {
 /**
  * Gathering tool slots, §8. One implement per skill line -- an axe is no use on
  * a seam and a bow is no use on a tree, so each line has its own slot and its
- * own ladder. A tool contributes its stat *only* on trips for its own line, and
- * only that tool takes durability for the trip.
+ * own ladder. A tool contributes its stat *only* on mines for its own line, and
+ * only that tool takes durability for the mine.
  *
  * `weapon` is deliberately absent: that slot is raid combat, and combat gear
  * must never be able to stand in for a gathering tool.

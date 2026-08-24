@@ -104,7 +104,7 @@ final class SkillEffectTest extends TestCase
     /**
      * §7.4.3 -- a gathering tree spares the line's tool, and only that line's.
      *
-     * Rolled per trip rather than shaved off it, because DRAIN_PER_MINE is one
+     * Rolled per mine rather than shaved off it, because DRAIN_PER_MINE is one
      * point and a fraction of one point is nothing a player could read off the
      * item.
      */
@@ -130,7 +130,7 @@ final class SkillEffectTest extends TestCase
             );
         }
 
-        $this->assertGreaterThan(0, $spared, 'a maxed tree never spared a single trip');
+        $this->assertGreaterThan(0, $spared, 'a maxed tree never spared a single mine');
         $this->assertGreaterThan($spared, $paid, 'the tool is spared more often than it is worn');
     }
 
@@ -139,7 +139,7 @@ final class SkillEffectTest extends TestCase
      *
      * `seamGrade` is a rolled COUNT of grades rather than a percentage, so what
      * is pinned here is the aggregate and its cap: the roll itself belongs to
-     * the trip, and the line-lock is the same one every other tree effect has.
+     * the mine, and the line-lock is the same one every other tree effect has.
      */
     public function test_a_gathering_tree_reads_the_seam_within_its_cap(): void
     {

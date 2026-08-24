@@ -657,7 +657,7 @@ final class Formulas
     // ------------------------------------------------------------- mining §7.3
 
     /**
-     * §7.3 -- a hex is an amount of WORK, and a trip is how long you take over it.
+     * §7.3 -- a hex is an amount of WORK, and a mine is how long you take over it.
      *
      *   rate      = (attack + skill_attack) * (1 + trip_reduction)
      *   trip_time = clamp(hp / rate, guard, ceiling)
@@ -671,7 +671,7 @@ final class Formulas
      * Balance::BARE_HAND_ATTACK here, because for that one verb your hands
      * ARE the tool.
      *
-     * At zero attack the answer is not a very long trip, it is NO trip: nothing
+     * At zero attack the answer is not a very long mine, it is NO mine: nothing
      * in your hands and nothing learned means the ground does not move. `able`
      * is false, `total` is zero, and the caller says so rather than printing a
      * clock nobody can reach.
@@ -681,7 +681,7 @@ final class Formulas
      *
      * @return array{hp:int,toolAttack:int,skillAttack:int,rate:float,total:int,clamped:bool,able:bool}
      */
-    public static function tripTime(
+    public static function mineTime(
         int $hp,
         int $skillLevel,
         float $equipTripReduction,
@@ -731,7 +731,7 @@ final class Formulas
      *
      * This is GATHERING's rate and nothing else's. Mining and hunting never
      * reach it: they are refused without their tool rather than downgraded, so
-     * there is no trip anywhere in the game that mixes hands and a tool.
+     * there is no mine anywhere in the game that mixes hands and a tool.
      */
     public static function gatherAttack(int $skillLevel): int
     {
@@ -743,7 +743,7 @@ final class Formulas
      *
      * A tool's BASE stat, and the only one it has. It used to lead with a yield
      * percentage and have its attack derived from that, which conflated the two
-     * halves of a trip: attack is how fast you work through a hex (§7.3) and
+     * halves of a mine: attack is how fast you work through a hex (§7.3) and
      * yield is how big the haul is. They are different questions, so they are
      * different numbers, and a tool answers the first one.
      *
@@ -755,8 +755,8 @@ final class Formulas
         return (int) ($def['attack'] ?? 0);
     }
 
-    /** Yield for one trip. Skill and gear add; ring adds the risk premium. */
-    public static function tripYield(
+    /** Yield for one mine. Skill and gear add; ring adds the risk premium. */
+    public static function mineYield(
         int $baseYield,
         int $skillLevel,
         float $equipYieldBonus,

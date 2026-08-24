@@ -7,7 +7,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * A running mining trip or processing batch.
+ * A running mine or processing batch.
  *
  * Named GameJob, and tabled as `jobs_queue`, to stay clear of Laravel's own
  * queue `jobs` table -- these are gameplay timers, not background work.

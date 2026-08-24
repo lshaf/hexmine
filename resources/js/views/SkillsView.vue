@@ -276,9 +276,9 @@ function effectText(effect: NodeEffect): string {
     case 'weaponWear':
       return `${formatPercent(-effect.value)} wear on the weapon you swing`
     case 'toolWear':
-      return `${formatPercent(effect.value)} of trips leave the tool untouched`
+      return `${formatPercent(effect.value)} of mines leave the tool untouched`
     case 'seamGrade':
-      return `${formatPercent(effect.value)} of trips come up a grade better`
+      return `${formatPercent(effect.value)} of mines come up a grade better`
     case 'presence':
       return `${formatPercent(effect.value)} faster while you stand at the bench`
     case 'runSlot':

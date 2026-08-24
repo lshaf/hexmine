@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace App\Game;
 
 /**
- * What a trip actually brings back, §4 / §5.3 / §8.
+ * What a mine actually brings back, §4 / §5.3 / §8.
  *
  * A hex used to pay out one material. It now pays out several: the same total
  * units the tile card promises, drawn from a weighted table instead of handed
  * over as a single stack. The haul is unchanged in size and changed in shape,
- * which is the point -- a trip is a small event with an outcome rather than a
+ * which is the point -- a mine is a small event with an outcome rather than a
  * withdrawal of a known quantity.
  *
  * THREE ACTIVITIES, and the tool is what separates them:
@@ -48,7 +48,7 @@ final class Drops
      *
      * §7.6 -- rows are the tighter bag limit in practice, and a haul that came
      * back as seven different things would eat a quarter of the straps in one
-     * trip. Past the cap the remaining units fall to the primary, so variety is
+     * mine. Past the cap the remaining units fall to the primary, so variety is
      * bounded and the bag stays a decision rather than an ambush.
      */
     public const MAX_KINDS = 4;
@@ -69,7 +69,7 @@ final class Drops
     }
 
     /**
-     * The weighted table for one trip. Keys are materials, values are weights;
+     * The weighted table for one mine. Keys are materials, values are weights;
      * nothing normalises them, because only their ratio is ever read.
      *
      * @param  array<string,mixed>  $tile
@@ -92,7 +92,7 @@ final class Drops
     /**
      * The same table, rebuilt from a haul already in flight.
      *
-     * A job records the material its trip resolved to when it started, and that
+     * A job records the material its mine resolved to when it started, and that
      * key IS the grade the tool could reach -- so the table can be rebuilt an
      * hour later without asking what is on the character's belt now. That is
      * the point: the tool that did the work decides the haul, and swapping to a
@@ -464,7 +464,7 @@ final class Drops
      *
      * Naming the weights would turn a hex into a spreadsheet and the decision
      * into arithmetic. What a prospector is owed is what this ground can give
-     * up, which is a fact about the place; how often is what the trip is for.
+     * up, which is a fact about the place; how often is what the mine is for.
      *
      * @return list<string>
      */
