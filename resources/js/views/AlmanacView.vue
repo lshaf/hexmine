@@ -370,14 +370,48 @@ const SLOT_ORDER: EquipSlot[] = [
   'armor',
   'boots',
   'gloves',
-  'weapon',
 ]
 
+const WORN = 'Worn, and one set with two axes rather than a second wardrobe: the work stat that counts on every line, and the flat pair that decides a fight. Combat-leaning pieces sit beside work-leaning ones at every rung, so the decision belongs at the bench and never in front of a pack.'
+
 const WORN_NOTE: Partial<Record<EquipSlot, string>> = {
-  armor: 'Worn. Counts on every line, and on the road between them.',
-  boots: 'Worn. Counts on every line, and on the road between them.',
-  gloves: 'Worn. Counts on every line, and on the road between them.',
-  weapon: 'Raid combat only, and it never gathers — combat gear must not be a shortcut around the mining ladder. Nothing is made for it yet.',
+  armor: WORN,
+  boots: WORN,
+  gloves: WORN,
+}
+
+/**
+ * §9.5.4 -- the weapon slot is three ladders, not one.
+ *
+ * Every other slot is one line and one climb, which is why the page groups by
+ * slot at all. This one holds three families competing for the same hand, and
+ * the family you carry is the battle job you level -- so stacking thirty
+ * unrelated pieces under a single "Weapon" heading would hide the only choice
+ * the slot actually asks you to make.
+ */
+const FAMILIES: Array<{ key: 'shield' | 'sword' | 'focus'; title: string; sub: string }> = [
+  {
+    key: 'shield',
+    title: 'Shield',
+    sub: 'Weapon slot · Shieldbearer. A third attack to two thirds guard, on a larger budget than the other two carry — a shieldbearer has no offense anywhere else in the kit. It is always the most expensive win: a slow kill is more rounds, and more rounds is more of both wear streams.',
+  },
+  {
+    key: 'sword',
+    title: 'Sword',
+    sub: 'Weapon slot · Swordhand. An even split, and the reference the other two are read against. Balanced means the two numbers are the same, not a bit of both.',
+  },
+  {
+    key: 'focus',
+    title: 'Focus',
+    sub: 'Weapon slot · Runecaster. Four fifths attack, and the guard that is left is small rather than nothing — a focus that stopped none of it would make the sword the balanced one twice over. The only kit in the game whose hardest fight is genuinely uncertain.',
+  },
+]
+
+/** §9.5.4 -- which battle job the family in the slot levels. */
+const FAMILY_JOB: Record<string, string> = {
+  shield: 'Shieldbearer',
+  sword: 'Swordhand',
+  focus: 'Runecaster',
 }
 
 interface ItemEntry {
@@ -430,6 +464,18 @@ const groups = computed<Group[]>(() => {
     }
   })
 
+  for (const family of FAMILIES) {
+    built.push({
+      key: family.key,
+      title: family.title,
+      sub: family.sub,
+      entries: ITEMS.filter((i) => i.family === family.key)
+        .map(describe)
+        .filter((e) => matches(e.hay))
+        .sort(byRung),
+    })
+  }
+
   built.push({
     key: 'consumable',
     title: 'Consumables',
@@ -459,6 +505,9 @@ const itemCount = computed(() => groups.value.reduce((n, g) => n + g.entries.len
 function nature(item: ItemDef): string {
   if (item.consumable) {
     return `Drunk · one ${SCOPE_ACTION[item.scope ?? 'global']}, then gone`
+  }
+  if (item.family) {
+    return `Weapon slot · ${FAMILY_JOB[item.family]} · ${item.maxDurability} durability`
   }
   const line = item.slot ? skillForSlot(item.slot) : null
   const scope = line ? SKILL_BY_KEY[line].name.toLowerCase() : 'every line'
@@ -802,12 +851,13 @@ function nature(item: ItemDef): string {
         </template>
         <template v-else>
           A bench reaches exactly as far as its tier, whatever you carry to it, and
-          gold reaches the bottom two rungs and stops at every settlement — what a
-          capital shop adds is a rolled bonus line, never a better rung. Every rung
-          climbs toward one ceiling of {{ formatPercent(EQUIPMENT.statCeiling) }} and
-          nothing passes it: not a rarity, not a rolled option, not a potion.
-          Legendary is guild-hall work and unique only ever drops, so no ladder here
-          reaches its top two rungs yet.
+          gold reaches the bottom two rungs and stops at every settlement — a shelf
+          sells a plain piece at every tier including a capital's, and a rolled bonus
+          line is the one thing only a bench can put on a thing. Every rung climbs
+          toward one ceiling of {{ formatPercent(EQUIPMENT.statCeiling) }} and nothing
+          passes it: not a rarity, not a rolled option, not a potion. Legendary is
+          guild-hall work, so it wants a guild that has built its bench that far;
+          unique has no bench at all and only ever drops.
         </template>
       </p>
     </div>

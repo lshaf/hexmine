@@ -228,11 +228,10 @@ const ceilings = computed(() =>
             </div>
           </template>
 
-          <!-- §4.0 -- never a refusal. The hex is still workable; it just pays
-               in scrap, and that gap is the argument for a first tool. -->
-          <p v-else class="tiny muted">
-            No {{ line.label.toLowerCase() }} — bare hands still work this ground, and bring back scrap.
-          </p>
+          <!-- Empty reads as the slot it is waiting for, the same way the worn
+               list below does. What a bare line costs you is the hex card's
+               answer, and its button already gives it. -->
+          <div v-else class="tiny muted">{{ line.label }}</div>
         </div>
 
         <div v-if="line.tool" class="row-actions">

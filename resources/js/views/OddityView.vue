@@ -611,7 +611,7 @@ const PHASES = [
 
         <p class="tiny muted prose">
           The tile’s feature comes from its own hash, exactly the way it already draws
-          <code>baseSeconds</code> and <code>baseYield</code>. Nothing is stored.
+          <code>hp</code> and <code>baseYield</code>. Nothing is stored.
           <strong>Nothing is drawn, either</strong> — the feature changes what a hex pays,
           never what it looks like. Richer ground is blended in among ordinary ground of
           the same biome, and the terrain layer is untouched.

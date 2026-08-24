@@ -29,11 +29,14 @@ const sellable = computed(() => {
   return out.sort((a, b) => b.qty * b.mat.npcPrice - a.qty * a.mat.npcPrice)
 })
 
-/** Only what this settlement stocks, §3.2 -- the server decides, we render it. */
+/**
+ * Only what this settlement stocks, §3.2 -- the server decides, we render it.
+ *
+ * What it does not stock is not on the shelf at all. A row you cannot buy is
+ * not a ladder, it is a list of somewhere else, and the bench panel already
+ * settles this the same way (CraftView): out of reach here means hidden here.
+ */
 const catalog = computed(() => shopItems().filter((i) => game.shopStock.includes(i.key)))
-
-/** Stocked elsewhere: shown grayed so the ladder is visible, not hidden. */
-const elsewhere = computed(() => shopItems().filter((i) => !game.shopStock.includes(i.key)))
 
 const atSettlement = computed(() => game.currentSettlement !== null)
 
@@ -201,29 +204,6 @@ const owned = (key: string) => game.equipment.filter((e) => e.key === key).lengt
             Buy
           </button>
         </div>
-
-        <template v-if="elsewhere.length">
-          <p class="tiny muted lead" style="margin-top: 16px">
-            Not stocked here. Bigger settlements carry more.
-          </p>
-          <div v-for="item in elsewhere" :key="item.key" class="list-item locked">
-            <SvgIcon
-              :svg="itemIcon({ slot: item.slot, family: item.family, rarity: item.rarity, palette: item.palette, size: 26 })"
-              boxed
-              :size="26"
-            />
-            <div class="grow">
-              <div class="row-between">
-                <strong class="tiny">{{ item.name }}</strong>
-                <span class="chip tiny">needs a {{ item.station }}</span>
-              </div>
-              <div class="row tiny" style="gap: 6px">
-                <StatChips :def="item" />
-                <span class="chip tiny">{{ item.goldPrice }}g</span>
-              </div>
-            </div>
-          </div>
-        </template>
       </template>
     </div>
     </template>
@@ -282,9 +262,5 @@ const owned = (key: string) => game.equipment.filter((e) => e.key === key).lengt
 
 .away {
   margin: 0;
-}
-
-.locked {
-  opacity: 0.55;
 }
 </style>

@@ -389,8 +389,10 @@ export function itemSources(item: ItemDef): SourceLine[] {
         key: key as MaterialKey,
         qty: qty as number,
       })),
-      pending: bench === 'guild',
-      note: bench === 'guild' ? 'Guild halls are not built yet.' : undefined,
+      note:
+        bench === 'guild'
+          ? "Members only, at their own guild's hall, and only once the treasury has built its bench that far."
+          : undefined,
     })
   }
 
@@ -443,8 +445,8 @@ export function materialUses(mat: Material): MaterialUses {
 
 /** Shop tiers that stock an item, for the trader line. */
 export const stocksAt = (item: ItemDef): SettlementTier[] => {
-  // §8.0 -- a guild hall is not a settlement, and no settlement reaches past
-  // it. Legendary work is stocked and craftable nowhere a player can stand.
+  // §8.0 -- a guild hall is not a settlement and stocks nothing. Legendary work
+  // is made there and sold nowhere.
   if (item.station === 'guild') return []
 
   const need = item.station ?? 'village'

@@ -10,10 +10,15 @@ namespace App\Game;
  * §8.0 -- the two rungs above epic. Neither is reachable and both are defined, so
  * the whole six-rung ladder can be read off one page.
  *
- * Legendary needs a guild hall, and guild halls do not exist (§10). Unique has no
- * bench and no recipe at all: it drops, and it is soulbound the moment it lands,
- * because §2 forbids a grind-to-external-value faucet and a tradeable drop would
- * be exactly that. The `weapon` slot stays empty until raid combat is designed.
+ * Legendary needs a guild hall, which a guild founds and builds out (§10.5).
+ * Unique has no bench and no recipe at all: it drops, and it is soulbound the
+ * moment it lands, because §2 forbids a grind-to-external-value faucet and a
+ * tradeable drop would be exactly that.
+ *
+ * The `weapon` slot is absent here on purpose: battle gear runs its own full
+ * ladder in `gen_battlegear.py`, three families wide at every rung, and a
+ * sixteenth top-tier weapon would be a second answer to a question that file has
+ * already answered.
  */
 final class TopTier
 {
