@@ -360,6 +360,54 @@ final class BattleResolveTest extends TestCase
     }
 
     /**
+     * §9.5.5 -- the fight is settled at engagement and the clock is the REPLAY.
+     *
+     * The exchange is stored round by round so the screen can draw it, and the
+     * job's length is that replay rather than a flat cooldown by tier: a rout
+     * is over in a couple of seconds and a grind takes ten, which is the whole
+     * reason to watch one.
+     */
+    public function test_a_fight_stores_its_exchange_and_is_clocked_by_it(): void
+    {
+        $this->equip('soldiers_sword');
+        $this->equip('studded_jack');
+
+        $this->standOnALivePack();
+
+        $job = $this->game->startBattle($this->character->fresh());
+        $payload = $job->payload;
+
+        $log = $payload['log'] ?? [];
+        $this->assertNotEmpty($log, 'a fight was drawn with nothing to draw');
+        $this->assertCount((int) $payload['rounds'], $log, 'the log and the round count disagree');
+
+        // Every round says what each side got through and where both pools
+        // stood after it -- which is exactly what a bar needs to move.
+        $hp = (int) $payload['pool'];
+        foreach ($log as $round) {
+            $this->assertArrayHasKey('hit', $round);
+            $this->assertArrayHasKey('back', $round);
+            $this->assertLessThanOrEqual($hp, $round['hp'], 'a pool went up mid-fight');
+            $hp = $round['hp'];
+        }
+
+        // §9.5.5 -- the clock is the exchange, and it is REAL milliseconds: an
+        // animation is not a game hour, so scaled() must not touch it.
+        $this->assertSame(
+            \App\Game\Formulas::battleDurationMs((int) $payload['rounds']),
+            (int) $job->ends_at - (int) $job->started_at,
+            'the fight is not clocked by its own exchange',
+        );
+
+        // Short enough to sit through: the longest possible fight is under a
+        // quarter of a minute.
+        $this->assertLessThan(
+            15_000,
+            \App\Game\Formulas::battleDurationMs(Balance::BATTLE_MAX_ROUNDS),
+        );
+    }
+
+    /**
      * §9.5.6 -- durability IS the health bar, so a beating lands on the kit
      * that took it. The blade pays separately, for what it was swung AT.
      */

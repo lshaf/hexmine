@@ -553,11 +553,24 @@ export interface CraftJob extends BenchJob {
 /**
  * §9.5.5 -- a fight under way.
  *
- * On a hex like a trip and pinning you the same way, but carrying nothing about
- * how it went: the roll happened when it started and is held server-side until
- * the fight is collected. A countdown to an outcome the client already knew
- * would be a countdown to nothing.
+ * On a hex like a trip and pinning you the same way, and it carries the whole
+ * exchange: the fight is settled the instant you close (§9.5.5), and what runs
+ * on screen is a REPLAY of it rather than a countdown to it.
+ *
+ * Handing the client the outcome early is deliberate and costs nothing. A fight
+ * cannot be abandoned (§9.5.3), so there is no decision left for foreknowledge
+ * to spoil -- reading ahead buys a few seconds of knowing.
  */
+export interface BattleRound {
+  /** What you got through this round. */
+  hit: number
+  /** What it got back. Zero on the round that put it down. */
+  back: number
+  /** Your pool after the round, and its HP. */
+  hp: number
+  foe: number
+}
+
 export interface BattleJob {
   id: string
   kind: 'battle'
@@ -572,6 +585,13 @@ export interface BattleJob {
   skill: string
   /** What is being fought, for the glyph and the name. */
   monster: string | null
+  /** §9.5.5 -- the two pools the bars start full at. */
+  pool: number
+  monsterHp: number
+  /** How long one round is drawn for. Real milliseconds, never scaled. */
+  roundMs: number
+  /** The exchange, in order. Empty only for a job stored before this existed. */
+  log: BattleRound[]
 }
 
 export type Job = FieldJob | ProcessingJob | CraftJob | BattleJob
@@ -609,8 +629,8 @@ export interface Tile {
   ring: Ring
   /** Undefined on barren capital-ring tiles, §5.2. */
   material?: MaterialKey
-  /** Seconds, before skill and equipment reduction. §7.3 */
-  baseSeconds: number
+  /** §7.3 -- how much work this hex is. The world rolls HP and nothing else. */
+  hp: number
   /** Units yielded per trip before bonuses. */
   baseYield: number
   /** Both slots full closes the tile to everyone else, §5.1. */

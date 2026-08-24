@@ -41,7 +41,16 @@ export const ACTION_PATHS: Record<string, string> = {
   /* §7.4.3 -- one glyph per effect kind. What a node *does* is the only thing
      worth encoding on 180 nodes; drawing 180 pictures would say less. */
   effectStat: 'M4 18h16 M7 14.5l4-5 3 3 4.5-6.5',
-  effectUnlock: 'M8 10.5V7a4 4 0 0 1 7.4-2 M5 10.5h14V20H5Z',
+  /* §5.1 -- ground that comes back: two leaves off a cut stem. */
+  effectDepletion: 'M4 20h16 M12 20v-7 M12 13c-3 0-4.5-1.8-4.5-4.4C10.3 8.6 12 10.5 12 13Z M12 13c3 0 4.5-1.8 4.5-4.4C13.7 8.6 12 10.5 12 13Z',
+  /* §6.2 -- somebody standing at a bench, which is the whole of presence. */
+  effectPresence: 'M12 4.4a2 2 0 1 0 0 4 2 2 0 0 0 0-4 M12 8.4v6 M9 20l3-5.6 3 5.6 M4 12.4h4 M16 12.4h4',
+  /* §6.1 -- a second run going beside the first. */
+  effectRunSlot: 'M4 6.5h7v4H4Z M13 6.5h7v4h-7Z M4 14.5h16v4H4Z',
+  /* §8.4 -- the consumable bench, which owns none of the other bench effects. */
+  effectBrew: 'M10 3.8h4 M11 3.8v5.4L6.6 18a2 2 0 0 0 1.8 2.9h7.2A2 2 0 0 0 17.4 18L13 9.2V3.8 M8.5 14.2h7',
+  /* §9.5.8 -- coin off a pack, which needs no strap to carry. */
+  effectGold: 'M12 4.4a7.6 7.6 0 1 0 0 15.2 7.6 7.6 0 0 0 0-15.2 M12 7.6v8.8 M9.8 10a1.8 1.8 0 0 1 1.8-1.8h2.6 M9.8 10a1.8 1.8 0 0 0 1.8 1.8h1.2a1.8 1.8 0 0 1 0 3.6H9.8',
   effectCraftOption: 'M5 8h14 M5 13h11 M5 18h6 M17.5 15v5.5 M14.8 17.8h5.4',
   effectCraftDurability: 'M12 3.5 19 6.6v5.2c0 4.1-3 6.7-7 7.7-4-1-7-3.6-7-7.7V6.6Z',
   effectCostReduction: 'M4 7h16 M4 12.5h10 M4 18h5',

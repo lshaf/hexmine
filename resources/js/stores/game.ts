@@ -659,12 +659,42 @@ export const useGame = defineStore('game', () => {
    * comes off the collect, like every other piece of work.
    */
   async function fight(): Promise<void> {
-    await act(() => api.fight())
+    const job = await act(() => api.fight())
+
+    // §9.5.5 -- the fight is already settled, and the job carries the whole
+    // exchange. Open the plate on it now rather than waiting for a clock: what
+    // runs on screen is the replay, and the collect at the end of it is what
+    // turns the replay into a receipt.
+    if (job && job.kind === 'battle') live.value = job
 
     // The pack is spent on engagement (§9.5.5), so the map moved even though
-    // nothing has been resolved yet.
+    // nothing has been collected yet.
     await refreshMutations()
     if (selected.value) await select(selected.value.col, selected.value.row)
+  }
+
+  /**
+   * §9.5.5 -- the fight being watched, if one is.
+   *
+   * A running battle job and nothing else. It is picked up from the state as
+   * well as from `fight()`, so closing the tab mid-exchange and coming back
+   * finds the plate where it was -- the result was never in the animation.
+   */
+  const live = ref<BattleJob | null>(null)
+
+  const liveBattle = computed<BattleJob | null>(() => {
+    if (live.value) return live.value
+
+    const running = jobs.value.find((j) => j.kind === 'battle')
+
+    return running && running.log?.length ? (running as BattleJob) : null
+  })
+
+  /** The replay is over: take the receipt, which is what actually pays out. */
+  async function finishLiveBattle(): Promise<void> {
+    const job = liveBattle.value
+    live.value = null
+    if (job) await collect(job.id)
   }
 
   /** Dismiss the fight receipt. */
@@ -876,6 +906,7 @@ export const useGame = defineStore('game', () => {
     boot, setView, setViewport, centerOnCharacter, refreshMutations, refreshState,
     select, clearSelection,
     haul, clearHaul, battle, fight, clearBattle, carriers,
+    liveBattle, finishLiveBattle,
     guilds, guild, atGuildHall, halls, openHalls, closeHalls,
     loadGuilds, foundGuild, joinGuild, leaveGuild,
     updateGuild, removeGuildMember, setGuildRole, withdrawApplication, decideApplication,
