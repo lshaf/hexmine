@@ -196,10 +196,11 @@ cross-map travel — same design pressure as biome-locked mining.
 - **Exactly 2 mining slots per hex.** When both are full, the tile is closed to others.
 - Tiles are **depletable**, then **regrow after ~9h** (tune). Depleted tiles keep their
   biome color (drained, not dead) and show remnant/sapling props.
-- **A gathering tree can leave more of the seam standing** (`depletion`, §7.4.3):
-  a share of mines take their haul without spending one of the hex's hauls.
-  Capped, and shared like the count itself — what one prospector spares is
-  spared for whoever works the hex next, and a hammered seam still closes.
+- **A gathering tree can read a hex better than the tool can work it**
+  (`seamGrade`, §7.4.3): a share of mines come up one grade past what the tool
+  reliably takes, and never past what the hex actually holds (§5.3). Capped
+  low — knowing your ground is worth a mine in eight, while a guaranteed grade
+  would be a free rung of tool and would make the ladder optional.
 
 ### 5.2 Ring layout (concentric, drives generation)
 | Ring | Contents |
@@ -313,10 +314,24 @@ standing would be a dead end rather than a decision.
 
 **Outside sight the map is not blank, it is unscouted.** Terrain is a pure
 function of `(col, row, seed)` (§5), so the client draws the land itself for
-free, at any distance, and draws a **settlement glyph** — tier only, no name —
-wherever anybody lives. What it does *not* have is anything the server alone
-knows: depletion timers, who is mining where, what a hex would pay. That is the
-whole of the difference between scouted ground and the rest.
+free, at any distance, and draws a **settlement glyph and its name** wherever
+anybody lives. What it does *not* have is anything the server alone knows:
+depletion timers, who is mining where, what a hex would pay. That is the whole
+of the difference between scouted ground and the rest.
+
+**A place's identity is terrain, and the fog was never entitled to it.** Name,
+tier and the lines it runs (§6) all fall out of `(col, row, seed)`, and the
+atlas has charted every one of them at any distance since it was built — off
+the same bundle, in the same session. Withholding them on the play map was a
+fiction rather than a fog: the client knew and pretended not to. A scouted name
+is drawn in vellum and an unscouted one dim, so the ring still means something;
+what it means is *how much of the live half you are being told*, which is the
+only half the server owns.
+
+**The lines are on the card, never on the hex.** A tile is a shape on a map,
+and a row of marks on it would be a legend to decode at a glance nobody asked
+for. Tapping a hex is the question being asked, and the card is where it is
+answered — a name, and what the place refines.
 
 Three consequences, all deliberate:
 
@@ -470,7 +485,7 @@ nothing of the kind. A hex is a **pile of work with a number on it**; a tool has
 an **attack**; the clock is what falls out of dividing one by the other.
 
 ```
-rate      = (attack + skill_attack) * (1 + tripReduction)
+rate      = (attack + skill_attack + skill_bite) * (1 + tripReduction)
 trip_time = clamp(hp / rate, 1min, 60min)
 ```
 
@@ -479,6 +494,22 @@ trip_time = clamp(hp / rate, 1min, 60min)
 - `attack`: **the whole base rate**, and it is the tool's — or, for gathering
   alone, `BARE_HAND_ATTACK` (**2**)
 - `skill_attack`: `floor(level / 10)` — five more points at maxed line skill
+- `skill_bite`: whole points off the **line's own tree** (§7.4.3), up to
+  `SKILL_BITE_CAP` (**5**)
+
+**The gathering tree buys attack, because there is no timer left to shave.** It
+used to buy `tripReduction`, and that was a percentage on this rate sharing one
+clamp with gear, options and potions (§8.1 rule 1) — so a prospector in a decent
+coat had already spent the ceiling and the ten nodes they had bought were worth
+nothing at all. That is the shape §7.4 forbids, reached through the clamp
+instead of through a missing call site.
+
+A count cannot be clamped away by a coat, and being flat inverts who it is worth
+most to: five points is most of a Stone Axe and a fifth of a Mythril Pickaxe.
+That direction is deliberate. Gear is the ladder (§8) and a tree is a **different
+road to the top rather than a longer one**, which is the same bargain
+`SKILL_PAIR_CAP` strikes on the combat side — five is about one rung of §8.0's
+ladder and never a tier of it.
 
 **HP is what the world rolls, and it is the only thing it rolls.** There used to
 be a range of *seconds* that a reference rate converted into work, which meant a
@@ -665,7 +696,7 @@ not woodcutting, so they could never pay out at all.)*
 
 | Kind | Stat | And the rest of the tree |
 |---|---|---|
-| gathering | `yield`, `tripReduction` — the two things a mine has | `toolWear`, `depletion` |
+| gathering | `yield` — the size of the haul, and the only percentage a mine has left | `bite`, `toolWear`, `seamGrade` |
 | processing | `processingSpeed` — the one thing a bench clock reads (§8.4) | `costReduction`, `batch`, `presence`, `runSlot` |
 | craft | `processingSpeed` | `costReduction`, and what the bench makes: `craftDurability`, `craftOption`, `optionTier` — or, at the consumable bench, `batch`, `brewExtra`, `stackCap` |
 | battle | none — the pair is solid (§9.5.4) | `pair`, `battleWear`, `weaponWear`, `goldFind`, `lootOption` |
@@ -751,8 +782,9 @@ a matter of judgment. A node's effect must be one of these, and nothing else:
 | `weaponWear` | The same for the blade, which pays its own stream (§9.5.6) | `SKILL_WEAPON_WEAR_CAP` (15%) |
 | `goldFind` | More of what a pack pays (§9.5.8) | `SKILL_GOLD_FIND_CAP` (25%) |
 | `lootOption` | Chance of an extra rolled option on looted gear | `SKILL_LOOT_OPTION_CAP` (25%) |
+| `bite` | Whole points of **mining** `attack` on that line (§7.3) | `SKILL_BITE_CAP` (5) |
 | `toolWear` | Share of mines that leave the line's tool untouched | `SKILL_TOOL_WEAR_CAP` (25%) |
-| `depletion` | Share of mines that take their haul off a hex without spending one of its hauls (§5.1) | `SKILL_DEPLETION_CAP` (12%) |
+| `seamGrade` | Share of mines that come up one grade past what the tool reliably takes (§5.3) | `SKILL_SEAM_GRADE_CAP` (12%) |
 | `presence` | Added to the §6.2 presence bonus, on that line's bench | `SKILL_PRESENCE_CAP` (20%) |
 | `runSlot` | Runs of that line you may keep going at once | `SKILL_RUN_SLOT_CAP` (+2) |
 | `craftOption` | Chance of an extra rolled option (§8.0.1) on what you make | `SKILL_OPTION_CHANCE_CAP` |
@@ -816,8 +848,8 @@ rule 4 stays true.
 
 The caps that are not the stat ceiling exist to protect §11 and §5.6, not §8.
 `costReduction`, `batch` and `brewExtra` thin a materials sink; `craftDurability`
-and both wear kinds thin the repair sink; `depletion` slows how fast a hex is
-worked out and `stackCap` thins the bag pressure §7.6 runs on. Left uncapped, a maxed specialist would
+and both wear kinds thin the repair sink; `seamGrade` reaches past the tool
+ladder and `stackCap` thins the bag pressure §7.6 runs on. Left uncapped, a maxed specialist would
 quietly switch off the loss the whole economy is balanced around.
 
 `bagUnits` and `bagRows` are the same argument in counts rather than
@@ -831,8 +863,8 @@ tiles, two is nineteen, three is thirty-seven, and ten would be three hundred
 and thirty-one. `SKILL_SIGHT_CAP` is a query budget rather than a balance one,
 and it is what lets sight be a reward at all instead of a scanner handed to
 anyone patient enough to walk. It is also a **count, not a percentage**, so like
-`runSlot`, `stackCap` and the bag pair it has nothing to do with the stat
-ceiling. It is capability.
+`bite`, `runSlot`, `stackCap` and the bag pair it has nothing to do with the
+stat ceiling. It is capability.
 
 **Where the trees grow now is depth, not a kind.** A node's value is read off the
 tier it sits at, so a tier-5 node of a kind is worth two or three times a tier-1
@@ -1848,11 +1880,15 @@ the game and the player saw none of it. A replay costs nothing a countdown did
 not already cost, and it is the one place the durability-as-health rule becomes
 visible: what drains on screen is what you will be paying to repair.)*
 
-**The clock is the exchange, not the monster.** A rout is over in two seconds
-and a grind against a wall takes ten — which is the whole reason to watch one —
-and the longest fight the game allows is under fifteen. It is the one clock that
-does **not** go through `scaled()`: `GAME_TIME_SCALE` compresses game hours so a
-tester need not wait them out, and an animation is not an hour.
+**The clock is the exchange, not the monster, and a round is one second.** So a
+rout is over in two or three seconds and a grind against a wall takes as long as
+the grind did — which is the whole reason to watch one: a fight that costs you a
+legendary should take longer to sit through than a fight that costs you nothing.
+The bell at sixty rounds is therefore a **full minute**, which is the ceiling and
+not the common case; a Barrow Knight in a mid kit runs about forty-five seconds.
+It is the one clock that does **not** go through `scaled()`: `GAME_TIME_SCALE`
+compresses game hours so a tester need not wait them out, and an animation is
+not an hour.
 
 **The client is handed the outcome early, and that is fine.** A fight cannot be
 abandoned (§9.5.3) and nothing is left to decide, so reading ahead buys a few
@@ -1887,41 +1923,61 @@ The pool that held you up **is** the gear, so what the exchange took off the
 pool comes off the pieces. There is nothing to convert and no second schedule to
 invent: the health bar and the repair bill are the same number read twice.
 
-**The beating lands on what was built to soak it.**
+**A quarter of what the fight took out of you. That is the whole bill.**
 
 ```
-bill   = min(damageTaken, pool * BATTLE_POOL_WEAR_CAP)    // half the pool
-share  = bill spread across the combat pieces, weighted by maxDurability
+bill  = round(damageTaken * BATTLE_WEAR_RATE)     // 25%
 ```
 
-Weighted by what a piece was built to take rather than by what is left of it, so
-a big coat takes the brunt and a nearly-broken piece is **found out** rather
-than quietly protected. Whatever a piece cannot absorb spills to the others,
-which is what lets a fight empty a pool without any of the arithmetic going
-missing.
+A player who watched their pool drop by eighty knows the bill is twenty before
+the plate says so, which is the point of drawing the exchange at all (§9.5.5).
 
-**The cap is on the bill, not on the outcome.** Now that the pool is the gear,
-an uncapped exchange in the center would strip a whole legendary set in one go —
-and §8.2's warning would be the only thing between a player and a week of work.
-The fight is still lost either way; it costs at most half.
+*(It used to be two streams — the whole of the damage capped at half the pool,
+plus a separate per-round blade bill for the rounds spent hitting armor. Between
+them they could exceed the damage taken, and neither could be predicted from the
+bar the player had just watched. One bill off one number is the version that
+makes "what drains here is the repair bill" literally true.)*
 
-**The blade pays separately, and it pays for what it was swung AT.**
+**The bill lands where the fight happened.**
 
-```
-perRound = max(1, ceil(itsDefense / WEAPON_WEAR_DIVISOR))    // divisor 8
-wear     = perRound * rounds * itsWearBias
-```
+| The monster leans on | Which means | Takes 70% |
+|---|---|---|
+| its **attack** | it beat on you | **armor · boots** |
+| its **guard** | you spent the fight hitting a wall | **weapon · gloves** |
 
-Enemy armor is what blunts a weapon, so a round against a 58-defense Barrow
-Knight costs seven and one against a Moss Hound costs one. **Bringing the wrong
-class is expensive even when it wins**, which is the entire reason the profiles
-in §9.5.2 matter — and a swift monster blunts harder than its numbers suggest,
-which is its whole `wearBias`.
+Seventy against thirty rather than all or nothing, because every combat piece
+was in the fight and the split says which part of it was the work. This is the
+surviving half of the old two-stream model: *what hit you is on the armor, what
+you hit is on the blade* is a ratio inside one bill now rather than a second
+bill of its own.
 
-Two streams rather than one, because they answer two different questions: what
-*hit you* is on the armor, and what *you hit* is on the blade. A long grind
-against a wall you can barely scratch is cheap in the first and ruinous in the
-second, which is exactly right.
+Within a half, the share is weighted by **what a piece was built to take** rather
+than by what is left of it, so a big coat takes the brunt and a nearly-broken
+piece is **found out** rather than quietly protected. Whatever a half cannot
+absorb spills to the other — a fighter with no gloves does not get a discount.
+
+**`wearBias` moves the ratio, never the total.** A Ridge Wyrm "blunts whatever it
+is hit with", so it sends half again as much of the same bill to the blade; the
+extra comes out of the worn half rather than out of thin air. A monster can
+change where a quarter lands and never how big the quarter is.
+
+**Two consequences, both chosen rather than accidental:**
+
+- **A fight that never landed on you costs nothing.** A kit strong enough to
+  take a pack untouched pays no repair bill for it. The sink (§11.1) charges the
+  fights that hurt and forgives the routs.
+- **A long grind against a gentle wall is cheap.** Seven rounds against a
+  Thornback run to three points where the old blade stream charged forty. What
+  a wall costs you now is the *time*, not the edge.
+
+Both fall out of anchoring the bill to damage **taken**, which is what buys the
+legibility above. If the repair sink ever needs the weight back, the honest
+lever is a per-round floor on the bill rather than a second stream.
+
+**The cap is the anchor, not a separate rule.** Damage taken can never exceed
+the pool, so the bill can never exceed a quarter of the kit however badly it
+went. That is a tighter promise than the old "half the pool, plus however long
+the fight ran", and it needs no constant of its own.
 
 #### 9.5.7 Death — what losing is
 
@@ -2426,10 +2482,16 @@ The working approach, after several failed attempts:
   scouting report stops, and it vanishes entirely on the road, where sight is
   zero. Every hex outside it is still walkable — the map must never imply
   otherwise.
-- **Beyond sight a tile gets its terrain color and, if anybody lives there, a
-  settlement glyph — tier only, no name.** Nothing else: no props, no slot pips,
-  no labels. The glyph is what makes deciding to walk somewhere possible; the
-  absence of everything else is what makes arriving worth something.
+- **Beyond sight a tile gets its terrain color and, if anybody lives there, its
+  settlement glyph and its name** — the name dimmed, because it is derived
+  rather than scouted (§5.6). Nothing else: no props, no slot pips, no live
+  state. The glyph and the name are what make deciding to walk somewhere
+  possible; the absence of everything else is what makes arriving worth
+  something.
+- **What a settlement processes is never drawn on the hex**, scouted or not. It
+  is on the tile card, in the portrait slot a seam fills with its material: a
+  comb of the materials each line turns out (§6), on the same nested lattice
+  the map itself tiles with.
 - **One exception, and it is one wallet wide: your own corpse** (§9.5.7). It is
   drawn through any fog at any distance, because it holds a row of yours on a
   24h clock. Anybody else's obeys the fog like everything else.
