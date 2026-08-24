@@ -616,6 +616,25 @@ export interface TravelState {
   /** Every hex crossed, from the departure tile to the destination. */
   path: Array<[number, number]>
   destinationName: string | null
+  /**
+   * §9.5.3 -- where the road ACTUALLY ends, which is not always where it was
+   * pointed. A pack ahead stops the journey on its hex.
+   *
+   * Server-computed and re-decided on every read (§16). The client counts down
+   * to `stopAt` rather than `endsAt`, because counting to the destination meant
+   * visibly arriving at the village and then snapping back down the road when
+   * the correction landed.
+   *
+   * A prediction, not a promise: whoever clears that pack first moves the
+   * answer further along. Being wrong is self-correcting -- the client asks
+   * early, is told it is still walking, and is handed the new stop.
+   */
+  stopHex: number
+  stopCol: number
+  stopRow: number
+  stopAt: number
+  /** The monster standing in the way, or null when the road is clear through. */
+  blockedBy: string | null
 }
 
 // ---------------------------------------------------------------- tiles

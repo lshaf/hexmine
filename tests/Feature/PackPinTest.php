@@ -365,6 +365,86 @@ final class PackPinTest extends TestCase
      * settle that has already walked the road does not walk it again. Without
      * that, a two-hundred hex journey rescans two hundred hexes on every poll.
      */
+    /**
+     * §9.5.3 + §16 -- the road says where it ENDS, not where it was pointed.
+     *
+     * The client counts down against this and stops the walker on it. Before
+     * it existed the only figure published was the destination clock, so a
+     * journey cut short by a pack was discovered a whole road late: the walker
+     * reached the village, and the correction on the next read snapped it back
+     * down the road it had already drawn itself walking. A fast game clock made
+     * that obvious rather than causing it.
+     *
+     * The stop is a prediction and the server still re-decides on the next read
+     * -- but the prediction and the decision are the same scan, which is the
+     * only way the two can be kept from disagreeing.
+     */
+    public function test_the_road_publishes_where_it_actually_ends(): void
+    {
+        $pack = $this->standOnAPack();
+
+        Packs::clear(
+            (int) $this->character->col,
+            (int) $this->character->row,
+            $pack['bucket'],
+            $pack['until'],
+            $this->game->now(),
+        );
+
+        $from = ['col' => (int) $this->character->col, 'row' => (int) $this->character->row];
+        $target = ['col' => $from['col'] + 40, 'row' => $from['row']];
+
+        $road = $this->game->travelTo($this->character->fresh(), $target['col'], $target['row']);
+
+        $this->assertNotNull($road);
+        $this->assertLessThanOrEqual($road['hexes'], $road['stopHex']);
+        $this->assertLessThanOrEqual($road['endsAt'], $road['stopAt']);
+
+        // Whatever it says, the stop is the hex the path holds at that index and
+        // the clock is when it would be stepped on. Anything else and the
+        // client would draw the walker somewhere the server does not have it.
+        $this->assertSame($road['path'][$road['stopHex']][0], $road['stopCol']);
+        $this->assertSame($road['path'][$road['stopHex']][1], $road['stopRow']);
+        $this->assertSame(
+            $road['startedAt'] + $road['stopHex'] * $road['perHexMs'],
+            $road['stopAt'],
+        );
+
+        if ($road['blockedBy'] === null) {
+            // A clear road is a legitimate outcome and on a sparse outer ring
+            // it is the likely one -- it just has to say so by pointing at the
+            // destination rather than at somewhere short of it.
+            $this->assertSame($road['hexes'], $road['stopHex']);
+            $this->assertSame($target['col'], $road['stopCol']);
+            $this->assertSame($road['endsAt'], $road['stopAt']);
+
+            return;
+        }
+
+        $this->assertLessThan($road['hexes'], $road['stopHex'], 'named a blocker but did not stop short');
+
+        // And the prediction is the decision: walking the clock past the stop
+        // lands the character exactly where the road said it would.
+        $arrived = new class extends GameService
+        {
+            public int $skip = 0;
+
+            public function now(): int
+            {
+                return parent::now() + $this->skip;
+            }
+        };
+        $arrived->skip = 40 * Balance::scaled(Balance::TRAVEL_MS_PER_HEX) + 1000;
+
+        $character = $this->character->fresh();
+        $arrived->settle($character);
+        $character = $character->fresh();
+
+        $this->assertSame($road['stopCol'], (int) $character->col, 'the road promised one hex and delivered another');
+        $this->assertSame($road['stopRow'], (int) $character->row);
+        $this->assertFalse($arrived->isTraveling($character));
+    }
+
     public function test_the_road_is_only_scanned_once(): void
     {
         $pack = $this->standOnAPack();

@@ -4564,16 +4564,44 @@ class GameService
 
         $path = $this->travelPath($character);
         $settlement = WorldGen::settlementAt((int) $character->travel_to_col, (int) $character->travel_to_row);
+        $perHex = $this->journeyPerHex($character);
+        $started = (int) $character->travel_started_at;
+        $hexes = count($path) - 1;
+
+        // §9.5.3 -- where the road ACTUALLY ends, which is not always where it
+        // was pointed. A pack ahead stops the journey on its hex, and the
+        // client has no other way to know: it was counting down to the
+        // destination and landing there, and the correction only arrived on the
+        // refresh that followed -- so the walker visibly reached the village
+        // and then snapped back down the road. A fast game clock made it
+        // obvious rather than causing it.
+        //
+        // Scanned from the high-water mark rather than from zero: settle() has
+        // just walked everything up to here and found nothing, so re-testing it
+        // would be the same answer at the same cost.
+        $met = Balance::packsEnabled()
+            ? $this->packOnRoad($path, $started, $perHex, (int) $character->travel_scanned_hexes + 1, $hexes)
+            : null;
 
         return [
             'toCol' => (int) $character->travel_to_col,
             'toRow' => (int) $character->travel_to_row,
             'startedAt' => (int) $character->travel_started_at,
             'endsAt' => (int) $character->travel_ends_at,
-            'perHexMs' => $this->journeyPerHex($character),
-            'hexes' => count($path) - 1,
+            'perHexMs' => $perHex,
+            'hexes' => $hexes,
             'path' => array_map(fn (array $hex) => [$hex['col'], $hex['row']], $path),
             'destinationName' => $settlement['name'] ?? null,
+            // A prediction, not a promise: the server still re-decides on the
+            // next read (§16), and whoever clears that pack first moves the
+            // answer further down the road. Being wrong is self-correcting --
+            // the client asks early, is told it is still walking, and is handed
+            // the new stop.
+            'stopHex' => $met['index'] ?? $hexes,
+            'stopCol' => $met['col'] ?? (int) $character->travel_to_col,
+            'stopRow' => $met['row'] ?? (int) $character->travel_to_row,
+            'stopAt' => $met['at'] ?? (int) $character->travel_ends_at,
+            'blockedBy' => $met === null ? null : (Monsters::ROSTER[$met['key']]['name'] ?? $met['key']),
         ];
     }
 
@@ -4624,7 +4652,41 @@ class GameService
             return false;
         }
 
-        for ($i = $scanned + 1; $i <= $reached; $i++) {
+        $met = $this->packOnRoad($path, $started, $perHex, $scanned + 1, $reached);
+
+        if ($met !== null) {
+            $character->col = $met['col'];
+            $character->row = $met['row'];
+            $this->clearTravel($character);
+            $this->grantExplorerXp($character, $met['index']);
+
+            return true;
+        }
+
+        $character->travel_scanned_hexes = $reached;
+
+        return true;
+    }
+
+    /**
+     * §9.5.3 -- the first hex on this stretch of road that something is standing on.
+     *
+     * Shared by the two questions that both need it and must never disagree:
+     * interceptIfDue() asks about the stretch already WALKED, and travelState()
+     * asks about the stretch still AHEAD so the client knows where the road
+     * really ends. One scan, one answer.
+     *
+     * Each hex is tested at the time it would be stepped on, never at the time
+     * the question is asked -- so the answer about the road ahead is the same
+     * answer that will be given when the walker gets there, and an hour offline
+     * resolves to the same road as an hour watching (§16).
+     *
+     * @param  list<array{col:int,row:int}>  $path
+     * @return array{index:int,col:int,row:int,at:int,key:string}|null
+     */
+    private function packOnRoad(array $path, int $started, int $perHex, int $from, int $to): ?array
+    {
+        for ($i = max(1, $from); $i <= min(count($path) - 1, $to); $i++) {
             $hex = $path[$i];
             $steppedAt = $started + $i * $perHex;
 
@@ -4633,21 +4695,22 @@ class GameService
                 continue;
             }
 
+            // Shared, and the one thing the hash cannot know (§9.5.1). A pack
+            // somebody else settled before you got there is one you walk past.
             if (Packs::isCleared($hex['col'], $hex['row'], $pack['bucket'])) {
                 continue;
             }
 
-            $character->col = $hex['col'];
-            $character->row = $hex['row'];
-            $this->clearTravel($character);
-            $this->grantExplorerXp($character, $i);
-
-            return true;
+            return [
+                'index' => $i,
+                'col' => $hex['col'],
+                'row' => $hex['row'],
+                'at' => $steppedAt,
+                'key' => $pack['key'],
+            ];
         }
 
-        $character->travel_scanned_hexes = $reached;
-
-        return true;
+        return null;
     }
 
     /** Land a journey whose clock has run out. Called from settle, never directly. */

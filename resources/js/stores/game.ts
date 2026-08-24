@@ -482,20 +482,32 @@ export const useGame = defineStore('game', () => {
     const journey = travel.value
     if (!journey) return 0
 
-    return Math.max(0, Math.min(journey.hexes, (now.value - journey.startedAt) / journey.perHexMs))
+    // §9.5.3 -- clamped to where the road actually ends, not to where it was
+    // pointed. The walker used to run the full length and land on the village,
+    // and the correction only arrived on the refresh after that -- so the
+    // marker visibly arrived and then snapped back down the road.
+    return Math.max(0, Math.min(journey.stopHex, (now.value - journey.startedAt) / journey.perHexMs))
   })
 
   /** Whole hexes already banked -- what stopping right now would keep. */
   const travelHexesWalked = computed(() => Math.floor(travelProgress.value))
 
+  /** Time to where the journey ENDS, which a pack ahead can bring forward. */
   const travelRemainingMs = computed(() =>
-    travel.value ? Math.max(0, travel.value.endsAt - now.value) : 0,
+    travel.value ? Math.max(0, travel.value.stopAt - now.value) : 0,
   )
+
+  /** §9.5.3 -- what is standing on the road, once it is close enough to matter. */
+  const travelBlockedBy = computed(() => travel.value?.blockedBy ?? null)
 
   /**
    * A journey lands on the server's clock, not on a request, and nothing pushes
    * that news down. So when the countdown runs out the client asks -- once, on
    * the edge, because the answer clears `travel` and the edge cannot repeat.
+   *
+   * It counts to `stopAt` rather than `endsAt`, so a journey cut short by a
+   * pack asks at the moment it is cut short. Asking at the destination meant
+   * every interception was discovered a whole road late.
    */
   watch(
     () => travel.value !== null && travelRemainingMs.value === 0,
@@ -931,7 +943,7 @@ export const useGame = defineStore('game', () => {
     questDefs, quests, questsReady, questReward,
     activeJobs, fieldJob, workFull, benchJobs, benchReady, benchHere, underfoot, selectedTile,
     currentSettlement, shopStock, sight, travelPerHexMs, travelEta,
-    travel, travelProgress, travelHexesWalked, travelRemainingMs,
+    travel, travelProgress, travelHexesWalked, travelRemainingMs, travelBlockedBy,
     // helpers
     tileAt, held, note,
     // actions
