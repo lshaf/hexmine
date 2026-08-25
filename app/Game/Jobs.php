@@ -86,7 +86,7 @@ final class Jobs
     /**
      * §7.5 -- the kind with one member, and every rule of §7.4 bent.
      *
-     * A wayfaring job is granted, not bought: its nodes arrive at their job
+     * A wayfaring job is free, not bought: its nodes are claimed at their job
      * level and cost no skill point. That is only safe because there is exactly
      * one of them and it is five nodes long -- a second free tree would make the
      * hundred-point cap (§7.4.1) a suggestion.
@@ -115,7 +115,7 @@ final class Jobs
      * @var array<string,array<string,string>>
      */
     public const JOBS = [
-        'explorer' => ['name' => 'Explorer', 'kind' => self::WAYFARING, 'source' => 'travel', 'palette' => 'fiber', 'description' => 'Levels by walking, and by nothing else. Its skills are not bought -- they arrive as you go.'],
+        'explorer' => ['name' => 'Explorer', 'kind' => self::WAYFARING, 'source' => 'travel', 'palette' => 'fiber', 'description' => 'Levels by walking. Its skills cost no point -- walk far enough and claim them.'],
         'woodcutting' => ['name' => 'Woodcutting', 'kind' => self::GATHERING, 'source' => 'woodcutting', 'palette' => 'wood', 'description' => 'Forest work. Its level is the skill you already carry, and it still takes time off the mine.'],
         'mining' => ['name' => 'Mining', 'kind' => self::GATHERING, 'source' => 'mining', 'palette' => 'iron', 'description' => 'Mountain seams, and the patience a shaft asks for.'],
         'hunting' => ['name' => 'Hunting', 'kind' => self::GATHERING, 'source' => 'hunting', 'palette' => 'pelt', 'description' => 'Any ground a herd wanders onto. Pelt, horn, sinew, and the animal itself.'],
@@ -703,7 +703,7 @@ final class Jobs
     }
 
     /**
-     * §7.5 -- true for a job whose nodes are granted by job level rather than
+     * §7.5 -- true for a job whose nodes cost no skill point, gated by job level rather than
      * bought with a point.
      *
      * Asked as a question about the *kind* rather than a hardcoded 'explorer',
@@ -740,19 +740,6 @@ final class Jobs
      * @param  array<string,int>  $jobLevels
      * @return array<int,string>
      */
-    public static function granted(array $jobLevels): array
-    {
-        $out = [];
-
-        foreach (self::NODES as $key => $node) {
-            if (self::isAutomatic($node['job']) && ($jobLevels[$node['job']] ?? 0) >= $node['jobLevel']) {
-                $out[] = $key;
-            }
-        }
-
-        return $out;
-    }
-
     /** @return array<string,array<string,mixed>> */
     public static function nodesFor(string $job): array
     {

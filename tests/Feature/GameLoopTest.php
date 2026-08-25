@@ -910,7 +910,7 @@ final class GameLoopTest extends TestCase
             config(['game.map.seed' => '0xdeadbeef', 'game.map.radius' => 40]);
             WorldGen::forget();
 
-            $this->assertSame(0xdeadbeef, Balance::mapSeed(), 'the seed did not come from config');
+            $this->assertSame(0xDEADBEEF, Balance::mapSeed(), 'the seed did not come from config');
             $this->assertSame(40, Balance::mapRadius());
             $this->assertSame(81, Balance::mapSize(), 'the count is not derived from the radius');
 
@@ -947,12 +947,12 @@ final class GameLoopTest extends TestCase
             WorldGen::forget();
             $hex = Balance::mapSeed();
 
-            config(['game.map.seed' => (string) 0x5eed1a3f]);
+            config(['game.map.seed' => (string) 0x5EED1A3F]);
             WorldGen::forget();
             $this->assertSame($hex, Balance::mapSeed(), 'decimal and hex disagree');
 
             // Anything wider than the hash is masked, not silently divergent.
-            config(['game.map.seed' => 0x1_5eed_1a3f]);
+            config(['game.map.seed' => 0x1_5EED_1A3F]);
             WorldGen::forget();
             $this->assertSame($hex, Balance::mapSeed(), 'the seed was not masked to 32 bits');
         } finally {
@@ -2428,7 +2428,7 @@ final class GameLoopTest extends TestCase
 
         // Several rolls rather than one, so the assertion is about the ladder
         // rather than about whichever hex hash zero happens to produce.
-        foreach ([0, 1, 7, 12345, 999983, 0xffffffff] as $hash) {
+        foreach ([0, 1, 7, 12345, 999983, 0xFFFFFFFF] as $hash) {
             $base = Formulas::mineTime(
                 WorldGen::tileHp($hash, 'common'),
                 $fresh,
@@ -2466,7 +2466,7 @@ final class GameLoopTest extends TestCase
      */
     public function test_better_ground_is_strictly_more_work_at_one_rung(): void
     {
-        foreach ([0, 1, 7, 12345, 999983, 0xffffffff] as $hash) {
+        foreach ([0, 1, 7, 12345, 999983, 0xFFFFFFFF] as $hash) {
             $previous = 0;
             foreach (array_keys(Balance::TILE_HP_GRADE_ATTACK) as $grade) {
                 $hp = WorldGen::tileHp($hash, $grade);
@@ -2490,7 +2490,7 @@ final class GameLoopTest extends TestCase
             Balance::TILE_HP_GRADE_ATTACK['common'],
         );
 
-        foreach ([0, 1, 12345, 0xffffffff] as $hash) {
+        foreach ([0, 1, 12345, 0xFFFFFFFF] as $hash) {
             $this->assertSame(
                 Hash::randInt($hash, Balance::TILE_HP_MIN, Balance::TILE_HP_MAX),
                 WorldGen::tileHp($hash, 'common'),
@@ -3791,6 +3791,30 @@ final class GameLoopTest extends TestCase
     }
 
     /**
+     * §7.5 -- walk far enough, then take what the walking opened.
+     *
+     * Free is not automatic: reaching the level makes a skill claimable and
+     * nothing more. Declaration order is dependency order, so claiming down the
+     * list never asks for a parent that is not already held.
+     */
+    private function claimExplorerTo(int $level): void
+    {
+        $this->explorerAt($level);
+
+        $held = $this->game->ownedNodes($this->character->fresh());
+
+        foreach (Jobs::nodesFor('explorer') as $key => $node) {
+            if ($node['jobLevel'] > $level || in_array($key, $held, true)) {
+                continue;
+            }
+
+            $this->game->buyNode($this->character->fresh(), $key);
+        }
+
+        $this->character->unsetRelation('nodes');
+    }
+
+    /**
      * §7.5 -- the road pays the Explorer and nobody else.
      *
      * Both halves matter. Walking has to level *something*, or a map with no
@@ -3841,45 +3865,51 @@ final class GameLoopTest extends TestCase
     }
 
     /**
-     * §7.5 -- the chain is granted, and granted means free.
+     * §7.5 -- the chain is free, and free still has to be taken.
      *
      * If a wayfaring node ever cost a point, the hundred-point cap (§7.4.1)
      * would quietly become ninety-five, and the tree that is supposed to reward
      * walking would start competing with the benches instead.
      */
-    public function test_explorer_skills_arrive_unbought_and_cost_no_points(): void
+    public function test_explorer_skills_are_claimed_and_cost_no_points(): void
     {
-        // §7.5 -- a character who has walked nowhere owns nothing. The first
-        // row waits for Explorer 2, not 1: a granted node has no point paying
-        // for it, so the walk is the price.
+        // A character who has walked nowhere owns nothing, and reaching the
+        // level does not hand anything over either.
         $this->assertNotContains('explorer.deep_pockets', $this->game->ownedNodes($this->character));
 
-        // §7.5 -- one skill per level, not a row at a time. Level 2 pays for
-        // the first of row one and nothing else in it.
         $this->explorerAt(2);
+        $this->assertNotContains(
+            'explorer.deep_pockets',
+            $this->game->ownedNodes($this->character->fresh()),
+            'a wayfaring skill arrived on its own -- it is claimed, not granted',
+        );
+
+        // §7.5 -- one skill per level, not a row at a time. Level 2 opens the
+        // first of row one and nothing else in it.
+        $this->game->buyNode($this->character->fresh(), 'explorer.deep_pockets');
         $owned = $this->game->ownedNodes($this->character->fresh());
         $this->assertContains('explorer.deep_pockets', $owned);
-        $this->assertNotContains('explorer.second_strap', $owned, 'the whole row arrived for one level');
+        $this->assertNotContains('explorer.second_strap', $owned, 'the whole row opened for one level');
         $this->assertSame(0, $this->game->skillPoints($this->character)['spent']);
 
-        $this->explorerAt(4);
+        $this->claimExplorerTo(4);
 
-        $this->assertContains('explorer.second_strap', $this->game->ownedNodes($this->character));
+        $this->assertContains('explorer.second_strap', $this->game->ownedNodes($this->character->fresh()));
         $this->assertSame(
             0,
-            $this->game->skillPoints($this->character)['spent'],
-            'a granted node was billed to the point ledger',
+            $this->game->skillPoints($this->character->fresh())['spent'],
+            'a free node was billed to the point ledger',
         );
     }
 
-    /** And what is granted is not for sale, however many points you are holding. */
-    public function test_an_explorer_skill_cannot_be_bought(): void
+    /** And no amount of points buys one early: the walking is the price. */
+    public function test_an_explorer_skill_cannot_be_claimed_early(): void
     {
         $this->character->update(['level' => 40]);
-        $this->explorerAt(30);
+        $this->explorerAt(1);
 
         $this->expectException(GameException::class);
-        $this->game->buyNode($this->character->fresh(), 'explorer.horizon_line');
+        $this->game->buyNode($this->character->fresh(), 'explorer.deep_pockets');
     }
 
     /** §7.5 -- two hexes of eye on top of the base one, earned one at a time. */
@@ -3889,10 +3919,10 @@ final class GameLoopTest extends TestCase
 
         // High Ground, the end of row two. The eye is the rarest thing the road
         // pays in, so it arrives later than a strap does.
-        $this->explorerAt(12);
+        $this->claimExplorerTo(12);
         $this->assertSame(Balance::SIGHT_RADIUS + 1, $this->game->sightRadius($this->character->fresh()));
 
-        $this->explorerAt(Balance::JOB_MAX_LEVEL);
+        $this->claimExplorerTo(Balance::JOB_MAX_LEVEL);
         $this->assertSame(
             Balance::SIGHT_RADIUS + Balance::SKILL_SIGHT_CAP,
             $this->game->sightRadius($this->character->fresh()),
@@ -4195,19 +4225,28 @@ final class GameLoopTest extends TestCase
         $this->assertSame(Balance::BAG_UNITS, $bag['unitCap']);
         $this->assertSame(Balance::BAG_ROWS, $bag['rowCap']);
 
+        // Reaching the level is not having the skill (§7.5): it opens, and
+        // then it is claimed.
+        $this->explorerAt(2);
+        $this->assertSame(
+            Balance::BAG_UNITS,
+            $this->game->bag($this->character->fresh())['unitCap'],
+            'the pack widened without anybody claiming anything',
+        );
+
         // The first skill, at Explorer 2: four hexes of walking, ten units of
         // pack. One skill per level, so the straps are still a level away.
-        $this->explorerAt(2);
+        $this->claimExplorerTo(2);
         $bag = $this->game->bag($this->character->fresh());
         $this->assertSame(Balance::BAG_UNITS + 10, $bag['unitCap']);
         $this->assertSame(Balance::BAG_ROWS, $bag['rowCap'], 'the straps arrived with the room');
 
-        $this->explorerAt(4);
+        $this->claimExplorerTo(4);
         $bag = $this->game->bag($this->character->fresh());
         $this->assertSame(Balance::BAG_UNITS + 10, $bag['unitCap']);
         $this->assertSame(Balance::BAG_ROWS + 4, $bag['rowCap']);
 
-        $this->explorerAt(Balance::JOB_MAX_LEVEL);
+        $this->claimExplorerTo(Balance::JOB_MAX_LEVEL);
         $bag = $this->game->bag($this->character->fresh());
         $this->assertSame(Balance::BAG_UNITS + Balance::SKILL_BAG_UNITS_CAP, $bag['unitCap']);
         $this->assertSame(Balance::BAG_ROWS + Balance::SKILL_BAG_ROWS_CAP, $bag['rowCap']);

@@ -185,15 +185,16 @@ const bands = computed<Band[]>(() => {
   return out
 })
 
-type NodeState = 'owned' | 'open' | 'no-points' | 'locked-level' | 'locked-parent' | 'waiting'
+type NodeState = 'owned' | 'open' | 'no-points' | 'locked-level' | 'locked-parent'
 
 function stateOf(key: string, def: NodeDef): NodeState {
   if (game.ownedNodes.has(key)) return 'owned'
   if (jobRow.value.level < def.jobLevel) return 'locked-level'
-  // §7.5 -- a granted node that is not owned yet is simply not reached yet.
-  // It can never be 'open': there is no button, so offering one would be a lie.
-  if (automatic.value) return 'waiting'
   if (!def.requires.every((r) => game.ownedNodes.has(r))) return 'locked-parent'
+  // §7.5 -- free, but still taken. Walking is the price and the job level is
+  // the receipt, so the only thing between a reached node and having it is
+  // pressing for it.
+  if (automatic.value) return 'open'
   if (game.skillPoints.available < 1) return 'no-points'
   return 'open'
 }
@@ -204,11 +205,7 @@ function reasonFor(key: string, def: NodeDef): string {
     case 'owned':
       return 'Learned.'
     case 'locked-level':
-      return automatic.value
-        ? `Arrives at ${jobDef.value?.name} level ${def.jobLevel}. You are ${jobRow.value.level}.`
-        : `Needs ${jobDef.value?.name} level ${def.jobLevel}. You are ${jobRow.value.level}.`
-    case 'waiting':
-      return 'Arrives on its own. Nothing to spend.'
+      return `Needs ${jobDef.value?.name} level ${def.jobLevel}. You are ${jobRow.value.level}.`
     case 'locked-parent': {
       const missing = def.requires
         .filter((r) => !game.ownedNodes.has(r))
@@ -218,7 +215,7 @@ function reasonFor(key: string, def: NodeDef): string {
     case 'no-points':
       return 'No points left. Level up to earn one.'
     default:
-      return 'Ready to learn.'
+      return automatic.value ? 'Ready to claim.' : 'Ready to learn.'
   }
 }
 
@@ -290,58 +287,72 @@ const EFFECT_ICON: Record<NodeEffect['kind'], string> = {
  * place to compare two nodes, because the eye has to find the number before it
  * can weigh anything. Split, three nodes read down a column.
  */
-function effectPhrase(effect: NodeEffect): string {
+/**
+ * What the node does, as one phrase with the number in it.
+ *
+ * "+1% woodcutting yield", not "Raises your Yield, on this job's work only."
+ * over a separate row reading "+1%". Two nodes are compared by reading two of
+ * these side by side, and a sentence with the figure buried in it is the
+ * hardest possible shape to do that from.
+ *
+ * The job's name is in the phrase wherever the effect is line-locked (§7.4.3),
+ * because "+1% yield" and "+1% yield ON THIS LINE" are different offers and the
+ * lock is the whole reason a tree is worth choosing between.
+ */
+function effectPhrase(effect: NodeEffect, jobName?: string): string {
+  const on = jobName ? `${jobName.toLowerCase()} ` : ''
+  const pct = formatPercent(effect.value)
+  const n = effect.value
+
   switch (effect.kind) {
     case 'stat':
-      // The words STAT_LABEL already uses, so a tree node and an item chip
-      // name the same stat the same way.
-      return `Raises your ${STAT_LABEL[effect.stat as StatKey]}, on this job's work only.`
+      return `${pct} ${on}${STAT_LABEL[effect.stat as StatKey].toLowerCase()}`
     case 'pair':
-      return `Adds whole points of ${effect.stat} to your kit.`
-    case 'battleWear':
-      return 'Spares some of what a fight takes off your armor.'
-    case 'weaponWear':
-      return 'Spares some of what a fight takes off the weapon you swing.'
-    case 'toolWear':
-      return 'Some mines leave the line\'s tool untouched.'
+      return `+${n} ${effect.stat}`
     case 'bite':
-      return 'Bites deeper into every hex on this line.'
-    case 'seamGrade':
-      return 'Some mines come up a grade better than your tool can reliably take.'
-    case 'presence':
-      return 'The bench runs faster while you stand at it.'
-    case 'runSlot':
-      return 'Keeps another run of this line going at one settlement.'
-    case 'goldFind':
-      return 'A pack pays out more.'
-    case 'lootOption':
-      return 'Gear taken off a monster carries an extra bonus line more often.'
-    case 'craftOption':
-      return 'What you make carries an extra bonus line more often.'
-    case 'optionTier':
-      return 'A bonus line is drawn from a deeper grade, never past the rung.'
-    case 'craftDurability':
-      return 'What you make comes off the bench with more durability.'
-    case 'brewExtra':
-      return 'A brew sometimes yields an extra flask.'
-    case 'stackCap':
-      return 'Deepens the shelf for every potion you carry.'
+      return `+${n} ${on}mining attack`
+    case 'battleWear':
+      return `${pct} armor wear in a fight`
+    case 'weaponWear':
+      return `${pct} weapon wear in a fight`
     case 'costReduction':
-      return 'Every craft eats fewer materials.'
+      return `${pct} materials per craft`
+    case 'toolWear':
+      return `${pct} chance a mine spares the tool`
+    case 'seamGrade':
+      return `${pct} chance of a grade better`
+    case 'presence':
+      return `${pct} bench speed while you stand there`
+    case 'runSlot':
+      return `+${n} run of this line at once`
+    case 'goldFind':
+      return `${pct} gold from a pack`
+    case 'lootOption':
+      return `${pct} chance of an extra line on loot`
+    case 'craftOption':
+      return `${pct} chance of an extra line on what you make`
+    case 'optionTier':
+      return `${pct} chance a line is drawn a grade deeper`
+    case 'craftDurability':
+      return `${pct} durability on what you make`
+    case 'brewExtra':
+      return `${pct} chance of an extra flask`
+    case 'stackCap':
+      return `+${n} to every potion stack`
     case 'batch':
-      return 'Every craft and every run makes more.'
-    case 'sight':
-      return 'Widens how far you can see from where you stand.'
-    case 'bagUnits':
-      return 'Your bag holds more.'
-    case 'bagRows':
-      return 'Your bag holds more different things.'
+      return `${pct} output per craft and run`
     case 'skillPower':
-      return "Sharpens what your weapon's three skills do."
+      return `${pct} on your weapon's three skills`
     case 'skillCooldown':
-      return "Your weapon's skills come round sooner."
+      return `−${n} round${n === 1 ? '' : 's'} on every skill cooldown`
     case 'skillStun':
-      return 'A stun holds your foe longer.'
+      return `+${n} round on a stun`
+    case 'sight':
+      return `+${n} hex of sight`
+    case 'bagUnits':
+      return `+${n} bag units`
+    case 'bagRows':
+      return `+${n} bag rows`
   }
 }
 
@@ -417,10 +428,21 @@ const progress = computed(() => {
   return { owned: mine.filter((k) => game.ownedNodes.has(k)).length, total: mine.length }
 })
 
+/**
+ * §7.4.3 -- the job's name, but only for the kinds that are locked to it.
+ *
+ * A gathering node's yield counts in its forest and nowhere else; a bag node
+ * counts everywhere. Naming the job on both would make the lock meaningless by
+ * saying it about things that do not have one.
+ */
+const SCOPED: ReadonlySet<string> = new Set(['stat', 'bite', 'toolWear', 'seamGrade', 'presence', 'runSlot'])
+
+const scopedName = computed(() =>
+  picked.value && SCOPED.has(chosen.value?.def.effect.kind ?? '') ? jobDef.value?.name : undefined,
+)
+
 async function learn(): Promise<void> {
-  // §7.5 -- the server refuses a granted node, and so does the button that
-  // never renders for one. This is the third guard, for the keyboard path.
-  if (!picked.value || automatic.value) return
+  if (!picked.value) return
   await game.buyNode(picked.value)
 }
 </script>
@@ -501,7 +523,7 @@ async function learn(): Promise<void> {
             footnote restating that, were three copies of one sentence stacked
             around a tree nobody could see for the prose.
           -->
-          <p v-if="automatic" class="tiny granted">Granted as you level — nothing here is bought.</p>
+          <p v-if="automatic" class="tiny granted">Free — walk far enough, then claim.</p>
         </header>
 
         <!-- The strata. Depth in the gutter, the seam beside it. -->
@@ -550,13 +572,9 @@ async function learn(): Promise<void> {
              carrying every figure, then flavour last and quietest. It was one
              sentence with the number buried in it, which is the hardest place
              to compare two nodes from. -->
-        <p class="tiny does">{{ effectPhrase(chosen.def.effect) }}</p>
+        <p class="does">{{ effectPhrase(chosen.def.effect, scopedName) }}</p>
 
         <div class="stats">
-          <div class="stat tiny">
-            <span class="muted">This node</span>
-            <span class="readout">{{ effectValue(chosen.def.effect) }}</span>
-          </div>
           <div v-if="total" class="stat tiny">
             <span class="muted">Learned so far</span>
             <span class="readout" :class="{ capped: total.now === total.cap }">
@@ -575,21 +593,19 @@ async function learn(): Promise<void> {
           </div>
         </div>
 
-        <p class="tiny flavour">{{ chosen.def.description }}</p>
-
         <div class="row-between foot">
           <span class="tiny" :class="stateOf(chosen.key, chosen.def) === 'open' ? 'ready' : 'muted'">
             {{ reasonFor(chosen.key, chosen.def) }}
           </span>
           <button
-            v-if="!automatic && stateOf(chosen.key, chosen.def) !== 'owned'"
+            v-if="stateOf(chosen.key, chosen.def) !== 'owned'"
             class="btn btn-sm"
             :class="{ 'btn-primary': stateOf(chosen.key, chosen.def) === 'open' }"
             type="button"
             :disabled="game.busy || stateOf(chosen.key, chosen.def) !== 'open'"
             @click="learn"
           >
-            Learn · 1 point
+            {{ automatic ? 'Claim' : 'Learn · 1 point' }}
           </button>
         </div>
       </div>
@@ -916,13 +932,19 @@ async function learn(): Promise<void> {
   margin: 6px 0 0;
 }
 
-/* The line that says what happens. No figure is allowed in it -- they are all
-   in the rows below, where three nodes can be compared down a column. */
+/*
+ * What the node does, figure included, and the only sentence on the card.
+ *
+ * The rule used to be the opposite -- no figure here, all of them in labelled
+ * rows underneath -- which meant reading a node took a sentence plus a table.
+ * Set at the size of a reading rather than a caption, because it IS the answer.
+ */
 .does {
-  margin: 7px 0 0;
+  margin: 8px 0 0;
   color: var(--vellum);
+  font-size: 13px;
   text-align: left;
-  line-height: 1.45;
+  line-height: 1.4;
 }
 
 .stats {
@@ -954,14 +976,6 @@ async function learn(): Promise<void> {
 }
 
 /* Flavour is not a mechanic. Last, quietest, and the only italic here. */
-.flavour {
-  margin: 8px 0 0;
-  color: var(--vellum-dim);
-  font-style: italic;
-  line-height: 1.45;
-  opacity: 0.72;
-  text-align: left;
-}
 
 .foot {
   margin-top: 10px;

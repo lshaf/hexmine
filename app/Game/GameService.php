@@ -5493,7 +5493,15 @@ class GameService
     public function skillPoints(Character $character): array
     {
         $total = Balance::skillPointsFor($character->level);
-        $spent = $character->nodes()->count();
+
+        // §7.5 -- the wayfaring tree is free, so its rows are not spending.
+        // Counting every row was safe while those nodes were never written
+        // down; now that they are claimed, the ledger has to tell the two kinds
+        // apart or a long walk would quietly eat the hundred-point cap.
+        $spent = $character->nodes()
+            ->pluck('node_key')
+            ->reject(fn (string $key) => Jobs::isAutomatic(Jobs::node($key)['job'] ?? ''))
+            ->count();
 
         return [
             'total' => $total,
@@ -5851,23 +5859,20 @@ class GameService
     }
 
     /**
-     * §7.4 + §7.5 -- every node this character has, however it got there.
+     * §7.4 + §7.5 -- every node this character has, and there is one place to
+     * look.
      *
-     * Two sources, and only one of them is a table. Bought nodes are rows;
-     * wayfaring nodes are a function of a job level and are never written down,
-     * because a granted row would be a second place for "do you have this yet"
-     * to be answered and the two would eventually disagree. It also means the
-     * point ledger stays honest: `skillPoints()` counts rows, so a granted node
-     * cannot cost a point by accident.
+     * Wayfaring nodes used to be derived from the job level instead of stored,
+     * so that a free skill could never cost a point by accident. They are
+     * claimed now (see buyNode), which makes them rows like everything else --
+     * and the point ledger stays honest by asking what KIND a row is rather
+     * than by keeping some rows out of the table.
      *
      * @return array<int,string>
      */
     public function ownedNodes(Character $character): array
     {
-        return array_merge(
-            $character->nodes()->pluck('node_key')->all(),
-            Jobs::granted($this->jobLevels($character)),
-        );
+        return $character->nodes()->pluck('node_key')->all();
     }
 
     /** One job's capped non-stat effects, or zeroes. */
@@ -5915,21 +5920,23 @@ class GameService
                 throw new GameException('No such skill.', 'not_found');
             }
 
-            if (Jobs::isAutomatic($node['job'])) {
-                $name = Jobs::JOBS[$node['job']]['name'];
-                throw new GameException(
-                    "{$name} skills are not bought. {$node['name']} arrives at {$name} level {$node['jobLevel']}.",
-                    'granted',
-                );
-            }
-
             if ($character->nodes()->where('node_key', $nodeKey)->exists()) {
                 throw new GameException("You already have {$node['name']}.", 'owned');
             }
 
-            $points = $this->skillPoints($character);
-            if ($points['available'] < 1) {
-                throw new GameException('No skill points left. Level up first.', 'no_points');
+            // §7.5 -- a wayfaring skill is CLAIMED, not bought. The walking is
+            // its price and the job level is the receipt, so no point is spent;
+            // everything else about taking it is the same as any other node.
+            //
+            // It used to arrive on its own the moment the level did. Nothing
+            // announced it, so the reward for a thousand hexes was a panel that
+            // had quietly changed since you last looked at it. Pressing for it
+            // is the difference between being paid and finding money.
+            if (! Jobs::isAutomatic($node['job'])) {
+                $points = $this->skillPoints($character);
+                if ($points['available'] < 1) {
+                    throw new GameException('No skill points left. Level up first.', 'no_points');
+                }
             }
 
             $jobLevel = $this->jobLevels($character)[$node['job']] ?? 1;

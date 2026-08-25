@@ -19,28 +19,28 @@ export interface BattleSkillDef {
   glyph: string
   cooldown: number
   /**
-   * §9.5.9 -- what it does, in a verb-first sentence with NO figure in it.
+   * Flavour, and flavour only.
    *
-   * Safe to mirror for exactly that reason: every number a skill has lives in
-   * a labelled row the server derives, and a test pins that a maxed tree does
-   * not move this sentence. The preview and the bench both have to say what a
-   * skill does before any fight has run, and a fetch that has not landed would
-   * leave them holding a name and nothing else.
+   * What the skill DOES is a sentence with the player's own figures in it, and
+   * it is generated server-side per player (BattleSkills::sentence) because
+   * `skillStun` and `skillPower` move those figures. A copy here could only
+   * ever be one character's numbers frozen into everybody's bundle, so the
+   * mirror holds identity -- name, glyph, family, cooldown -- and nothing that
+   * a skill point can change.
    */
-  effect: string
   description: string
 }
 
 export const BATTLE_SKILLS: Record<string, BattleSkillDef> = {
-  shield_bash: { key: "shield_bash", family: "shield", name: "Shield Bash", glyph: "bash", cooldown: 11, effect: "Slam the rim into your foe, stunning it.", description: "They teach you early that the rim is a weapon. Most people find out later." },
-  anvil_stance: { key: "anvil_stance", family: "shield", name: "Anvil Stance", glyph: "anvil", cooldown: 14, effect: "Set behind your shield. Part of every blow is stored rather than suffered, then returned all at once.", description: "Feet planted, shoulder set. Let it come." },
-  wardens_toll: { key: "wardens_toll", family: "shield", name: "Warden's Toll", glyph: "toll", cooldown: 12, effect: "Swing with everything you are wearing behind it.", description: "Everything the smith gave you, given back at once." },
-  onslaught: { key: "onslaught", family: "sword", name: "Onslaught", glyph: "onslaught", cooldown: 10, effect: "Press the attack, striking twice each round.", description: "Never give it a round to think in." },
-  sunder: { key: "sunder", family: "sword", name: "Sunder", glyph: "sunder", cooldown: 12, effect: "Cut into your foe's guard. It does not recover.", description: "Armor was only ever a delay." },
-  riposte: { key: "riposte", family: "sword", name: "Riposte", glyph: "riposte", cooldown: 13, effect: "Answer every blow the moment it lands.", description: "The blade was already going back before you decided to send it." },
-  ember_bolt: { key: "ember_bolt", family: "focus", name: "Ember Bolt", glyph: "ember", cooldown: 11, effect: "Burn your foe through its guard, and leave it burning.", description: "It goes in cold and it does not come out." },
-  chain_arc: { key: "chain_arc", family: "focus", name: "Chain Arc", glyph: "arc", cooldown: 10, effect: "Loose the charge you have been building all fight.", description: "You have been holding this since the first round." },
-  rune_of_binding: { key: "rune_of_binding", family: "focus", name: "Rune of Binding", glyph: "bind", cooldown: 15, effect: "Bind your foe where it stands, stunning it.", description: "One syllable, and it forgets what it was doing." },
+  shield_bash: { key: "shield_bash", family: "shield", name: "Shield Bash", glyph: "bash", cooldown: 11, description: "They teach you early that the rim is a weapon. Most people find out later." },
+  anvil_stance: { key: "anvil_stance", family: "shield", name: "Anvil Stance", glyph: "anvil", cooldown: 14, description: "Feet planted, shoulder set. Let it come." },
+  wardens_toll: { key: "wardens_toll", family: "shield", name: "Warden's Toll", glyph: "toll", cooldown: 12, description: "Everything the smith gave you, given back at once." },
+  onslaught: { key: "onslaught", family: "sword", name: "Onslaught", glyph: "onslaught", cooldown: 10, description: "Never give it a round to think in." },
+  sunder: { key: "sunder", family: "sword", name: "Sunder", glyph: "sunder", cooldown: 12, description: "Armor was only ever a delay." },
+  riposte: { key: "riposte", family: "sword", name: "Riposte", glyph: "riposte", cooldown: 13, description: "The blade was already going back before you decided to send it." },
+  ember_bolt: { key: "ember_bolt", family: "focus", name: "Ember Bolt", glyph: "ember", cooldown: 11, description: "It goes in cold and it does not come out." },
+  chain_arc: { key: "chain_arc", family: "focus", name: "Chain Arc", glyph: "arc", cooldown: 10, description: "You have been holding this since the first round." },
+  rune_of_binding: { key: "rune_of_binding", family: "focus", name: "Rune of Binding", glyph: "bind", cooldown: 15, description: "One syllable, and it forgets what it was doing." },
 }
 
 /*

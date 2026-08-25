@@ -276,9 +276,77 @@ final class BattleSkills
         $stats[] = ['label' => 'First use', 'value' => 'round '.$cooldown];
 
         return [
-            'effect' => (string) ($skill['effect'] ?? $skill['description']),
+            'effect' => self::sentence($skill),
             'stats' => $stats,
         ];
+    }
+
+    /**
+     * What the skill does, with its numbers in it.
+     *
+     * The sentence used to be hand-written and deliberately numberless, with
+     * every figure in the rows beside it -- "Burn your foe through its guard,
+     * and leave it burning", then `Burn: 22% of your attack a round` and
+     * `Duration: 3 rounds`. Reading one skill meant reading a sentence and then
+     * a table and holding them together.
+     *
+     * It is built here, off the ARMED skill, so a player who has bought
+     * `skillStun` or `skillPower` reads their own figures rather than the
+     * catalog's. That is the same reason the sentence could not be typed by
+     * hand in the first place, arrived at from the other side: instead of
+     * keeping numbers OUT of the prose, the prose is generated FROM them.
+     *
+     * @param  array<string,mixed>  $skill  an ARMED skill, so the tree is in it
+     */
+    private static function sentence(array $skill): string
+    {
+        $parts = [];
+
+        if (! empty($skill['toll'])) {
+            $parts[] = 'One hit for your attack plus your defense';
+        }
+
+        if (isset($skill['power'])) {
+            $line = 'Hits for x'.self::figure((float) $skill['power']).' your attack';
+            if (isset($skill['ramp'])) {
+                $line .= ', +'.round($skill['ramp'] * 100).'% per round already fought';
+            }
+            $parts[] = $line;
+        }
+
+        if (isset($skill['strikes'])) {
+            $parts[] = 'Strike twice a round for '.self::rounds((int) $skill['strikes']);
+        }
+
+        if (isset($skill['sunder'])) {
+            $parts[] = 'Cuts its guard by '.$skill['sunder'].' permanently, and stacks';
+        }
+
+        if (isset($skill['riposte'])) {
+            $parts[] = 'For '.self::rounds((int) $skill['riposte'])
+                .', every blow it lands comes straight back through its guard';
+        }
+
+        if (isset($skill['stance'])) {
+            $parts[] = 'For '.self::rounds((int) $skill['stance']).', '
+                .round($skill['share'] * 100).'% of every blow is stored instead of suffered, then returned as one hit';
+        }
+
+        if (isset($skill['burn'])) {
+            $parts[] = (! empty($skill['pierce']) ? 'Hits through its guard, then burns' : 'Burns')
+                .' it for '.round($skill['tick'] * 100).'% of your attack a round for '
+                .self::rounds((int) $skill['burn']);
+        } elseif (! empty($skill['pierce'])) {
+            $parts[] = 'Hits through its guard';
+        }
+
+        if (isset($skill['stun'])) {
+            $parts[] = 'Stuns it for '.self::rounds((int) $skill['stun']);
+        }
+
+        return $parts === []
+            ? (string) ($skill['effect'] ?? $skill['description'])
+            : implode('. ', $parts).'.';
     }
 
     private static function rounds(int $n): string

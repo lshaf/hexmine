@@ -261,19 +261,19 @@ final class BattleSkillTest extends TestCase
     }
 
     /**
-     * §9.5.9 -- a tooltip the way the genre writes one.
+     * §9.5.9 -- a tooltip that says what the skill does, with its numbers in it.
      *
-     * The convention every MMO shares: a plain verb-first sentence saying what
-     * the skill does, then labelled rows carrying every number. Guild Wars 2
-     * writes "Bash your foe with your shield and stun them", then `Stun: 2
-     * seconds` underneath. It is not one dense paragraph with figures buried
-     * in it, which is what this used to be.
+     * The sentence CARRIES the figures now: "Hits through its guard, then burns
+     * it for 22% of your attack a round for 3 rounds." It used to be
+     * deliberately numberless, with every figure in the rows beside it, so that
+     * the prose could be hand-written without going stale.
      *
-     * NO NUMBER MAY APPEAR IN THE SENTENCE, and that is the load-bearing half.
-     * It is what lets the prose be hand-written while every figure stays
-     * derived from the very fields the exchange reads -- so nothing can drift,
-     * and a player who has bought a node reads their own numbers. A typed
-     * "stuns for 2 rounds" would be wrong for everybody with `skillStun`.
+     * Generating it from the same fields the exchange reads gets that safety
+     * back from the other side -- nothing is typed, so nothing can drift, and a
+     * player who has bought `skillStun` reads their own number rather than the
+     * catalog's. What is still forbidden is a HAND-WRITTEN figure, which is why
+     * the catalog `effect` strings stay numberless: they are only the fallback
+     * for a skill with no mechanical fields at all.
      */
     public function test_a_tooltip_reads_the_way_the_genre_writes_one(): void
     {
@@ -281,11 +281,30 @@ final class BattleSkillTest extends TestCase
             foreach (BattleSkills::armed($family) as $skill) {
                 $card = BattleSkills::summary($skill);
 
+                // A skill with a numeric mechanic has to state it. Warden's
+                // Toll is the one that has none: its damage IS your attack plus
+                // your defense, two figures that are already on the Hero sheet
+                // and would be a lie printed here as constants.
+                $numeric = array_filter(
+                    ['power', 'stun', 'burn', 'strikes', 'riposte', 'sunder', 'stance'],
+                    static fn (string $f): bool => isset($skill[$f]),
+                );
+
+                if ($numeric !== []) {
+                    $this->assertMatchesRegularExpression(
+                        '/\d/',
+                        $card['effect'],
+                        "{$skill['key']} has numbers to state and its sentence states none of them",
+                    );
+                }
+
+                // The hand-written catalog string is the fallback, and it must
+                // stay numberless: a typed "stuns for 2 rounds" outlives the
+                // arithmetic it describes the moment anybody buys `skillStun`.
                 $this->assertDoesNotMatchRegularExpression(
                     '/\d/',
-                    $card['effect'],
-                    "{$skill['key']}'s sentence carries a figure. Numbers belong in the rows, ".
-                    'or a hand-written one will outlive the arithmetic it describes.',
+                    (string) $skill['effect'],
+                    "{$skill['key']}'s catalog sentence has a figure typed into it",
                 );
                 $this->assertMatchesRegularExpression(
                     '/[.!]$/',
@@ -348,7 +367,11 @@ final class BattleSkillTest extends TestCase
         );
 
         $this->assertNotSame($plain['stats'], $maxed['stats'], 'a maxed tree reads exactly like an empty one');
-        $this->assertSame($plain['effect'], $maxed['effect'], 'the sentence moved, so it was carrying a figure');
+        $this->assertNotSame(
+            $plain['effect'],
+            $maxed['effect'],
+            'the sentence did not move, so it is not reading the player\'s own figures',
+        );
     }
 
     /**
@@ -359,11 +382,11 @@ final class BattleSkillTest extends TestCase
      * mentions one and a fetch that has not landed yet would draw a key where a
      * name goes. Mirrors drift; this is what stops it.
      *
-     * Only what the client is allowed to hold is compared -- name, glyph,
-     * family, cooldown and the effect SENTENCE. Multipliers, ticks and stun
-     * lengths are the server's alone and are deliberately absent from the
-     * mirror; the sentence is safe to carry because it holds no figure, which
-     * the test above pins by maxing a tree and checking it did not move.
+     * Only IDENTITY is compared -- name, glyph, family. Multipliers, ticks and
+     * stun lengths are the server's alone and are deliberately absent, and the
+     * effect sentence left the mirror with them: it is generated per player now
+     * (see BattleSkills::sentence), so a copy here could only ever be one
+     * player's numbers frozen into everybody's bundle.
      */
     public function test_the_client_mirror_agrees_with_the_server(): void
     {
@@ -377,7 +400,7 @@ final class BattleSkillTest extends TestCase
                 "{$key} is missing from the client mirror",
             );
 
-            foreach (['family', 'name', 'glyph', 'effect'] as $field) {
+            foreach (['family', 'name', 'glyph'] as $field) {
                 $this->assertStringContainsString(
                     $field.': '.json_encode($skill[$field]),
                     $ts,

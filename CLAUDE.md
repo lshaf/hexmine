@@ -928,7 +928,7 @@ a waiting room.
 | | Explorer | Every other job |
 |---|---|---|
 | Tree | **15 nodes, 3/3/3/3/3** | 30 nodes, 6/8/8/6/2 |
-| Cost | **Nothing — granted at its job level** | 1 skill point each |
+| Cost | **No skill point — claimed at its job level** | 1 skill point each |
 | Levels from | **Hexes crossed** | Bench work, or raiding |
 | Pays in | **Capability only — never a stat** | Stats, and the work of the job |
 | Gating | **One skill per level**, every 2nd level, 2 → 30 | A whole depth at once, at 1 / 5 / 12 / 20 / 28 |
@@ -995,11 +995,20 @@ Without the first, a map with no reach limit is a long wait; without the second,
 the cheapest XP in the game is pressing *travel* and going to bed — and §2's
 whole argument is that idle time must not be a faucet.
 
-**Its nodes are granted, never bought, and that is only safe because there is
-exactly one such tree.** A second free tree would not be a new job, it would be
-a hole in the 100-point cap (§7.4.1). Granted nodes are **derived from the job
-level and never stored** — a row would be a second place for "do you have this
-yet" to be answered, and the two would eventually disagree.
+**Its nodes cost no skill point, and that is only safe because there is exactly
+one such tree.** A second free tree would not be a new job, it would be a hole
+in the 100-point cap (§7.4.1).
+
+**They are claimed, not granted.** Free is not the same as automatic: the walk
+is the price and the job level is the receipt, but the skill is still taken by
+pressing for it. Arriving on its own meant the reward for a thousand hexes was
+a panel that had quietly changed since you last looked at it — nothing
+announced it, and there was no moment where it was given to you.
+
+So a wayfaring node is **a row like every other node**, and the point ledger
+stays honest by asking what KIND a row is rather than by keeping some rows out
+of the table. That is the one place this differs from every other tree: the
+`spent` count skips them.
 
 **Sight is the rarest thing the road pays in**, and it is capped for the reason
 in §7.4.3: it is a query radius, and cost goes as the square of it. It goes
