@@ -802,6 +802,99 @@ final class BattleResolveTest extends TestCase
     }
 
     /**
+     * §9.5.6 -- half a kit pays the whole bill, and it pays it into what is there.
+     *
+     * The split says WHERE a beating landed, not which pieces exist to take it.
+     * A fighter carrying nothing but a sword took the same quarter as a fighter
+     * in full plate: the worn half has nowhere to land, so it spills back to
+     * the hands, and the sword is what is left. The reverse holds too -- armor
+     * with no weapon takes the hands' share on the coat.
+     *
+     * The invariant is that nothing goes missing. A half the arithmetic cannot
+     * reach must never quietly discount the fight, because that would make
+     * stripping down a way of fighting cheaply -- and §9.5.6 already promises
+     * "a fighter with no gloves does not get a discount".
+     */
+    public function test_half_a_kit_still_pays_the_whole_bill(): void
+    {
+        $kits = [
+            'a weapon and nothing else' => ['notched_sword'],
+            'worn gear and no weapon' => ['padded_jack', 'studded_boots', 'knuckle_wraps'],
+        ];
+
+        foreach ($kits as $what => $pieces) {
+            $this->character->items()->delete();
+            foreach ($pieces as $key) {
+                $this->equip($key);
+            }
+
+            $result = null;
+            foreach ($this->packHexes() as $pack) {
+                $this->standOn($pack);
+                $attempt = $this->tryFight($this->character);
+                if ($attempt !== null && $attempt['damageTaken'] > 0) {
+                    $result = $attempt;
+                    break;
+                }
+            }
+
+            $this->assertNotNull($result, "no pack on the map ever landed on {$what}");
+
+            $lost = array_sum(array_column($result['wear'], 'lost'));
+
+            // The whole bill, not the half that had somewhere to go.
+            $this->assertSame(
+                Formulas::battleWearBill($result['damageTaken']),
+                $lost,
+                "{$what} was billed for less than the fight took",
+            );
+
+            // And every point of it landed on a piece that was actually worn.
+            foreach ($result['wear'] as $row) {
+                $this->assertContains($row['slot'], Balance::COMBAT_SLOTS);
+                $this->assertGreaterThan(0, $row['lost']);
+            }
+        }
+    }
+
+    /**
+     * §9.5.6 -- and a piece is never charged twice for the same bill.
+     *
+     * The spill is a SECOND look at the same pieces: whatever the worn half
+     * could not absorb goes back to the hands, and if that pass re-read the
+     * durability the first pass had already spent, a piece could be billed for
+     * more than it holds. Unreachable in play -- damage cannot exceed the pool
+     * and the bill is a quarter of it, so the two halves can never both be
+     * empty at once -- but the receipt has to be true whatever BATTLE_WEAR_RATE
+     * is tuned to, and this is the shape that would break first.
+     */
+    public function test_a_spill_never_charges_a_piece_past_what_it_holds(): void
+    {
+        $wear = new ReflectionMethod($this->game, 'battleWear');
+        $wear->setAccessible(true);
+
+        $sword = [[
+            'id' => 1,
+            'key' => 'notched_sword',
+            'durability' => 3,
+            'equipped' => true,
+            'options' => [],
+        ]];
+
+        foreach (Monsters::ROSTER as $key => $monster) {
+            // Far more damage than this kit could ever really take, which is
+            // the only way to reach the spill at all.
+            $lost = $wear->invoke($this->game, $sword, $monster, 4000, 0.0, 0.0);
+
+            $this->assertSame(
+                3,
+                array_sum($lost),
+                "{$key} billed a 3-durability sword for more than three",
+            );
+        }
+    }
+
+    /**
      * §8.2 -- at zero the thing is GONE. Not broken, not inactive: the row is
      * deleted and named in the result that killed it.
      */

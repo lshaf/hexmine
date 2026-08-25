@@ -475,9 +475,17 @@ class GameService
         $spill = $worn - array_sum($wornShare);
 
         // Anything the worn half could not take goes back to the hands, which
-        // is the only place left for it.
+        // is the only place left for it -- a fighter with no gloves does not
+        // get a discount (§9.5.6), and neither does one wearing nothing at all.
+        //
+        // What the hands ALREADY took is passed back in, because this is a
+        // second look at the same pieces: without it the spill re-reads the
+        // durability the first pass had spent and can charge a piece more than
+        // it has. Unreachable while damage cannot exceed the pool -- the bill
+        // is a quarter of it, so both halves can never be empty at once -- but
+        // the figure a receipt prints must be true whatever the tuning does.
         if ($spill > 0) {
-            foreach ($this->wearShares($items, $spill, ['weapon', 'gloves']) as $id => $extra) {
+            foreach ($this->wearShares($items, $spill, ['weapon', 'gloves'], $handsShare) as $id => $extra) {
                 $handsShare[$id] = ($handsShare[$id] ?? 0) + $extra;
             }
         }
@@ -500,9 +508,10 @@ class GameService
      *
      * @param  array<int,array<string,mixed>>  $items
      * @param  list<string>|null  $slots
+     * @param  array<int,int>  $already  durability these pieces have lost already
      * @return array<int,int> item id -> durability lost
      */
-    private function wearShares(array $items, int $damage, ?array $slots = null): array
+    private function wearShares(array $items, int $damage, ?array $slots = null, array $already = []): array
     {
         $allowed = $slots ?? Balance::COMBAT_SLOTS;
 
@@ -538,7 +547,7 @@ class GameService
                 $room = 0;
                 foreach ($combat as $item) {
                     if ($item['id'] === $id) {
-                        $room = (int) $item['durability'] - ($out[$id] ?? 0);
+                        $room = (int) $item['durability'] - ($out[$id] ?? 0) - ($already[$id] ?? 0);
                         break;
                     }
                 }
