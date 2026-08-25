@@ -715,7 +715,7 @@ not woodcutting, so they could never pay out at all.)*
 | gathering | `yield` — the size of the haul, and the only percentage a mine has left | `bite`, `toolWear`, `seamGrade` |
 | processing | `processingSpeed` — the one thing a bench clock reads (§8.4) | `costReduction`, `batch`, `presence`, `runSlot` |
 | craft | `processingSpeed` | `costReduction`, and what the bench makes: `craftDurability`, `craftOption`, `optionTier` — or, at the consumable bench, `batch`, `brewExtra`, `stackCap` |
-| battle | none — the pair is solid (§9.5.4) | `pair`, `battleWear`, `weaponWear`, `goldFind`, `lootOption` |
+| battle | none — the pair is solid (§9.5.4) | `pair`, `battleWear`, `weaponWear`, `goldFind`, `lootOption`, and the three that sharpen its skills (§9.5.9) |
 | wayfaring | nothing at all (§7.5) | `sight`, `bagUnits`, `bagRows` |
 
 **A craft tree spends most of itself on what comes off the bench** rather than on
@@ -795,6 +795,9 @@ a matter of judgment. A node's effect must be one of these, and nothing else:
 | `stat` | A `StatKey` percentage | **feeds the same aggregate and clamp as gear, options and buffs** |
 | `pair` | Whole points of `attack` or `defense` (§9.5.4) | `SKILL_PAIR_CAP` (12) |
 | `battleWear` | A share of what a fight takes off the worn kit, spared | `SKILL_BATTLE_WEAR_CAP` (15%) |
+| `skillPower` | More of the *extra* on the family's three skills (§9.5.9) | `SKILL_BATTLE_POWER_CAP` (25%) |
+| `skillCooldown` | Whole rounds off every one of their cooldowns | `SKILL_BATTLE_COOLDOWN_CAP` (+2) |
+| `skillStun` | A round longer on a stun | `SKILL_BATTLE_STUN_CAP` (+1) |
 | `weaponWear` | The same for the blade, which pays its own stream (§9.5.6) | `SKILL_WEAPON_WEAR_CAP` (15%) |
 | `goldFind` | More of what a pack pays (§9.5.8) | `SKILL_GOLD_FIND_CAP` (25%) |
 | `lootOption` | Chance of an extra rolled option on looted gear | `SKILL_LOOT_OPTION_CAP` (25%) |
@@ -1545,6 +1548,10 @@ Combat is **PvE only** — no player-vs-player fighting anywhere in the game. Th
 removes the snowball problem (winners farming losers' gear) entirely, leaving
 only loot-table tuning.
 
+**Skills are §9.5.9**, and they are the one thing in a fight that is not a
+trade of blows. They come with the weapon rather than with a point, they all
+start a fight on cooldown, and none of them can be steered.
+
 It happens in two places. **Dungeons** (§9.1–§9.4) are the deliberate expedition: you
 kit up, spend a charge, and go. **The road** (§9.5) is the other one, and it
 comes to you — packs stand on hexes and stop travelers. Dungeons are the ladder
@@ -2097,6 +2104,130 @@ three lines, and never an epic.
 Battle drafts come off the ichor line and want a new **`battle` buff scope**
 (§8.5) moving `power` and `defense`: twelve more on the shelf, two a rung.
 
+#### 9.5.9 Battle skills — what a weapon knows besides swinging
+
+**Nine of them, three to a family, and no two families share a trick.** §9.5.4
+already makes the weapon in the slot your class; three costumes over one
+mechanic would have made that choice cosmetic. Each family gets the answer to
+its own problem:
+
+| Family | Its problem (§9.5.4) | What its three do about it |
+|---|---|---|
+| **Shield** | kills slowly, so wins cost the most | turn being hit into damage, and buy rounds where nothing comes back |
+| **Sword** | remarkable at nothing | attrition — more swings, answered blows, a guard that never comes back up |
+| **Focus** | no guard anywhere in the kit | end it before that matters: pierce, burn, escalate |
+
+| Family | Skill | CD | What it does |
+|---|---|---|---|
+| Shield | **Shield Bash** | 11 | it loses its next **2** answers |
+| | **Anvil Stance** | 14 | for 3 rounds **half of what lands is kept, not suffered** — and comes back as one blow |
+| | **Warden's Toll** | 12 | one blow that adds **your defense to your attack** |
+| Sword | **Onslaught** | 10 | you swing **twice** for 2 rounds |
+| | **Sunder** | 12 | its guard drops **3 permanently**, and stacks with itself |
+| | **Riposte** | 13 | for 3 rounds everything it lands **comes straight back**, through no guard |
+| Focus | **Ember Bolt** | 11 | ignores guard, and **burns 3 rounds** — armor answers neither half |
+| | **Chain Arc** | 10 | a blow that is **bigger the deeper the fight has gone** |
+| | **Rune of Binding** | 15 | it loses its next answer |
+
+**They come with the WEAPON, never with a skill point.** §7.4.1 keeps job level
+as the proof you have done the work rather than a reward for it, so carrying a
+sword is what makes you a Swordhand and the three sword skills are simply what a
+sword *is*. What a point buys is the tree that sharpens them — `skillPower`,
+`skillCooldown`, `skillStun` (§7.4.3), each capped so a maxed tree is worth
+about a rung of gear and never a tier of it.
+
+**Every skill starts a fight on cooldown, and the cooldowns are long.** Both
+halves are load-bearing. An opening alpha strike would decide fights §9.5.5
+wants decided by the exchange; and a pack put down in four rounds is meant to be
+a **rout**, not a rotation. Skills are what a *long* fight is for, which is
+exactly where the shield needs them. At most one fires a round — the first the
+family lists that is off cooldown — and using one resets only that one, so a
+long fight rotates through all three rather than repeating the cheapest.
+
+**Nothing is steered.** A fight is settled the instant you close (§9.5.5) and
+cannot be abandoned (§9.5.3), so this is not a bar of buttons: the skills are on
+the fight preview because *whether to close at all* is the decision, and against
+a long fight these are half of it.
+
+**The burn tick and a riposte both ignore guard**, and that is the one asymmetry
+in the set. It is what gives a family an answer to a carapace — the matchup
+where `BATTLE_CHIP_FRACTION` otherwise leaves a light hitter tapping at a wall
+until the bell.
+
+**A stun is set, never added, and a burn is refreshed, never stacked.** Two
+stuns running would be a monster that never answers again; two burns would be
+two fires on one body. Sunder is the deliberate exception: it is *permanent and
+stacks*, which is the one effect in the game that makes every round after it
+worth more than the one before, and it is the sword's for exactly that reason.
+
+**The preview runs the real exchange with the swing pinned to 1.** It used to
+approximate — rounds-to-kill against rounds-to-fall — and that closed form does
+not survive a stance that stores damage for three rounds and returns it as one
+blow. §9.5.5 calls the preview a promise; running the actual loop is the only
+version of it that stays one.
+
+**On screen** each skill has its own procedural glyph (§13), and the replay
+draws it on the round it lands with one line saying what it did — *held 2
+rounds*, *guard down 6*, *answered for 13*. It gets a strip of its own between
+the crests and the pools rather than a mark tucked beside the round counter: a
+skill is the only thing in an exchange a player did not already expect, and at
+one round a second it has to be readable at a glance. The strip keeps its
+height whether or not anything fired, so the pools never jump — and on the
+rounds that had none, which is most of them, it holds a hairline. Reserved and
+empty read as a hole; a hairline is the seam between *who is fighting* and *how
+it is going*, and a skill breaks it open.
+
+**The cooldown comes round a HEXAGON, and that is a rule rather than a
+flourish.** It was a circle, and a circle was the only round thing in a game
+whose map tiles with hexes (§13.2), whose icons are cut from them (§13.1) and
+whose screens block nests as a honeycomb (§13.3) — one foreign object on a
+plate full of cut corners, and it read as borrowed from some other app. The
+sweep travels the six edges of one flat-top hexagon, drawn twice and dashed by
+`pathLength` so it uncovers itself from the top middle, clockwise. Not a circle
+wearing a hex mask: the stroke is genuinely hexagonal, which is the difference
+between borrowing the shape and being made of it.
+
+The sweep reports the clock and **only** the clock — it is full-strength copper
+whether or not the skill is ready, because fading it toward the track colour
+was what made two skills at 79% and 92% indistinguishable. Readiness is told on
+the mark instead, which is where the eye already is: dim while it runs, copper
+when it is up, ink on a filled face for the one beat it goes.
+
+**They are named before the fight, and that is where the rule is said out
+loud.** The three sit on the pin's preview and on the bench, because a player
+who has spent no skill points and finds three skills armed is looking at
+§9.5.9 working rather than at a bug — so the list says *they come with the
+weapon, not with a skill point* in as many words. Before a fight they carry
+the sentence and the cooldown; every figure arrives with the fight, because
+every figure is the server's.
+
+*(The client mirrors the nine — name, glyph, family, cooldown, and the effect
+SENTENCE — in `battleSkills.ts`, because the modal has to name a skill the
+instant a stored round mentions one and a fetch that has not landed would draw
+a key where a name goes. **Nothing the fight reads is mirrored**: multipliers,
+ticks and stun lengths are the server's alone (§16). The sentence is safe to
+carry for exactly the reason it is written the way it is — it holds no figure,
+and a test proves it by maxing a tree and checking it did not move. A parity
+test compares the two.)*
+
+**One band, one cooldown rail, one skill row, drawn everywhere a fight is.**
+The replay, the receipt and the bench at `/battle` are three moments of one
+screen, so the two crests facing each other across a middle column are a single
+component with a slot in it — a round counter while it runs, a hairline when it
+is over. It was three hand-kept copies, comment for comment, and the bench is
+where that stops being a tidiness argument: a simulator that redraws what it
+simulates is a second opinion, and the first thing a second opinion does is
+drift. The arithmetic was already shared — `/api/battle-sim` runs the real
+`resolveBattle()` and the real wear split — and now the drawing is too.
+
+**Open: the roster and the swing were tuned before any of this existed.** Adding
+skills moved §9.5.4's measured ladder up by roughly a rung — a rare focus now
+takes a Barrow Knight, and an epic sword takes an Ash Revenant about one time in
+five where it never did. Monster `attack`/`defense`/`hp` and `BATTLE_SWING` are
+the levers for putting that back where it belongs, and neither has been touched
+yet: how hard the eight *should* be once every fighter has three skills is a
+tuning decision, not a consequence of adding them.
+
 ---
 
 ## 10. Guilds
@@ -2466,6 +2597,19 @@ All visuals are **procedural SVG**. The full equipment icon set is generated fro
 `9 base shapes (one per slot) × 3 tier treatments × 5 material palettes` via
 fill/stroke swaps. The 25 gathering tools of §8.0 cost five new silhouettes and
 nothing else.
+
+**One shape, and two ways of cutting it.** A hexagon is what the map tiles
+with, what an icon is framed in and what a cooldown comes round; a **chamfer** —
+two opposing corners cut off the same stone — is what a panel, a button and a
+chip get, because a stretched hexagon is unreadable at a panel's aspect ratio
+and a chamfer is not. Nothing in the interface is round. If a new element wants
+a circle, it wants one of these two instead.
+
+`.plate` draws its hairline border by being the border colour with **exactly
+one child** inset a pixel to carry the fill — so `.plate > *` styles every
+direct child as if it were that one. A plate handed five children draws five
+stacked slabs, which is what the fight replay did until it was given the single
+wrapper the contract asks for.
 
 ### 13.1 Icon system
 | Axis | Encoding |
