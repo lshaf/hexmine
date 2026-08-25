@@ -418,6 +418,28 @@ function effectTotal(key: string, effect: NodeEffect): { now: string; cap: strin
 }
 
 
+/**
+ * §7.5 -- free skills reached and not yet taken, per job.
+ *
+ * Zero for every bought tree: an unspent point is a decision, and colouring it
+ * as something waiting would nag a player for not having committed yet. A
+ * wayfaring node has nothing to decide -- it is paid for and sitting there.
+ */
+function claimable(key: string): number {
+  const t = tree.value
+  if (!t || !(t.automatic ?? []).includes(key)) return 0
+
+  const level = game.jobLevels.find((j) => j.key === key)?.level ?? 1
+
+  return Object.entries(t.nodes).filter(
+    ([nodeKey, n]) =>
+      n.job === key
+      && !game.ownedNodes.has(nodeKey)
+      && n.jobLevel <= level
+      && n.requires.every((r) => game.ownedNodes.has(r)),
+  ).length
+}
+
 /** Learned, and out of how many -- the trees are no longer all the same size. */
 const progress = computed(() => {
   const t = tree.value
@@ -485,8 +507,16 @@ async function learn(): Promise<void> {
             @click="job = key"
           >
             {{ tree.jobs[key]!.name }}
-            <span class="tally">{{
-              Object.keys(tree.nodes).filter((k) => tree!.nodes[k]!.job === key && game.ownedNodes.has(k)).length
+            <!--
+              §13.3 -- sap when something free is waiting on that tree, the same
+              green the quest ledger lights with. A wayfaring skill costs no
+              point, so there is no reason not to take it and every reason to
+              be told it is there; the count is otherwise what you have learned.
+            -->
+            <span class="tally" :class="{ ready: claimable(key) > 0 }">{{
+              claimable(key) > 0
+                ? claimable(key)
+                : Object.keys(tree.nodes).filter((k) => tree!.nodes[k]!.job === key && game.ownedNodes.has(k)).length
             }}</span>
           </button>
         </div>
@@ -541,6 +571,7 @@ async function learn(): Promise<void> {
               type="button"
               class="node"
               :class="[stateOf(n.key, n.def), {
+                free: automatic,
                 picked: picked === n.key,
                 lineage: lineage.has(n.key) && picked !== n.key,
               }]"
@@ -848,6 +879,11 @@ async function learn(): Promise<void> {
   background: var(--accent);
 }
 
+/* §13.3 -- something free is waiting on this tree. */
+.tally.ready {
+  color: var(--sap);
+}
+
 /* Takeable right now: lit edge, so affordability is a glance not a count. */
 .node.open {
   color: var(--vellum);
@@ -859,6 +895,29 @@ async function learn(): Promise<void> {
 
 .node.open .face {
   background: var(--ink-raised);
+}
+
+/*
+ * §13.3 -- a FREE skill sitting there unclaimed is the one thing on this panel
+ * worth crossing the screen for, so it gets sap.
+ *
+ * A bought node's `open` means "you could spend a point here", which is an
+ * invitation. A wayfaring one means "you have already paid for this by walking
+ * and it is waiting" -- and while these were granted, a reached node was
+ * FILLED, so the eye had something to land on. Claimed, it is an outline that
+ * reads exactly like the locked rows under it, which is how three free skills
+ * sat unnoticed on a tree the player was looking straight at.
+ */
+.node.open.free {
+  color: var(--ink);
+}
+
+.node.open.free .hex {
+  background: var(--sap);
+}
+
+.node.open.free .face {
+  background: var(--sap);
 }
 
 /* Everything else is dim, and the detail plate says which kind of dim. */
