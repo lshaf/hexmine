@@ -1,7 +1,9 @@
 <?php
 
+use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BattleController;
 use App\Http\Controllers\Api\BattleSimController;
+use App\Http\Controllers\Api\CharacterController;
 use App\Http\Controllers\Api\CraftingController;
 use App\Http\Controllers\Api\EquipmentController;
 use App\Http\Controllers\Api\GuildController;
@@ -37,11 +39,24 @@ use Illuminate\Support\Facades\Route;
 | would make the bench unusable for the one question it exists to answer, which
 | is what a kit nobody owns would do against a monster nobody has met.
 */
+/*
+| §2/§7 -- wallet login. Outside the character middleware because it is what a
+| caller does BEFORE they have a character: a wallet proves it is controlled by
+| paying a fee from itself, and the two steps are a challenge and its payment.
+*/
+Route::get('/auth/wax', [AuthController::class, 'show']);
+Route::post('/auth/wax/challenge', [AuthController::class, 'challenge']);
+Route::post('/auth/wax', [AuthController::class, 'store']);
+Route::delete('/auth/wax', [AuthController::class, 'destroy']);
+
 Route::get('/battle-sim', [BattleSimController::class, 'index']);
 Route::post('/battle-sim', [BattleSimController::class, 'store']);
 
 Route::middleware(ResolveCharacter::class)->group(function () {
     Route::get('/state', [StateController::class, 'show']);
+
+    // §7 -- a prospector claims a name. Letters and digits, and nobody else's.
+    Route::post('/character/name', [CharacterController::class, 'rename']);
 
     Route::get('/world', [MapController::class, 'world']);
     Route::get('/map', [MapController::class, 'index']);

@@ -14,6 +14,7 @@ import { PROCESSING } from '@/game/balance'
 import { materialIcon } from '@/icons/procedural'
 import SvgIcon from './SvgIcon.vue'
 import QueueBar from './QueueBar.vue'
+import JobCard from './JobCard.vue'
 import type { Recipe, Settlement } from '@/game/types'
 
 const props = defineProps<{ settlement: Settlement }>()
@@ -54,9 +55,26 @@ const freeSlots = computed(
  * now that work is left all over the map (§8.4), "your job" without a place
  * attached is a question with several answers.
  */
-const helpingHere = computed(
-  () => game.benchJobs.some((j) => j.kind === 'processing' && j.settlementId === props.settlement.id),
+const helpingHere = computed(() => mine.value.some((j) => j.endsAt > game.now))
+
+/**
+ * §8.4 -- your own work parked in THIS building, finished or not.
+ *
+ * It is on this screen because this screen is the building. The Benches panel
+ * (§8.4) answers "where is my work" across the whole map, which is a route to
+ * plan; standing in the doorway the question is the narrower one -- what is
+ * mine here, and can I take it -- and being sent to another screen to answer it
+ * while the bench is under your feet is a walk to a menu.
+ *
+ * Finished first, because that is the news and the only part that is a tap.
+ */
+const mine = computed(() =>
+  game.benchJobs
+    .filter((j) => j.kind === 'processing' && j.settlementId === props.settlement.id)
+    .sort((a, b) => a.endsAt - b.endsAt),
 )
+
+const readyHere = computed(() => mine.value.filter((j) => j.endsAt <= game.now))
 
 /**
  * §6.3 -- your own allowance on one line here, spent or not.
@@ -123,6 +141,34 @@ watch(() => props.settlement.id, () => { batches.value = 1 })
       :slots="station?.slots ?? []"
       full-note="Every slot is busy. Congestion at popular settlements is intended — try a quieter village, or wait."
     />
+
+    <!--
+      §8.4 -- your own runs at this bench.
+      Above the recipe list, because collecting what is finished is what you
+      came back for; queueing more is what you do next.
+    -->
+    <div v-if="mine.length" class="mine">
+      <div class="label" style="margin-bottom: 6px">
+        Your runs here
+        <span v-if="readyHere.length" class="tally ready">{{ readyHere.length }} ready</span>
+      </div>
+
+      <!--
+        The card carries its own Collect and its own Abandon, so this adds a
+        line and no second button: two Collects side by side is one decision
+        drawn twice.
+
+        What the line is for is the case the card cannot know about -- a run
+        that is finished at a settlement you are looking at from somewhere else.
+        §8.4 hands work over only to somebody standing there.
+      -->
+      <div v-for="job in mine" :key="job.id" class="run">
+        <JobCard :job="job" />
+        <p v-if="job.endsAt <= game.now && !onSite" class="tiny foot muted">
+          Finished — but it is handed over at the bench, and you are not there.
+        </p>
+      </div>
+    </div>
 
     <!-- Presence bonus, §6.2. A readout, not a control: presence is simply
          where you are standing, so there is nothing here to switch on. -->
@@ -206,6 +252,39 @@ watch(() => props.settlement.id, () => { batches.value = 1 })
 </template>
 
 <style scoped>
+/* Your own work, set apart from the shared queue above it: one is a fact about
+   the building, the other is a list of things to pick up. */
+.mine {
+  padding: 11px;
+  border: 1px solid var(--line);
+  background: var(--ink);
+}
+
+.run + .run {
+  margin-top: 9px;
+  padding-top: 9px;
+  border-top: 1px solid var(--line);
+}
+
+.foot {
+  margin-top: 5px;
+}
+
+/* §13.3 -- sap for a thing worth crossing the screen for, which a finished run
+   is. Ember would read as a warning about work that went right. */
+.ready {
+  color: var(--sap);
+}
+
+.tally {
+  margin-left: 6px;
+  color: var(--vellum-dim);
+}
+
+.tally.ready {
+  color: var(--sap);
+}
+
 .head-row {
   display: flex;
   align-items: center;

@@ -43,8 +43,41 @@ import AtlasView from '@/views/AtlasView.vue'
 import SkillsView from '@/views/SkillsView.vue'
 import QuestView from '@/views/QuestView.vue'
 import QuestRewardModal from '@/shell/QuestRewardModal.vue'
+import LoginView from '@/views/LoginView.vue'
+import { loadSettings } from '@/wallet/wax'
 
 const game = useGame()
+
+/**
+ * §2 -- the door.
+ *
+ * Three states rather than two, because "no wallet yet" and "still loading" are
+ * different screens and showing the surveying mark to somebody who has not
+ * logged in would be a spinner that never resolves.
+ *
+ * Whether the door is even there is the SERVER'S answer (`required`), not a
+ * build flag: while the API still mints a character for any session, a gate
+ * here would only be a screen to click past.
+ */
+const gate = ref<'checking' | 'login' | 'open'>('checking')
+
+async function openGate(): Promise<void> {
+  try {
+    const settings = await loadSettings()
+    gate.value = settings.required && !settings.wallet ? 'login' : 'open'
+  } catch {
+    // The door is not the game. If asking about it fails, fall through to the
+    // boot the app has always done and let that report its own trouble.
+    gate.value = 'open'
+  }
+
+  if (gate.value === 'open') void game.boot()
+}
+
+function onConnected(): void {
+  gate.value = 'open'
+  void game.boot()
+}
 
 const PANELS = {
   bag: { title: 'Bag', component: BagView, wide: false },
@@ -109,7 +142,7 @@ function onRecenter(col: number, row: number) {
 }
 
 onMounted(() => {
-  void game.boot()
+  void openGate()
   if (import.meta.env.DEV) {
     ;(window as unknown as Record<string, unknown>).game = game
   }
@@ -118,7 +151,9 @@ onMounted(() => {
 
 <template>
   <div class="app" :style="stackHeight ? { '--stack-h': `${stackHeight}px` } : undefined">
-    <template v-if="game.booted && game.character">
+    <LoginView v-if="gate === 'login'" @connected="onConnected" />
+
+    <template v-else-if="game.booted && game.character">
       <HexMap
         :tiles="game.tiles"
         :center-col="game.view.col"
@@ -170,18 +205,27 @@ onMounted(() => {
               : 'What is owed, and what has been paid'"
             @activate="game.openPanel('quests')"
           />
-          <!-- §8.4 -- a bench holds work somewhere on the map, and hands it
-               over only to somebody standing there. The cell counts what is
-               finished AND reachable from where you are, because a "ready" you
-               cannot take is worse than no number at all. -->
+          <!--
+            §8.4 -- a bench holds work somewhere on the map, and hands it over
+            only to somebody standing there. The cell lights for anything
+            FINISHED, wherever it is: the news is that a run is done, and where
+            it is done is what the panel behind the cell exists to say.
+
+            It used to light only for work under your feet, on the argument that
+            a "ready" you cannot reach is crying wolf. The opposite turned out
+            to be the problem -- a run finishing four hexes away went unmentioned
+            until you happened to open the panel, which made the whole ledger
+            something to remember to check. The hint carries the distinction the
+            colour no longer does.
+          -->
           <HexAction
             icon="craft"
             label="Benches"
-            :good="game.benchHere > 0"
+            :good="game.benchReady > 0"
             :hint="game.benchHere > 0
               ? `${game.benchHere} finished here — take it off the bench`
               : game.benchReady > 0
-                ? `${game.benchReady} finished, none of it here`
+                ? `${game.benchReady} finished, elsewhere on the map`
                 : 'Crafts and processing runs, and which bench holds them'"
             @activate="game.openPanel('bench')"
           />
@@ -377,6 +421,17 @@ onMounted(() => {
   clip-path: var(--hex-clip);
 }
 
+/*
+ * The face is sized from the same two variables the lattice is, so the cells and
+ * the gaps between them can never disagree. HexAction carries its own default
+ * size for the bottom dock, where the hexes are not nested into anything; left
+ * to that default, this block's grid would grow and its hexes would not.
+ */
+.screens :deep(.cell .hex) {
+  width: var(--cell-w);
+  height: var(--cell-h);
+}
+
 .screens :deep(.cell .name) {
   display: none;
 }
@@ -455,13 +510,8 @@ onMounted(() => {
    * closes up with them rather than coming apart.
    */
   .screens {
-    --cell-w: 37px;
-    --cell-h: 32px;
-  }
-
-  .screens :deep(.cell .hex) {
-    width: var(--cell-w);
-    height: var(--cell-h);
+    --cell-w: 42px;
+    --cell-h: 37px;
   }
 }
 </style>

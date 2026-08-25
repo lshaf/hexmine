@@ -146,6 +146,14 @@ export const CHARACTER = {
   /** §7.4.1 -- 100 levels, one skill point each. */
   maxLevel: 100,
   skillPointsPerLevel: 1,
+  /**
+   * §7 -- what a prospector may call themselves. Mirrors
+   * Balance::CHARACTER_NAME_MIN/MAX; the server is still the authority and
+   * refuses on its own, and these are here so the hint under the field says
+   * the same thing the refusal would.
+   */
+  nameMin: 4,
+  nameMax: 16,
 } as const
 
 /**

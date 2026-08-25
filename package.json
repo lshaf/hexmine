@@ -9,6 +9,10 @@
         "parity": "tsx scripts/parity.ts"
     },
     "dependencies": {
+        "@wharfkit/session": "^1.6.1",
+        "@wharfkit/wallet-plugin-anchor": "^1.7.3",
+        "@wharfkit/wallet-plugin-cloudwallet": "^1.6.5",
+        "@wharfkit/web-renderer": "^1.4.3",
         "pinia": "^3.0.1",
         "vue": "^3.5.13"
     },

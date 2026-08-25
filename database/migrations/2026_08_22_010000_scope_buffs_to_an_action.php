@@ -32,31 +32,49 @@ return new class extends Migration
             $table->string('scope')->default('global')->after('stat');
         });
 
+        // The new index goes on BEFORE the old one comes off, and the order is
+        // not tidiness. On MySQL the old unique is the only index covering the
+        // character_id foreign key, and InnoDB refuses to drop the last index a
+        // constraint is leaning on (1553). The wider unique leads with the same
+        // column, so once it exists the constraint has somewhere else to stand.
+        //
         // SQLite cannot drop an index it did not name, and Laravel's generated
         // name is the one both drivers agree on.
         Schema::table('character_buffs', function (Blueprint $table) {
-            $table->dropUnique('character_buffs_character_id_stat_unique');
             $table->unique(['character_id', 'stat', 'scope']);
+        });
+
+        Schema::table('character_buffs', function (Blueprint $table) {
+            $table->dropUnique('character_buffs_character_id_stat_unique');
         });
     }
 
     public function down(): void
     {
-        Schema::table('character_buffs', function (Blueprint $table) {
-            $table->dropUnique('character_buffs_character_id_stat_scope_unique');
-        });
-
         // Two rows can differ only by scope, so collapsing back would violate
         // the old index. Keep the newest per (character, stat) and drop the rest.
-        DB::table('character_buffs')
-            ->whereNotIn('id', function ($q) {
-                $q->selectRaw('MAX(id)')->from('character_buffs')->groupBy('character_id', 'stat');
-            })
-            ->delete();
+        //
+        // The survivors are read out first rather than named in a subquery on
+        // the table being deleted from: MySQL refuses that outright (1093), and
+        // wrapping it in a derived table would only hide the same scan behind a
+        // temporary copy. A rollback of a dev database is small enough to hold.
+        $keep = DB::table('character_buffs')
+            ->selectRaw('MAX(id) as id')
+            ->groupBy('character_id', 'stat')
+            ->pluck('id')
+            ->all();
+
+        DB::table('character_buffs')->whereNotIn('id', $keep)->delete();
+
+        // Narrow index back on first, wide one off after -- the 1553 argument
+        // from up(), read backwards.
+        Schema::table('character_buffs', function (Blueprint $table) {
+            $table->unique(['character_id', 'stat']);
+        });
 
         Schema::table('character_buffs', function (Blueprint $table) {
+            $table->dropUnique('character_buffs_character_id_stat_scope_unique');
             $table->dropColumn('scope');
-            $table->unique(['character_id', 'stat']);
         });
     }
 };

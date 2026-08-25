@@ -255,6 +255,18 @@ const huntHint = computed(() => {
   return `${h.yield} units`
 })
 
+/**
+ * What calling it off costs, §11.1 -- leaving a hex mid-progress forfeits the
+ * partial yield. Said plainly, because it is the only thing this button does.
+ */
+const cancelHint = computed(() => {
+  if (!working.value) return ''
+
+  return working.value.kind === 'hunting'
+    ? 'Leaves the herd, and the time spent on it'
+    : 'Forfeits the dig, and frees you to move'
+})
+
 const claimHint = computed(() => {
   if (!working.value) return ''
 
@@ -342,9 +354,20 @@ function hunted(): void {
       </div>
 
       <div class="actions">
-        <!-- Mine and Claim are the same slot at two moments of one mine. -->
+        <!--
+          Mine and Claim are the same slot at two moments of one mine, and only
+          ONE verb is ever offered at a time.
+
+          While it runs there is nothing to take, so the only thing on offer is
+          calling it off. The moment it finishes that button goes away and the
+          claim takes its place: a finished haul dropped by a mistap is pure
+          loss with nothing bought -- there is no version of that tap anybody
+          means. Giving up mid-dig is a real decision (§11.1 forfeits the
+          partial yield); giving up a haul that already exists is not.
+        -->
         <template v-if="working">
           <HexAction
+            v-if="ready || working.kind === 'battle'"
             small
             :icon="working.kind === 'battle' ? 'battle' : 'claim'"
             :label="working.kind === 'battle' ? 'Result' : 'Claim'"
@@ -357,13 +380,13 @@ function hunted(): void {
                from. §9.5.3 offers two exits from a pack and once the first is
                chosen there is no third. -->
           <HexAction
-            v-if="working.kind !== 'battle'"
+            v-else
             small
             icon="drop"
-            label="Drop"
+            label="Cancel"
             danger
             :disabled="game.busy"
-            hint="Forfeits the reward, and frees you to move"
+            :hint="cancelHint"
             @activate="game.abandon(working.id)"
           />
         </template>

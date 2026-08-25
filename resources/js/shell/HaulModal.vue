@@ -56,6 +56,16 @@ const line = computed(() =>
   props.haul.xp?.skill ? (SKILL_BY_KEY[props.haul.xp.skill]?.name ?? null) : null,
 )
 
+/**
+ * §7.4 -- the bench trade, named. The job keys ARE the words (smith, sawyer),
+ * so there is no table to look them up in -- the same reading BattleModal does
+ * for the three battle jobs.
+ */
+const jobName = computed(() => {
+  const key = props.haul.job
+  return key && props.haul.jobXp ? key[0]!.toUpperCase() + key.slice(1) : null
+})
+
 const lineGlyph = computed(() =>
   props.haul.xp?.skill ? skillIcon(props.haul.xp.skill, 15) : '',
 )
@@ -176,7 +186,16 @@ onBeforeUnmount(() => {
             <span class="muted">{{ line }}</span>
             <span class="readout good">+{{ haul.xp.amount }} xp</span>
           </div>
-          <div class="row-between">
+          <!-- §7.4 -- the bench's own trade. A craft teaches nothing else, so
+               without this row an hour at the anvil reported a flat zero. -->
+          <div v-if="jobName" class="row-between">
+            <span class="muted">{{ jobName }}</span>
+            <span class="readout good">+{{ haul.jobXp }} xp</span>
+          </div>
+          <!-- A craft earns no character XP at all (§7.4.1: job levels are the
+               proof you did the work, not a reward for it), and a row of zero
+               reads as something withheld rather than something absent. -->
+          <div v-if="haul.characterXp || !jobName" class="row-between">
             <span class="muted">Character</span>
             <span class="readout good">+{{ haul.characterXp }} xp</span>
           </div>

@@ -18,6 +18,14 @@ php artisan migrate
 composer dev          # php artisan serve + vite, together  -> http://localhost:8000
 ```
 
+Served by nginx on **port 8006** as well (`/etc/nginx/sites-available/hexmine`),
+which is the one a Cloudflare tunnel points at. Two things have to agree for the
+cookie-authenticated API to work behind a hostname: `APP_URL` and
+`SANCTUM_STATEFUL_DOMAINS`. Sanctum will not start a session for a request whose
+origin is not on that list, and with no session there is no wallet login (§2) and
+no character (§7) — the API answers 401 rather than failing visibly, so a missing
+entry there reads as a broken game rather than a misconfigured host.
+
 Node comes from `fnm` on this machine — have the default v22 active before npm.
 
 ```bash
@@ -28,8 +36,38 @@ npm run parity        # the TS generator against the same frozen fixture
 composer parity       # re-verify world generation against the frozen fixture
 ```
 
-Database is SQLite (`database/database.sqlite`) because it needs no setup.
-Nothing depends on the driver — switching to MySQL is a `.env` change.
+Database is MySQL. Create the schema and a user before the first migrate:
+
+```sql
+CREATE DATABASE hexmine CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+CREATE DATABASE hexmine_test CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+CREATE USER 'hexmine'@'127.0.0.1' IDENTIFIED BY '...';
+GRANT ALL ON hexmine.* TO 'hexmine'@'127.0.0.1';
+GRANT ALL ON hexmine_test.* TO 'hexmine'@'127.0.0.1';
+```
+
+### Never exercise the live database
+
+`hexmine` holds real wallet accounts — a login is a chain-verified payment (§2),
+so a character in there belongs to somebody. Seeding it, or clicking through the
+UI against it, leaves demo rows sitting beside real ones where nothing tells them
+apart. Drive a second instance on the test database instead:
+
+```bash
+DB_DATABASE=hexmine_test php artisan migrate:fresh --force
+DB_DATABASE=hexmine_test php artisan serve --port=8007
+DB_DATABASE=hexmine_test php artisan game:demo      # kits out a character
+```
+
+`127.0.0.1:8007` is already in `SANCTUM_STATEFUL_DOMAINS`, so sessions start
+there. Re-migrate before a session rather than assuming state: `hexmine_test` is
+also the PHPUnit database and `RefreshDatabase` empties it.
+
+`hexmine_test` is the second one on purpose: the suite runs on MySQL too
+(`phpunit.xml`), so tests exercise the engine the game actually runs on. It was
+in-memory SQLite, which was faster and hid an entire class of bug — the map is
+centered on (0, 0) and half of every axis is negative, and SQLite stored those
+coordinates in unsigned columns without complaint for months.
 
 ## Structure
 

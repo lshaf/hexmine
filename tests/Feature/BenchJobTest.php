@@ -116,6 +116,34 @@ final class BenchJobTest extends TestCase
         $this->assertSame($before + 1, $this->character->fresh()->items()->count());
     }
 
+    /**
+     * §7.4 -- the receipt has to say what the bench taught.
+     *
+     * The XP was always granted; the plate reported a flat zero for it, because
+     * a craft earns no §7.2 skill XP and no character XP, and those were the
+     * only two figures on the receipt. An hour at the anvil that levels a trade
+     * must not read as an hour that did nothing.
+     */
+    public function test_a_finished_craft_reports_the_job_it_taught(): void
+    {
+        $this->standAtVillage();
+        $this->stockForAxe();
+
+        $job = $this->game->startCraft($this->character->fresh(), 'hewn_axe');
+        $job->update(['ends_at' => $this->game->now() - 1]);
+
+        $before = $this->character->fresh()->jobLevels()->where('job_key', 'smith')->value('xp') ?? 0;
+        $result = $this->game->collectJob($this->character->fresh(), $job->id);
+
+        $this->assertSame('smith', $result['job'], 'an axe is the weapon bench, so it is the Smith that learns');
+        $this->assertGreaterThan(0, $result['jobXp'], 'the receipt reported no job XP for a finished craft');
+
+        // And what it reported is what was actually written down, rather than a
+        // figure the plate makes up on its own.
+        $after = $this->character->fresh()->jobLevels()->where('job_key', 'smith')->value('xp') ?? 0;
+        $this->assertSame($before + $result['jobXp'], $after);
+    }
+
     /** §8.4 -- a bench is a place, not a queue you can stack five deep. */
     public function test_one_craft_at_a_time_per_bench(): void
     {

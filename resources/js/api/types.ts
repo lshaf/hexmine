@@ -27,6 +27,12 @@ import type { WorldConfig } from '@/game/worldgen'
 export interface CharacterDto {
   id: string
   name: string
+  /**
+   * §7 -- whether `name` is a name this character claimed or the label every
+   * unnamed one is drawn with. The string alone cannot say: somebody could have
+   * been called Prospector, except that the one name nobody may claim is that.
+   */
+  named: boolean
   /** Truncated for display; the backend keys everything off the full address. */
   wallet: string
   level: number
@@ -593,6 +599,13 @@ export interface CollectResult {
   /** Units that did not fit: the §2 per-wallet cap, or a full bag (§7.6). */
   lostToOverflow: number
   xp: { skill: SkillKey; amount: number }
+  /**
+   * §7.4 -- the bench trade this taught, if any. A craft teaches no §7.2 skill
+   * and no character XP, so this is the ONLY figure on a craft receipt; a
+   * processing run teaches both its line and its job.
+   */
+  job: string | null
+  jobXp: number
   characterXp: number
   levelsGained: number
   durabilityLost: number
@@ -788,6 +801,9 @@ export interface GameApi {
   equipItem(ownedId: string): Promise<ActionResult<null>>
   unequipItem(ownedId: string): Promise<ActionResult<null>>
   repairItem(ownedId: string): Promise<ActionResult<null>>
+  /** §7 -- claim a name. Letters and digits, and nobody else's. */
+  renameCharacter(name: string): Promise<ActionResult<{ name: string }>>
+
   discardItem(ownedId: string): Promise<ActionResult<null>>
   /** §11.1 -- tip materials out. Nothing comes back; you are buying room. */
   discardMaterial(

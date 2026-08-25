@@ -911,6 +911,20 @@ export const useGame = defineStore('game', () => {
     await act(() => api.sellEquipment(ownedId))
   }
 
+  /**
+   * §7 -- claim a name.
+   *
+   * Answers with a toast rather than silence: the name is drawn in half a dozen
+   * places and none of them is necessarily on screen when it changes, so the
+   * confirmation has to travel to the player rather than wait to be found.
+   */
+  async function rename(name: string): Promise<boolean> {
+    // `act` surfaces a refusal as a toast and answers null, which is how every
+    // other action in the app reports one. What the caller needs back is only
+    // whether to close the form.
+    return (await act(() => api.renameCharacter(name), 'good')) !== null
+  }
+
   async function discard(ownedId: string): Promise<void> {
     await act(() => api.discardItem(ownedId), 'info')
   }
@@ -940,6 +954,7 @@ export const useGame = defineStore('game', () => {
     character, timeScale, bag, bagFull, inventory, equipment, skills, bonuses, toolYield, jobs, readyJobs,
     consumables, buffs,
     tree, skillPoints, jobLevels, ownedNodes,
+    rename,
     questDefs, quests, questsReady, questReward,
     activeJobs, fieldJob, workFull, benchJobs, benchReady, benchHere, underfoot, selectedTile,
     currentSettlement, shopStock, sight, travelPerHexMs, travelEta,

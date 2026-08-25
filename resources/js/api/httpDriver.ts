@@ -285,6 +285,10 @@ export class HttpDriver implements GameApi {
     return post<ActionResult<null>>(`/equipment/${ownedId}/repair`)
   }
 
+  renameCharacter(name: string): Promise<ActionResult<{ name: string }>> {
+    return post<ActionResult<{ name: string }>>('/character/name', { name })
+  }
+
   discardItem(ownedId: string): Promise<ActionResult<null>> {
     return del<ActionResult<null>>(`/equipment/${ownedId}`)
   }

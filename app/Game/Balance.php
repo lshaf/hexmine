@@ -518,6 +518,17 @@ final class Balance
     /** Three raw bytes a dot, so the decoded flag is exactly this many bytes. */
     public const GUILD_FLAG_BYTES = self::GUILD_FLAG_SIZE * self::GUILD_FLAG_SIZE * 3;
 
+    /**
+     * §7 -- what a prospector may call themselves.
+     *
+     * Capped at 16 because the name is drawn on a shared map beside other
+     * people's, where a long one crowds them out. The column is the same width,
+     * so the schema and this agree.
+     */
+    public const CHARACTER_NAME_MIN = 4;
+
+    public const CHARACTER_NAME_MAX = 16;
+
     public const GUILD_NAME_MIN = 3;
 
     public const GUILD_NAME_MAX = 32;

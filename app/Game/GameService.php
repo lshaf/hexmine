@@ -20,6 +20,7 @@ use App\Models\GuildApplication;
 use App\Models\GuildMember;
 use App\Models\Player;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -124,6 +125,75 @@ class GameService
     }
 
     /** Mint the one soulbound character this wallet is allowed, §7. */
+    /**
+     * Claiming a name, §7.
+     *
+     * Letters and digits only, and no two prospectors may hold the same one.
+     * The narrowness is the point rather than prudishness: a name is drawn
+     * beside other players' on a shared map, so anything that can be mistaken
+     * for a different name -- a leading space, a zero-width joiner, two names
+     * differing only by punctuation -- is a way to be somebody else.
+     *
+     * "Prospector" is not claimable. It is the LABEL every unnamed character is
+     * drawn with (see the migration), so letting one player own it would make
+     * every other unnamed prospector look like them.
+     *
+     * The unique index is the authority; this only gets to the refusal first so
+     * the player is told which rule they broke instead of being handed a
+     * constraint violation.
+     */
+    public function renameCharacter(Character $character, string $name): Character
+    {
+        $name = trim($name);
+
+        if (preg_match('/^[A-Za-z0-9]+$/', $name) !== 1) {
+            throw new GameException(
+                'A name is letters and digits only — no spaces, punctuation or symbols.',
+                'name_not_alphanumeric',
+            );
+        }
+
+        if (mb_strlen($name) < Balance::CHARACTER_NAME_MIN || mb_strlen($name) > Balance::CHARACTER_NAME_MAX) {
+            throw new GameException(
+                'A name is between '.Balance::CHARACTER_NAME_MIN.' and '.Balance::CHARACTER_NAME_MAX.' characters.',
+                'name_length',
+            );
+        }
+
+        if (mb_strtolower($name) === 'prospector') {
+            throw new GameException(
+                'Prospector is what an unnamed character is called. Pick something of your own.',
+                'name_reserved',
+            );
+        }
+
+        if ($name === $character->name) {
+            return $character;
+        }
+
+        // Case-insensitively, matching the collation the index is enforced
+        // under -- so the answer here and the answer there are the same answer.
+        $taken = Character::whereRaw('LOWER(name) = ?', [mb_strtolower($name)])
+            ->where('id', '!=', $character->id)
+            ->exists();
+
+        if ($taken) {
+            throw new GameException('Somebody already goes by that name.', 'name_taken');
+        }
+
+        try {
+            $character->name = $name;
+            $character->save();
+        } catch (UniqueConstraintViolationException) {
+            // Two claims for one name in the same instant. The index settles it
+            // and the loser is told the same thing they would have been told a
+            // moment earlier.
+            throw new GameException('Somebody already goes by that name.', 'name_taken');
+        }
+
+        return $character;
+    }
+
     public function createCharacter(Player $player): Character
     {
         $now = $this->now();
@@ -132,7 +202,9 @@ class GameService
         return DB::transaction(function () use ($player, $now, $spawn) {
             $character = Character::create([
                 'player_id' => $player->id,
-                'name' => 'Prospector',
+                // Unnamed. §7 -- the label is applied where it is read, so the
+                // unique index has nothing to collide with (see the migration).
+                'name' => null,
                 'level' => 1,
                 'xp' => 0,
                 'gold' => Balance::STARTING_GOLD,
@@ -1523,7 +1595,10 @@ class GameService
             ->whereNotNull('col')
             ->whereBetween('col', [$minCol, $maxCol])
             ->whereBetween('row', [$minRow, $maxRow])
-            ->selectRaw('col, row, COUNT(*) as total')
+            // Backticked because `row` is a RESERVED WORD in MySQL 8 and is not
+            // one in MariaDB or SQLite, so this raw select parses on two of the
+            // three engines and is a syntax error on the one the game runs on.
+            ->selectRaw('`col`, `row`, COUNT(*) as total')
             ->groupBy('col', 'row')
             ->get()
             ->filter(fn ($job) => $inSight((int) $job->col, (int) $job->row))
@@ -3229,6 +3304,11 @@ class GameService
             // §8.2 -- anything the mine wore out entirely, named in the result
             // that killed it.
             $destroyed = [];
+            // §7.4 -- the bench trade a run teaches, if it teaches one. A mine
+            // never does: a gathering job's level IS its §7.2 skill level, so
+            // there is no second number for it to report.
+            $jobKey = null;
+            $jobXp = 0;
 
             if ($job->kind === 'mining') {
                 // §4 -- the haul is the same SIZE the tile card promised and a
@@ -3286,7 +3366,7 @@ class GameService
                 // §8.4 -- the bench hands over one thing, not a haul. Nothing
                 // here goes through the material ledger, so `gained` stays
                 // empty and the receipt names the item instead.
-                $made = $this->finishCraft($character, $job);
+                $crafted = $this->finishCraft($character, $job);
                 $lostToOverflow = 0;
                 $xpAmount = 0;
 
@@ -3296,8 +3376,13 @@ class GameService
                 return [
                     'gained' => [],
                     'lostToOverflow' => 0,
-                    'made' => $made,
+                    'made' => $crafted['made'],
                     'xp' => ['skill' => null, 'amount' => 0],
+                    // §7.4 -- the bench's own trade. A craft teaches no §7.2
+                    // skill and no character XP, so without this the receipt
+                    // for an hour at the anvil was a row of zeroes.
+                    'job' => $crafted['job'],
+                    'jobXp' => $crafted['jobXp'],
                     'characterXp' => 0,
                     'levelsGained' => 0,
                     'durabilityLost' => 0,
@@ -3315,7 +3400,8 @@ class GameService
                 // rather than what went in, because a bigger batch is more work.
                 $processJob = $this->jobForLine((string) $job->skill_key);
                 if ($processJob !== null) {
-                    $this->grantJobXp(
+                    $jobKey = $processJob;
+                    $jobXp = $this->grantJobXp(
                         $character,
                         $processJob,
                         $job->quantity * Balance::JOB_XP_PER_PROCESS_UNIT,
@@ -3351,6 +3437,8 @@ class GameService
                 'gained' => $gained,
                 'lostToOverflow' => $lostToOverflow,
                 'xp' => ['skill' => $job->skill_key, 'amount' => $xpAmount],
+                'job' => $jobKey,
+                'jobXp' => $jobXp,
                 'characterXp' => $characterXp,
                 'levelsGained' => $levelsGained,
                 'durabilityLost' => $durabilityLost,
@@ -5296,14 +5384,17 @@ class GameService
 
         // §7.4 -- the bench that made it is the job that learns from it, and
         // a better piece teaches more: common 10 through epic 40.
+        // §7.4 -- the bench that made it is the job that learns from it, and a
+        // better piece teaches more: common 10 through epic 40. What was
+        // granted is carried back so the receipt can say so; it was being
+        // awarded silently, which made the plate report a flat zero for work
+        // that had just levelled a trade.
         $jobKey = $this->jobForItem($def);
-        if ($jobKey !== null) {
-            $this->grantJobXp(
-                $character,
-                $jobKey,
-                Balance::JOB_XP_PER_RARITY_RANK * (Balance::rarityRank($def['rarity']) + 1),
-            );
-        }
+        $jobXp = $jobKey === null ? 0 : $this->grantJobXp(
+            $character,
+            $jobKey,
+            Balance::JOB_XP_PER_RARITY_RANK * (Balance::rarityRank($def['rarity']) + 1),
+        );
 
         $effects = $this->jobEffects($character, $jobKey);
 
@@ -5335,10 +5426,14 @@ class GameService
             $row->save();
 
             return [
-                'key' => $itemKey,
-                'name' => $def['name'],
-                'consumable' => true,
-                'quantity' => $made,
+                'made' => [
+                    'key' => $itemKey,
+                    'name' => $def['name'],
+                    'consumable' => true,
+                    'quantity' => $made,
+                ],
+                'job' => $jobKey,
+                'jobXp' => $jobXp,
             ];
         }
 
@@ -5360,12 +5455,16 @@ class GameService
         ]);
 
         return [
-            'key' => $itemKey,
-            'name' => $def['name'],
-            'consumable' => false,
-            'itemId' => (string) $item->id,
-            'durability' => $durability,
-            'options' => $item->options ?? [],
+            'made' => [
+                'key' => $itemKey,
+                'name' => $def['name'],
+                'consumable' => false,
+                'itemId' => (string) $item->id,
+                'durability' => $durability,
+                'options' => $item->options ?? [],
+            ],
+            'job' => $jobKey,
+            'jobXp' => $jobXp,
         ];
     }
 
@@ -5453,14 +5552,14 @@ class GameService
      * fenced off for still holds: no gathering or bench work may ever reach
      * them, or combat becomes optional.
      */
-    private function grantJobXp(Character $character, string $jobKey, int $amount): void
+    private function grantJobXp(Character $character, string $jobKey, int $amount): int
     {
         $def = Jobs::JOBS[$jobKey] ?? null;
         if ($def === null || $amount <= 0) {
-            return;
+            return 0;
         }
         if ($def['kind'] === Jobs::GATHERING) {
-            return;
+            return 0;
         }
 
         // firstOrCreate rather than first: createCharacter seeds a row per job,
@@ -5482,6 +5581,8 @@ class GameService
         $row->level = $result['level'];
         $row->xp = $result['xp'];
         $row->save();
+
+        return $amount;
     }
 
     /**
@@ -6109,7 +6210,14 @@ class GameService
             'timeScale' => Balance::timeScale(),
             'character' => [
                 'id' => (string) $character->id,
-                'name' => $character->name,
+                // §7 -- NULL is unnamed, and the label is applied here, at the
+                // one place the client reads it from. Storing the label would
+                // make it a name somebody holds (see renameCharacter).
+                'name' => $character->name ?? 'Prospector',
+                // Whether that is a name or the label standing in for one. The
+                // screen offers "Take a name" against one and "Change" against
+                // the other, and cannot tell them apart from the string alone.
+                'named' => $character->name !== null,
                 // The player's own address, in full. Abbreviating it here would
                 // only hide it from the one person it belongs to, and would make
                 // "copy address" impossible; the UI shortens it for display.
