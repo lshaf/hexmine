@@ -324,8 +324,26 @@ final class SkillEffectTest extends TestCase
             $this->assertSame(0.0, $other['loot']);
         }
 
+        // §9.5.9 -- and the three skill upgrades are scoped the same way, which
+        // matters more than the rest of them: a Runecaster's Overdraw reaching
+        // a shield would sharpen a Shield Bash it was never bought for.
+        $this->assertGreaterThan(0, $this->grantKind('runecaster', 'skillPower'));
+        $this->assertGreaterThan(
+            0.0,
+            $this->invoke('battleTree', [$this->character->fresh(), 'focus'])['skillPower'],
+        );
         $this->assertSame(
-            ['attack' => 0, 'defense' => 0, 'wear' => 0.0, 'weaponWear' => 0.0, 'gold' => 0.0, 'loot' => 0.0],
+            0.0,
+            $this->invoke('battleTree', [$this->character->fresh(), 'sword'])['skillPower'],
+            'a runecaster node sharpened a swordhand skill',
+        );
+
+        $this->assertSame(
+            [
+                'attack' => 0, 'defense' => 0, 'wear' => 0.0, 'weaponWear' => 0.0,
+                'gold' => 0.0, 'loot' => 0.0,
+                'skillPower' => 0.0, 'skillCooldown' => 0, 'skillStun' => 0,
+            ],
             $this->invoke('battleTree', [$this->character->fresh(), null]),
         );
     }

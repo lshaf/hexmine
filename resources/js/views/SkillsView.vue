@@ -31,7 +31,8 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useGame } from '@/stores/game'
 import { ACTION_PATHS } from '@/icons/actions'
 import { MATERIAL_PALETTE } from '@/theme/palette'
-import { formatPercent, statLine } from '@/game/formulas'
+import { formatPercent } from '@/game/formulas'
+import { STAT_LABEL } from '@/game/catalog'
 import type { NodeDef, NodeEffect } from '@/api/types'
 import type { StatKey } from '@/game/types'
 
@@ -239,6 +240,16 @@ const chosen = computed(() =>
   picked.value && tree.value ? { key: picked.value, def: tree.value.nodes[picked.value]! } : null,
 )
 
+/** §7.4.3 -- how much of this kind is already learned, and where it stops. */
+const total = computed(() =>
+  chosen.value ? effectTotal(chosen.value.key, chosen.value.def.effect) : null,
+)
+
+/** The node or nodes this one hangs off, by name rather than by key. */
+const needs = computed(() =>
+  (chosen.value?.def.requires ?? []).map((k) => tree.value?.nodes[k]?.name ?? k),
+)
+
 const EFFECT_ICON: Record<NodeEffect['kind'], string> = {
   sight: 'effectSight',
   stat: 'effectStat',
@@ -247,6 +258,9 @@ const EFFECT_ICON: Record<NodeEffect['kind'], string> = {
   weaponWear: 'effectCraftDurability',
   toolWear: 'effectCraftDurability',
   bite: 'effectStat',
+  skillPower: 'effectSkillPower',
+  skillCooldown: 'effectSkillCooldown',
+  skillStun: 'effectSkillStun',
   seamGrade: 'effectSeam',
   presence: 'effectPresence',
   runSlot: 'effectRunSlot',
@@ -263,57 +277,135 @@ const EFFECT_ICON: Record<NodeEffect['kind'], string> = {
   bagRows: 'effectBagRows',
 }
 
-/** Plain terms. A node says what it gives you, never what field it writes. */
-function effectText(effect: NodeEffect): string {
+/**
+ * §7.4.3 -- what a node does, with no figure anywhere in it.
+ *
+ * The convention the genre settled on and §9.5.9 already follows on the fight
+ * plate: a plain verb-first line saying what happens, and every number in a
+ * LABELLED ROW under it. GW2 writes "Bash your foe with your shield and stun
+ * them", then `Stun: 2 seconds`.
+ *
+ * It used to be one sentence with the figure buried in the middle of it --
+ * "+1.5% of mines come up a grade better" -- which is the hardest possible
+ * place to compare two nodes, because the eye has to find the number before it
+ * can weigh anything. Split, three nodes read down a column.
+ */
+function effectPhrase(effect: NodeEffect): string {
   switch (effect.kind) {
     case 'stat':
-      return statLine(effect.stat as StatKey, effect.value)
+      // The words STAT_LABEL already uses, so a tree node and an item chip
+      // name the same stat the same way.
+      return `Raises your ${STAT_LABEL[effect.stat as StatKey]}, on this job's work only.`
     case 'pair':
-      // §9.5.4 -- a whole point, said as a whole point. The percentage twins
-      // were the least legible thing in the game.
-      return `+${effect.value} ${effect.stat}`
+      return `Adds whole points of ${effect.stat} to your kit.`
     case 'battleWear':
-      return `${formatPercent(-effect.value)} durability lost in a fight`
+      return 'Spares some of what a fight takes off your armor.'
     case 'weaponWear':
-      return `${formatPercent(-effect.value)} wear on the weapon you swing`
+      return 'Spares some of what a fight takes off the weapon you swing.'
     case 'toolWear':
-      return `${formatPercent(effect.value)} of mines leave the tool untouched`
+      return 'Some mines leave the line\'s tool untouched.'
     case 'bite':
-      // §7.3 -- a whole point of the same attack the tool carries, said the
-      // way the tool says it. There is no mine timer left to shave.
-      return `+${effect.value} attack on this line`
+      return 'Bites deeper into every hex on this line.'
     case 'seamGrade':
-      return `${formatPercent(effect.value)} of mines come up a grade better`
+      return 'Some mines come up a grade better than your tool can reliably take.'
     case 'presence':
-      return `${formatPercent(effect.value)} faster while you stand at the bench`
+      return 'The bench runs faster while you stand at it.'
     case 'runSlot':
-      return `+${effect.value} run you can keep going at once`
+      return 'Keeps another run of this line going at one settlement.'
     case 'goldFind':
-      return `${formatPercent(effect.value)} gold off a pack`
+      return 'A pack pays out more.'
     case 'lootOption':
-      return `${formatPercent(effect.value)} chance of an extra bonus line on looted gear`
+      return 'Gear taken off a monster carries an extra bonus line more often.'
     case 'craftOption':
-      return `${formatPercent(effect.value)} chance of an extra bonus line on what you make`
+      return 'What you make carries an extra bonus line more often.'
     case 'optionTier':
-      return `${formatPercent(effect.value)} chance a bonus line rolls from a better grade`
+      return 'A bonus line is drawn from a deeper grade, never past the rung.'
     case 'craftDurability':
-      return `${formatPercent(effect.value)} durability on what you make`
+      return 'What you make comes off the bench with more durability.'
     case 'brewExtra':
-      return `${formatPercent(effect.value)} chance of an extra flask off a brew`
+      return 'A brew sometimes yields an extra flask.'
     case 'stackCap':
-      return `+${effect.value} of each potion you can carry`
+      return 'Deepens the shelf for every potion you carry.'
     case 'costReduction':
-      return `${formatPercent(-effect.value)} materials per craft`
+      return 'Every craft eats fewer materials.'
     case 'batch':
-      return `+${effect.value} made per craft`
+      return 'Every craft and every run makes more.'
     case 'sight':
-      return `+${effect.value} hex of sight`
+      return 'Widens how far you can see from where you stand.'
     case 'bagUnits':
-      return `+${effect.value} units of bag`
+      return 'Your bag holds more.'
     case 'bagRows':
-      return `+${effect.value} kinds you can carry`
+      return 'Your bag holds more different things.'
+    case 'skillPower':
+      return "Sharpens what your weapon's three skills do."
+    case 'skillCooldown':
+      return "Your weapon's skills come round sooner."
+    case 'skillStun':
+      return 'A stun holds your foe longer.'
   }
 }
+
+/** The figure by itself, formatted the way its kind is counted. */
+function effectValue(effect: NodeEffect): string {
+  switch (effect.kind) {
+    case 'stat':
+      return formatPercent(effect.value)
+    case 'battleWear':
+    case 'weaponWear':
+    case 'costReduction':
+      return formatPercent(-effect.value)
+    case 'toolWear':
+    case 'seamGrade':
+    case 'presence':
+    case 'goldFind':
+    case 'lootOption':
+    case 'craftOption':
+    case 'optionTier':
+    case 'craftDurability':
+    case 'brewExtra':
+    case 'skillPower':
+      return formatPercent(effect.value)
+    case 'skillCooldown':
+      return `${effect.value} round${effect.value === 1 ? '' : 's'} sooner`
+    case 'skillStun':
+      return `+${effect.value} round`
+    case 'sight':
+      return `+${effect.value} hex`
+    default:
+      return `+${effect.value}`
+  }
+}
+
+/**
+ * What this node's kind adds up to across everything already learned, and what
+ * it stops at.
+ *
+ * The one question the panel could not answer before, and the one §7.4.3 cares
+ * most about: the caps are what keep a maxed specialist from switching off a
+ * §11 sink, and a cap nobody is shown reads as a bug the day it binds. Counted
+ * off owned nodes rather than asked for, because the tree and what you own are
+ * both already here -- and clamped, because the server clamps.
+ */
+function effectTotal(key: string, effect: NodeEffect): { now: string; cap: string } | null {
+  const t = tree.value
+  const cap = t?.caps?.[effect.kind]
+  if (!t || cap === undefined) return null
+
+  const job = t.nodes[key]!.job
+  let owned = 0
+
+  for (const [k, def] of Object.entries(t.nodes)) {
+    if (def.job !== job || def.effect.kind !== effect.kind) continue
+    if (def.effect.kind === 'pair' && def.effect.stat !== (effect as { stat?: string }).stat) continue
+    if (game.ownedNodes.has(k)) owned += def.effect.value
+  }
+
+  const shape = (v: number) =>
+    effectValue({ ...effect, value: Math.min(v, cap) } as NodeEffect).replace(/^\+/, '')
+
+  return { now: shape(owned), cap: shape(cap) }
+}
+
 
 /** Learned, and out of how many -- the trees are no longer all the same size. */
 const progress = computed(() => {
@@ -452,8 +544,37 @@ async function learn(): Promise<void> {
           <strong class="name">{{ chosen.def.name }}</strong>
           <span class="label tier">Depth {{ roman(chosen.def.tier) }}</span>
         </div>
-        <p class="tiny muted note">{{ chosen.def.description }}</p>
-        <p class="tiny gives">{{ effectText(chosen.def.effect) }}</p>
+        <!-- §7.4.3 -- the genre's shape, and §9.5.9 already uses it on the
+             fight plate: a plain line saying what happens, then labelled rows
+             carrying every figure, then flavour last and quietest. It was one
+             sentence with the number buried in it, which is the hardest place
+             to compare two nodes from. -->
+        <p class="tiny does">{{ effectPhrase(chosen.def.effect) }}</p>
+
+        <div class="stats">
+          <div class="stat tiny">
+            <span class="muted">This node</span>
+            <span class="readout">{{ effectValue(chosen.def.effect) }}</span>
+          </div>
+          <div v-if="total" class="stat tiny">
+            <span class="muted">Learned so far</span>
+            <span class="readout" :class="{ capped: total.now === total.cap }">
+              {{ total.now }} of {{ total.cap }}
+            </span>
+          </div>
+          <div class="stat tiny">
+            <span class="muted">Opens at</span>
+            <span class="readout">
+              {{ jobDef?.name }} {{ chosen.def.jobLevel }}
+            </span>
+          </div>
+          <div v-if="needs.length" class="stat tiny">
+            <span class="muted">Follows</span>
+            <span class="readout">{{ needs.join(' or ') }}</span>
+          </div>
+        </div>
+
+        <p class="tiny flavour">{{ chosen.def.description }}</p>
 
         <div class="row-between foot">
           <span class="tiny" :class="stateOf(chosen.key, chosen.def) === 'open' ? 'ready' : 'muted'">
@@ -811,10 +932,51 @@ async function learn(): Promise<void> {
   margin: 6px 0 0;
 }
 
-.gives {
-  margin: 6px 0 0;
-  color: var(--accent, var(--copper));
-  font-weight: 600;
+/* The line that says what happens. No figure is allowed in it -- they are all
+   in the rows below, where three nodes can be compared down a column. */
+.does {
+  margin: 7px 0 0;
+  color: var(--vellum);
+  text-align: left;
+  line-height: 1.45;
+}
+
+.stats {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-top: 7px;
+}
+
+/* Label left, figure right, and the figures share a column so two nodes can be
+   weighed against each other without reading either sentence. */
+.stat {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  line-height: 1.6;
+  text-align: left;
+}
+
+.stat .readout {
+  text-align: right;
+  color: var(--vellum);
+}
+
+/* §13.3 -- ember is a state to deal with, and a kind you have already maxed is
+   exactly that: the next node of it is a point you will not feel. */
+.stat .readout.capped {
+  color: var(--ember);
+}
+
+/* Flavour is not a mechanic. Last, quietest, and the only italic here. */
+.flavour {
+  margin: 8px 0 0;
+  color: var(--vellum-dim);
+  font-style: italic;
+  line-height: 1.45;
+  opacity: 0.72;
+  text-align: left;
 }
 
 .foot {

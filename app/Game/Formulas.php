@@ -440,7 +440,13 @@ final class Formulas
      * over the instant you close, and the modal is a replay of something the
      * server already settled rather than a negotiation with it.
      *
-     * @return array{won:bool,rounds:int,damageTaken:int,damageDealt:int,left:int,foeLeft:int,log:list<array{hit:int,back:int,hp:int,foe:int}>}
+     * §9.5.9 -- and what the weapon knows how to do besides swing. Every skill
+     * starts the fight ON COOLDOWN, so the earliest any of them lands is round
+     * `cooldown + 1` and a rout never sees one. At most one fires a round, the
+     * first one listed for the family that is ready (BattleSkills::armed).
+     *
+     * @param  list<array<string,mixed>>  $skills
+     * @return array{won:bool,rounds:int,damageTaken:int,damageDealt:int,left:int,foeLeft:int,log:list<array<string,mixed>>}
      */
     public static function resolveBattle(
         int $attack,
@@ -448,6 +454,8 @@ final class Formulas
         int $pool,
         array $monster,
         int $seed,
+        array $skills = [],
+        bool $steady = false,
     ): array {
         $hp = max(0, $pool);
         $foe = max(1, (int) ($monster['hp'] ?? 1));
@@ -456,23 +464,201 @@ final class Formulas
         $round = 0;
         $log = [];
 
+        // §9.5.9 -- the round each skill last went, and zero means "never".
+        //
+        // Held as the round rather than as a counter to tick down, because a
+        // counter has to be decremented somewhere and the somewhere is easy to
+        // leave out -- which is exactly what happened first time: the cooldowns
+        // were set at the bell, never counted down, and not one skill fired in
+        // the whole game. Read off the clock there is nothing to forget.
+        //
+        // Zero also gives the on-cooldown start for free: ready means
+        // `round - last >= cooldown`, so with nothing used yet the earliest any
+        // of them lands is round `cooldown`.
+        $used = array_fill(0, count($skills), 0);
+
+        $stunned = 0;
+        $extra = 0;
+        $riposte = 0;
+        $sundered = 0;
+        $burn = null;
+        $stance = null;
+
         while ($hp > 0 && $foe > 0 && $round < Balance::BATTLE_MAX_ROUNDS) {
             $round++;
+            $entry = ['hit' => 0, 'back' => 0, 'hp' => $hp, 'foe' => $foe];
 
-            $hit = self::strike($attack, (int) $monster['defense'], $seed, $round, 0);
-            $foe -= $hit;
-            $dealt += $hit;
+            // What is already alight goes on burning whatever it is wearing.
+            // Resolved before the swing, so a foe finished off by a burn is
+            // finished without a blow being logged that never landed.
+            if ($burn !== null) {
+                $seared = max(1, (int) round($attack * $burn['tick']));
+                $foe -= $seared;
+                $dealt += $seared;
+                $entry['burn'] = $seared;
 
-            if ($foe <= 0) {
-                $log[] = ['hit' => $hit, 'back' => 0, 'hp' => $hp, 'foe' => 0];
+                if (--$burn['left'] <= 0) {
+                    $burn = null;
+                }
+
+                if ($foe <= 0) {
+                    $entry['foe'] = 0;
+                    $log[] = $entry;
+                    break;
+                }
+            }
+
+            // One a round at most, and the first listed that is ready. Picked
+            // before the blow, because most of them ARE the blow.
+            $fired = null;
+            foreach ($skills as $i => $skill) {
+                if ($round - $used[$i] < (int) $skill['cooldown']) {
+                    continue;
+                }
+
+                $fired = $skill;
+                $used[$i] = $round;
                 break;
             }
 
-            $back = self::strike((int) $monster['attack'], $defense, $seed, $round, 1);
+            $multiplier = 1.0;
+            $swung = max(0, $attack);
+            $pierce = false;
+
+            if ($fired !== null) {
+                $entry['skill'] = $fired['key'];
+
+                if (isset($fired['power'])) {
+                    $multiplier = (float) $fired['power'];
+                }
+
+                // §9.5.9 -- the arc has been building since the first round,
+                // so it reads the clock. Nothing else in the game gets better
+                // for the fight having gone badly.
+                if (isset($fired['ramp'])) {
+                    $multiplier += (float) $fired['ramp'] * ($round - 1);
+                }
+
+                $pierce = (bool) ($fired['pierce'] ?? false);
+
+                // The only blow in the game that reads your guard. A wall
+                // landing a wall-sized hit is the shield's whole answer to
+                // being unable to finish anything (§9.5.4).
+                if (! empty($fired['toll'])) {
+                    $swung += max(0, $defense);
+                    $entry['toll'] = max(0, $defense);
+                }
+
+                if (isset($fired['stun'])) {
+                    // Set rather than added, so two stuns running do not stack
+                    // into a monster that never answers again.
+                    $stunned = max($stunned, (int) $fired['stun']);
+                    $entry['stunned'] = $stunned;
+                }
+
+                if (isset($fired['burn'])) {
+                    // Refreshed, never stacked. A second application is the
+                    // same fire burning longer.
+                    $burn = ['left' => (int) $fired['burn'], 'tick' => (float) $fired['tick']];
+                }
+
+                if (isset($fired['strikes'])) {
+                    $extra = max($extra, (int) $fired['strikes']);
+                }
+
+                if (isset($fired['riposte'])) {
+                    $riposte = max($riposte, (int) $fired['riposte']);
+                }
+
+                // Permanent, and it stacks with itself. The one effect in the
+                // fight that makes every round AFTER this one worth more, which
+                // is what makes it the sword's.
+                if (isset($fired['sunder'])) {
+                    $sundered += (int) $fired['sunder'];
+                    $entry['sunder'] = $sundered;
+                }
+
+                if (isset($fired['stance'])) {
+                    $stance = [
+                        'left' => (int) $fired['stance'],
+                        'share' => (float) $fired['share'],
+                        'stored' => 0,
+                    ];
+                }
+            }
+
+            $guard = $pierce ? 0 : max(0, (int) $monster['defense'] - $sundered);
+
+            $hit = self::strike($swung, $guard, $seed, $round, 0, $multiplier, $steady);
+            $foe -= $hit;
+            $dealt += $hit;
+
+            // A second swing inside its guard, at no multiplier: what Onslaught
+            // buys is the extra blow, not a bigger one.
+            if ($extra > 0 && $foe > 0) {
+                $again = self::strike($swung, $guard, $seed, $round, 2, 1.0, $steady);
+                $foe -= $again;
+                $dealt += $again;
+                $hit += $again;
+                $entry['extra'] = $again;
+                $extra--;
+            }
+
+            $entry['hit'] = $hit;
+            $entry['foe'] = max(0, $foe);
+
+            if ($foe <= 0) {
+                $log[] = $entry;
+                break;
+            }
+
+            // A stunned foe does not answer. It burns a round of the stun
+            // whether or not it would have connected, so a stun landed on a
+            // round it was going to miss is not a stun wasted.
+            if ($stunned > 0) {
+                $stunned--;
+                $entry['held'] = true;
+                $log[] = $entry;
+
+                continue;
+            }
+
+            $back = self::strike((int) $monster['attack'], $defense, $seed, $round, 1, 1.0, $steady);
+
+            // Set behind the boss: a share of what lands is kept rather than
+            // suffered, and comes back as one blow when the stance breaks.
+            if ($stance !== null) {
+                $kept = (int) round($back * $stance['share']);
+                $back -= $kept;
+                $stance['stored'] += $kept;
+                $entry['kept'] = $kept;
+            }
+
             $hp -= $back;
             $taken += $back;
 
-            $log[] = ['hit' => $hit, 'back' => $back, 'hp' => max(0, $hp), 'foe' => $foe];
+            $entry['back'] = $back;
+            $entry['hp'] = max(0, $hp);
+
+            // Everything it lands comes straight back, and it comes back
+            // through no guard at all -- an answer is not a swing.
+            if ($riposte > 0) {
+                $foe -= $back;
+                $dealt += $back;
+                $entry['riposte'] = $back;
+                $entry['foe'] = max(0, $foe);
+                $riposte--;
+            }
+
+            if ($stance !== null && --$stance['left'] <= 0) {
+                $foe -= $stance['stored'];
+                $dealt += $stance['stored'];
+                $entry['released'] = $stance['stored'];
+                $entry['foe'] = max(0, $foe);
+                $stance = null;
+            }
+
+            $log[] = $entry;
         }
 
         // The bell is a loss. Anything else and a big enough pool grinds down
@@ -519,14 +705,33 @@ final class Formulas
      * floor is an invariant rather than a coincidence. There is a test pinning
      * the invariant.
      */
-    private static function strike(int $attack, int $guard, int $seed, int $round, int $side): int
-    {
+    private static function strike(
+        int $attack,
+        int $guard,
+        int $seed,
+        int $round,
+        int $side,
+        float $multiplier = 1.0,
+        bool $steady = false,
+    ): int {
+        // §9.5.5 -- the preview is the same exchange with the swing taken out,
+        // which is the only honest way to promise anything about a fight that
+        // now has eight mechanics in it. A closed form could be written for a
+        // plain trade of blows and cannot be for a stance that stores damage
+        // and returns it later.
         $roll = Hash::rand01(Hash::hash2($seed, $round * 2 + $side, Balance::mapSeed()));
-        $swing = 1 + (($roll * 2) - 1) * Balance::BATTLE_SWING;
+        $swing = $steady ? 1.0 : 1 + (($roll * 2) - 1) * Balance::BATTLE_SWING;
 
+        // §9.5.9 -- the multiplier is on the BLOW, which is the gap the guard
+        // has already been taken out of. Multiplying the attack instead would
+        // make a strike skill worth nothing against a wall, and the wall is
+        // exactly what a strike skill is for.
+        //
+        // The floor is still applied last (see above), so a multiplied chip is
+        // at least a chip: the invariant does not care what happened before it.
         return max(
             self::strikeFloor($attack),
-            (int) round(max(0, $attack - $guard) * $swing),
+            (int) round(max(0, $attack - $guard) * $multiplier * $swing),
         );
     }
 
@@ -547,36 +752,33 @@ final class Formulas
      * §9.5.5 -- the same exchange with the swing taken out, for the preview.
      *
      * A promise rather than a guess: the numbers on the plate are what the
-     * arithmetic says, and the fight then wanders by ten per cent either way.
+     * arithmetic says, and the fight then wanders by BATTLE_SWING either way.
      *
+     * It RUNS the exchange rather than approximating it, which it did not use
+     * to have to. A plain trade of blows has a closed form -- rounds to kill
+     * against rounds to fall -- and §9.5.9's skills have none: a stance that
+     * stores damage for three rounds and returns it as one blow cannot be
+     * divided out of a total. Running the real loop with the swing pinned is
+     * the only version of this that stays a promise.
+     *
+     * @param  list<array<string,mixed>>  $skills
      * @return array{won:bool,rounds:int,damageTaken:int,damageDealt:int,left:int,foeLeft:int}
      */
-    public static function expectedBattle(int $attack, int $defense, int $pool, array $monster): array
-    {
-        $foe = max(1, (int) ($monster['hp'] ?? 1));
+    public static function expectedBattle(
+        int $attack,
+        int $defense,
+        int $pool,
+        array $monster,
+        array $skills = [],
+    ): array {
+        // Seed zero: nothing reads it once the swing is pinned, and passing the
+        // fight's real seed would imply the preview knew which fight this was
+        // going to be. It does not -- the seed is not struck until you close.
+        $steady = self::resolveBattle($attack, $defense, $pool, $monster, 0, $skills, true);
 
-        $mine = max(self::strikeFloor($attack), $attack - (int) $monster['defense']);
-        $theirs = max(
-            self::strikeFloor((int) $monster['attack']),
-            (int) $monster['attack'] - $defense,
-        );
+        unset($steady['log']);
 
-        $roundsToKill = (int) ceil($foe / $mine);
-        $roundsToFall = (int) ceil(max(0, $pool) / $theirs);
-
-        // The bell is a loss, so running out of rounds counts against you the
-        // same way running out of pool does.
-        $won = $roundsToKill <= $roundsToFall && $roundsToKill <= Balance::BATTLE_MAX_ROUNDS;
-        $rounds = min($roundsToKill, $roundsToFall, Balance::BATTLE_MAX_ROUNDS);
-
-        return [
-            'won' => $won,
-            'rounds' => $rounds,
-            'damageTaken' => min($pool, ($won ? $rounds - 1 : $rounds) * $theirs),
-            'damageDealt' => min($foe, $rounds * $mine),
-            'left' => max(0, $pool - ($won ? $rounds - 1 : $rounds) * $theirs),
-            'foeLeft' => max(0, $foe - $rounds * $mine),
-        ];
+        return $steady;
     }
 
     /**

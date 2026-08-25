@@ -254,6 +254,10 @@ export type NodeEffect =
   | { kind: 'toolWear'; value: number }
   /** §7.3 -- whole points of mining attack on this line. A count, not a stat. */
   | { kind: 'bite'; value: number }
+  /** §9.5.9 -- what the family's three battle skills are worth, and how often. */
+  | { kind: 'skillPower'; value: number }
+  | { kind: 'skillCooldown'; value: number }
+  | { kind: 'skillStun'; value: number }
   /** §5.1 -- a mine that comes up one grade better than the tool can take. */
   | { kind: 'seamGrade'; value: number }
   /** §7.5 -- whole hexes of sight, on top of the base one. Not a percentage. */
@@ -293,6 +297,15 @@ export interface SkillTree {
   /** §7.5 -- jobs whose nodes are granted by job level, never bought. */
   automatic: string[]
   jobMaxLevel: number
+  /**
+   * §7.4.3 -- what each non-stat kind stops at, keyed as the effects are.
+   *
+   * Served rather than mirrored: these caps are what protect the §11 sinks, and
+   * a second copy here would be a second opinion about where a tree ends.
+   * `stat` is absent on purpose — those have no cap of their own, they join
+   * gear's aggregate and stop at STAT_CEILING (§8.1 rule 1).
+   */
+  caps: Partial<Record<NodeEffect['kind'], number>>
 }
 
 /** Server-computed preview of what a mine on this tile would cost and give. */

@@ -393,6 +393,16 @@ final class Balance
     public const BATTLE_MAX_ROUNDS = 60;
 
     /**
+     * §9.5.9 -- the shortest a battle skill's cooldown may ever be tuned or
+     * bought down to.
+     *
+     * Two, not one. At one a skill fires every round, which is the whole thing
+     * a cooldown exists to prevent -- and with three skills armed at once the
+     * exchange would stop being an exchange and become a rotation.
+     */
+    public const BATTLE_SKILL_MIN_COOLDOWN = 2;
+
+    /**
      * §9.5.6 -- the share of a beating that comes off the kit.
      *
      * ONE bill, taken off what the fight actually took out of you. It used to
@@ -887,6 +897,35 @@ final class Balance
      * balanced around.
      */
     public const SKILL_BATTLE_WEAR_CAP = 0.15;
+
+    /**
+     * §9.5.9 + §7.4.3 -- what a battle tree may do to the three skills its
+     * family carries.
+     *
+     * Three caps rather than one because they are three different things being
+     * bought, and each of them breaks something different if it runs away.
+     *
+     * `skillPower` is a quarter MORE OF THE EXTRA, never a quarter of the whole
+     * blow: a maxed tree moves a Lunge from x2.2 to x2.5, which is worth about
+     * a rung of gear on the rounds it lands. That is the same bargain
+     * SKILL_PAIR_CAP strikes, and §8.1 rule 4 is why -- the ladder is twelve
+     * points wide and a tree must be a different road up it rather than a
+     * longer one.
+     *
+     * `skillCooldown` is whole rounds, and two is most of a rotation: the
+     * shortest cooldown in the set is four, so two rounds off it is half again
+     * as many firings over a long fight. BATTLE_SKILL_MIN_COOLDOWN is what
+     * stops it reaching every-round.
+     *
+     * `skillStun` is ONE round and will not be more. A stun is the only effect
+     * that takes a turn away outright, so it compounds with itself: two extra
+     * rounds on a Shield Bash is a monster that never gets to answer.
+     */
+    public const SKILL_BATTLE_POWER_CAP = 0.25;
+
+    public const SKILL_BATTLE_COOLDOWN_CAP = 2;
+
+    public const SKILL_BATTLE_STUN_CAP = 1;
 
     /**
      * §7.5 -- how many hexes of sight the Explorer tree can add, on top of the

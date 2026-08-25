@@ -494,6 +494,33 @@ class GameService
     }
 
     /**
+     * §9.5.6 -- the wear bill, for a kit nobody owns.
+     *
+     * The one seam the battle bench needs (BattleSimController): it runs the
+     * real exchange off Formulas and then has to charge the real bill, and
+     * battleWear() is private because nothing in the game had any business
+     * calling it from outside. A bench that reimplemented the split would be a
+     * second opinion about the largest sink in the game (§11.1).
+     *
+     * Takes rows rather than a character precisely because there is no
+     * character: it reads nothing, writes nothing and is a pure function of
+     * what it is handed.
+     *
+     * @param  array<int,array<string,mixed>>  $items
+     * @param  array<string,mixed>  $monster
+     * @return array<int,int> item id -> durability lost
+     */
+    public function simulateWear(
+        array $items,
+        array $monster,
+        int $damageTaken,
+        float $wearSpared = 0.0,
+        float $weaponSpared = 0.0,
+    ): array {
+        return $this->battleWear($items, $monster, $damageTaken, $wearSpared, $weaponSpared);
+    }
+
+    /**
      * §9.5.6 -- how a beating is spread across the kit that took it.
      *
      * By how much each piece was built to soak rather than by how much is left
@@ -1616,7 +1643,11 @@ class GameService
      */
     private function battleTree(Character $character, ?string $family): array
     {
-        $zero = ['attack' => 0, 'defense' => 0, 'wear' => 0.0, 'weaponWear' => 0.0, 'gold' => 0.0, 'loot' => 0.0];
+        $zero = [
+            'attack' => 0, 'defense' => 0, 'wear' => 0.0, 'weaponWear' => 0.0,
+            'gold' => 0.0, 'loot' => 0.0,
+            'skillPower' => 0.0, 'skillCooldown' => 0, 'skillStun' => 0,
+        ];
         if ($family === null) {
             return $zero;
         }
@@ -1637,6 +1668,12 @@ class GameService
             'weaponWear' => (float) ($byJob['weaponWear'] ?? 0.0),
             'gold' => (float) ($byJob['goldFind'] ?? 0.0),
             'loot' => (float) ($byJob['lootOption'] ?? 0.0),
+            // §9.5.9 -- what the tree does to the three skills the family
+            // carries. Clamped in BattleSkills::armed(), not here, so the
+            // preview and the exchange cannot read different numbers.
+            'skillPower' => (float) ($byJob['skillPower'] ?? 0.0),
+            'skillCooldown' => (int) ($byJob['skillCooldown'] ?? 0),
+            'skillStun' => (int) ($byJob['skillStun'] ?? 0),
         ];
     }
 
@@ -1681,7 +1718,22 @@ class GameService
         // promise: this is what the arithmetic says, and the fight then wanders
         // by BATTLE_SWING either way.
         $pool = Formulas::battlePool($items);
-        $expected = Formulas::expectedBattle($pair['attack'], $pair['defense'], $pool, $monster);
+
+        // §9.5.9 -- the skills are in the arithmetic even though the hex card
+        // says nothing about them. They belong to the exchange rather than to
+        // the ground you are standing on, so the preview COSTS them and the
+        // battle plate is where they are actually read.
+        $expected = Formulas::expectedBattle(
+            $pair['attack'],
+            $pair['defense'],
+            $pool,
+            $monster,
+            BattleSkills::armed($job['family'], [
+                'power' => $tree['skillPower'],
+                'cooldown' => $tree['skillCooldown'],
+                'stun' => $tree['skillStun'],
+            ]),
+        );
 
         // §9.5.6 -- the same one bill the fight will charge, so the preview and
         // the receipt cannot disagree about what this is going to cost.
@@ -1891,12 +1943,24 @@ class GameService
             // it, and swapping to a better sword while the clock runs buys
             // nothing.
             $pool = Formulas::battlePool($items);
+
+            // §9.5.9 -- the family in the slot decides which three, and the
+            // tree decides how good they are. Read HERE with everything else
+            // about the kit, because the fight is settled the instant you
+            // close: swapping weapons while the clock runs buys nothing.
+            $armedSkills = BattleSkills::armed($job['family'], [
+                'power' => $tree['skillPower'],
+                'cooldown' => $tree['skillCooldown'],
+                'stun' => $tree['skillStun'],
+            ]);
+
             $fight = Formulas::resolveBattle(
                 $pair['attack'],
                 $pair['defense'],
                 $pool,
                 $monster,
                 $seed,
+                $armedSkills,
             );
             $won = $fight['won'];
 
@@ -1950,6 +2014,19 @@ class GameService
                     // is the replay, and it rides the job so closing the tab
                     // costs the animation and never the result.
                     'log' => $fight['log'],
+                    // §9.5.9 -- the three that took the fight, as they were
+                    // armed when it started. Stored with the roll for the same
+                    // reason the roll is: the replay has to draw the cooldowns
+                    // the exchange actually ran on, not the ones the character
+                    // happens to have when they open the tab.
+                    'skills' => array_map(static fn (array $skill): array => [
+                        'key' => $skill['key'],
+                        'name' => $skill['name'],
+                        'glyph' => $skill['glyph'],
+                        'cooldown' => $skill['cooldown'],
+                        'description' => $skill['description'],
+                        ...BattleSkills::summary($skill),
+                    ], $armedSkills),
                     'monsterHp' => (int) $monster['hp'],
                     'attack' => $pair['attack'],
                     'defense' => $pair['defense'],
@@ -5510,6 +5587,22 @@ class GameService
      */
     public function nodeEffects(Character $character): array
     {
+        return $this->effectsOf($this->ownedNodes($character));
+    }
+
+    /**
+     * The same aggregate, from a bare list of node keys.
+     *
+     * Split out for the battle bench (BattleSimController), which has no
+     * character to own anything and still has to answer "what would THIS set of
+     * nodes be worth". Everything the caps and the bucketing do is here rather
+     * than in nodeEffects(), so the bench and the game cannot come to different
+     * conclusions about the same six nodes.
+     *
+     * @param  list<string>  $keys
+     */
+    public function effectsOf(array $keys): array
+    {
         $stats = [];
         $byLine = [];
         $byJob = [];
@@ -5519,7 +5612,7 @@ class GameService
         $bagUnits = 0;
         $bagRows = 0;
 
-        foreach ($this->ownedNodes($character) as $key) {
+        foreach ($keys as $key) {
             $node = Jobs::node($key);
             if ($node === null) {
                 continue;
@@ -5613,6 +5706,9 @@ class GameService
             'weaponWear' => Balance::SKILL_WEAPON_WEAR_CAP,
             'goldFind' => Balance::SKILL_GOLD_FIND_CAP,
             'lootOption' => Balance::SKILL_LOOT_OPTION_CAP,
+            'skillPower' => Balance::SKILL_BATTLE_POWER_CAP,
+            'skillCooldown' => Balance::SKILL_BATTLE_COOLDOWN_CAP,
+            'skillStun' => Balance::SKILL_BATTLE_STUN_CAP,
         ];
         foreach ($byJob as $job => $kinds) {
             foreach ($kinds as $kind => $value) {
@@ -5681,6 +5777,9 @@ class GameService
             'weaponWear' => 0.0,
             'goldFind' => 0.0,
             'lootOption' => 0.0,
+            'skillPower' => 0.0,
+            'skillCooldown' => 0.0,
+            'skillStun' => 0.0,
         ];
         if ($jobKey === null) {
             return $zero;
@@ -5956,6 +6055,7 @@ class GameService
                 'monsterHp' => $job->payload['monsterHp'] ?? 0,
                 'roundMs' => Balance::BATTLE_ROUND_MS,
                 'log' => $job->payload['log'] ?? [],
+                'skills' => $job->payload['skills'] ?? [],
             ];
         }
 

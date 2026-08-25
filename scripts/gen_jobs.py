@@ -30,6 +30,9 @@ def bite(n): return ('bite', None, n)
 def seam_grade(v): return ('seamGrade', None, v)
 def pair(key, n): return ('pair', key, n)
 def battle_wear(v): return ('battleWear', None, v)
+def skill_power(v): return ('skillPower', None, v)
+def skill_cooldown(n): return ('skillCooldown', None, n)
+def skill_stun(n): return ('skillStun', None, n)
 def weapon_wear(v): return ('weaponWear', None, v)
 def gold_find(v): return ('goldFind', None, v)
 def loot_option(v): return ('lootOption', None, v)
@@ -56,6 +59,9 @@ VALUES = {
     'A': (pair, 'attack',   [1, 1, 2, 2, 3]),
     'F': (pair, 'defense',  [1, 1, 2, 2, 3]),
     'W': (battle_wear, None, [.01, .015, .015, .02, .025]),
+    'P': (skill_power, None,    [.03, .04, .05, .06, .08]),
+    'C': (skill_cooldown, None, [1, 1, 1, 1, 1]),
+    'S': (skill_stun, None,     [1, 1, 1, 1, 1]),
     'V': (weapon_wear, None, [.01, .015, .015, .02, .025]),
     'G': (gold_find, None,   [.02, .03, .03, .04, .05]),
     'L': (loot_option, None, [.02, .03, .04, .05, .06]),
@@ -79,6 +85,9 @@ CAPS = {
     'stackCap': 10,
     'pair': 12,
     'battleWear': .15,
+    'skillPower': .25,
+    'skillCooldown': 2,
+    'skillStun': 1,
     'weaponWear': .15,
     'goldFind': .25,
     'lootOption': .25,
@@ -93,7 +102,7 @@ ALLOWED = {
     'weapon': set('pcDOT'),
     'armor': set('pcDOT'),
     'consumable': set('pcbXK'),
-    'battle': set('AFWVGL'),
+    'battle': set('AFWVGLPCS'),
 }
 
 # ---------------------------------------------------------------- the names
@@ -584,7 +593,7 @@ SHIELD_NAMES = [
  ('shoulder_behind','Shoulder Behind It','The arm holds it; the body stops it.'),
  ('short_steps','Short Steps','Never cross your feet under pressure.'),
  ('boss_punch','Boss Punch','Close range, and it buys you a yard.'),
- ('shield_wall','Shield Wall','Nobody in a line fights alone.'),
+ ('shoulder_drive','Shoulder Drive','All of you behind the boss, not just the arm.'),
 
  ('angled_deflection','Angled Deflection','Turn it aside rather than take it.'),
  ('low_guard','Low Guard','Everything below the knee is still a wound.'),
@@ -602,14 +611,14 @@ SHIELD_NAMES = [
  ('field_repair','Field Repair','A cracked board holds if you know how to bind it.'),
  ('watchful_rest','Watchful Rest','You are still on guard while the party sits.'),
  ('unmoved','Unmoved','They stop coming at you and go around.'),
- ('the_last_rank','The Last Rank','Whoever is behind you gets out.'),
+ ('rim_first','Rim First','The edge arrives before the arm does.'),
 
  ('rim_binding','Rim Binding','A bound rim takes the chips so the boards do not.'),
  ('board_swap','Board Swap','Replace the split board and keep the shield.'),
- ('strap_care','Strap Care','Oiled leather outlasts the arm behind it.'),
+ ('recovered_stance','Recovered Stance','Back behind the boss before it has finished swinging.'),
  ('boss_reseat','Boss Reseat','Reseat it before the rivets work loose.'),
  ('glancing_habit','Glancing Habit','Let it slide off rather than stopping it dead.'),
- ('thickest_part','Thickest Part','Take the blow where the shield is built for it.'),
+ ('ringing_blow','Ringing Blow','It stays down a beat longer than it means to.'),
 
  ('kit_discipline','Kit Discipline','Checked before the walk, not after the fight.'),
  ('the_long_watch','The Long Watch','Gear you look after outlives the ones who do not.'),
@@ -633,7 +642,7 @@ SWORD_NAMES = [
  ('close_quarters','Close Quarters','Inside the swing is the safest place to stand.'),
 
  ('parry_riposte','Parry and Riposte','The block is the first half of the attack.'),
- ('shoulder_roll','Shoulder Roll','Take the graze and keep the arm.'),
+ ('committed_edge','Committed Edge','Nothing held back for a second attempt.'),
  ('long_guard','Long Guard','Hold the distance you chose.'),
  ('sword_care','Sword Care','A cared-for edge is a longer fight.'),
  ('reading_stance','Reading Stance','You know what they will do from how they stand.'),
@@ -642,10 +651,10 @@ SWORD_NAMES = [
  ('the_even_hand','The Even Hand','Neither reckless nor slow.'),
 
  ('flat_of_the_blade','Flat of the Blade','Turn it aside on the flat; the edge is for one thing.'),
- ('honing_habit','Honing Habit','A stone every evening beats a forge every month.'),
+ ('opening_read','Opening Read','You saw the gap two rounds ago.'),
  ('scabbard_fit','Scabbard Fit','A loose scabbard files the edge off for free.'),
  ('no_wasted_swing','No Wasted Swing','Every swing that lands on nothing still costs you.'),
- ('grip_wrap','Grip Wrap','The wrap wears out first, and it is the cheap part.'),
+ ('pommel_strike','Pommel Strike','Not a cut. It still sits down.'),
  ('rust_watch','Rust Watch','Dry it before you sit down.'),
 
  ('pommel_seat','Pommel Seat','A tight pommel keeps the tang from working.'),
@@ -671,16 +680,16 @@ RUNE_NAMES = [
 
  ('echo_carve','Echo Carve','The second casting is cheaper than the first.'),
  ('warding_ring','Warding Ring','A circle is the oldest instruction there is.'),
- ('ash_reading','Ash Reading','What burned tells you what will.'),
+ ('ash_reading','Ash Reading','What burned tells you what will, and what it is worth.'),
  ('steady_channel','Steady Channel','Held open, not opened repeatedly.'),
  ('silence_before','Silence Before','Nothing works if you are still talking.'),
- ('binding_knot','Binding Knot','Tie it off or it unravels into you.'),
+ ('open_channel','Open Channel','Never quite closed, so never quite cold.'),
  ('long_burn','Long Burn','Less at once, for much longer.'),
  ('the_quiet_word','The Quiet Word','Loud is amateur.'),
 
- ('cool_between','Cool Between','A focus worked hot cracks along the mark.'),
- ('sealed_ends','Sealed Ends','Sealed at both ends, so the weather stays out.'),
- ('spare_binding','Spare Binding','Carry the cord you will need before you need it.'),
+ ('overdraw','Overdraw','More than the focus was meant to hold.'),
+ ('unspent_charge','Unspent Charge','Nothing left in it afterwards, which is the point.'),
+ ('stilling_word','Stilling Word','One syllable, and it forgets what it was doing.'),
  ('measured_draw','Measured Draw','Ask for what the work needs and not a spark more.'),
  ('rest_the_rod','Rest the Rod','Between marks, put it down.'),
  ('clean_the_groove','Clean the Groove','Ash in the cut is what widens the cut.'),
@@ -731,9 +740,9 @@ CODES = {
  'armorer':      'pcDpcO DDTcODcc DTpcpOpc TDppcT Dp',
  'alchemist':    'pcKpcX pXXcXpbK XKpcpXbc XKcpKK pp',
 
- 'shieldbearer': 'FAFWAW FFWAWVAG FAFWWVFG WWGFAL GL',
- 'swordhand':    'AFAFWV FAFAGLVW FWFVAAGL FVWALG WG',
- 'runecaster':   'AAFFVW AVAFVFLW VFGVALAL VLGAAF VL',
+ 'shieldbearer': 'FAFWAP FFWAPVAG FAFCWVFP WWCFAS GL',
+ 'swordhand':    'AFAFWP FAFAGCVW FPFVAACL FPWASG WG',
+ 'runecaster':   'AAFFPW AVAFVFCW VFGVACAL PPSAAF VL',
 }
 
 TIER_OF = [1] * 6 + [2] * 8 + [3] * 8 + [4] * 6 + [5] * 2
@@ -924,7 +933,8 @@ def effect_php(e):
         return "['kind' => 'stat', 'stat' => %s, 'value' => %s]" % (php_str(target), value)
     if kind == 'pair':
         return "['kind' => 'pair', 'stat' => %s, 'value' => %d]" % (php_str(target), value)
-    if kind in ('batch', 'runSlot', 'stackCap', 'sight', 'bagUnits', 'bagRows', 'bite'):
+    if kind in ('batch', 'runSlot', 'stackCap', 'sight', 'bagUnits', 'bagRows', 'bite',
+                'skillCooldown', 'skillStun'):
         return "['kind' => %s, 'value' => %d]" % (php_str(kind), value)
     return "['kind' => %s, 'value' => %s]" % (php_str(kind), value)
 

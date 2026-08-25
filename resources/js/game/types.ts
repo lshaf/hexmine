@@ -569,6 +569,25 @@ export interface BattleRound {
   /** Your pool after the round, and its HP. */
   hp: number
   foe: number
+  /**
+   * §9.5.9 -- the skill that went off this round, if one did. At most one a
+   * round, and never in the opening rounds: they all start on cooldown.
+   */
+  skill?: string
+  /**
+   * What it did. Only the field its skill actually sets is present, which is
+   * what lets the modal say one true sentence instead of a list of zeroes.
+   */
+  stunned?: number
+  burn?: number
+  extra?: number
+  riposte?: number
+  sunder?: number
+  kept?: number
+  released?: number
+  toll?: number
+  /** Its answer never came, because it was still finding its feet. */
+  held?: boolean
 }
 
 export interface BattleJob {
@@ -592,6 +611,22 @@ export interface BattleJob {
   roundMs: number
   /** The exchange, in order. Empty only for a job stored before this existed. */
   log: BattleRound[]
+  /**
+   * §9.5.9 -- the three that took the fight, as they were armed when it began.
+   *
+   * Stored with the roll for the same reason the roll is: the replay has to
+   * draw the cooldowns the exchange actually ran on, not the ones the character
+   * happens to have when they open the tab.
+   */
+  skills: Array<{
+    key: string
+    name: string
+    glyph: string
+    cooldown: number
+    description: string
+    effect: string
+    stats: Array<{ label: string; value: string }>
+  }>
 }
 
 export type Job = FieldJob | ProcessingJob | CraftJob | BattleJob

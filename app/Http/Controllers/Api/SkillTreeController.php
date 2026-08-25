@@ -19,6 +19,40 @@ use Illuminate\Http\Request;
  */
 class SkillTreeController extends GameController
 {
+    /**
+     * §7.4.3 -- the ceiling on each non-stat kind, keyed as the effects are.
+     *
+     * `stat` is deliberately absent: those do not have a cap of their own at
+     * all. They join the very same aggregate and clamp as gear, options and
+     * potions (§8.1 rule 1), so the number that bounds them is STAT_CEILING and
+     * it is not this tree's to report.
+     */
+    private const CAPS = [
+        'bite' => Balance::SKILL_BITE_CAP,
+        'toolWear' => Balance::SKILL_TOOL_WEAR_CAP,
+        'seamGrade' => Balance::SKILL_SEAM_GRADE_CAP,
+        'presence' => Balance::SKILL_PRESENCE_CAP,
+        'runSlot' => Balance::SKILL_RUN_SLOT_CAP,
+        'costReduction' => Balance::SKILL_COST_REDUCTION_CAP,
+        'batch' => Balance::SKILL_BATCH_CAP,
+        'craftDurability' => Balance::SKILL_DURABILITY_CAP,
+        'craftOption' => Balance::SKILL_OPTION_CHANCE_CAP,
+        'optionTier' => Balance::SKILL_OPTION_TIER_CAP,
+        'brewExtra' => Balance::SKILL_BREW_EXTRA_CAP,
+        'stackCap' => Balance::SKILL_STACK_CAP,
+        'pair' => Balance::SKILL_PAIR_CAP,
+        'battleWear' => Balance::SKILL_BATTLE_WEAR_CAP,
+        'weaponWear' => Balance::SKILL_WEAPON_WEAR_CAP,
+        'goldFind' => Balance::SKILL_GOLD_FIND_CAP,
+        'lootOption' => Balance::SKILL_LOOT_OPTION_CAP,
+        'skillPower' => Balance::SKILL_BATTLE_POWER_CAP,
+        'skillCooldown' => Balance::SKILL_BATTLE_COOLDOWN_CAP,
+        'skillStun' => Balance::SKILL_BATTLE_STUN_CAP,
+        'sight' => Balance::SKILL_SIGHT_CAP,
+        'bagUnits' => Balance::SKILL_BAG_UNITS_CAP,
+        'bagRows' => Balance::SKILL_BAG_ROWS_CAP,
+    ];
+
     /** The whole tree, cacheable and player-independent. */
     public function index(): JsonResponse
     {
@@ -36,6 +70,17 @@ class SkillTreeController extends GameController
                 fn (string $job) => Jobs::isAutomatic($job),
             )),
             'jobMaxLevel' => Balance::JOB_MAX_LEVEL,
+            // §7.4.3 -- what each kind stops at.
+            //
+            // Served rather than mirrored for the same reason the nodes are:
+            // these caps are what protect the §11 sinks, and a second copy in
+            // the client would be a second opinion about where a tree ends.
+            //
+            // The panel needs them for the one question it could not answer
+            // before: how much of this kind you have already, and whether the
+            // node you are looking at is a point you will actually feel. A cap
+            // nobody is shown is a cap that reads as a bug the day it binds.
+            'caps' => self::CAPS,
         ]);
     }
 

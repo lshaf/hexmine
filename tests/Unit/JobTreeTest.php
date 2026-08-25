@@ -258,6 +258,7 @@ final class JobTreeTest extends TestCase
         $known = [
             'stat', 'pair', 'battleWear', 'weaponWear', 'goldFind', 'lootOption',
             'craftOption', 'craftDurability', 'optionTier', 'brewExtra', 'stackCap', 'bite',
+            'skillPower', 'skillCooldown', 'skillStun',
             'costReduction', 'batch', 'runSlot', 'presence', 'toolWear', 'seamGrade',
             'sight', 'bagUnits', 'bagRows',
         ];
@@ -332,6 +333,9 @@ final class JobTreeTest extends TestCase
             'weaponWear' => Balance::SKILL_WEAPON_WEAR_CAP,
             'goldFind' => Balance::SKILL_GOLD_FIND_CAP,
             'lootOption' => Balance::SKILL_LOOT_OPTION_CAP,
+            'skillPower' => Balance::SKILL_BATTLE_POWER_CAP,
+            'skillCooldown' => Balance::SKILL_BATTLE_COOLDOWN_CAP,
+            'skillStun' => Balance::SKILL_BATTLE_STUN_CAP,
         ];
 
         foreach (array_keys(Jobs::JOBS) as $job) {
@@ -434,7 +438,11 @@ final class JobTreeTest extends TestCase
                 // pays (§9.5.8). Nothing here reaches a mine or a bench.
                 $this->assertContains(
                     $effect['kind'],
-                    ['pair', 'battleWear', 'weaponWear', 'goldFind', 'lootOption'],
+                    [
+                        'pair', 'battleWear', 'weaponWear', 'goldFind', 'lootOption',
+                        // §9.5.9 -- and what the family's three skills are worth.
+                        'skillPower', 'skillCooldown', 'skillStun',
+                    ],
                     "{$key} is a battle node doing some other job's work",
                 );
 

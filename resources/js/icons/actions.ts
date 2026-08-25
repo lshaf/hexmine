@@ -47,6 +47,14 @@ export const ACTION_PATHS: Record<string, string> = {
   effectPresence: 'M12 4.4a2 2 0 1 0 0 4 2 2 0 0 0 0-4 M12 8.4v6 M9 20l3-5.6 3 5.6 M4 12.4h4 M16 12.4h4',
   /* §6.1 -- a second run going beside the first. */
   effectRunSlot: 'M4 6.5h7v4H4Z M13 6.5h7v4h-7Z M4 14.5h16v4H4Z',
+  /* §9.5.9 -- the three that sharpen a weapon's own skills. Drawn from the same
+     vocabulary as the skill glyphs they upgrade (icons/skills.ts), so a node in
+     the tree and the mark that flashes in a fight are recognisably about the
+     same thing: a chevron for force, a turning arrow for sooner, a crossed ring
+     for a turn taken away. */
+  effectSkillPower: 'M6 17l5-5-5-5 M13 17l5-5-5-5 M4 20.5h16',
+  effectSkillCooldown: 'M12 6.5A5.5 5.5 0 1 1 7 10 M7 4.5v5.5h5.5 M12 9.5v3l2 1.5',
+  effectSkillStun: 'M12 4a8 8 0 1 1-.01 0 M4.5 12h15',
   /* §8.4 -- the consumable bench, which owns none of the other bench effects. */
   effectBrew: 'M10 3.8h4 M11 3.8v5.4L6.6 18a2 2 0 0 0 1.8 2.9h7.2A2 2 0 0 0 17.4 18L13 9.2V3.8 M8.5 14.2h7',
   /* §9.5.8 -- coin off a pack, which needs no strap to carry. */
