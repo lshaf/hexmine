@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\BattleController;
+use App\Http\Controllers\Api\BattleSimController;
 use App\Http\Controllers\Api\CraftingController;
 use App\Http\Controllers\Api\EquipmentController;
 use App\Http\Controllers\Api\GuildController;
@@ -27,6 +28,17 @@ use Illuminate\Support\Facades\Route;
 | complete fresh PlayerState.
 |
 */
+
+/*
+| §9.5 -- the battle bench, outside the character middleware on purpose.
+|
+| It takes no character, reads nothing and writes nothing: every input arrives
+| in the request and the answer is a pure function of it. Requiring a character
+| would make the bench unusable for the one question it exists to answer, which
+| is what a kit nobody owns would do against a monster nobody has met.
+*/
+Route::get('/battle-sim', [BattleSimController::class, 'index']);
+Route::post('/battle-sim', [BattleSimController::class, 'store']);
 
 Route::middleware(ResolveCharacter::class)->group(function () {
     Route::get('/state', [StateController::class, 'show']);

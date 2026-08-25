@@ -14,6 +14,7 @@ export default defineConfig({
         'resources/js/main.ts',
         'resources/js/almanac.ts',
         'resources/js/oddity.ts',
+        'resources/js/battle.ts',
       ],
       refresh: true,
     }),

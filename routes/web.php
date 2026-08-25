@@ -18,6 +18,14 @@ Route::view('/almanac', 'almanac');
 Route::view('/oddity', 'oddity');
 
 /*
+| §9.5 -- the battle bench. A tool, not a screen: pick a kit, pick a tree, pick
+| a monster, and watch the exact exchange a real fight would run. It takes no
+| character and loads no map, so like the almanac it has no business booting
+| the SPA to be used.
+*/
+Route::view('/battle', 'battle');
+
+/*
 | The whole client is one Vue SPA. Every non-API path returns the same shell so
 | the app owns its own routing; /api/* is handled by routes/api.php and never
 | reaches this catch-all.
