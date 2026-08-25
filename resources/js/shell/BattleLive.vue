@@ -17,28 +17,41 @@
  * That is the whole reason to watch: what drains on screen is what you will be
  * paying to repair, so the cost of a bad matchup is legible while it happens
  * rather than only on the plate afterwards.
+ *
+ * The band, the cooldown rail and the skill rows are all shared components: the
+ * bench at /battle draws this same fight off the same pieces, so there is no
+ * second copy of any of it to drift.
  */
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { MONSTERS } from '@/game/monsters'
 import { FAMILY_FOR_BATTLE_JOB, fighterCrest, monsterCrest } from '@/icons/combatants'
 import { useGame } from '@/stores/game'
 import SvgIcon from '@/components/SvgIcon.vue'
-import type { BattleJob } from '@/game/types'
+import BattleBand from '@/shell/BattleBand.vue'
+import BattleSkillRail from '@/shell/BattleSkillRail.vue'
+import { BATTLE_SKILLS } from '@/game/battleSkills'
+import { skillEffect, skillGlyph } from '@/icons/skills'
+import type { BattleJob, BattleRound } from '@/game/types'
 
-const props = defineProps<{ job: BattleJob }>()
+const props = defineProps<{ job: BattleJob; pair?: { attack: number; defense: number } }>()
 const emit = defineEmits<{ (e: 'done'): void }>()
 
 const game = useGame()
 
 /**
- * §9.5.4 -- your half of the matchup, off the player state.
+ * Your pair, for the corner readout.
  *
- * The pair rides the state rather than the fight, because what your kit is
+ * Taken from the store in play, and from a prop on the battle bench (/battle),
+ * where there is no character and no state to read one off. The store is
+ * touched either way -- a composable cannot be called conditionally -- but
+ * nothing is asked of it when the prop is there.
+ *
+ * §9.5.4 -- it rides the state rather than the fight, because what your kit is
  * worth is a thing to know while shopping and not something to discover by
  * finding a pack on your hex. Nothing can change it mid-replay either: a pin
  * offers two exits and neither of them is the gear screen (§9.5.3).
  */
-const mine = computed(() => game.state?.combat ?? null)
+const mine = computed(() => props.pair ?? game.state?.combat ?? null)
 
 const monster = computed(() => (props.job.monster ? MONSTERS[props.job.monster] : null))
 
@@ -50,7 +63,25 @@ const tookMine = ref(0)
 const tookTheirs = ref(0)
 
 const round = ref(0)
-const over = ref(false)
+
+/**
+ * §9.5.9 -- the skill that went off this round, held for the beat it is drawn.
+ *
+ * One a round at most, so this is a single value rather than a list. Cleared on
+ * every round that has none, which is most of them: the cooldowns are long and
+ * a rout never sees one at all.
+ */
+const fired = ref<BattleRound | null>(null)
+
+const firedName = computed(() =>
+  fired.value?.skill ? (BATTLE_SKILLS[fired.value.skill]?.name ?? fired.value.skill) : null,
+)
+
+const firedGlyph = computed(() =>
+  fired.value?.skill ? skillGlyph(BATTLE_SKILLS[fired.value.skill]?.glyph, 18) : null,
+)
+
+const firedEffect = computed(() => (fired.value ? skillEffect(fired.value) : null))
 
 const rounds = computed(() => props.job.log ?? [])
 
@@ -85,7 +116,6 @@ function step(): void {
   const next = rounds.value[round.value]
 
   if (!next) {
-    over.value = true
     stop()
     // A beat on the last blow before the plate replaces it.
     window.setTimeout(() => emit('done'), 450)
@@ -97,6 +127,7 @@ function step(): void {
   tookTheirs.value = next.hit
   hp.value = next.hp
   foe.value = next.foe
+  fired.value = next.skill ? next : null
   round.value += 1
 }
 
@@ -128,72 +159,94 @@ onBeforeUnmount(stop)
 <template>
   <div class="scrim">
     <div class="plate" role="dialog" aria-live="polite">
-      <!-- §9.5.5 -- a round is ONE exchange, so the two pools face each other
-           across a single line rather than stacking. Two stacked bars imply a
-           turn order the arithmetic does not have; opposed bars draining away
-           from a shared center say what actually happens -- one blow, two
-           consequences, and whoever empties first loses. -->
-      <div class="band">
-        <div class="corner them" :class="{ struck: tookTheirs > 0 }">
-          <SvgIcon :svg="theirCrest" class="crest" />
-          <span class="who">
-            <strong class="name">{{ monster?.name ?? 'It' }}</strong>
-            <span class="tiny muted block">{{ monster?.profile }}</span>
-            <span class="tiny muted block mono">
-              {{ monster?.attack }} atk · {{ monster?.defense }} def
-            </span>
+      <!-- ONE child, because `.plate` is the hairline-border trick: the outer
+           element is the border colour and a single inner one, inset by a
+           pixel, carries the fill. `.plate > *` therefore hands EVERY direct
+           child the chamfered clip, the panel fill and a 14px backdrop blur --
+           so five children were drawn as five stacked slabs with the rows
+           floating on them. -->
+      <div class="inner">
+        <!-- §9.5.5 -- a round is ONE exchange, so the two pools face each other
+             across a single line rather than stacking. Two stacked bars imply a
+             turn order the arithmetic does not have; opposed bars draining away
+             from a shared center say what actually happens -- one blow, two
+             consequences, and whoever empties first loses.
+
+             The counter sits in the middle rather than above because it is the
+             one thing belonging to BOTH sides: a round is one exchange. -->
+        <BattleBand
+          :their-crest="theirCrest"
+          :my-crest="myCrest"
+          :their-name="monster?.name ?? 'It'"
+          :their-profile="monster?.profile"
+          :their-attack="monster?.attack"
+          :their-defense="monster?.defense"
+          :my-sub="job.skill"
+          :my-attack="mine?.attack ?? 0"
+          :my-defense="mine?.defense ?? 0"
+          :struck-them="tookTheirs > 0"
+          :struck-you="tookMine > 0"
+        >
+          <span class="tick">
+            <span class="tiny muted">Round</span>
+            <strong class="count">{{ round }}</strong>
           </span>
-        </div>
+        </BattleBand>
 
-        <div class="tick">
-          <span class="tiny muted">Round</span>
-          <strong class="count">{{ round }}</strong>
-        </div>
-
-        <div class="corner you" :class="{ struck: tookMine > 0 }">
-          <span class="who">
-            <strong class="name">You</strong>
-            <span class="tiny muted block">{{ job.skill }}</span>
-            <span class="tiny muted block mono">
-              {{ mine?.attack ?? 0 }} atk · {{ mine?.defense ?? 0 }} def
+        <!-- §9.5.9 -- what the weapon just did, on the round it did it.
+             A strip of its own rather than a mark tucked beside the round
+             counter: a skill is the only thing in the exchange a player did not
+             already expect, and it has to be readable at one round a second.
+             The row reserves its height whether or not anything fired, so the
+             pools underneath never jump. -->
+        <div class="cast" :class="{ lit: firedName !== null }">
+          <Transition name="fire">
+            <span v-if="firedName" :key="`s${round}`" class="cast-inner">
+              <SvgIcon v-if="firedGlyph" :svg="firedGlyph" class="cast-glyph" />
+              <strong class="cast-name">{{ firedName }}</strong>
+              <span v-if="firedEffect" class="cast-effect tiny">{{ firedEffect }}</span>
             </span>
-          </span>
-          <SvgIcon :svg="myCrest" class="crest" />
+            <!-- Most rounds have no skill, and reserved-and-empty read as a
+                 hole once the rest of the plate was tightened. A hairline is
+                 the house answer to that (it is what stands where the round
+                 counter was on the receipt): the strip is the seam between WHO
+                 is fighting and HOW IT IS GOING, and a skill breaks it open. -->
+            <span v-else class="cast-rule" aria-hidden="true" />
+          </Transition>
         </div>
+
+        <!-- Both pools drain toward the outside, so the gap in the middle is the
+             fight: it opens on whichever side is losing. -->
+        <div class="pools">
+          <div class="pool left">
+            <div class="bar"><span class="fill foe" :style="{ width: `${foePercent}%` }" /></div>
+            <div class="under">
+              <Transition name="hit">
+                <span v-if="tookTheirs > 0" :key="`t${round}`" class="blow">−{{ tookTheirs }}</span>
+              </Transition>
+              <span class="readout mono figure">{{ foe }}</span>
+            </div>
+          </div>
+
+          <span class="seam" aria-hidden="true" />
+
+          <div class="pool right">
+            <div class="bar">
+              <span class="fill mine" :class="{ low: failing }" :style="{ width: `${myPercent}%` }" />
+            </div>
+            <div class="under">
+              <span class="readout mono figure" :class="{ low: failing }">{{ hp }}</span>
+              <Transition name="hit">
+                <span v-if="tookMine > 0" :key="`m${round}`" class="blow">−{{ tookMine }}</span>
+              </Transition>
+            </div>
+          </div>
+        </div>
+
+        <!-- §9.5.9 -- the weapon's three, under the pools they are spending. -->
+        <BattleSkillRail class="arts" :skills="job.skills" :log="rounds" :round="round" />
+
       </div>
-
-      <!-- Both pools drain toward the outside, so the gap in the middle is the
-           fight: it opens on whichever side is losing. -->
-      <div class="pools">
-        <div class="pool left">
-          <div class="bar"><span class="fill foe" :style="{ width: `${foePercent}%` }" /></div>
-          <div class="under">
-            <Transition name="hit">
-              <span v-if="tookTheirs > 0" :key="`t${round}`" class="blow">−{{ tookTheirs }}</span>
-            </Transition>
-            <span class="readout mono figure">{{ foe }}</span>
-          </div>
-        </div>
-
-        <span class="seam" aria-hidden="true" />
-
-        <div class="pool right">
-          <div class="bar">
-            <span class="fill mine" :class="{ low: failing }" :style="{ width: `${myPercent}%` }" />
-          </div>
-          <div class="under">
-            <span class="readout mono figure" :class="{ low: failing }">{{ hp }}</span>
-            <Transition name="hit">
-              <span v-if="tookMine > 0" :key="`m${round}`" class="blow">−{{ tookMine }}</span>
-            </Transition>
-          </div>
-        </div>
-      </div>
-
-      <p class="tiny muted foot">
-        <template v-if="over">Settling up…</template>
-        <template v-else>What drains here is the repair bill.</template>
-      </p>
     </div>
   </div>
 </template>
@@ -211,80 +264,16 @@ onBeforeUnmount(stop)
 
 .plate {
   width: min(420px, 100%);
+}
+
+/* No caption under the pools. A line explaining what the bars mean is read
+   once and read past forever, and the bars are the whole plate -- so the last
+   thing on it is the thing being watched. */
+.inner {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 16px;
-  background: var(--ink-panel);
-  border: 1px solid var(--line);
-}
-
-/* ------------------------------------------------------------------- band */
-
-/* §9.5.5 -- the two faces, and the round counter on the line between them. The
-   counter sits in the middle rather than above because it is the one thing
-   belonging to BOTH sides: a round is one exchange. */
-.band {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: center;
-  gap: 10px;
-}
-
-.corner {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  min-width: 0;
-  transition: transform 0.1s ease;
-}
-
-.corner.you {
-  justify-content: flex-end;
-  text-align: right;
-}
-
-/* The blow lands on the fighter, not just on the number, and each side recoils
-   AWAY from the center. One frame is enough -- longer reads as a bug. */
-.corner.them.struck {
-  transform: translateX(-3px);
-}
-
-.corner.you.struck {
-  transform: translateX(3px);
-}
-
-.crest {
-  flex: 0 0 auto;
-}
-
-.who {
-  min-width: 0;
-}
-
-/* Wraps rather than truncates. A crest says what KIND of thing this is; the
-   name is the only thing saying WHICH, and "Barrow K…" on a phone is the half
-   of it that carries no information. Two short lines cost a few pixels the
-   band has, since it is centered against a 44px crest either way. */
-.name {
-  display: block;
-  font-family: var(--font-display);
-  font-size: 15px;
-  line-height: 1.15;
-  overflow-wrap: anywhere;
-}
-
-.block {
-  display: block;
-  line-height: 1.35;
-}
-
-.corner .block:first-of-type {
-  text-transform: capitalize;
-}
-
-.corner .mono {
-  white-space: nowrap;
+  padding: 15px 16px 16px;
 }
 
 /* The seam the whole plate is built around. */
@@ -293,7 +282,6 @@ onBeforeUnmount(stop)
   flex-direction: column;
   align-items: center;
   gap: 1px;
-  padding: 0 4px;
 }
 
 .tick .tiny {
@@ -306,6 +294,87 @@ onBeforeUnmount(stop)
   font-size: 21px;
   line-height: 1;
   font-variant-numeric: tabular-nums;
+}
+
+/* §9.5.9 -- the skill strip. Fixed height so nothing below it moves when a
+   skill lands; the copper is borrowed rather than owned, because §13.3 spends
+   ember on a state to deal with and sap on a thing worth crossing the screen
+   for, and a skill firing is neither.
+
+   It is `.cast` rather than `.art` because the cooldown dials underneath were
+   ALSO called `.art`: same specificity, declared later, so the dials' 30px
+   grid box quietly won and this strip was drawn as a square. */
+.cast {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 26px;
+  margin: 0 0 2px;
+  border-top: 1px solid transparent;
+  border-bottom: 1px solid transparent;
+  color: var(--copper);
+}
+
+.cast.lit {
+  border-color: rgba(193, 121, 63, 0.35);
+}
+
+.cast-rule {
+  width: 46px;
+  height: 1px;
+  background: var(--line);
+}
+
+.cast-inner {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.cast-glyph {
+  flex: 0 0 auto;
+  display: block;
+}
+
+.cast-name {
+  font-size: 12px;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.cast-effect {
+  color: var(--vellum-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fire-enter-active {
+  transition: opacity 140ms ease, transform 140ms ease;
+}
+
+.fire-leave-active {
+  transition: opacity 100ms ease;
+}
+
+.fire-enter-from {
+  opacity: 0;
+  transform: scale(0.9);
+}
+
+.fire-leave-to {
+  opacity: 0;
+}
+
+@media (max-width: 380px) {
+  .cast-effect {
+    display: none;
+  }
+}
+
+.arts {
+  margin-top: 4px;
 }
 
 /* ------------------------------------------------------------------ pools */
@@ -337,7 +406,7 @@ onBeforeUnmount(stop)
   align-items: baseline;
   justify-content: space-between;
   gap: 8px;
-  min-height: 19px;
+  min-height: 18px;
 }
 
 .pool.left .under {
@@ -360,7 +429,7 @@ onBeforeUnmount(stop)
 
 .bar {
   width: 100%;
-  height: 10px;
+  height: 13px;
   background: rgba(0, 0, 0, 0.5);
   overflow: hidden;
 }
@@ -410,28 +479,13 @@ onBeforeUnmount(stop)
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .corner,
   .fill,
   .hit-enter-active,
-  .hit-leave-active {
+  .hit-leave-active,
+  .fire-enter-active,
+  .fire-leave-active {
     transition: none;
   }
-
-  .corner.struck {
-    transform: none;
-  }
 }
 
-.foot {
-  margin: 0;
-  text-align: center;
-  letter-spacing: 0.12em;
-}
-
-@media (max-width: 380px) {
-  .crest :deep(svg) {
-    width: 36px;
-    height: 36px;
-  }
-}
 </style>

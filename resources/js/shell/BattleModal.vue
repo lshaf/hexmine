@@ -23,6 +23,7 @@ import { MATERIALS } from '@/game/catalog'
 import { itemIcon, materialIcon } from '@/icons/procedural'
 import { FAMILY_FOR_BATTLE_JOB, fighterCrest, monsterCrest } from '@/icons/combatants'
 import SvgIcon from '@/components/SvgIcon.vue'
+import BattleBand from '@/shell/BattleBand.vue'
 import { optionStatLine } from '@/game/formulas'
 import { ITEM_BY_KEY } from '@/game/catalog'
 import type { BattleResult } from '@/api/types'
@@ -116,31 +117,19 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
              place, so the two faces have to still be there: a plate that
              switched to a heading and a list would read as a different screen
              about a different fight. -->
-        <div class="band">
-          <div class="corner them">
-            <SvgIcon :svg="theirCrest" class="crest" />
-            <span class="who">
-              <strong class="name">{{ battle.monster.name }}</strong>
-              <span class="tiny muted block">{{ battle.monster.profile }}</span>
-              <span class="tiny muted block mono">
-                {{ battle.monster.attack }} atk · {{ battle.monster.defense }} def
-              </span>
-            </span>
-          </div>
-
+        <BattleBand
+          :their-crest="theirCrest"
+          :my-crest="myCrest"
+          :their-name="battle.monster.name"
+          :their-profile="battle.monster.profile"
+          :their-attack="battle.monster.attack"
+          :their-defense="battle.monster.defense"
+          :my-sub="jobName ?? 'bare-handed'"
+          :my-attack="battle.attack"
+          :my-defense="battle.defense"
+        >
           <span class="clash" aria-hidden="true" />
-
-          <div class="corner you">
-            <span class="who">
-              <strong class="name">You</strong>
-              <span class="tiny muted block">{{ jobName ?? 'bare-handed' }}</span>
-              <span class="tiny muted block mono">
-                {{ battle.attack }} atk · {{ battle.defense }} def
-              </span>
-            </span>
-            <SvgIcon :svg="myCrest" class="crest" />
-          </div>
-        </div>
+        </BattleBand>
 
         <!-- §9.5.7 -- two outcomes and no third. `died` is `!won` on the server,
              so the old "Driven off" branch could never fire: it read as a
@@ -324,57 +313,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
   text-transform: capitalize;
 }
 
-/* ------------------------------------------------------------------- band */
-
-/* The two faces, with the verdict standing where the round counter was. Centre
-   column is auto so a long word ("Driven off") never squeezes a crest. */
-.band {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: center;
-  gap: 9px;
-}
-
-.corner {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-.corner.you {
-  justify-content: flex-end;
-  text-align: right;
-}
-
-.crest {
-  flex: 0 0 auto;
-}
-
-.who {
-  min-width: 0;
-}
-
-/* Wraps rather than truncates. A crest says what KIND of thing this is; the
-   name is the only thing saying WHICH, and "Barrow K…" on a phone is the half
-   of it that carries no information. Two short lines cost a few pixels the
-   band has, since it is centered against a 44px crest either way. */
-.name {
-  display: block;
-  font-family: var(--font-display);
-  font-size: 14px;
-  line-height: 1.15;
-  overflow-wrap: anywhere;
-}
-
-.corner .block:first-of-type {
-  text-transform: capitalize;
-}
-
-.corner .mono {
-  white-space: nowrap;
-}
-
 /* Where the round counter stood while it was still running. A hairline rather
    than a word: the fight is over, and the thing worth saying about it is the
    verdict below rather than a divider trying to be one. */
@@ -384,8 +322,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
   background: var(--line);
 }
 
-/* The one word the plate exists to say. Display face, tight, and the only
-   thing here allowed to be this size. */
 /* The one word the plate exists to say, and the only thing on it at this size.
    Boldness spent in one place (§13.2's discipline): everything around it is a
    number in a quiet row. */
@@ -528,12 +464,5 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 .note {
   margin: 0;
   line-height: 1.5;
-}
-
-@media (max-width: 380px) {
-  .crest :deep(svg) {
-    width: 36px;
-    height: 36px;
-  }
 }
 </style>

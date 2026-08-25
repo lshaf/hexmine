@@ -22,6 +22,9 @@ import { waterLabel } from '@/game/water'
 import { formatDuration, placeLabel } from '@/game/formulas'
 import { worldParams } from '@/game/worldgen'
 import HexAction from './HexAction.vue'
+import BattleSkillRail from './BattleSkillRail.vue'
+import { skillsOfFamily } from '@/game/battle'
+import { FAMILY_FOR_BATTLE_JOB } from '@/icons/combatants'
 import type { BattlePreview } from '@/api/types'
 
 const game = useGame()
@@ -92,6 +95,7 @@ const gather = computed(() => underfoot.value?.gather)
  * with that axe" is what would change your mind.
  */
 const wearWarning = computed(() => underfoot.value?.warnings?.[0] ?? null)
+
 
 const mineHint = computed(
   () => underfoot.value?.reason ?? wearWarning.value ?? `${underfoot.value?.yield ?? 0} units`,
@@ -184,6 +188,22 @@ watch(
     battle.value = isPinned || corpse.value ? await api.previewBattle() : null
   },
   { immediate: true },
+)
+
+/**
+ * §9.5.9 -- the three your weapon knows, on the fight preview.
+ *
+ * The design has always put them here and nothing drew them: "the skills are
+ * on the fight preview because whether to close at all is the decision, and
+ * against a long fight these are half of it."
+ *
+ * Cold, because a fight that has not started has every cooldown full -- which
+ * is the rule rather than a placeholder. Read off the battle job the preview
+ * already reports, since §9.5.4 makes the family in the slot your class and
+ * the job is the same fact said the other way round.
+ */
+const packSkills = computed(() =>
+  skillsOfFamily(FAMILY_FOR_BATTLE_JOB[battle.value?.job ?? ''] ?? null),
 )
 
 const packHint = computed(() => {
@@ -358,6 +378,12 @@ function hunted(): void {
               {{ warning }}
             </span>
             <span v-if="packLeaves" class="tiny muted">Moves on in {{ packLeaves }}</span>
+
+            <!-- §9.5.9 -- what the weapon brings to a long fight. Every dial
+                 is full, because every skill starts a fight on cooldown: a
+                 rout never sees one, and knowing that is part of deciding
+                 whether to close. -->
+            <BattleSkillRail v-if="packSkills.length" class="knows" :skills="packSkills" />
           </div>
 
           <!-- §9.5.3 -- one of the two exits, and the only one that is an
@@ -613,5 +639,10 @@ function hunted(): void {
 
 .pinned .warn {
   color: var(--ember);
+}
+
+.knows {
+  justify-content: flex-start;
+  margin-top: 3px;
 }
 </style>
