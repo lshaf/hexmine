@@ -30,6 +30,7 @@ import { itemIcon, materialIcon } from '@/icons/procedural'
 import SvgIcon from '@/components/SvgIcon.vue'
 import StatChips from '@/components/StatChips.vue'
 import QueueBar from '@/components/QueueBar.vue'
+import JobCard from '@/components/JobCard.vue'
 import type { BuffScope, EquipSlot, ItemDef, MaterialKey, Rarity } from '@/game/types'
 
 const game = useGame()
@@ -92,6 +93,22 @@ const freeBenches = computed(() => benchSlots.value.filter((s) => s.owner === nu
 const mineHere = computed(() => benchSlots.value.some((s) => s.owner === 'you'))
 
 const benchFull = computed(() => benchSlots.value.length > 0 && freeBenches.value === 0)
+
+/**
+ * §8.4 -- your own craft at THIS bench, finished or not.
+ *
+ * The panel already knew about it: it told you something of yours was on a
+ * bench here and to collect it before starting another, and then offered no way
+ * to. Being handed over at the bench is the rule, and standing at the bench is
+ * exactly where this screen is read from -- so the collection belongs here
+ * rather than three taps away in the Benches ledger.
+ */
+const craftHere = computed(() =>
+  game.benchJobs.find(
+    (j) => j.kind === 'craft' && j.settlementId === station.value?.id,
+  ) ?? null,
+)
+
 
 onMounted(() => void game.loadBench())
 watch(() => station.value?.id, () => void game.loadBench())
@@ -353,7 +370,12 @@ const emptyNote = computed(() => {
         :slots="benchSlots"
         full-note="Every bench here is busy. Congestion at a popular settlement is the point — try a quieter one, or wait for a slot."
       >
-        <p v-if="mineHere && !benchFull" class="tiny muted queue-note">
+        <!-- The one of yours, and the button that takes it. What used to be
+             here was the same sentence with nothing to press. -->
+        <div v-if="craftHere" class="mine">
+          <JobCard :job="craftHere" />
+        </div>
+        <p v-else-if="mineHere && !benchFull" class="tiny muted queue-note">
           Something of yours is on a bench here. Collect it before starting
           another — one bench each, per settlement.
         </p>
@@ -468,6 +490,12 @@ const emptyNote = computed(() => {
 </template>
 
 <style scoped>
+/* The card carries its own Collect when it is ready and its own Abandon while
+   it runs, so this only has to give it a place to sit. */
+.mine {
+  margin-top: 8px;
+}
+
 .page {
   /* Sizing and scrolling belong to PanelOverlay. */
   padding: 0;

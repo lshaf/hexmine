@@ -596,6 +596,18 @@ export interface ActionResult<T = unknown> {
 
 export interface CollectResult {
   gained: Partial<Record<MaterialKey, number>>
+  /**
+   * §8.4 -- what a craft handed over. A bench makes one THING, not a haul, so
+   * this is set exactly when `gained` is empty for a reason rather than for
+   * want of a strap.
+   */
+  made?: {
+    key: string
+    name: string
+    consumable: boolean
+    quantity?: number
+    durability?: number
+  } | null
   /** Units that did not fit: the §2 per-wallet cap, or a full bag (§7.6). */
   lostToOverflow: number
   xp: { skill: SkillKey; amount: number }

@@ -61,6 +61,16 @@ const line = computed(() =>
  * so there is no table to look them up in -- the same reading BattleModal does
  * for the three battle jobs.
  */
+/**
+ * §8.4 -- a bench hands over one thing, and the plate has to say so.
+ *
+ * A craft was being drawn as a haul: "0 units brought back", over copy telling
+ * the player nothing fit and to work the hex again. Nothing had gone wrong and
+ * there was no hex -- a craft simply does not pay in units, and the receipt was
+ * reading the wrong half of the result.
+ */
+const made = computed(() => props.haul.made ?? null)
+
 const jobName = computed(() => {
   const key = props.haul.job
   return key && props.haul.jobXp ? key[0]!.toUpperCase() + key.slice(1) : null
@@ -142,10 +152,20 @@ onBeforeUnmount(() => {
              is possible, so the eyebrow falls back to the bare fact. -->
         <span class="eyebrow label">
           <SvgIcon v-if="lineGlyph" :svg="lineGlyph" class="line-mark" />
-          {{ line ?? 'Brought back' }}
+          {{ line ?? (made ? 'Off the bench' : 'Brought back') }}
         </span>
 
-        <p class="tally">
+        <p v-if="made" class="tally made">
+          <strong class="figure">{{ made.name }}</strong>
+          <span v-if="made.quantity && made.quantity > 1" class="unit label">
+            ×{{ made.quantity }}
+          </span>
+          <span v-else-if="made.durability" class="unit label">
+            {{ made.durability }} durability
+          </span>
+        </p>
+
+        <p v-else class="tally">
           <strong class="figure">{{ counted }}</strong>
           <span class="unit label">{{ total === 1 ? 'unit' : 'units' }} brought back</span>
         </p>
@@ -175,7 +195,7 @@ onBeforeUnmount(() => {
           </li>
         </ul>
 
-        <p v-else class="tiny muted empty">
+        <p v-else-if="!made" class="tiny muted empty">
           Nothing fit. Sell, process or drop something and work the hex again.
         </p>
 
@@ -225,6 +245,13 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+/* A name, not a figure -- so it is set at a size a name can live at rather than
+   the display size a single digit needs. */
+.tally.made .figure {
+  font-size: 25px;
+  line-height: 1.15;
+}
+
 .wrap {
   position: absolute;
   inset: 0;

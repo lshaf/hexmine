@@ -26,14 +26,19 @@ const heading = computed(() => {
 })
 
 /**
- * §9.5.3 -- how far the road actually goes, which a pack ahead brings forward.
+ * The whole road, as asked for.
  *
- * Nothing is given away by saying so: the client generates packs itself from
- * the seed (§5.6), so the map is already drawing the one standing there. What
- * this fixes is the walker arriving at the village and snapping back down the
- * road when the server's correction landed a whole journey later.
+ * NOT the hex a pack ahead will stop you on. §5.6 puts sight at zero while
+ * traveling -- you are between hexes, watching your feet -- and a journey that
+ * announces its own ambush by counting down to it is that fog leaking. Being
+ * stopped is meant to be the moment you find out.
+ *
+ * The marker still stops where the road really ends: travelProgress clamps to
+ * `stopHex`, which is what keeps a walker from visibly arriving at the village
+ * and snapping back when the correction lands. That is a fact about the
+ * animation, and it is not drawn as a number anywhere.
  */
-const legs = computed(() => game.travel?.stopHex ?? 0)
+const legs = computed(() => game.travel?.hexes ?? 0)
 </script>
 
 <template>
@@ -48,13 +53,6 @@ const legs = computed(() => game.travel?.stopHex ?? 0)
           <span class="qty readout">To {{ heading }}</span>
           <span class="label when">
             {{ walked }}/{{ legs }} hexes · {{ formatDuration(game.travelRemainingMs) }}
-          </span>
-          <!-- §13.3 -- ember, because it is a state to deal with rather than
-               news worth crossing the screen for. The rest of the road is not
-               walked (§9.5.3), so the destination on the line above is no
-               longer where this journey is going. -->
-          <span v-if="game.travelBlockedBy" class="label blocked">
-            {{ game.travelBlockedBy }} on the road — the walk ends there
           </span>
         </span>
         <button
@@ -111,11 +109,6 @@ const legs = computed(() => game.travel?.stopHex ?? 0)
 }
 
 .when {
-  font-size: 8.5px;
-}
-
-.road .blocked {
-  color: var(--ember);
   font-size: 8.5px;
 }
 

@@ -206,20 +206,22 @@ const packSkills = computed(() =>
   skillsOfFamily(FAMILY_FOR_BATTLE_JOB[battle.value?.job ?? ''] ?? null),
 )
 
-const packHint = computed(() => {
-  const b = battle.value
-  if (!b) return 'Nothing here will let you work'
-  if (b.reason) return b.reason
-
-  // §9.5.5 -- what the exchange says, and what it costs. The fight is not a
-  // coin any more, so the plate says WIN or DRIVEN OFF rather than a
-  // percentage. What a loss costs is on the warning line underneath.
-  const clock = b.seconds ? ` · ${formatDuration(b.seconds * 1000)}` : ''
-  const call = b.expected?.won ? 'You take it' : 'It drives you off'
-  const bill = b.wear ? ` · −${b.wear.taken + b.wear.weapon} durability` : ''
-
-  return `${call} in ${b.expected?.rounds ?? 0} · you ${b.attack}/${b.defense}/${b.pool}hp · it ${b.monster?.attack}/${b.monster?.defense}/${b.monster?.hp}hp${bill}${clock}`
-})
+/**
+ * Why the button will not work, and nothing else.
+ *
+ * The dock used to carry the whole preview here: the verdict, the rounds, the
+ * durability bill, and both fighters' attack, defense and pool. That is a
+ * paragraph of arithmetic in front of a decision that is one tap, and on a
+ * phone it wrapped into lines of unreadable digits.
+ *
+ * What is left is the one thing a player cannot act without: the reason a tap
+ * would do nothing -- already in this fight, already working the hex. A
+ * refusal with no explanation is the worst answer a dock can give.
+ *
+ * The bench at /battle runs the same exchange against any kit, for anybody who
+ * wants the numbers before walking into one.
+ */
+const packBlock = computed(() => battle.value?.reason ?? null)
 
 /**
  * §10.0 -- what the guild cell has to say at this settlement.
@@ -396,7 +398,13 @@ function hunted(): void {
         <template v-else-if="pinned">
           <div class="pinned">
             <strong class="tiny">{{ pack ? MONSTERS[pack.key]?.name : 'Something' }} is standing here</strong>
-            <span class="tiny muted">{{ packHint }}</span>
+            <span v-if="packBlock" class="tiny muted">{{ packBlock }}</span>
+            <!--
+              §8.2 -- the one thing that is still said every time. An idle game
+              may never take something expensive by surprise, and the warnings
+              above it are the specific version of that: THIS fight finishes
+              THAT piece of gear.
+            -->
             <span v-for="warning in battle?.warnings ?? []" :key="warning" class="tiny warn">
               {{ warning }}
             </span>
@@ -420,7 +428,7 @@ function hunted(): void {
             label="Fight"
             :primary="Boolean(battle?.canFight)"
             :disabled="game.busy"
-            :hint="packHint"
+            :hint="packBlock ?? ''"
             @activate="game.fight()"
           />
         </template>
@@ -631,6 +639,31 @@ function hunted(): void {
   .where {
     max-width: none;
     gap: 2px;
+  }
+
+  /*
+   * §9.5.3 -- a pack owns the hex, so the hex's own business is not on offer:
+   * you may not mine, gather, hunt or travel while it stands there. On a phone
+   * the two columns fought for the same 130px and the place name lost, which
+   * left the dock reading "OPEN COUNTRY · O…" over a fight nobody could see the
+   * terms of. The pack takes the row; where you are standing keeps the line
+   * above it.
+   */
+  .inner:has(.pinned) {
+    flex-wrap: wrap;
+  }
+
+  .inner:has(.pinned) .where {
+    flex: 1 0 100%;
+  }
+
+  .inner:has(.pinned) .actions {
+    margin-left: 0;
+  }
+
+  .pinned {
+    flex: 1;
+    min-width: 0;
   }
 
   .named {

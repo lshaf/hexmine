@@ -492,13 +492,29 @@ export const useGame = defineStore('game', () => {
   /** Whole hexes already banked -- what stopping right now would keep. */
   const travelHexesWalked = computed(() => Math.floor(travelProgress.value))
 
-  /** Time to where the journey ENDS, which a pack ahead can bring forward. */
+  /**
+   * Time to the DESTINATION, which is the journey the player asked for.
+   *
+   * Not to `stopAt`. A pack ahead cuts the road short (§9.5.3), and counting to
+   * the cut told the walker something §5.6 says they cannot know: sight on the
+   * road is zero, because you are between hexes watching your feet. A shortened
+   * clock is that fog leaking -- the walk quietly announcing an ambush several
+   * minutes before it happens.
+   */
   const travelRemainingMs = computed(() =>
-    travel.value ? Math.max(0, travel.value.stopAt - now.value) : 0,
+    travel.value ? Math.max(0, travel.value.endsAt - now.value) : 0,
   )
 
-  /** §9.5.3 -- what is standing on the road, once it is close enough to matter. */
-  const travelBlockedBy = computed(() => travel.value?.blockedBy ?? null)
+  /**
+   * Time to where the road ACTUALLY ends, which is not shown to anybody.
+   *
+   * It exists for the watch below: an interception has to be discovered when it
+   * happens rather than a whole road later, and that is a request to make, not
+   * a thing to draw.
+   */
+  const travelStopMs = computed(() =>
+    travel.value ? Math.max(0, travel.value.stopAt - now.value) : 0,
+  )
 
   /**
    * A journey lands on the server's clock, not on a request, and nothing pushes
@@ -510,7 +526,7 @@ export const useGame = defineStore('game', () => {
    * every interception was discovered a whole road late.
    */
   watch(
-    () => travel.value !== null && travelRemainingMs.value === 0,
+    () => travel.value !== null && travelStopMs.value === 0,
     async (landed) => {
       if (!landed) return
       await refreshState()
@@ -682,6 +698,11 @@ export const useGame = defineStore('game', () => {
 
     await refreshMutations()
     if (selected.value) await select(selected.value.col, selected.value.row)
+
+    // §8.4 -- the bench bank is its own fetch, so taking something off one has
+    // to re-read it. Without this the Workshop kept drawing the slot that was
+    // just emptied, and went on refusing the next craft because of it.
+    if (job?.kind === 'craft') await loadBench()
   }
 
   /** Dismiss the haul receipt. Nothing depends on it having been read. */
@@ -958,7 +979,7 @@ export const useGame = defineStore('game', () => {
     questDefs, quests, questsReady, questReward,
     activeJobs, fieldJob, workFull, benchJobs, benchReady, benchHere, underfoot, selectedTile,
     currentSettlement, shopStock, sight, travelPerHexMs, travelEta,
-    travel, travelProgress, travelHexesWalked, travelRemainingMs, travelBlockedBy,
+    travel, travelProgress, travelHexesWalked, travelRemainingMs,
     // helpers
     tileAt, held, note,
     // actions

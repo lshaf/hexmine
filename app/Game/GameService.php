@@ -199,7 +199,7 @@ class GameService
         $now = $this->now();
         $spawn = $this->pickSpawn(crc32($player->wallet));
 
-        return DB::transaction(function () use ($player, $now, $spawn) {
+        return DB::transaction(function () use ($player, $spawn) {
             $character = Character::create([
                 'player_id' => $player->id,
                 // Unnamed. §7 -- the label is applied where it is read, so the
@@ -719,7 +719,6 @@ class GameService
 
         return $roll < $chance ? 1 : 0;
     }
-
 
     /**
      * Aggregated equipment bonuses.
@@ -1567,8 +1566,7 @@ class GameService
         [$minRow, $maxRow] = [$centerRow - $range, $centerRow + $range];
 
         // The box above is the cheap index scan; sight is a hex disc inside it.
-        $inSight = fn (int $col, int $row): bool =>
-            HexGeometry::distance($centerCol, $centerRow, $col, $row) <= $range;
+        $inSight = fn (int $col, int $row): bool => HexGeometry::distance($centerCol, $centerRow, $col, $row) <= $range;
 
         // §5.1 -- one MGET over the sight disc, where this used to be an index
         // scan over a `tile_states` box. Thirty-seven hexes at the very most,
@@ -1853,7 +1851,13 @@ class GameService
         // beside it are only half the decision: what a loss costs is the other
         // half, and an idle game may never take something expensive by
         // surprise (§8.2).
-        $warnings[] = 'Lose and you die: it takes one row out of your bag and you wake at the nearest settlement.';
+        //
+        // Both costs, in one line. It was three lines of a sentence, and being
+        // unconditional it was on the plate at every pack a player ever met --
+        // which is how a colour reserved for alarm (§13.3) stopped reading as
+        // one. What is left in ember is the conditional warning above: THIS
+        // fight will finish THAT piece of gear.
+        $warnings[] = 'Lose and you die — one bag row, and the walk back.';
 
         // §9.5.5 -- a fight takes time, so there is a state in which one is
         // already under way. Named rather than silently refused: the dock is
@@ -2005,12 +2009,12 @@ class GameService
                 ? Hash::hash2(
                     $col * 71 + (int) $carrier->id,
                     $row * 53 + $now,
-                    Balance::mapSeed() ^ 0x6a77,
+                    Balance::mapSeed() ^ 0x6A77,
                 )
                 : Hash::hash2(
                     $col * 61 + $pin['bucket'],
                     $row * 43 + (int) $character->id,
-                    Balance::mapSeed() ^ 0x6a77,
+                    Balance::mapSeed() ^ 0x6A77,
                 );
 
             // §9.5.5 -- the exchange, run to a conclusion here rather than on
@@ -2185,7 +2189,7 @@ class GameService
 
         if ($won) {
             $gold = (int) round(Hash::randInt(
-                Hash::hash2($col, $row, $seed ^ 0x901d),
+                Hash::hash2($col, $row, $seed ^ 0x901D),
                 (int) $monster['gold'][0],
                 (int) $monster['gold'][1],
             ) * (1 + (float) ($payload['goldFind'] ?? 0.0)));
@@ -2213,7 +2217,7 @@ class GameService
                 $monster,
                 $seed,
                 $leftBehind,
-                $this->extraRoll($character, (float) ($payload['lootOption'] ?? 0.0), 0x100e),
+                $this->extraRoll($character, (float) ($payload['lootOption'] ?? 0.0), 0x100E),
             );
         }
 
@@ -2532,7 +2536,7 @@ class GameService
             return null;
         }
 
-        $taken = $rows[Hash::randInt(Hash::hash2($seed, count($rows), Balance::mapSeed() ^ 0x0dead), 0, count($rows) - 1)];
+        $taken = $rows[Hash::randInt(Hash::hash2($seed, count($rows), Balance::mapSeed() ^ 0x0DEAD), 0, count($rows) - 1)];
         $model = $taken['model'];
         unset($taken['model']);
 
@@ -3094,7 +3098,7 @@ class GameService
         $skillLevel = (int) ($character->skills()->where('skill_key', 'hunting')->value('level') ?? 1);
 
         $rolled = Hash::randInt(
-            Hash::hash2($col, $row + $herdUntil, Balance::mapSeed() ^ 0x8eed),
+            Hash::hash2($col, $row + $herdUntil, Balance::mapSeed() ^ 0x8EED),
             Balance::HUNT_PELT_MIN,
             Balance::HUNT_PELT_MAX,
         );
@@ -3538,7 +3542,7 @@ class GameService
                 $short = Balance::GUILD_FOUNDING_COST - (int) $character->gold;
 
                 throw new GameException(
-                    "A hall costs ".Balance::GUILD_FOUNDING_COST." gold. You are {$short} short.",
+                    'A hall costs '.Balance::GUILD_FOUNDING_COST." gold. You are {$short} short.",
                     'poor',
                 );
             }
@@ -4775,7 +4779,14 @@ class GameService
             'stopCol' => $met['col'] ?? (int) $character->travel_to_col,
             'stopRow' => $met['row'] ?? (int) $character->travel_to_row,
             'stopAt' => $met['at'] ?? (int) $character->travel_ends_at,
-            'blockedBy' => $met === null ? null : (Monsters::ROSTER[$met['key']]['name'] ?? $met['key']),
+            // §5.6 -- what stops you is NOT named. Sight on the road is zero,
+            // and a journey that hands over the name of the thing waiting three
+            // hexes up it is that rule leaking. The stop itself has to be sent
+            // (the marker has to know where to halt, or it visibly arrives and
+            // snaps back), but where and when is a fact about the animation;
+            // WHO is the surprise, and it stays the server's until you are
+            // standing in front of it.
+            'blocked' => $met !== null,
         ];
     }
 
@@ -5412,7 +5423,7 @@ class GameService
             $cap = Balance::CONSUMABLE_STACK_CAP + (int) $effects['stackCap'];
             $made = 1
                 + (int) $effects['batch']
-                + $this->extraRoll($character, (float) $effects['brewExtra'], 0xb2e3);
+                + $this->extraRoll($character, (float) $effects['brewExtra'], 0xB2E3);
 
             if ($row->quantity >= $cap) {
                 throw new GameException(
@@ -5449,7 +5460,7 @@ class GameService
             'options' => $this->rollFor(
                 $character,
                 $def,
-                $this->extraRoll($character, $effects['craftOption'], 0x5c11),
+                $this->extraRoll($character, $effects['craftOption'], 0x5C11),
                 (float) $effects['optionTier'],
             ),
         ]);

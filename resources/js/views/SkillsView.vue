@@ -474,9 +474,14 @@ async function learn(): Promise<void> {
         <header class="head">
           <div class="row-between">
             <h3>{{ jobDef.name }}</h3>
-            <span class="chip tiny" :class="jobDef.kind === 'battle' ? 'chip-off' : ''">
-              {{ jobDef.kind === 'battle' ? 'dormant' : jobDef.source }}
-            </span>
+            <!--
+              §9.5 -- the battle jobs are not dormant any more. They level on
+              the road, on a win and on nothing else, and which of the three
+              earns it is the weapon family in the slot (§9.5.4). The chip said
+              "dormant" and the sheet said raiding was not built yet, both left
+              over from before packs stood on hexes.
+            -->
+            <span class="chip tiny">{{ jobDef.source }}</span>
           </div>
           <p class="tiny muted note">{{ jobDef.description }}</p>
 
@@ -490,17 +495,13 @@ async function learn(): Promise<void> {
           <div class="bar" :title="`${jobRow.xp} / ${jobRow.xpToNext} xp`">
             <span :style="{ width: `${Math.min(100, (jobRow.xp / Math.max(1, jobRow.xpToNext)) * 100)}%` }" />
           </div>
-          <p v-if="jobDef.kind === 'battle'" class="tiny dormant">
-            Levels by raiding, and raiding is not built yet. The tree is here so
-            it is ready when combat is — nothing else will move it.
-          </p>
-          <p v-else-if="automatic" class="tiny granted">
-            Levels on hexes walked, and walking earns no character XP — this is
-            the only thing a long road pays out. Nothing here is bought, and
-            nothing here is a stat. Every other tree opens a whole depth at
-            once; this one hands over one skill per level, and pays in sight or
-            in room to carry things.
-          </p>
+          <!--
+            One line, and only where it changes how the panel behaves. The job's
+            own description is above; a second paragraph restating it, and a
+            footnote restating that, were three copies of one sentence stacked
+            around a tree nobody could see for the prose.
+          -->
+          <p v-if="automatic" class="tiny granted">Granted as you level — nothing here is bought.</p>
         </header>
 
         <!-- The strata. Depth in the gutter, the seam beside it. -->
@@ -593,20 +594,7 @@ async function learn(): Promise<void> {
         </div>
       </div>
 
-      <p v-else class="tiny muted hint">Tap a skill to see what it gives and what it needs.</p>
-
-      <!-- §7.5 -- the granted tree obeys a stricter rule than the ceiling, so
-           it gets the stricter sentence rather than the general one. -->
-      <p v-if="automatic" class="tiny muted footnote">
-        Nothing on this ladder is a stat. A tree that costs no points may only
-        ever pay in what you can carry and how far you can see — both capped,
-        and neither of them power.
-      </p>
-      <p v-else class="tiny muted footnote">
-        A job level opens the depths; points are what you spend in them. Nothing
-        here can push a stat past the same ceiling gear stops at — what a tree
-        buys is a different road to it.
-      </p>
+      <p v-else class="tiny muted hint">Tap a skill for what it gives.</p>
     </template>
   </div>
 </template>
@@ -727,19 +715,15 @@ async function learn(): Promise<void> {
   margin-bottom: 4px;
 }
 
-.dormant,
+/*
+ * One line, so no box. It carried a paragraph and needed the dashed frame to
+ * hold it; framing a single clause makes it look like a notice that lost its
+ * notice. The accent does the work the border was doing.
+ */
 .granted {
-  margin: 8px 0 0;
-  padding: 7px 9px;
-  border: 1px dashed var(--line);
-  color: #8a938c;
+  margin: 7px 0 0;
+  color: var(--accent);
   line-height: 1.45;
-}
-
-/* Not a warning like .dormant is -- this sheet works, it just has no price. */
-.granted {
-  border-color: var(--accent);
-  color: var(--vellum-dim);
 }
 
 /* ------------------------------------------------------------------ strata */

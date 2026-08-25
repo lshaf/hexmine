@@ -410,7 +410,7 @@ final class PackPinTest extends TestCase
             $road['stopAt'],
         );
 
-        if ($road['blockedBy'] === null) {
+        if (! $road['blocked']) {
             // A clear road is a legitimate outcome and on a sparse outer ring
             // it is the likely one -- it just has to say so by pointing at the
             // destination rather than at somewhere short of it.
@@ -421,7 +421,7 @@ final class PackPinTest extends TestCase
             return;
         }
 
-        $this->assertLessThan($road['hexes'], $road['stopHex'], 'named a blocker but did not stop short');
+        $this->assertLessThan($road['hexes'], $road['stopHex'], 'reported a blocker but did not stop short');
 
         // And the prediction is the decision: walking the clock past the stop
         // lands the character exactly where the road said it would.

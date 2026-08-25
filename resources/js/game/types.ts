@@ -669,7 +669,13 @@ export interface TravelState {
   stopRow: number
   stopAt: number
   /** The monster standing in the way, or null when the road is clear through. */
-  blockedBy: string | null
+  /**
+   * §5.6 -- THAT the road is cut short, never by what. Sight on the road is
+   * zero, so the name of whatever is waiting is not the walker's to have until
+   * they are standing in front of it. Nothing draws this; it is here so the
+   * shape of the payload is honest.
+   */
+  blocked: boolean
 }
 
 // ---------------------------------------------------------------- tiles
