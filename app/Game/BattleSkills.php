@@ -115,7 +115,7 @@ final class BattleSkills
             'glyph' => 'sunder',
             'cooldown' => 12,
             'sunder' => 3,
-            'effect' => "Cut into your foe's guard. It does not recover.",
+            'effect' => "Cut into your foe's defense. It does not recover.",
             'description' => 'Armor was only ever a delay.',
         ],
         'riposte' => [
@@ -143,7 +143,7 @@ final class BattleSkills
             'pierce' => true,
             'burn' => 3,
             'tick' => 0.22,
-            'effect' => 'Burn your foe through its guard, and leave it burning.',
+            'effect' => 'Burn your foe past its defense, and leave it burning.',
             'description' => 'It goes in cold and it does not come out.',
         ],
         'chain_arc' => [
@@ -240,13 +240,13 @@ final class BattleSkills
         }
 
         if (! empty($skill['pierce'])) {
-            $stats[] = ['label' => 'Guard', 'value' => 'ignored'];
+            $stats[] = ['label' => 'Defense', 'value' => 'ignored'];
         }
 
         if (isset($skill['burn'])) {
             $stats[] = [
                 'label' => 'Burn',
-                'value' => round($skill['tick'] * 100).'% of your attack a round, through guard',
+                'value' => round($skill['tick'] * 100).'% of your attack a round, ignoring defense',
             ];
             $stats[] = ['label' => 'Duration', 'value' => self::rounds((int) $skill['burn'])];
         }
@@ -257,12 +257,12 @@ final class BattleSkills
         }
 
         if (isset($skill['riposte'])) {
-            $stats[] = ['label' => 'Answers', 'value' => 'the whole blow, through guard'];
+            $stats[] = ['label' => 'Answers', 'value' => 'the whole blow, ignoring defense'];
             $stats[] = ['label' => 'Duration', 'value' => self::rounds((int) $skill['riposte'])];
         }
 
         if (isset($skill['sunder'])) {
-            $stats[] = ['label' => 'Guard', 'value' => '-'.$skill['sunder'].', permanent'];
+            $stats[] = ['label' => 'Defense', 'value' => '-'.$skill['sunder'].', permanent'];
             $stats[] = ['label' => 'Stacks', 'value' => 'every time it lands'];
         }
 
@@ -328,12 +328,12 @@ final class BattleSkills
         }
 
         if (isset($skill['sunder'])) {
-            $parts[] = 'Cuts its guard by '.$skill['sunder'].' permanently, and stacks';
+            $parts[] = 'Cuts its defense by '.$skill['sunder'].' permanently, and stacks';
         }
 
         if (isset($skill['riposte'])) {
             $parts[] = 'For '.self::rounds((int) $skill['riposte'])
-                .', every blow it lands comes straight back through its guard';
+                .', every blow it lands comes straight back, ignoring defense';
         }
 
         if (isset($skill['stance'])) {
