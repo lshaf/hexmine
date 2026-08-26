@@ -157,10 +157,7 @@ onMounted(() => {
     </template>
 
     <template v-else>
-      <p class="tiny muted note">
-        You are not in a guild. A hall is the only bench in the game that reaches
-        legendary (§8.0), and it stands in a city or a capital.
-      </p>
+      <p class="tiny muted note">You are not in a guild.</p>
 
       <template v-if="applied.length">
         <div class="row-between head-row">
