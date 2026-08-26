@@ -398,19 +398,26 @@ onBeforeUnmount(stop)
   direction: rtl;
 }
 
-/* What is LEFT sits against the seam and what was just TAKEN sits at the
-   outside edge, so the two remaining pools can be compared across the middle
-   and a blow never lands on top of the figure it changed. */
+/* What is LEFT sits against the seam, so the two remaining pools can be
+   compared across the middle.
+
+   What was just TAKEN is out of the flow entirely: it travels from the seam to
+   the outside edge (below), and a figure in the flow would shove the readout
+   about for the beat the old blow and the new one overlap. */
 .under {
+  position: relative;
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
   gap: 8px;
   min-height: 18px;
 }
 
 .pool.left .under {
-  flex-direction: row;
+  justify-content: flex-end;
+}
+
+.pool.right .under {
+  justify-content: flex-start;
 }
 
 .seam {
@@ -454,28 +461,63 @@ onBeforeUnmount(stop)
   background: var(--ember);
 }
 
+/* The blow comes off the seam and flies out, the way the fill under it is
+   draining: it is struck in the middle, where the exchange happens, and it is
+   read at the edge, beside the pool it came out of. Falling upward from below
+   said nothing about which side lost it.
+
+   Out of the flow, and starting where the remaining figure sits -- but at zero
+   opacity, so it fades in already moving and never lands on top of the number
+   it just changed. */
 .blow {
+  position: absolute;
+  top: 0;
   font-family: var(--font-display);
   font-size: 14px;
+  line-height: 18px;
   color: var(--ember);
   pointer-events: none;
 }
 
+.pool.left .blow {
+  left: 0;
+}
+
+.pool.right .blow {
+  right: 0;
+}
+
 .hit-enter-active {
-  transition: opacity 0.14s ease, transform 0.22s ease;
+  transition: opacity 0.16s ease, transform 0.34s cubic-bezier(0.16, 0.84, 0.34, 1);
 }
 
 .hit-enter-from {
   opacity: 0;
-  transform: translateY(6px);
 }
 
+.pool.left .hit-enter-from {
+  transform: translateX(44px);
+}
+
+.pool.right .hit-enter-from {
+  transform: translateX(-44px);
+}
+
+/* It keeps going as it goes out, rather than stopping dead and dimming. */
 .hit-leave-active {
-  transition: opacity 0.16s ease;
+  transition: opacity 0.16s ease, transform 0.16s ease;
 }
 
 .hit-leave-to {
   opacity: 0;
+}
+
+.pool.left .hit-leave-to {
+  transform: translateX(-7px);
+}
+
+.pool.right .hit-leave-to {
+  transform: translateX(7px);
 }
 
 @media (prefers-reduced-motion: reduce) {
