@@ -33,6 +33,7 @@ import { ACTION_PATHS } from '@/icons/actions'
 import { MATERIAL_PALETTE } from '@/theme/palette'
 import { formatPercent } from '@/game/formulas'
 import { STAT_LABEL } from '@/game/catalog'
+import BattleSkillList from '@/shell/BattleSkillList.vue'
 import type { NodeDef, NodeEffect } from '@/api/types'
 import type { StatKey } from '@/game/types'
 
@@ -42,7 +43,14 @@ const game = useGame()
 const job = ref<string>('woodcutting')
 const picked = ref<string | null>(null)
 
-onMounted(() => void game.loadTree())
+onMounted(() => {
+  void game.loadTree()
+  void game.loadBattleSkills()
+})
+
+// A bought node moves what the three are worth (§7.4.3), so they are re-read
+// rather than left at whatever they said when the panel opened.
+watch(() => game.ownedNodes.size, () => void game.loadBattleSkills())
 
 /** A different job is a different sheet; keep nothing selected across it. */
 watch(job, () => {
@@ -463,6 +471,9 @@ const scopedName = computed(() =>
   picked.value && SCOPED.has(chosen.value?.def.effect.kind ?? '') ? jobDef.value?.name : undefined,
 )
 
+/** §9.5.9 -- the three this job knows, if it is one of the three that do. */
+const knows = computed(() => game.battleSkills[job.value] ?? [])
+
 async function learn(): Promise<void> {
   if (!picked.value) return
   await game.buyNode(picked.value)
@@ -554,7 +565,24 @@ async function learn(): Promise<void> {
             around a tree nobody could see for the prose.
           -->
           <p v-if="automatic" class="tiny granted">Free — walk far enough, then claim.</p>
+
         </header>
+
+        <!--
+          §9.5.9 -- what this job KNOWS, before what it can buy.
+          The three come with the weapon rather than with a skill point, so they
+          are not tree nodes and never appear in the strata below. A player
+          opening Shieldbearer to see what a Shieldbearer does was being shown
+          thirty stat nodes and no mention of Shield Bash.
+        -->
+        <section v-if="knows.length" class="knows">
+          <!--
+            No labelled rows. The sentence carries every figure now, so the
+            rows under it were the same numbers a second time -- "Stuns it for
+            2 rounds." over `Stun: 2 rounds`. The cooldown is on the chip.
+          -->
+          <BattleSkillList :skills="knows" :family="null" :detail="false" />
+        </section>
 
         <!-- The strata. Depth in the gutter, the seam beside it. -->
         <div v-for="band in bands" :key="band.tier" class="band" :class="{ sealed: !band.reached }">
@@ -877,6 +905,13 @@ async function learn(): Promise<void> {
 
 .node.owned .face {
   background: var(--accent);
+}
+
+/* The three a battle job knows, set apart from the strata: one is what the job
+   IS and the other is what sharpens it. */
+.knows {
+  margin-top: 12px;
+  padding-bottom: 4px;
 }
 
 /* §13.3 -- something free is waiting on this tree. */

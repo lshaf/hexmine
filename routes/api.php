@@ -117,6 +117,9 @@ Route::middleware(ResolveCharacter::class)->group(function () {
     // §7.4 -- the tree is static and player-independent, so it is its own GET.
     Route::get('/jobs-tree', [SkillTreeController::class, 'index']);
     Route::post('/jobs-tree/nodes', [SkillTreeController::class, 'store']);
+    // §9.5.9 -- the three a battle job knows. Its own route because these carry
+    // the player's own figures and the tree above it does not.
+    Route::get('/jobs-tree/skills', [SkillTreeController::class, 'skills']);
 
     // §12.1 -- the catalog once, the claim per quest. Where a character stands
     // rides in the state like everything else that moves.

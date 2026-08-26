@@ -33,6 +33,7 @@
  */
 import type {
   ActionResult,
+  BattleSkillRow,
   CollectResult,
   GameApi,
   MapMutations,
@@ -283,6 +284,10 @@ export class HttpDriver implements GameApi {
 
   repairItem(ownedId: string): Promise<ActionResult<null>> {
     return post<ActionResult<null>>(`/equipment/${ownedId}/repair`)
+  }
+
+  getBattleSkills(): Promise<Record<string, BattleSkillRow[]>> {
+    return request<Record<string, BattleSkillRow[]>>('/jobs-tree/skills')
   }
 
   renameCharacter(name: string): Promise<ActionResult<{ name: string }>> {

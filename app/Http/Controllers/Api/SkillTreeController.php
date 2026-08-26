@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Game\Balance;
+use App\Game\BattleSkills;
+use App\Game\Catalog;
 use App\Game\Jobs;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -82,6 +84,41 @@ class SkillTreeController extends GameController
             // nobody is shown is a cap that reads as a bug the day it binds.
             'caps' => self::CAPS,
         ]);
+    }
+
+    /**
+     * §9.5.9 -- the three a battle job knows, with this character's tree in them.
+     *
+     * These are NOT tree nodes and never were: a skill comes with the weapon,
+     * not with a skill point. But the Jobs panel is where a player goes to ask
+     * "what does my Shieldbearer know", and answering that with thirty stat
+     * nodes and no mention of Shield Bash is the panel refusing the question.
+     *
+     * Its own route rather than part of index() because index() is
+     * player-independent and cacheable, and every figure here is the player's:
+     * `skillPower`, `skillCooldown` and `skillStun` move them (§7.4.3), which
+     * is the whole reason the sentences are generated rather than typed.
+     */
+    public function skills(Request $request): JsonResponse
+    {
+        $character = $this->character($request);
+
+        $out = [];
+
+        foreach (Catalog::BATTLE_JOB_FOR_FAMILY as $family => $job) {
+            $out[$job] = array_values(array_map(
+                static fn (array $skill): array => [
+                    'key' => $skill['key'],
+                    'name' => $skill['name'],
+                    'glyph' => $skill['glyph'],
+                    'cooldown' => $skill['cooldown'],
+                    ...BattleSkills::summary($skill),
+                ],
+                $this->game->armedSkills($character, $family),
+            ));
+        }
+
+        return response()->json($out);
     }
 
     /**

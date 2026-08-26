@@ -594,6 +594,16 @@ export interface ActionResult<T = unknown> {
   message?: string
 }
 
+/** §9.5.9 -- a skill as the panel draws it: what it does, and its figures. */
+export interface BattleSkillRow {
+  key: string
+  name: string
+  glyph: string
+  cooldown: number
+  effect: string
+  stats: Array<{ label: string; value: string }>
+}
+
 export interface CollectResult {
   gained: Partial<Record<MaterialKey, number>>
   /**
@@ -813,6 +823,14 @@ export interface GameApi {
   equipItem(ownedId: string): Promise<ActionResult<null>>
   unequipItem(ownedId: string): Promise<ActionResult<null>>
   repairItem(ownedId: string): Promise<ActionResult<null>>
+  /**
+   * §9.5.9 -- the three each battle job knows, keyed by job.
+   *
+   * Separate from getSkillTree() because those are the same for everybody and
+   * these carry the caller's own figures: a bought `skillStun` moves them.
+   */
+  getBattleSkills(): Promise<Record<string, BattleSkillRow[]>>
+
   /** §7 -- claim a name. Letters and digits, and nobody else's. */
   renameCharacter(name: string): Promise<ActionResult<{ name: string }>>
 

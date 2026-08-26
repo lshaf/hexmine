@@ -16,6 +16,7 @@ import { api } from '@/api/client'
 import { ApiError } from '@/api/types'
 import { PROCESSING } from '@/game/balance'
 import type {
+  BattleSkillRow,
   BattleResult,
   CollectResult,
   GuildDirectory,
@@ -323,6 +324,19 @@ export const useGame = defineStore('game', () => {
   async function loadTree(): Promise<void> {
     if (tree.value) return
     tree.value = await api.getSkillTree()
+  }
+
+  /**
+   * §9.5.9 -- what each battle job knows.
+   *
+   * Re-read rather than cached like the tree: the figures move the moment a
+   * `skillPower`, `skillCooldown` or `skillStun` node is bought, and a stale
+   * copy would tell a player their point did nothing.
+   */
+  const battleSkills = ref<Record<string, BattleSkillRow[]>>({})
+
+  async function loadBattleSkills(): Promise<void> {
+    battleSkills.value = await api.getBattleSkills()
   }
 
   async function buyNode(nodeKey: string): Promise<void> {
@@ -993,7 +1007,7 @@ export const useGame = defineStore('game', () => {
     donateToGuild, upgradeGuildFacility,
     startMining, startGathering, startHunt, collect, abandon, travelTo, cancelTravel, startProcessing, buy,
     sell, sellAllScrap, sellItem, craft, equip, unequip, repair, discard, discardMaterial, drink, openPanel, closePanel,
-    loadTree, buyNode,
+    battleSkills, loadTree, loadBattleSkills, buyNode,
     loadQuests, claimQuest, clearQuestReward,
     openStation, closeStation, loadBench,
   }

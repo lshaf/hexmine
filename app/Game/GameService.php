@@ -1714,6 +1714,25 @@ class GameService
      *
      * @return array{attack:int,defense:int,wear:float,weaponWear:float,gold:float,loot:float}
      */
+    /**
+     * §9.5.9 -- one family's three, with this character's tree folded in.
+     *
+     * The same call the exchange makes, so the panel and the fight read one set
+     * of numbers rather than two that agree today.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function armedSkills(Character $character, string $family): array
+    {
+        $tree = $this->battleTree($character, $family);
+
+        return BattleSkills::armed($family, [
+            'power' => $tree['skillPower'],
+            'cooldown' => $tree['skillCooldown'],
+            'stun' => $tree['skillStun'],
+        ]);
+    }
+
     private function battleTree(Character $character, ?string $family): array
     {
         $zero = [
