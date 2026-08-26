@@ -31,7 +31,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useGame } from '@/stores/game'
 import { ACTION_PATHS } from '@/icons/actions'
 import { MATERIAL_PALETTE } from '@/theme/palette'
-import { formatPercent } from '@/game/formulas'
+import { formatPercent, formatStat } from '@/game/formulas'
 import { STAT_LABEL } from '@/game/catalog'
 import type { NodeDef, NodeEffect } from '@/api/types'
 import type { StatKey } from '@/game/types'
@@ -306,18 +306,41 @@ const EFFECT_ICON: Record<NodeEffect['kind'], string> = {
  * because "+1% yield" and "+1% yield ON THIS LINE" are different offers and the
  * lock is the whole reason a tree is worth choosing between.
  */
+/**
+ * §7.4.3 -- the kinds whose value is a BILL SPARED rather than a gain.
+ *
+ * `battleWear` is "a share of what a fight takes off the worn kit, spared", and
+ * the other two read the same way: fewer materials, less wear on the blade. The
+ * stored value is positive because it is a share, so every figure drawn from it
+ * has to be negated -- and it has to be negated in ONE place, or the sentence
+ * and the rows disagree. They did: the card read "+2.5% armor wear in a fight"
+ * over a row reading "−2.5% of −15%", which is the same node arguing with
+ * itself about whether it helps.
+ */
+const REDUCES: ReadonlySet<NodeEffect['kind']> = new Set(['battleWear', 'weaponWear', 'costReduction'])
+
+/** The figure as it should READ: negative where the node spares a bill. */
+function signed(effect: NodeEffect): number {
+  const value = 'value' in effect ? effect.value : 0
+
+  return REDUCES.has(effect.kind) ? -value : value
+}
+
 function effectPhrase(effect: NodeEffect, jobName?: string): string {
   // §9.5.9 -- the one effect with no figure of its own: what it teaches has its
   // own sentence, built server-side from this character's tree.
   if (effect.kind === 'battleSkill') return skillLine(effect.skill)
 
   const on = jobName ? `${jobName.toLowerCase()} ` : ''
-  const pct = formatPercent(effect.value)
+  const pct = formatPercent(signed(effect))
   const n = effect.value
 
   switch (effect.kind) {
     case 'stat':
-      return `${pct} ${on}${STAT_LABEL[effect.stat as StatKey].toLowerCase()}`
+      // formatStat, not the local sign: a StatKey has its own reduction rule
+      // (`tripReduction` is stored as a share and read as a cut), and that rule
+      // belongs to the one function every other screen reads a stat through.
+      return `${formatStat(effect.stat, effect.value)} ${on}${STAT_LABEL[effect.stat as StatKey].toLowerCase()}`
     case 'pair':
       return `+${n} ${effect.stat}`
     case 'bite':
@@ -325,7 +348,7 @@ function effectPhrase(effect: NodeEffect, jobName?: string): string {
     case 'battleWear':
       return `${pct} armor wear in a fight`
     case 'weaponWear':
-      return `${pct} weapon wear in a fight`
+      return `${pct} weapon wear on your blade`
     case 'costReduction':
       return `${pct} materials per craft`
     case 'toolWear':
@@ -384,11 +407,13 @@ function effectValue(effect: NodeEffect): string {
 
   switch (effect.kind) {
     case 'stat':
-      return formatPercent(effect.value)
+      return formatStat(effect.stat, effect.value)
     case 'battleWear':
     case 'weaponWear':
     case 'costReduction':
-      return formatPercent(-effect.value)
+      // signed() is where a spared bill becomes negative, for the sentence and
+      // this row alike.
+      return formatPercent(signed(effect))
     case 'toolWear':
     case 'seamGrade':
     case 'presence':
@@ -436,8 +461,11 @@ function effectTotal(key: string, effect: NodeEffect): { now: string; cap: strin
     if (game.ownedNodes.has(k)) owned += def.effect.value
   }
 
+  // Both sides bare, because this row is a progress figure against a ceiling
+  // and neither half is a change: "2.5% of 15%" spared, not "-2.5% of -15%".
+  // The sentence above already says which direction the node pushes.
   const shape = (v: number) =>
-    effectValue({ ...effect, value: Math.min(v, cap) } as NodeEffect).replace(/^\+/, '')
+    effectValue({ ...effect, value: Math.min(v, cap) } as NodeEffect).replace(/^[+-]/, '')
 
   return { now: shape(owned), cap: shape(cap) }
 }
