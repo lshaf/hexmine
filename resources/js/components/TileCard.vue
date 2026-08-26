@@ -332,6 +332,15 @@ watch(open, (isOpen) => {
               <span class="label">Slots</span>
               <span class="readout">{{ tile.slotsUsed }}/2</span>
             </span>
+            <!-- §5.1 -- the map fills a notch for anybody at work on the hex and
+                 §5.5 says only mining takes a seat, so a hunt or a fight leaves
+                 the two counts disagreeing. Printed only when they do: without
+                 it a hex drawn busy would read "0/2" here and one of the two
+                 would look wrong. -->
+            <span v-if="tile.workers > tile.slotsUsed" class="stat">
+              <span class="label">At work</span>
+              <span class="readout">{{ tile.workers }}</span>
+            </span>
           </span>
           <!-- §5.6 -- the walk, on any hex that is not the one underfoot.
                Distance is the whole cost of going anywhere, so the card owes it

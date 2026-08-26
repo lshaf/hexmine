@@ -157,7 +157,9 @@ export const useGame = defineStore('game', () => {
   function rebuildTiles(): void {
     const { col, row, w, h } = view.value
     const depleted = new Map(mutations.value.depleted.map(([c, r, at]) => [key(c, r), at]))
-    const occupied = new Map(mutations.value.occupied.map(([c, r, n]) => [key(c, r), n]))
+    const occupied = new Map(
+      mutations.value.occupied.map(([c, r, bodies, seats]) => [key(c, r), { bodies, seats }]),
+    )
     // §9.5.1 -- the pack itself is derived; whether it is still standing is not.
     const cleared = new Set((mutations.value.cleared ?? []).map(([c, r]) => key(c, r)))
 
@@ -173,7 +175,8 @@ export const useGame = defineStore('game', () => {
       built.push(
         generateTile(coord.col, coord.row, now.value, {
           regrowsAt: depleted.get(k) ?? 0,
-          slotsUsed: occupied.get(k) ?? 0,
+          slotsUsed: occupied.get(k)?.seats ?? 0,
+          workers: occupied.get(k)?.bodies ?? 0,
           packCleared: cleared.has(k),
         }),
       )

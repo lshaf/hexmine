@@ -205,15 +205,13 @@ interface RenderTile {
   onBoundary: boolean
   isSelected: boolean
   /**
-   * §5.1 -- one mark per mining slot, already coloured, or empty on ground with
-   * no seam in it.
+   * §5.1 -- one mark per body at work on this hex, and nothing at all when
+   * nobody is.
    *
-   * Empty for water, settlements, dungeon mouths and the barren center: those
-   * have no slots to take, and a mark on them would say a hex is open when it
-   * is not ground at all. Empty out of sight too -- occupancy is the server's
-   * half of the map (§5.6).
+   * Empty out of sight too: who is working where is the server's half of the
+   * map (§5.6), and the fog holds it back like everything else.
    */
-  slots: Array<{ fill: string; stroke: string }>
+  slots: string[]
   label: string | null
   /** Scouted names are vellum; the rest are dim, so the ring still reads. */
   labelLit: boolean
@@ -235,62 +233,57 @@ const RARE_KEYS = new Set<string>([
 ])
 
 /**
- * §5.1 -- what the two mining slots are worth saying, per tile.
+ * §5.1 -- who is at work on this hex, as marks cut into the seam.
  *
- * It was two ink circles, drawn only for the slots already TAKEN. Three things
- * were wrong with that, and they compound:
+ * It was two ink circles, drawn only for the mining slots already taken. Three
+ * things were wrong with that, and they compound:
  *
  *  - Ink on a dark biome fill is the least legible mark on the map, and the
- *    state it was hiding is the consequential one: both slots gone means the
+ *    state it was hiding is the consequential one: both seats gone means the
  *    hex is shut to everybody, which is a walk you would rather not take.
- *  - Drawing only what is taken makes "open" the same picture as "I have not
- *    looked" -- the exact mistake §7.6 already fixed for the bag, where an
- *    empty strap is the same SHAPE as a full one so free space is seen rather
- *    than subtracted. Two marks are always drawn; what changes is their fill.
+ *  - It counted mining alone, so a hunter or a fighter standing on a hex left
+ *    the map saying nobody was there. A hex somebody is on is not an empty one,
+ *    whatever they came to do.
  *  - A circle is the one shape this game does not own (§13).
  *
- * So a free slot is a notch cut in the tile's own stone, a taken one is filled,
- * and both taken is ember -- §13.3 spends ember on a state to deal with, and a
- * closed hex is one. Depleted overrides all of it: the ground is spent, so the
- * slots are moot and the pair is struck through instead.
+ * TWO COUNTS, because busy and shut are two different facts:
+ *
+ *  - `workers` is how many marks there are. Everybody at work here, whatever
+ *    the verb -- a mine, a gather, a hunt, a fight.
+ *  - `slotsUsed` picks the colour. Only mining takes one of the hex's two seats
+ *    (§5.5: a herd is not a seat, and neither is a pack), so it is the only
+ *    number that can refuse you -- and ember is kept for exactly that. Two
+ *    hunters make a hex busy; they never make it shut.
+ *
+ * Both colours are picked on VALUE, and the reason is arithmetic rather than
+ * taste. Every
+ * biome fill is a mid-to-light warm tone, so a light mark competes with the
+ * ground it sits on: vellumDim is only 34 points of luminance off grassland and
+ * 45 off plains, which is where it disappeared. Ink is 85 to 130 off all five,
+ * live or drained -- the most even contrast the palette has, because none of the
+ * biomes are dark. It is also what a notch cut into stone actually looks like:
+ * a shadow, not a sticker.
+ *
+ * Ember was worse than the mark it sat beside, and it is the more consequential
+ * of the two: raw #b8453f is SEVEN points off badlands and eleven off forest,
+ * so the state that says you cannot work here was the washed-out one. Deepened
+ * it clears thirty-three everywhere and stays plainly red against the ink --
+ * the same shade() the map already tints every slab side and drained tile with,
+ * rather than a colour invented off §13.3's list.
+ *
+ * Nothing is drawn for an empty hex. Ground with nobody on it is the resting
+ * state of the whole map, and marking it would put a pair of notches on every
+ * tile in sight to say the thing the bare stone already says.
  */
-function slotMarks(
-  tile: Tile,
-  inSight: boolean,
-  depleted: boolean,
-  top: string,
-): Array<{ fill: string; stroke: string }> {
-  const seam =
-    tile.material !== undefined && !tile.water && !tile.settlement && !tile.dungeon
+function slotMarks(tile: Tile, inSight: boolean): string[] {
+  if (!inSight) return []
 
-  if (!inSight || !seam) return []
+  const busy = Math.min(MINING.slotsPerTile, Math.max(tile.workers, tile.slotsUsed))
+  if (busy === 0) return []
 
-  // Worked out: both hollow and crossed off, drawn in the tile's OWN stone
-  // rather than in vellum.
-  //
-  // That is what keeps the three colours meaning one thing each: ground colour
-  // is the land, vellum is a person standing on it, ember is a refusal. In
-  // vellum the strike was the brightest thing on the map and the least urgent
-  // state on it -- a hex that regrows in nine hours was shouting over a hex
-  // somebody is working right now. §5.1's phrase for depleted is drained, not
-  // dead, and this is that sentence in paint.
-  if (depleted) {
-    const scratch = shade(top, 0.5)
+  const shut = tile.slotsUsed >= MINING.slotsPerTile
 
-    return Array.from({ length: MINING.slotsPerTile }, () => ({
-      fill: 'none',
-      stroke: scratch,
-    }))
-  }
-
-  const closed = tile.slotsUsed >= MINING.slotsPerTile
-  const notch = shade(top, 0.34)
-
-  return Array.from({ length: MINING.slotsPerTile }, (_, i) =>
-    i < tile.slotsUsed
-      ? { fill: closed ? EMBER : VELLUM_DIM, stroke: INK }
-      : { fill: 'none', stroke: notch },
-  )
+  return Array.from({ length: busy }, () => (shut ? SHUT : INK))
 }
 
 const jobsByTile = computed(() => {
@@ -367,7 +360,7 @@ const renderTiles = computed<RenderTile[]>(() =>
       // the hex you just left, which is not a boundary, it is a memory.
       onBoundary: props.sight > 0 && distance === props.sight,
       isSelected,
-      slots: slotMarks(tile, inSight, depleted, top),
+      slots: slotMarks(tile, inSight),
       // §5.6 -- a place is named whether or not you have stood in it. Identity
       // is terrain: name, tier and lines all fall out of (col, row, seed), and
       // the atlas has always drawn them at any distance. What the fog holds
@@ -436,20 +429,26 @@ const roadAhead = computed(() => {
 })
 
 /**
- * Where the ground marks sit, and how big.
+ * Where the marks sit, and how big.
  *
  * Low on the top face, on the shelf the extruded slab already suggests, and cut
  * to the same squash as the tile itself (§13.2's baked tilt) -- so they read as
- * notches in the stone rather than as badges laid over it. The pair spans 26px
- * against a 33px face at that height: inside the edge on every column.
+ * notches in the stone rather than as badges laid over it.
+ *
+ * Small, and no outline. A mark carries one bit -- somebody is here -- and it
+ * does not need a border to say it: the stroke was doing the work the fill
+ * already does, at twice the visual weight. Two of them span 19px against a
+ * 34px face, which leaves the stone around them room to be stone.
  */
-const SLOT_Y = HEX_H / 2 - 6
-const SLOT_MARK = groundMark(12)
-const SLOT_GAP = 7
-const SLOT_STRIKE = `M${-SLOT_GAP - 6},${SLOT_Y} L${SLOT_GAP + 6},${SLOT_Y}`
+/** §13.3's ember, carrying enough value to survive a light biome (see below). */
+const SHUT = shade(EMBER, -0.3)
 
-/** §4 -- the contested-ring tell, cut from the same stone as the slot marks. */
-const RARE_MARK = groundMark(7)
+const SLOT_Y = HEX_H / 2 - 5
+const SLOT_MARK = groundMark(8)
+const SLOT_GAP = 5.5
+
+/** §4 -- the contested-ring tell, cut from the same stone as the marks. */
+const RARE_MARK = groundMark(6)
 </script>
 
 <template>
@@ -500,34 +499,17 @@ const RARE_MARK = groundMark(7)
           :d="RARE_MARK"
           :transform="`translate(0,${-HEX_H / 2 + 5})`"
           :fill="GOLD"
-          :stroke="INK"
-          stroke-width="0.9"
-          stroke-linejoin="round"
         />
 
-        <!-- §5.1 -- exactly two mining slots, always both drawn: hollow is a
-             free one, filled is somebody working it, and ember is the pair
-             gone, which shuts the hex to everyone. -->
+        <!-- §5.1 -- one mark per body at work here, whatever the verb, and
+             ember when the two mining seats are gone and the hex is shut. An
+             empty hex is left alone: bare stone is what open looks like. -->
         <path
-          v-for="(slot, i) in t.slots"
+          v-for="(fill, i) in t.slots"
           :key="`slot${i}`"
           :d="SLOT_MARK"
-          :transform="`translate(${-SLOT_GAP + i * SLOT_GAP * 2},${SLOT_Y})`"
-          :fill="slot.fill"
-          :stroke="slot.stroke"
-          stroke-width="1.1"
-          stroke-linejoin="round"
-        />
-
-        <!-- Worked out (§5.1): the seam is spent whoever is standing on it, so
-             the pair is crossed off rather than counted. -->
-        <path
-          v-if="t.depleted && t.slots.length > 0"
-          :d="SLOT_STRIKE"
-          fill="none"
-          :stroke="t.slots[0]!.stroke"
-          stroke-width="1.2"
-          stroke-linecap="round"
+          :transform="`translate(${t.slots.length === 1 ? 0 : -SLOT_GAP + i * SLOT_GAP * 2},${SLOT_Y})`"
+          :fill="fill"
         />
 
         <!-- Your own job on this tile. -->

@@ -703,6 +703,14 @@ export interface Tile {
   extractions: number
   /** Both slots full closes the tile to everyone else, §5.1. */
   slotsUsed: number
+  /**
+   * §5.1 -- how many people are at work on this hex, whatever they are doing:
+   * mining, gathering, hunting or fighting.
+   *
+   * Never fewer than `slotsUsed` and often more, because only mining takes one
+   * of the two seats. A hex with two hunters on it is busy and still open.
+   */
+  workers: number
   /** §5.1 -- hauls already taken off this hex, by anybody. Shared. */
   taken: number
   /** Unix ms when a depleted tile regrows; 0 when live. §5.1 */

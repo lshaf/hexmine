@@ -702,6 +702,8 @@ function packAt(col: number, row: number, ring: Ring, now: number): Pack | undef
 
 export interface TileMutation {
   slotsUsed?: number
+  /** §5.1 -- bodies at work here, any verb. See Tile.workers. */
+  workers?: number
   regrowsAt?: number
   /** §5.1 -- hauls already off this hex. Shared, and the seed cannot know it. */
   taken?: number
@@ -825,6 +827,7 @@ export function generateTile(
     baseYield,
     extractions: tileExtractions(baseYield),
     slotsUsed: mutation?.slotsUsed ?? 0,
+    workers: mutation?.workers ?? 0,
     taken: mutation?.taken ?? 0,
     regrowsAt: mutation?.regrowsAt ?? 0,
     settlement,

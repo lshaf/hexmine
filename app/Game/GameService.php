@@ -1589,12 +1589,21 @@ class GameService
             $depleted[] = [$col, $row, $state['regrowsAt']];
         }
 
-        // Mining only, exactly as occupiedSlots() counts it: §5.5 hunts stand on
-        // a hex without taking one of its two seats. This asked for every kind
-        // of active job, so a hunter drew a taken slot on a hex that was in fact
-        // open -- invisible while the marks were two ink dots nobody could see,
-        // and a plain lie now that a closed hex is drawn in ember.
-        $occupied = GameJob::where('kind', 'mining')
+        // Two counts, because a hex is busy and shut for two different reasons.
+        //
+        // BODIES is everybody at work on the hex, whatever the verb: a mine, a
+        // gather (the same job with hands in the tool's place, §4.0), a hunt and
+        // a fight. That is what the map draws, because a hex somebody is
+        // standing on is not an empty one.
+        //
+        // SEATS is mining alone, exactly as occupiedSlots() counts it, and it is
+        // the only number that can refuse you: §5.5 says a herd is not one of
+        // the hex's two seats, so a hunt takes none and neither does a fight.
+        //
+        // Keeping them apart is what lets the map say "busy" without ever
+        // saying "shut" about ground that is open. One count did both jobs and
+        // got one of them wrong whichever kind it filtered on.
+        $occupied = GameJob::whereIn('kind', ['mining', 'hunting', 'battle'])
             ->where('status', 'active')
             ->whereNotNull('col')
             ->whereBetween('col', [$minCol, $maxCol])
@@ -1602,14 +1611,15 @@ class GameService
             // Backticked because `row` is a RESERVED WORD in MySQL 8 and is not
             // one in MariaDB or SQLite, so this raw select parses on two of the
             // three engines and is a syntax error on the one the game runs on.
-            ->selectRaw('`col`, `row`, COUNT(*) as total')
+            ->selectRaw("`col`, `row`, COUNT(*) as bodies, SUM(`kind` = 'mining') as seats")
             ->groupBy('col', 'row')
             ->get()
             ->filter(fn ($job) => $inSight((int) $job->col, (int) $job->row))
             ->map(fn ($job) => [
                 (int) $job->col,
                 (int) $job->row,
-                min(Balance::SLOTS_PER_TILE, (int) $job->total),
+                min(Balance::SLOTS_PER_TILE, (int) $job->bodies),
+                min(Balance::SLOTS_PER_TILE, (int) $job->seats),
             ])
             ->values()
             ->all();

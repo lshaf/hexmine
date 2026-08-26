@@ -434,16 +434,24 @@ export interface HuntPreview {
 }
 
 /**
- * What the server sends for a viewport. Terrain is NOT in here -- the client
- * generates it from the world config (§5). These are the two facts it cannot
- * derive, as compact tuples because this fires on every pan.
+ * What the server sends for the disc in sight. Terrain is NOT in here -- the
+ * client generates it from the world config (§5). These are the facts it cannot
+ * derive, as compact tuples because this fires on arrival and departure.
  *
  *   depleted: [col, row, regrowsAt]
- *   occupied: [col, row, slotsUsed]
+ *   occupied: [col, row, bodies, seats]
  */
 export interface MapMutations {
   depleted: Array<[number, number, number]>
-  occupied: Array<[number, number, number]>
+  /**
+   * §5.1 -- `[col, row, bodies, seats]`.
+   *
+   * `bodies` is everybody at work on the hex whatever the verb -- mine, gather,
+   * hunt, fight. `seats` is mining alone, which is the only one of the four
+   * that takes one of the hex's two and therefore the only one that can shut
+   * the ground to anybody else.
+   */
+  occupied: Array<[number, number, number, number]>
   /** §9.5.1 -- packs in sight that somebody has already fought, win or lose. */
   cleared: Array<[number, number]>
   /** §9.5.7 -- other people's corpses, inside sight like everything else here. */

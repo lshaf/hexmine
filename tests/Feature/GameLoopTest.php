@@ -3635,14 +3635,55 @@ final class GameLoopTest extends TestCase
         // A live mine is the one thing that has to show up.
         $this->game->startMining($this->character, $this->character->col, $this->character->row, Drops::GATHERING);
 
+        // [col, row, bodies, seats] -- a gather is the hex worked with hands
+        // (§4.0), so it is both a body at work and one of the two seats.
         $busy = $this->game->mapMutations($this->character->fresh());
         $this->assertSame(
-            [[$this->character->col, $this->character->row, 1]],
+            [[$this->character->col, $this->character->row, 1, 1]],
             $busy['occupied'],
         );
 
         // Small enough that the whole window is a rounding error on the wire.
         $this->assertLessThan(200, strlen(json_encode($busy)));
+    }
+
+    /**
+     * §5.1 / §5.5 -- busy and shut are two different facts about a hex.
+     *
+     * The map fills a notch for anybody at work on the ground, whatever the
+     * verb, because a hex somebody is standing on is not an empty one. Only
+     * mining takes one of the two seats, so only mining can shut the hex --
+     * and the two counts have to be able to disagree, or one of them is wrong.
+     *
+     * A hunt is the case that proves it: two hunters on a hex make it plainly
+     * busy and leave both seats free.
+     */
+    public function test_a_hunt_is_a_body_at_work_and_never_one_of_the_two_seats(): void
+    {
+        [$col, $row] = $this->standOnAHerd();
+
+        $this->equipBow();
+
+        $hunter = $this->game->createCharacter(Player::create(['wallet' => '0xhunter']));
+        $hunter->update(['col' => $col, 'row' => $row]);
+        CharacterItem::create([
+            'character_id' => $hunter->id,
+            'item_key' => 'crude_bow',
+            'durability' => 200,
+            'equipped' => true,
+            'options' => [],
+        ]);
+
+        $this->game->startHunt($hunter->fresh(), $col, $row);
+        $this->game->startHunt($this->character->fresh(), $col, $row);
+
+        $seen = $this->game->mapMutations($this->character->fresh())['occupied'];
+
+        // Two bodies, no seats: busy, and open to anybody who came to dig.
+        $this->assertSame([[$col, $row, 2, 0]], $seen);
+
+        // And the ground agrees -- a hex two hunts deep still takes a miner.
+        $this->assertSame(0, $this->game->buildTile($col, $row, $this->game->now())['slotsUsed']);
     }
 
     /**
@@ -3669,7 +3710,7 @@ final class GameLoopTest extends TestCase
         $this->arrive($this->character);
 
         $seen = $this->game->mapMutations($this->character->fresh())['occupied'];
-        $this->assertSame([[(int) $far->col, (int) $far->row, 1]], $seen);
+        $this->assertSame([[(int) $far->col, (int) $far->row, 1, 1]], $seen);
     }
 
     /**
