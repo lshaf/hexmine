@@ -641,8 +641,23 @@ final class Balance
         return (bool) config('game.packs', true);
     }
 
+    /**
+     * §9.5.1 -- what share of hexes hold a pack, per two-hour bucket.
+     *
+     * The gradient is the road inward: it climbs every ring, and there is a
+     * test pinning that it climbs monotonically. What each rung is worth is a
+     * tuning value; the ORDER is not.
+     *
+     * The outer ring runs at twice what it used to. At 0.02 a village-to-village
+     * walk of twenty-five hexes was stopped about two times in five, which made
+     * the pack a thing you heard about rather than the thing §9.4 says it is --
+     * the one step where a player learns what attack, defense and durability
+     * cost them, before a dungeon charges a crafted charge to teach the same
+     * lesson. At 0.04 that same walk is stopped about two times in three, and
+     * the outer ring is still by far the safest ground on the map.
+     */
     public const PACK_CHANCE = [
-        'outer' => 0.02,
+        'outer' => 0.04,
         'mid' => 0.10,
         'inner' => 0.18,
         'center' => 0.22,

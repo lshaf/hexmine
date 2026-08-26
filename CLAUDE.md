@@ -1622,10 +1622,20 @@ two hours.
 
 | Ring | Spawn chance per hex per bucket | Pool |
 |---|---|---|
-| Outer (villages) | 0.02 — the road is nearly safe | 2 |
+| Outer (villages) | 0.04 — the safest road on the map, and not an empty one | 2 |
 | Mid (cities) | 0.10 | 4 |
 | Inner (capitals) | 0.18 | 4 |
 | Center (dungeon mouths) | 0.22 | 4 |
+
+**The outer ring runs at twice what it first did.** At 0.02 a walk between two
+villages — call it twenty-five hexes — was stopped about two times in five,
+which made the pack something a new prospector heard about rather than the
+thing §9.4 says it is: the one step where you find out what attack, defense and
+durability cost you, before a dungeon charges a crafted charge to teach the
+same lesson. At 0.04 that walk is stopped about two times in three, and the
+outer ring is still by far the quietest ground on the map. What is not a tuning
+value is the **order** — density climbs every ring inward, and there is a test
+pinning that it climbs monotonically.
 
 Lifetime is **2h**, through `Balance::scaled()` like every other clock — the
 fast clock is a testing tool, so it shortens the pin too. Job XP is not scaled

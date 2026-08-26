@@ -28,7 +28,7 @@
     "herdChance": 0.06,
     "packLifetimeMs": 120000,
     "packChance": {
-        "outer": 0.02,
+        "outer": 0.04,
         "mid": 0.1,
         "inner": 0.18,
         "center": 0.22

@@ -43,7 +43,7 @@
 -68,-87|mountain|mountain|mid|iron_ore|3057|5|9|-|-|-|-|57610202
 107,125|mountain|mountain|outer|iron_ore|5200|4|10|-|-|-|-|3227843831
 -119,-64|plains|plains|outer|pelt|4092|4|10|-|-|-|-|1757244746
-56,148|plains|plains|outer|pelt|4281|5|9|-|-|-|-|174176402
+56,148|plains|plains|outer|pelt|4281|5|9|-|-|-|moss_hound:0|174176402
 -170,-41|forest|forest|outer|wood|4345|3|10|-|-|-|-|2999766817
 5,171|forest|forest|outer|wood|4489|8|6|-|-|-|-|1689498096
 180,-18|mountain|mountain|outer|iron_ore|3785|6|8|-|-|-|-|1052380551
@@ -106,7 +106,7 @@
 130,36|badlands|badlands|outer|stone|3196|3|10|-|-|-|-|2167978547
 -96,-153|grassland|grassland|outer|fiber|4795|4|10|-|-|-|ditch_crawler:0|2128344762
 79,59|forest|forest|mid|-|4191|7|7|-|-|lake|-|888259510
--147,-130|badlands|badlands|outer|stone|4775|4|10|-|-|-|-|1126305994
+-147,-130|badlands|badlands|outer|stone|4775|4|10|-|-|-|moss_hound:0|1126305994
 28,82|badlands|badlands|mid|stone|2929|6|8|-|-|-|-|2098170549
 -198,-107|plains|plains|outer|pelt|4897|3|10|-|-|-|-|3015082441
 -23,105|badlands|badlands_uncommon|mid|basalt|7848|6|8|-|-|-|-|2653833237
@@ -193,7 +193,7 @@
 117,34|forest|forest_uncommon|mid|hardwood|10180|7|7|-|-|-|-|932779167
 -109,-155|forest|forest|outer|wood|4303|3|10|-|-|-|-|2348915516
 66,57|grassland|grassland|mid|fiber|3369|8|6|-|-|-|-|3796006868
--160,-132|badlands|badlands|outer|stone|4257|4|10|-|-|-|-|292338999
+-160,-132|badlands|badlands|outer|stone|4257|4|10|-|-|-|ditch_crawler:0|292338999
 15,80|badlands|badlands|mid|stone|3151|4|10|-|-|-|ditch_crawler:0|1737296730
 190,-109|forest|forest|outer|wood|2731|7|7|-|-|-|-|4287289122
 -36,103|plains|plains|mid|-|3482|3|10|-|-|river|-|4227901800
@@ -209,7 +209,7 @@
 110,-183|mountain|mountain|outer|iron_ore|3835|3|10|-|-|-|-|3071153017
 -116,29|forest|forest|mid|wood|3301|8|6|-|-|-|-|722741152
 59,-160|forest|forest|outer|wood|3784|3|10|-|-|-|-|865208534
--167,52|grassland|grassland|outer|fiber|3219|8|6|-|-|-|-|3787621737
+-167,52|grassland|grassland|outer|fiber|3219|8|6|-|-|-|ditch_crawler:0|3787621737
 8,-137|plains|plains|outer|pelt|4146|3|10|-|-|-|-|1780865228
 183,75|forest|forest|outer|wood|4513|5|9|-|-|-|-|1588159558
 -43,-114|mountain|mountain_uncommon|mid|hematite|6776|5|9|-|-|-|-|1376562595
