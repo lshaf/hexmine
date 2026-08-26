@@ -2,10 +2,11 @@
 /**
  * §9.5.9 -- the three your weapon can know, named before anything happens.
  *
- * THEY ARE LEARNED, one skill point each, behind the battle job's level. The
- * family in the slot still decides WHICH three (§9.5.4) -- carrying a sword is
- * what makes you a Swordhand -- but knowing them is a thing you spend for, and
- * a fighter who has spent nothing swings and does nothing else.
+ * THEY ARE LEARNED, as ordinary nodes of the battle job's own tree -- one at
+ * each of the first three depths. The family in the slot still decides WHICH
+ * three (§9.5.4), but knowing them is a point spent against the stat nodes
+ * beside them, and a fighter who has spent nothing swings and does nothing
+ * else.
  *
  * §9.5.9 also puts them on the fight PREVIEW, because whether to close at all
  * is the decision and against a long fight these are half of it. Same rows on
@@ -63,8 +64,8 @@ const rows = computed(() =>
   <div v-if="rows.length" class="skills">
     <p class="tiny muted lead">
       <template v-if="family">Your {{ family }} can know these.</template>
-      <template v-else>These are learned on the Jobs sheet.</template>
-      One skill point each, and the tree sharpens what you have learned.
+      <template v-else>These are learned in the job's tree.</template>
+      One node each, at depths I, II and III.
     </p>
 
     <div v-for="row in rows" :key="row.key" class="skill" :class="{ unknown: row.known === false }">

@@ -33,7 +33,6 @@ import { ACTION_PATHS } from '@/icons/actions'
 import { MATERIAL_PALETTE } from '@/theme/palette'
 import { formatPercent } from '@/game/formulas'
 import { STAT_LABEL } from '@/game/catalog'
-import BattleSkillList from '@/shell/BattleSkillList.vue'
 import type { NodeDef, NodeEffect } from '@/api/types'
 import type { StatKey } from '@/game/types'
 
@@ -253,6 +252,9 @@ const needs = computed(() =>
 )
 
 const EFFECT_ICON: Record<NodeEffect['kind'], string> = {
+  // §9.5.9 -- the battle glyph, so a skill reads as a skill in the seam rather
+  // than as one more stat node with a different tooltip.
+  battleSkill: 'battle',
   sight: 'effectSight',
   stat: 'effectStat',
   pair: 'effectStat',
@@ -305,6 +307,10 @@ const EFFECT_ICON: Record<NodeEffect['kind'], string> = {
  * lock is the whole reason a tree is worth choosing between.
  */
 function effectPhrase(effect: NodeEffect, jobName?: string): string {
+  // §9.5.9 -- the one effect with no figure of its own: what it teaches has its
+  // own sentence, built server-side from this character's tree.
+  if (effect.kind === 'battleSkill') return skillLine(effect.skill)
+
   const on = jobName ? `${jobName.toLowerCase()} ` : ''
   const pct = formatPercent(effect.value)
   const n = effect.value
@@ -359,10 +365,23 @@ function effectPhrase(effect: NodeEffect, jobName?: string): string {
     case 'bagRows':
       return `+${n} bag rows`
   }
+
+  return ''
+}
+
+/** What a battle skill does, in the words the fight plate uses. */
+function skillLine(skillKey: string): string {
+  const rows = game.battleSkills[job.value] ?? []
+
+  return rows.find((r) => r.key === skillKey)?.effect ?? 'A skill your weapon carries.'
 }
 
 /** The figure by itself, formatted the way its kind is counted. */
 function effectValue(effect: NodeEffect): string {
+  // §9.5.9 -- a skill node has no figure of its own; what it teaches carries
+  // its own. Nothing asks this for one, and the guard says why.
+  if (effect.kind === 'battleSkill') return ''
+
   switch (effect.kind) {
     case 'stat':
       return formatPercent(effect.value)
@@ -413,6 +432,7 @@ function effectTotal(key: string, effect: NodeEffect): { now: string; cap: strin
   for (const [k, def] of Object.entries(t.nodes)) {
     if (def.job !== job || def.effect.kind !== effect.kind) continue
     if (def.effect.kind === 'pair' && def.effect.stat !== (effect as { stat?: string }).stat) continue
+    if (def.effect.kind === 'battleSkill') continue
     if (game.ownedNodes.has(k)) owned += def.effect.value
   }
 
@@ -467,19 +487,6 @@ const SCOPED: ReadonlySet<string> = new Set(['stat', 'bite', 'toolWear', 'seamGr
 const scopedName = computed(() =>
   picked.value && SCOPED.has(chosen.value?.def.effect.kind ?? '') ? jobDef.value?.name : undefined,
 )
-
-/** §9.5.9 -- the three this job can know, learned or not. */
-const knows = computed(() => game.battleSkills[job.value] ?? [])
-
-/** Why the button is dead, in the same words a tree node uses. */
-function learnBlock(row: { known?: boolean; jobLevel?: number; canLearn?: boolean }): string {
-  if (row.known) return 'Learned.'
-  if (jobRow.value.level < (row.jobLevel ?? 1)) {
-    return `Needs ${jobDef.value?.name} level ${row.jobLevel}. You are ${jobRow.value.level}.`
-  }
-
-  return row.canLearn ? 'Ready to learn.' : 'No skill points left. Level up first.'
-}
 
 async function learn(): Promise<void> {
   if (!picked.value) return
@@ -574,35 +581,6 @@ async function learn(): Promise<void> {
           <p v-if="automatic" class="tiny granted">Free — walk far enough, then claim.</p>
 
         </header>
-
-        <!--
-          §9.5.9 -- what this job KNOWS, before what it can buy.
-          The weapon decides which three (§9.5.4) and a point buys them, but
-          they are not tree NODES: no tier, no parent, no place in a depth. So
-          they sit above the strata rather than in them.
-        -->
-        <section v-if="knows.length" class="knows">
-          <!--
-            No labelled rows. The sentence carries every figure now, so the
-            rows under it were the same numbers a second time -- "Stuns it for
-            2 rounds." over `Stun: 2 rounds`. The cooldown is on the chip.
-          -->
-          <BattleSkillList :skills="knows" :family="null" :detail="false">
-            <template #action="{ row }">
-              <button
-                v-if="!row.known"
-                class="btn btn-sm"
-                :class="{ 'btn-primary': row.canLearn }"
-                type="button"
-                :disabled="game.busy || !row.canLearn"
-                :title="learnBlock(row)"
-                @click="row.node && game.buyNode(row.node)"
-              >
-                Learn · 1 point
-              </button>
-            </template>
-          </BattleSkillList>
-        </section>
 
         <!-- The strata. Depth in the gutter, the seam beside it. -->
         <div v-for="band in bands" :key="band.tier" class="band" :class="{ sealed: !band.reached }">
@@ -925,13 +903,6 @@ async function learn(): Promise<void> {
 
 .node.owned .face {
   background: var(--accent);
-}
-
-/* The three a battle job knows, set apart from the strata: one is what the job
-   IS and the other is what sharpens it. */
-.knows {
-  margin-top: 12px;
-  padding-bottom: 4px;
 }
 
 /* §13.3 -- something free is waiting on this tree. */

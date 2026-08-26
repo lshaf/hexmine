@@ -1558,8 +1558,8 @@ removes the snowball problem (winners farming losers' gear) entirely, leaving
 only loot-table tuning.
 
 **Skills are §9.5.9**, and they are the one thing in a fight that is not a
-trade of blows. The weapon decides which three and a point buys them, they all
-start a fight on cooldown, and none of them can be steered.
+trade of blows. The weapon decides which three and the tree teaches them, they
+all start a fight on cooldown, and none of them can be steered.
 
 It happens in two places. **Dungeons** (§9.1–§9.4) are the deliberate expedition: you
 kit up, spend a charge, and go. **The road** (§9.5) is the other one, and it
@@ -2138,16 +2138,33 @@ its own problem:
 | | **Chain Arc** | 10 | a blow that is **bigger the deeper the fight has gone** |
 | | **Rune of Binding** | 15 | it loses its next answer |
 
-**The WEAPON decides which three; a skill point buys them.** §9.5.4 makes the
-family in the slot your class, so carrying a sword is what makes you a Swordhand
-— but the three sword skills are then *learned*, one point each, behind the
-battle job's level (1 / 5 / 12). A fighter who has spent nothing swings and does
-nothing else.
+**The WEAPON decides which three; the TREE teaches them.** §9.5.4 makes the
+family in the slot your class, so carrying a sword is what makes you a
+Swordhand — but the three sword skills are then *learned*, and they are learned
+as **ordinary nodes of that battle job's tree**: one at depth I, one at II, one
+at III. A fighter who has spent nothing swings and does nothing else.
+
+Being nodes is the load-bearing part. A battle job still costs **thirty points
+like every other job** — the skills displaced three stat nodes rather than
+arriving beside them — so learning all three is a tenth of the tree, paid for
+out of the same hundred (§7.4.1) and against the same stat nodes. That is the
+choice: a Runecaster who takes all three has three fewer nodes of pair and wear
+than one who takes none.
+
+**What the displaced nodes were worth was merged, not lost.** Each one's value
+went into a surviving sibling of the same kind, so a battle tree is worth
+exactly what it was before it taught anything — three of its nodes are simply
+larger. A skill may never be placed on a tree's *only* node of some kind, or the
+tree loses that kind outright; there is a test for it, because it happened
+twice.
 
 *(They used to arrive with the weapon, on the argument that the three simply
 **are** what a sword is. That made a Runecaster's whole kit free the moment they
 picked up a wand, and left the battle trees buying nothing but percentages on
-skills nobody had chosen. Learning them is what makes the choice a choice.)*
+skills nobody had chosen.)*
+
+**A `battleSkill` node is the one effect with no value** (§7.4.3): owning it IS
+the effect. It is also the one thing a battle tree carries that is not a number.
 
 What a point ALSO buys is the tree that sharpens them — `skillPower`,
 `skillCooldown`, `skillStun` (§7.4.3), each capped so a maxed tree is worth

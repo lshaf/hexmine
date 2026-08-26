@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit;
 
 use App\Game\Balance;
+use App\Game\BattleSkills;
 use App\Game\Catalog;
 use App\Game\GameService;
 use App\Game\Jobs;
@@ -261,10 +262,23 @@ final class JobTreeTest extends TestCase
             'skillPower', 'skillCooldown', 'skillStun',
             'costReduction', 'batch', 'runSlot', 'presence', 'toolWear', 'seamGrade',
             'sight', 'bagUnits', 'bagRows',
+            // §9.5.9 -- teaches one of the three a battle job carries. The only
+            // kind with no `value`: owning the node IS the effect.
+            'battleSkill',
         ];
 
         foreach (Jobs::NODES as $key => $node) {
             $this->assertContains($node['effect']['kind'], $known, "{$key} has an unknown effect kind");
+
+            if ($node['effect']['kind'] === 'battleSkill') {
+                $this->assertNotNull(
+                    BattleSkills::get($node['effect']['skill']),
+                    "{$key} teaches a skill that is not in the roster",
+                );
+
+                continue;
+            }
+
             $this->assertGreaterThan(0, $node['effect']['value'], "{$key} is worth nothing");
 
             if ($node['effect']['kind'] === 'stat') {
@@ -287,7 +301,8 @@ final class JobTreeTest extends TestCase
 
         foreach (array_keys(Jobs::JOBS) as $job) {
             $kinds = array_map(
-                fn (array $n) => $n['effect']['kind'].':'.($n['effect']['stat'] ?? '').':'.$n['effect']['value'],
+                fn (array $n) => $n['effect']['kind'].':'.($n['effect']['stat'] ?? '').':'
+                    .($n['effect']['value'] ?? $n['effect']['skill'] ?? ''),
                 array_values(Jobs::nodesFor($job)),
             );
 
@@ -421,6 +436,56 @@ final class JobTreeTest extends TestCase
      * and raids that are not designed (§14). A node nobody can feel is a node
      * nobody should be asked to spend a point on.
      */
+    /**
+     * §9.5.9 -- teaching a skill costs the tree a NODE, never a KIND.
+     *
+     * The three skills displaced three stat nodes rather than being added
+     * beside them, which is what keeps a battle job at thirty points. What each
+     * displaced node was worth was merged into a surviving sibling of the same
+     * kind, so the tree is worth exactly what it was.
+     *
+     * This is the failure that has to be caught here rather than in play: pick
+     * a node whose kind appears only once and the tree silently loses that kind
+     * outright. It happened twice while these were being placed -- a runecaster
+     * that could not spare its armor, and a swordhand that rolled no extra loot
+     * lines at all.
+     */
+    public function test_a_battle_tree_still_carries_every_kind_it_teaches_a_skill_from(): void
+    {
+        $kinds = [
+            'pair', 'battleWear', 'weaponWear', 'goldFind', 'lootOption',
+            'skillPower', 'skillCooldown', 'skillStun',
+        ];
+
+        foreach (Jobs::JOBS as $job => $def) {
+            if ($def['kind'] !== Jobs::BATTLE) {
+                continue;
+            }
+
+            $present = [];
+            foreach (Jobs::nodesFor($job) as $node) {
+                $present[$node['effect']['kind']] = true;
+            }
+
+            foreach ($kinds as $kind) {
+                $this->assertArrayHasKey(
+                    $kind,
+                    $present,
+                    "{$job} has no {$kind} node left — a skill was placed on its only one",
+                );
+            }
+
+            $this->assertSame(
+                3,
+                count(array_filter(
+                    Jobs::nodesFor($job),
+                    static fn (array $n): bool => $n['effect']['kind'] === 'battleSkill',
+                )),
+                "{$job} does not teach exactly its three",
+            );
+        }
+    }
+
     public function test_battle_trees_grant_the_pair_and_spare_the_kit(): void
     {
         foreach (Jobs::JOBS as $job => $def) {
@@ -439,6 +504,9 @@ final class JobTreeTest extends TestCase
                 $this->assertContains(
                     $effect['kind'],
                     [
+                        // §9.5.9 -- and the three it teaches, which is the one
+                        // thing a battle tree carries that is not a number.
+                        'battleSkill',
                         'pair', 'battleWear', 'weaponWear', 'goldFind', 'lootOption',
                         // §9.5.9 -- and what the family's three skills are worth.
                         'skillPower', 'skillCooldown', 'skillStun',

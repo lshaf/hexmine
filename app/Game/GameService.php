@@ -5840,6 +5840,11 @@ class GameService
                 case 'bagRows':
                     $bagRows += (int) $effect['value'];
                     break;
+                case 'battleSkill':
+                    // §9.5.9 -- teaches a skill rather than moving a number.
+                    // Owning the node IS the effect; armedSkills() reads the
+                    // node keys directly, so there is nothing to accumulate.
+                    break;
                 default:
                     $byJob[$job][$effect['kind']] = ($byJob[$job][$effect['kind']] ?? 0) + $effect['value'];
             }
@@ -5950,54 +5955,9 @@ class GameService
      * the tree, the server decides what may be bought (§16). The unique index on
      * (character, node) is the last line of defense against a doubled request.
      */
-    /**
-     * §9.5.9 -- learn one of the three a battle job knows.
-     *
-     * Gated by the battle job's level rather than by a parent skill: the three
-     * are alternatives a fighter accumulates, not a chain, so there is nothing
-     * for one to follow.
-     *
-     * @param  array<string,mixed>  $skill
-     * @return array{node:string,points:array<string,int>}
-     */
-    private function learnBattleSkill(Character $character, string $nodeKey, array $skill): array
-    {
-        if ($character->nodes()->where('node_key', $nodeKey)->exists()) {
-            throw new GameException("You already know {$skill['name']}.", 'owned');
-        }
-
-        $job = Catalog::BATTLE_JOB_FOR_FAMILY[$skill['family']];
-        $jobLevel = $this->jobLevels($character)[$job] ?? 1;
-
-        if ($jobLevel < $skill['jobLevel']) {
-            $name = Jobs::JOBS[$job]['name'];
-            throw new GameException(
-                "{$skill['name']} needs {$name} level {$skill['jobLevel']}. You are level {$jobLevel}.",
-                'job_level',
-            );
-        }
-
-        if ($this->skillPoints($character)['available'] < 1) {
-            throw new GameException('No skill points left. Level up first.', 'no_points');
-        }
-
-        CharacterNode::create(['character_id' => $character->id, 'node_key' => $nodeKey]);
-
-        return ['node' => $nodeKey, 'points' => $this->skillPoints($character->fresh())];
-    }
-
     public function buyNode(Character $character, string $nodeKey): array
     {
         return DB::transaction(function () use ($character, $nodeKey) {
-            // §9.5.9 -- a battle skill is learned with a point like a node, and
-            // is stored beside them, but it is NOT one: it has no tier, no
-            // parent and no place in a depth. Its own gate, and then the same
-            // ledger.
-            $skill = BattleSkills::forNodeKey($nodeKey);
-            if ($skill !== null) {
-                return $this->learnBattleSkill($character, $nodeKey, $skill);
-            }
-
             $node = Jobs::node($nodeKey);
             if ($node === null) {
                 throw new GameException('No such skill.', 'not_found');

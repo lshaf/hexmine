@@ -191,27 +191,6 @@ final class BattleSkills
         );
     }
 
-    /**
-     * The skill a stored node key names, or null if it names anything else.
-     *
-     * This is what keeps battle skills and tree nodes in one table without
-     * either having to know about the other: a key either resolves here or it
-     * resolves in Jobs::NODES, never both.
-     *
-     * @return array<string,mixed>|null
-     */
-    public static function forNodeKey(string $nodeKey): ?array
-    {
-        if (! str_starts_with($nodeKey, 'battle.')) {
-            return null;
-        }
-
-        $key = substr($nodeKey, strlen('battle.'));
-        $skill = self::SKILLS[$key] ?? null;
-
-        return $skill === null ? null : $skill + ['key' => $key];
-    }
-
     /** @return array<string,mixed>|null */
     public static function get(string $key): ?array
     {
@@ -401,17 +380,10 @@ final class BattleSkills
      * @param  array{power?:float,cooldown?:int,stun?:int}  $tree
      * @return list<array<string,mixed>>
      */
-    /**
-     * §9.5.9 -- the node key a learned skill is stored under.
-     *
-     * They live in `character_nodes` beside the trees because that is what the
-     * table is: things learned with a skill point. The prefix keeps them out of
-     * `Jobs::NODES` -- a battle skill is not a tree node and must never appear
-     * in a depth -- while the point ledger counts the row like any other.
-     */
+    /** §9.5.9 -- the tree node that teaches this skill. */
     public static function nodeKey(string $key): string
     {
-        return 'battle.'.$key;
+        return Jobs::nodeForSkill($key) ?? '';
     }
 
     /**

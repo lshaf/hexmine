@@ -230,6 +230,14 @@ export interface JobLevel {
 export type NodeEffect =
   | { kind: 'stat'; stat: StatKey; value: number }
   /**
+   * §9.5.9 -- teaches one of the three a battle job carries.
+   *
+   * The only effect with no `value`: owning the node IS the effect. Three per
+   * battle job at depths I, II and III, bought with a point like every node
+   * beside them, which is what keeps a battle job at thirty.
+   */
+  | { kind: 'battleSkill'; skill: string }
+  /**
    * §9.5.4 -- the SOLID pair. Whole points of attack or defense, added to the
    * gear before the percentages multiply, and locked to the weapon family the
    * job is fought with. Not a percentage and not under §8.1's ceiling.
