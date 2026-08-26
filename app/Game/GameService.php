@@ -1589,7 +1589,13 @@ class GameService
             $depleted[] = [$col, $row, $state['regrowsAt']];
         }
 
-        $occupied = GameJob::where('status', 'active')
+        // Mining only, exactly as occupiedSlots() counts it: §5.5 hunts stand on
+        // a hex without taking one of its two seats. This asked for every kind
+        // of active job, so a hunter drew a taken slot on a hex that was in fact
+        // open -- invisible while the marks were two ink dots nobody could see,
+        // and a plain lie now that a closed hex is drawn in ember.
+        $occupied = GameJob::where('kind', 'mining')
+            ->where('status', 'active')
             ->whereNotNull('col')
             ->whereBetween('col', [$minCol, $maxCol])
             ->whereBetween('row', [$minRow, $maxRow])

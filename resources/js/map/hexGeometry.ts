@@ -56,6 +56,25 @@ export const HEX_TOP_PATH: string =
   HEX_CORNERS.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x},${y}`).join(' ') + ' Z'
 
 /**
+ * A small hex cut to the SAME squash as the tiles, §13.2.
+ *
+ * For marks that lie on the ground rather than float above it. Every mark on
+ * this map used to be a true circle, which reads as a sticker laid over a
+ * 3/4-view board -- and §13 says nothing in the interface is round in the first
+ * place. A mark built from HEX_CORNERS inherits the baked tilt for free, so it
+ * sits in the stone at the same angle the stone is drawn at.
+ */
+export function groundMark(width: number): string {
+  const scale = width / HEX_W
+
+  return (
+    HEX_CORNERS.map(
+      ([x, y], i) => `${i === 0 ? 'M' : 'L'}${(x * scale).toFixed(2)},${(y * scale).toFixed(2)}`,
+    ).join(' ') + ' Z'
+  )
+}
+
+/**
  * The three lower edges pushed down by HEX_DEPTH, forming the visible slab
  * sides. Drawn behind the top face and shaded darker.
  */

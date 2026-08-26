@@ -18,6 +18,7 @@ import {
   HEX_H,
   HEX_SIDE_PATH,
   HEX_TOP_PATH,
+  groundMark,
   hexDistance,
   paintersSort,
   pickTile,
@@ -25,7 +26,8 @@ import {
   tileToScreen,
 } from './hexGeometry'
 import { corpseProp, dungeonGlyph, herdProp, packProp, settlementGlyph, tileProps } from './props'
-import { GOLD, VELLUM, VELLUM_DIM, depletedColor, shade, variantColor, waterColor } from '@/theme/palette'
+import { EMBER, GOLD, INK, VELLUM, VELLUM_DIM, depletedColor, shade, variantColor, waterColor } from '@/theme/palette'
+import { MINING } from '@/game/balance'
 import type { Job, Tile, TravelState } from '@/game/types'
 import type { Carrier } from '@/api/types'
 
@@ -202,7 +204,16 @@ interface RenderTile {
   inSight: boolean
   onBoundary: boolean
   isSelected: boolean
-  slotsUsed: number
+  /**
+   * §5.1 -- one mark per mining slot, already coloured, or empty on ground with
+   * no seam in it.
+   *
+   * Empty for water, settlements, dungeon mouths and the barren center: those
+   * have no slots to take, and a mark on them would say a hex is open when it
+   * is not ground at all. Empty out of sight too -- occupancy is the server's
+   * half of the map (§5.6).
+   */
+  slots: Array<{ fill: string; stroke: string }>
   label: string | null
   /** Scouted names are vellum; the rest are dim, so the ring still reads. */
   labelLit: boolean
@@ -222,6 +233,65 @@ interface RenderTile {
 const RARE_KEYS = new Set<string>([
   'ironwood', 'mythril_ore', 'beastfang_hide', 'obsidian_shard', 'silkweave_fiber',
 ])
+
+/**
+ * §5.1 -- what the two mining slots are worth saying, per tile.
+ *
+ * It was two ink circles, drawn only for the slots already TAKEN. Three things
+ * were wrong with that, and they compound:
+ *
+ *  - Ink on a dark biome fill is the least legible mark on the map, and the
+ *    state it was hiding is the consequential one: both slots gone means the
+ *    hex is shut to everybody, which is a walk you would rather not take.
+ *  - Drawing only what is taken makes "open" the same picture as "I have not
+ *    looked" -- the exact mistake §7.6 already fixed for the bag, where an
+ *    empty strap is the same SHAPE as a full one so free space is seen rather
+ *    than subtracted. Two marks are always drawn; what changes is their fill.
+ *  - A circle is the one shape this game does not own (§13).
+ *
+ * So a free slot is a notch cut in the tile's own stone, a taken one is filled,
+ * and both taken is ember -- §13.3 spends ember on a state to deal with, and a
+ * closed hex is one. Depleted overrides all of it: the ground is spent, so the
+ * slots are moot and the pair is struck through instead.
+ */
+function slotMarks(
+  tile: Tile,
+  inSight: boolean,
+  depleted: boolean,
+  top: string,
+): Array<{ fill: string; stroke: string }> {
+  const seam =
+    tile.material !== undefined && !tile.water && !tile.settlement && !tile.dungeon
+
+  if (!inSight || !seam) return []
+
+  // Worked out: both hollow and crossed off, drawn in the tile's OWN stone
+  // rather than in vellum.
+  //
+  // That is what keeps the three colours meaning one thing each: ground colour
+  // is the land, vellum is a person standing on it, ember is a refusal. In
+  // vellum the strike was the brightest thing on the map and the least urgent
+  // state on it -- a hex that regrows in nine hours was shouting over a hex
+  // somebody is working right now. §5.1's phrase for depleted is drained, not
+  // dead, and this is that sentence in paint.
+  if (depleted) {
+    const scratch = shade(top, 0.5)
+
+    return Array.from({ length: MINING.slotsPerTile }, () => ({
+      fill: 'none',
+      stroke: scratch,
+    }))
+  }
+
+  const closed = tile.slotsUsed >= MINING.slotsPerTile
+  const notch = shade(top, 0.34)
+
+  return Array.from({ length: MINING.slotsPerTile }, (_, i) =>
+    i < tile.slotsUsed
+      ? { fill: closed ? EMBER : VELLUM_DIM, stroke: INK }
+      : { fill: 'none', stroke: notch },
+  )
+}
 
 const jobsByTile = computed(() => {
   const map = new Map<string, 'active' | 'ready'>()
@@ -297,7 +367,7 @@ const renderTiles = computed<RenderTile[]>(() =>
       // the hex you just left, which is not a boundary, it is a memory.
       onBoundary: props.sight > 0 && distance === props.sight,
       isSelected,
-      slotsUsed: inSight ? tile.slotsUsed : 0,
+      slots: slotMarks(tile, inSight, depleted, top),
       // §5.6 -- a place is named whether or not you have stood in it. Identity
       // is terrain: name, tier and lines all fall out of (col, row, seed), and
       // the atlas has always drawn them at any distance. What the fog holds
@@ -365,7 +435,21 @@ const roadAhead = computed(() => {
   return `M${characterScreen.value.x.toFixed(1)},${(characterScreen.value.y + 3).toFixed(1)} ${rest}`
 })
 
-const SLOT_PIP_Y = HEX_H / 2 - 4
+/**
+ * Where the ground marks sit, and how big.
+ *
+ * Low on the top face, on the shelf the extruded slab already suggests, and cut
+ * to the same squash as the tile itself (§13.2's baked tilt) -- so they read as
+ * notches in the stone rather than as badges laid over it. The pair spans 26px
+ * against a 33px face at that height: inside the edge on every column.
+ */
+const SLOT_Y = HEX_H / 2 - 6
+const SLOT_MARK = groundMark(12)
+const SLOT_GAP = 7
+const SLOT_STRIKE = `M${-SLOT_GAP - 6},${SLOT_Y} L${SLOT_GAP + 6},${SLOT_Y}`
+
+/** §4 -- the contested-ring tell, cut from the same stone as the slot marks. */
+const RARE_MARK = groundMark(7)
 </script>
 
 <template>
@@ -410,20 +494,41 @@ const SLOT_PIP_Y = HEX_H / 2 - 4
         <!-- Beyond sight: is anybody there. Nothing else is knowable. -->
         <g v-if="t.glyph" v-html="t.glyph" />
 
-        <!-- Rare-material tell: a gold pip, only in the contested ring. -->
-        <circle v-if="t.rare && !t.depleted" cx="0" :cy="-HEX_H / 2 + 5" r="2.6" :fill="GOLD" />
+        <!-- Rare-material tell, §4: gold, only in the contested ring. -->
+        <path
+          v-if="t.rare && !t.depleted"
+          :d="RARE_MARK"
+          :transform="`translate(0,${-HEX_H / 2 + 5})`"
+          :fill="GOLD"
+          :stroke="INK"
+          stroke-width="0.9"
+          stroke-linejoin="round"
+        />
 
-        <!-- Mining slot pips, §5.1: exactly two per hex. -->
-        <template v-if="t.slotsUsed > 0">
-          <circle
-            v-for="i in t.slotsUsed"
-            :key="i"
-            :cx="-5 + (i - 1) * 10"
-            :cy="SLOT_PIP_Y"
-            r="2.2"
-            fill="#141b18"
-          />
-        </template>
+        <!-- §5.1 -- exactly two mining slots, always both drawn: hollow is a
+             free one, filled is somebody working it, and ember is the pair
+             gone, which shuts the hex to everyone. -->
+        <path
+          v-for="(slot, i) in t.slots"
+          :key="`slot${i}`"
+          :d="SLOT_MARK"
+          :transform="`translate(${-SLOT_GAP + i * SLOT_GAP * 2},${SLOT_Y})`"
+          :fill="slot.fill"
+          :stroke="slot.stroke"
+          stroke-width="1.1"
+          stroke-linejoin="round"
+        />
+
+        <!-- Worked out (§5.1): the seam is spent whoever is standing on it, so
+             the pair is crossed off rather than counted. -->
+        <path
+          v-if="t.depleted && t.slots.length > 0"
+          :d="SLOT_STRIKE"
+          fill="none"
+          :stroke="t.slots[0]!.stroke"
+          stroke-width="1.2"
+          stroke-linecap="round"
+        />
 
         <!-- Your own job on this tile. -->
         <g v-if="t.jobState !== 'none'" :transform="`translate(0,${-HEX_H / 2 - 12})`">
