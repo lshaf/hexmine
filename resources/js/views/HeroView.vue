@@ -452,8 +452,8 @@ const ceilings = computed(() =>
           {{ leaving ? 'Disconnecting…' : 'Disconnect wallet' }}
         </button>
         <span class="tiny muted">
-          Your character stays with the wallet. Signing back in costs another
-          login fee.
+          Your character stays with the wallet. Signing back in means another
+          transfer.
         </span>
       </div>
     </section>

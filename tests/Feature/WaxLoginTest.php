@@ -63,14 +63,11 @@ final class WaxLoginTest extends TestCase
 
     public function test_a_paid_challenge_connects_the_wallet(): void
     {
-        $challenge = $this->challenge(self::WALLET);
+        $challenge = $this->challenge();
 
         $this->fakeChain($this->transfer(self::WALLET, $challenge['memo']));
 
-        $response = $this->postJson('/api/auth/wax', [
-            'wallet' => self::WALLET,
-            'transaction_id' => str_repeat('a', 64),
-        ]);
+        $response = $this->postJson('/api/auth/wax', ['transaction_id' => str_repeat('a', 64)]);
 
         $response->assertOk()->assertJsonPath('wallet', self::WALLET);
         $this->assertDatabaseHas('players', ['wallet' => self::WALLET]);
@@ -85,7 +82,7 @@ final class WaxLoginTest extends TestCase
      */
     public function test_a_stranger_cannot_redeem_a_payment_they_watched(): void
     {
-        $challenge = $this->challenge(self::WALLET);
+        $challenge = $this->challenge();
         $transaction = $this->transfer(self::WALLET, $challenge['memo']);
 
         // A different browser entirely: everything about the payment is known
@@ -93,10 +90,7 @@ final class WaxLoginTest extends TestCase
         $this->asBrowser();
         $this->fakeChain($transaction);
 
-        $this->postJson('/api/auth/wax', [
-            'wallet' => self::WALLET,
-            'transaction_id' => str_repeat('a', 64),
-        ])->assertStatus(422)->assertJsonPath('code', 'challenge_not_yours');
+        $this->postJson('/api/auth/wax', ['transaction_id' => str_repeat('a', 64)])->assertStatus(422)->assertJsonPath('code', 'challenge_not_yours');
 
         $this->assertDatabaseMissing('players', ['wallet' => self::WALLET]);
     }
@@ -104,22 +98,16 @@ final class WaxLoginTest extends TestCase
     /** A payment buys one login. The second time it is quoted, it is spent. */
     public function test_a_payment_cannot_be_used_twice(): void
     {
-        $challenge = $this->challenge(self::WALLET);
+        $challenge = $this->challenge();
         $this->fakeChain($this->transfer(self::WALLET, $challenge['memo']));
 
-        $this->postJson('/api/auth/wax', [
-            'wallet' => self::WALLET,
-            'transaction_id' => str_repeat('a', 64),
-        ])->assertOk();
+        $this->postJson('/api/auth/wax', ['transaction_id' => str_repeat('a', 64)])->assertOk();
 
         // Same session, same wallet, same payment -- and a fresh challenge, so
         // the only thing standing in the way is the spent transaction id.
-        $this->challenge(self::WALLET);
+        $this->challenge();
 
-        $this->postJson('/api/auth/wax', [
-            'wallet' => self::WALLET,
-            'transaction_id' => str_repeat('a', 64),
-        ])->assertStatus(422)->assertJsonPath('code', 'transaction_spent');
+        $this->postJson('/api/auth/wax', ['transaction_id' => str_repeat('a', 64)])->assertStatus(422)->assertJsonPath('code', 'transaction_spent');
     }
 
     /**
@@ -129,49 +117,47 @@ final class WaxLoginTest extends TestCase
      */
     public function test_a_payment_without_a_challenge_memo_is_refused(): void
     {
-        $this->challenge(self::WALLET);
+        $this->challenge();
         $this->fakeChain($this->transfer(self::WALLET, 'thanks!'));
 
-        $this->postJson('/api/auth/wax', [
-            'wallet' => self::WALLET,
-            'transaction_id' => str_repeat('a', 64),
-        ])->assertStatus(422)->assertJsonPath('code', 'unknown_challenge');
+        $this->postJson('/api/auth/wax', ['transaction_id' => str_repeat('a', 64)])->assertStatus(422)->assertJsonPath('code', 'unknown_challenge');
     }
 
-    /** The challenge names a wallet, and another wallet cannot pay it. */
-    public function test_the_payment_must_come_from_the_wallet_being_claimed(): void
+    /**
+     * The wallet is READ off the payment, never claimed by the caller.
+     *
+     * Nothing is asked who it is (see WaxLogin): the transfer is signed by an
+     * account and says so, so whoever signed is who gets the session. This is
+     * the identity request gone, stated as a fact about the outcome.
+     */
+    public function test_the_wallet_is_whoever_signed_the_payment(): void
     {
-        $challenge = $this->challenge(self::WALLET);
+        $challenge = $this->challenge();
         $this->fakeChain($this->transfer(self::OTHER, $challenge['memo']));
 
-        $this->postJson('/api/auth/wax', [
-            'wallet' => self::WALLET,
-            'transaction_id' => str_repeat('a', 64),
-        ])->assertStatus(422)->assertJsonPath('code', 'wallet_mismatch');
+        $this->postJson('/api/auth/wax', ['transaction_id' => str_repeat('a', 64)])
+            ->assertOk()
+            ->assertJsonPath('wallet', self::OTHER);
+
+        $this->assertDatabaseHas('players', ['wallet' => self::OTHER]);
     }
 
     /** Exact amount, and the fee account. Neither is a floor. */
     public function test_the_wrong_amount_or_the_wrong_account_is_not_a_login(): void
     {
-        $challenge = $this->challenge(self::WALLET);
+        $challenge = $this->challenge();
 
         $this->fakeChain($this->transfer(self::WALLET, $challenge['memo'], quantity: '0.00001000 WAX'));
-        $this->postJson('/api/auth/wax', [
-            'wallet' => self::WALLET,
-            'transaction_id' => str_repeat('a', 64),
-        ])->assertStatus(422)->assertJsonPath('code', 'not_a_login_payment');
+        $this->postJson('/api/auth/wax', ['transaction_id' => str_repeat('a', 64)])->assertStatus(422)->assertJsonPath('code', 'not_a_login_payment');
 
         $this->fakeChain($this->transfer(self::WALLET, $challenge['memo'], to: 'someone.wam'));
-        $this->postJson('/api/auth/wax', [
-            'wallet' => self::WALLET,
-            'transaction_id' => str_repeat('b', 64),
-        ])->assertStatus(422)->assertJsonPath('code', 'not_a_login_payment');
+        $this->postJson('/api/auth/wax', ['transaction_id' => str_repeat('b', 64)])->assertStatus(422)->assertJsonPath('code', 'not_a_login_payment');
     }
 
     /** Old payments do not accumulate into a stock of logins. */
     public function test_a_payment_older_than_the_window_is_refused(): void
     {
-        $challenge = $this->challenge(self::WALLET);
+        $challenge = $this->challenge();
 
         $this->fakeChain($this->transfer(
             self::WALLET,
@@ -179,35 +165,38 @@ final class WaxLoginTest extends TestCase
             at: time() - config('wax.window') - 60,
         ));
 
-        $this->postJson('/api/auth/wax', [
-            'wallet' => self::WALLET,
-            'transaction_id' => str_repeat('a', 64),
-        ])->assertStatus(422)->assertJsonPath('code', 'transaction_stale');
+        $this->postJson('/api/auth/wax', ['transaction_id' => str_repeat('a', 64)])->assertStatus(422)->assertJsonPath('code', 'transaction_stale');
     }
 
     /**
      * A rejected attempt must burn neither the payment nor the challenge --
-     * otherwise a typo, or a node blinking, would cost a fee to find out about.
+     * otherwise a node blinking would cost a fee to find out about.
      *
-     * The same transfer is quoted twice here, which is the honest version of a
-     * retry: a transaction id names one transaction, and re-reading it cannot
-     * turn up different contents. What changes between the two attempts is the
-     * wallet the caller claims.
+     * A chain nobody could reach is the honest version of that: the same
+     * transfer, quoted twice, refused the first time because no node answered
+     * and taken the second time when one does.
      */
     public function test_a_refused_attempt_leaves_the_payment_spendable(): void
     {
-        $challenge = $this->challenge(self::WALLET);
-        $this->fakeChain($this->transfer(self::WALLET, $challenge['memo']));
+        $challenge = $this->challenge();
+        $payment = $this->transfer(self::WALLET, $challenge['memo']);
 
-        $this->postJson('/api/auth/wax', [
-            'wallet' => self::OTHER,
-            'transaction_id' => str_repeat('a', 64),
-        ])->assertStatus(422)->assertJsonPath('code', 'wallet_mismatch');
+        // One stub whose answer changes, rather than two calls to Http::fake():
+        // stubs MERGE, and the first one that matches wins, so a second fake for
+        // '*' never gets a look in.
+        $reachable = false;
+        // `use (&$reachable)`, not an arrow function: those capture by value, so
+        // the flag would still read false after it is flipped below.
+        Http::fake(function () use (&$reachable, $payment) {
+            return $reachable ? Http::response($payment) : Http::response('', 502);
+        });
 
-        $this->postJson('/api/auth/wax', [
-            'wallet' => self::WALLET,
-            'transaction_id' => str_repeat('a', 64),
-        ])->assertOk();
+        $this->postJson('/api/auth/wax', ['transaction_id' => str_repeat('a', 64)])
+            ->assertStatus(422)
+            ->assertJsonPath('code', 'transaction_not_found');
+
+        $reachable = true;
+        $this->postJson('/api/auth/wax', ['transaction_id' => str_repeat('a', 64)])->assertOk();
     }
 
     /**
@@ -221,22 +210,16 @@ final class WaxLoginTest extends TestCase
     public function test_a_stranger_losing_the_race_does_not_burn_the_challenge(): void
     {
         $payer = $this->session;
-        $challenge = $this->challenge(self::WALLET);
+        $challenge = $this->challenge();
         $transaction = $this->transfer(self::WALLET, $challenge['memo']);
 
         $this->asBrowser();
         $this->fakeChain($transaction);
-        $this->postJson('/api/auth/wax', [
-            'wallet' => self::WALLET,
-            'transaction_id' => str_repeat('a', 64),
-        ])->assertStatus(422)->assertJsonPath('code', 'challenge_not_yours');
+        $this->postJson('/api/auth/wax', ['transaction_id' => str_repeat('a', 64)])->assertStatus(422)->assertJsonPath('code', 'challenge_not_yours');
 
         // The payer, arriving second, is unaffected.
         $this->withCookie(config('session.cookie'), $payer);
-        $this->postJson('/api/auth/wax', [
-            'wallet' => self::WALLET,
-            'transaction_id' => str_repeat('a', 64),
-        ])->assertOk()->assertJsonPath('wallet', self::WALLET);
+        $this->postJson('/api/auth/wax', ['transaction_id' => str_repeat('a', 64)])->assertOk()->assertJsonPath('wallet', self::WALLET);
     }
 
     /** Logging in takes the wallet off whatever session was holding it. */
@@ -244,13 +227,10 @@ final class WaxLoginTest extends TestCase
     {
         Player::create(['wallet' => self::WALLET, 'session_id' => 'somewhere-else']);
 
-        $challenge = $this->challenge(self::WALLET);
+        $challenge = $this->challenge();
         $this->fakeChain($this->transfer(self::WALLET, $challenge['memo']));
 
-        $this->postJson('/api/auth/wax', [
-            'wallet' => self::WALLET,
-            'transaction_id' => str_repeat('a', 64),
-        ])->assertOk();
+        $this->postJson('/api/auth/wax', ['transaction_id' => str_repeat('a', 64)])->assertOk();
 
         $this->assertNotSame('somewhere-else', Player::where('wallet', self::WALLET)->value('session_id'));
         $this->assertSame(1, Player::where('wallet', self::WALLET)->count());
@@ -265,13 +245,10 @@ final class WaxLoginTest extends TestCase
      */
     public function test_disconnecting_releases_the_session_but_keeps_the_character(): void
     {
-        $challenge = $this->challenge(self::WALLET);
+        $challenge = $this->challenge();
         $this->fakeChain($this->transfer(self::WALLET, $challenge['memo']));
 
-        $login = $this->postJson('/api/auth/wax', [
-            'wallet' => self::WALLET,
-            'transaction_id' => str_repeat('a', 64),
-        ]);
+        $login = $this->postJson('/api/auth/wax', ['transaction_id' => str_repeat('a', 64)]);
 
         $login->assertOk();
 
@@ -294,19 +271,16 @@ final class WaxLoginTest extends TestCase
     /** A node nobody can reach is "not yet", never "no". */
     public function test_an_unreachable_chain_does_not_deny_the_payment(): void
     {
-        $this->challenge(self::WALLET);
+        $this->challenge();
         Http::fake(['*' => Http::response('', 502)]);
 
-        $this->postJson('/api/auth/wax', [
-            'wallet' => self::WALLET,
-            'transaction_id' => str_repeat('a', 64),
-        ])->assertStatus(422)->assertJsonPath('code', 'transaction_not_found');
+        $this->postJson('/api/auth/wax', ['transaction_id' => str_repeat('a', 64)])->assertStatus(422)->assertJsonPath('code', 'transaction_not_found');
     }
 
     /** @return array{nonce:string,memo:string} */
-    private function challenge(string $wallet): array
+    private function challenge(): array
     {
-        $response = $this->postJson('/api/auth/wax/challenge', ['wallet' => $wallet]);
+        $response = $this->postJson('/api/auth/wax/challenge');
 
         $response->assertOk()
             ->assertJsonPath('account', 'shaf.wiz')

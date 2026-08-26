@@ -19,17 +19,22 @@ return [
     | What a login costs
     |--------------------------------------------------------------------------
     |
-    | Small enough that logging in is not a decision, large enough that it is a
-    | signature. The amount is matched EXACTLY rather than as a floor: a floor
-    | would let one large transfer stand in for a login, and the point is that
-    | each login is its own signed act.
+    | ONE UNIT of WAX -- 8 decimal places, so this is the smallest quantity the
+    | chain can express. The fee was never the point: what proves the wallet is
+    | the SIGNATURE, and a signature costs the same whether it moves a fortune
+    | or a dust mote. Charging anything real would have been charging for the
+    | privilege of proving who you are.
+    |
+    | The amount is matched EXACTLY rather than as a floor: a floor would let
+    | one large transfer stand in for many, and the point is that each proof is
+    | its own signed act.
     |
     | Written as the chain writes it -- 8 decimal places, symbol included -- so
     | there is one spelling of the amount and no conversion between the string
     | the wallet signs and the string this compares.
     |
     */
-    'fee' => env('WAX_LOGIN_FEE', '0.00010000 WAX'),
+    'fee' => env('WAX_LOGIN_FEE', '0.00000001 WAX'),
     'token_contract' => env('WAX_TOKEN_CONTRACT', 'eosio.token'),
 
     /*

@@ -2,11 +2,13 @@
 /**
  * The door, §2.
  *
- * A wallet gets in by paying out of itself: naming an account proves nothing,
- * and moving funds out of one needs a key only its owner holds. The page has
- * exactly one job, which is to get informed consent for a charge -- so the
- * charge is the largest thing on it, above the name of the game. Nobody is
- * deciding whether to like the logo.
+ * A wallet gets in by signing something out of itself: naming an account proves
+ * nothing, and moving funds out of one needs a key only its owner holds. The
+ * amount is one unit -- the smallest the chain can express -- because the fee
+ * was never the point and charging for the privilege of proving who you are
+ * would be. The figure stays the largest thing on the page anyway: it is the
+ * one thing a player is consenting to, and consent to a trivial charge is still
+ * consent.
  *
  * THE SIGNATURE IS THE DISC OF SEVEN, and it is not an ornament: sight is one
  * hex (§5.6), so the tile underfoot and its six neighbors are literally the
@@ -135,15 +137,15 @@ async function connect(kind: WalletKind): Promise<void> {
         <h1>hexmine</h1>
 
         <p class="lead">
-          One wallet, one character, kept for good. Sign a small payment to
-          prove the wallet is yours.
+          One wallet, one character, kept for good. Sign a transfer and the
+          signature proves the wallet is yours.
         </p>
 
         <div class="price">
-          <p class="label">Each login costs</p>
+          <p class="label">You send</p>
           <p class="fee">{{ settings?.fee ?? '—' }}</p>
           <p class="to">
-            paid to <span>{{ settings?.account ?? '—' }}</span>
+            to <span>{{ settings?.account ?? '—' }}</span>
           </p>
         </div>
 

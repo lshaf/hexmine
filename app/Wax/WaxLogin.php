@@ -13,24 +13,38 @@ use Illuminate\Support\Str;
  *
  * The shape is two steps, and the second cannot be reached without the first:
  *
- *   1. CHALLENGE. The caller names the wallet it intends to prove. The server
- *      mints a nonce, remembers which SESSION it was handed to, and says what
- *      to pay and what to write in the memo.
- *   2. REDEEM. The caller pays and hands back a transaction id. The server
- *      reads that transaction off the chain and checks it is the transfer the
+ *   1. CHALLENGE. The browser asks for one. The server mints a nonce, remembers
+ *      which SESSION it was handed to, and says what to pay and what to write
+ *      in the memo. It does NOT ask who is about to pay: the transfer names its
+ *      own signer, so an identity request before it would be a question whose
+ *      answer arrives anyway.
+ *   2. REDEEM. The caller pays and hands back a transaction id. The server reads
+ *      that transaction off the chain and checks it is the transfer the
  *      challenge asked for -- right token, right account, right amount, right
- *      memo, young enough, and from the wallet being claimed.
+ *      memo, young enough. WHO it came from is not checked against a claim; it
+ *      is simply read, and that is the wallet.
  *
  * THE NONCE IS THE WHOLE SECURITY ARGUMENT, and it is worth saying why, because
  * without it the scheme reads as though it works and does not.
  *
  * Transfers are public. Anybody can watch payments arrive at the fee account
- * and read the sender straight off the chain. A verifier that checked only
- * "this transaction is a 0.0001 WAX transfer from the wallet you claim" would
- * therefore accept a transaction it had nothing to do with: an attacker names
- * somebody else's wallet, quotes somebody else's transaction, and is logged in
- * as them. The payment proves a wallet signed SOMETHING, never that the person
- * asking is the one who signed it.
+ * and read the sender straight off the chain, so a verifier that accepted any
+ * transfer of the right shape would accept one it had nothing to do with:
+ * somebody quotes a stranger's transaction and is logged in as them. The
+ * payment proves a wallet signed SOMETHING, never that the person asking is the
+ * one who signed it.
+ *
+ * The memo is what closes that, and the session it is bound to is what makes it
+ * a secret rather than a label. A watcher reads the memo off the chain the
+ * moment it lands and it does them no good: redeeming it needs the browser it
+ * was issued to.
+ *
+ * The one thing this does NOT prove is that the signer meant to sign in HERE.
+ * A phishing page can ask this server for a memo and talk somebody into signing
+ * a transfer carrying it, which would hand that page the victim's session. The
+ * memo is human-readable for exactly that reason -- it says `hexmine login` in
+ * the wallet's own confirmation, where somebody being asked to sign it can see
+ * what they are being asked for.
  *
  * The memo closes that, because it is a secret at the moment of signing: only
  * whoever was handed the challenge knows what to write, and the challenge is
@@ -48,12 +62,14 @@ class WaxLogin
     /**
      * @return array{nonce:string,memo:string,account:string,fee:string,contract:string,expires_in:int}
      */
-    public function challenge(string $wallet, string $session): array
+    public function challenge(string $session): array
     {
         $nonce = Str::lower(Str::random(16));
 
+        // The SESSION and nothing else. Which wallet will pay is neither asked
+        // for nor asserted -- it is whoever signs the transfer, read off the
+        // chain when the payment is examined.
         $this->store()->put($this->challengeKey($nonce), [
-            'wallet' => $wallet,
             'session' => $session,
         ], $this->window());
 
@@ -70,7 +86,7 @@ class WaxLogin
     /**
      * @return array{ok:true,wallet:string}|array{ok:false,code:string,message:string}
      */
-    public function redeem(string $wallet, string $transactionId, string $session, int $now): array
+    public function redeem(string $transactionId, string $session, int $now): array
     {
         $transactionId = Str::lower(trim($transactionId));
 
@@ -89,7 +105,7 @@ class WaxLogin
             return $this->no('transaction_spent', 'That payment has already been used to log in.');
         }
 
-        $verified = $this->verify($wallet, $transactionId, $session, $now);
+        $verified = $this->verify($transactionId, $session, $now);
 
         if ($verified['ok'] === false) {
             $this->release($transactionId);
@@ -101,7 +117,7 @@ class WaxLogin
     /**
      * @return array{ok:true,wallet:string}|array{ok:false,code:string,message:string}
      */
-    private function verify(string $wallet, string $transactionId, string $session, int $now): array
+    private function verify(string $transactionId, string $session, int $now): array
     {
         // The chain read is cached for the window, keyed by the transaction
         // rather than by the caller: what a transaction contains is a fact
@@ -148,15 +164,20 @@ class WaxLogin
             return $this->no('unknown_challenge', 'That payment does not carry a login memo this server issued.');
         }
 
-        // Both halves, and neither is redundant. The session check is what stops
-        // a watcher redeeming a memo they read off the chain; the wallet check
-        // is what stops a challenge for one wallet being paid by another.
+        // The whole of the check. A watcher who reads the memo off the chain has
+        // the memo and not the session it was issued to, which is what stops
+        // them spending somebody else's payment.
         if (! hash_equals((string) $challenge['session'], $session)) {
-            return $this->no('challenge_not_yours', 'That login memo was issued to a different session.');
+            return $this->no('challenge_not_yours', 'That memo was issued to a different browser.');
         }
 
-        if ((string) $transfer['from'] !== $challenge['wallet'] || $challenge['wallet'] !== $wallet) {
-            return $this->no('wallet_mismatch', 'That payment came from a different wallet than the one being connected.');
+        // WHO paid is read off the transfer rather than asserted by the caller.
+        // That is the identity request gone: nothing has to be asked before the
+        // one act that proves anything, because the act names its own signer.
+        $wallet = trim((string) ($transfer['from'] ?? ''));
+
+        if ($wallet === '') {
+            return $this->no('not_a_login_payment', 'That transaction is not a login payment.');
         }
 
         // Spent on the way out, and ONLY on the way out. A challenge burned by a

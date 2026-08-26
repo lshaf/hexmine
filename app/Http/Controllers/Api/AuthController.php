@@ -25,9 +25,6 @@ use Illuminate\Support\Facades\DB;
  */
 class AuthController extends Controller
 {
-    /** WAX account names: up to 12 of a-z, 1-5 and the dot. */
-    private const WALLET = 'regex:/^[a-z1-5.]{1,12}$/';
-
     public function __construct(private readonly WaxLogin $login) {}
 
     /** Who this session is, if anybody. The client asks at boot. */
@@ -57,26 +54,24 @@ class AuthController extends Controller
      * Step one: what to pay, and what to write on it.
      *
      * The nonce is bound to this session, which is the whole reason the flow
-     * has two steps rather than one (see WaxLogin).
+     * has two steps rather than one (see WaxLogin). It takes no input at all:
+     * who is about to pay is not this server's question, because the payment
+     * answers it.
      */
     public function challenge(Request $request): JsonResponse
     {
-        $data = $request->validate(['wallet' => ['required', 'string', self::WALLET]]);
-
         if (! $request->hasSession()) {
             return $this->noSession();
         }
 
-        return response()->json(
-            $this->login->challenge($data['wallet'], $request->session()->getId())
-        );
+        // No wallet in, and none asked for. The transfer names its own signer.
+        return response()->json($this->login->challenge($request->session()->getId()));
     }
 
     /** Step two: the payment, and the session it buys. */
     public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'wallet' => ['required', 'string', self::WALLET],
             'transaction_id' => ['required', 'string', 'size:64', 'regex:/^[0-9a-fA-F]{64}$/'],
         ]);
 
@@ -85,7 +80,6 @@ class AuthController extends Controller
         }
 
         $result = $this->login->redeem(
-            $data['wallet'],
             $data['transaction_id'],
             $request->session()->getId(),
             time(),

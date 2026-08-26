@@ -6,10 +6,13 @@
  * moment earlier. Three round trips, and the middle one is the only one that
  * touches a key:
  *
- *   1. the wallet says who it is          (Anchor or WAX Cloud Wallet)
- *   2. the server says what to pay        POST /api/auth/wax/challenge
- *   3. the wallet signs and broadcasts    eosio.token::transfer
- *   4. the server reads it off the chain  POST /api/auth/wax
+ *   1. the server says what to pay        POST /api/auth/wax/challenge
+ *   2. the wallet signs and broadcasts    eosio.token::transfer
+ *   3. the server reads it off the chain  POST /api/auth/wax
+ *
+ * There is no step where anything is asked who it is. The transfer is signed by
+ * an account and says so, so the identity request that used to come first was a
+ * popup asking for an answer the next step hands over anyway.
  *
  * Everything about the payment -- the account, the amount, the memo -- comes
  * from step 2. Nothing here decides what a login costs, which is the same rule
@@ -157,16 +160,22 @@ async function sessionKit(): Promise<SessionKit> {
 export async function login(kind: WalletKind): Promise<string> {
   const wallets = await sessionKit()
 
+  // §2 -- restore before asking. A wallet that has signed in here before is
+  // already known to the kit, and putting it through the identity dance again
+  // is a popup that answers a question nobody asked: the transfer below names
+  // its own signer.
   let session: Session
   try {
-    const result = await wallets.login({ walletPlugin: kind })
-    session = result.session
+    session = (await wallets.restore()) ?? (await wallets.login({ walletPlugin: kind })).session
   } catch (error) {
     throw new WalletError(reason(error, 'The wallet did not connect.'), 'wallet_cancelled')
   }
 
   const wallet = String(session.actor)
-  const challenge = await post<Challenge>('/api/auth/wax/challenge', { wallet })
+
+  // Nothing about the wallet goes up with this. The server issues a memo for
+  // this browser and finds out who paid by reading the payment.
+  const challenge = await post<Challenge>('/api/auth/wax/challenge', {})
 
   let transactionId: string
   try {
@@ -200,7 +209,6 @@ export async function login(kind: WalletKind): Promise<string> {
   }
 
   const { wallet: connected } = await post<{ wallet: string }>('/api/auth/wax', {
-    wallet,
     transaction_id: transactionId,
   })
 
