@@ -23,8 +23,6 @@ import { formatDuration, placeLabel } from '@/game/formulas'
 import { worldParams } from '@/game/worldgen'
 import HexAction from './HexAction.vue'
 import BattleSkillRail from './BattleSkillRail.vue'
-import { skillsOfFamily } from '@/game/battle'
-import { FAMILY_FOR_BATTLE_JOB } from '@/icons/combatants'
 import type { BattlePreview } from '@/api/types'
 
 const game = useGame()
@@ -202,9 +200,7 @@ watch(
  * already reports, since §9.5.4 makes the family in the slot your class and
  * the job is the same fact said the other way round.
  */
-const packSkills = computed(() =>
-  skillsOfFamily(FAMILY_FOR_BATTLE_JOB[battle.value?.job ?? ''] ?? null),
-)
+const packSkills = computed(() => battle.value?.skills ?? [])
 
 /**
  * Why the button will not work, and nothing else.
@@ -222,6 +218,27 @@ const packSkills = computed(() =>
  * wants the numbers before walking into one.
  */
 const packBlock = computed(() => battle.value?.reason ?? null)
+
+/**
+ * §8.2 -- the terms of every fight, told apart from the hazards of this one.
+ *
+ * The server sends both in `warnings`. Losing is dying is unconditional, so it
+ * is drawn first and a step quieter; "your Stone Axe will not survive this" is
+ * about the kit you happen to be wearing, and keeps the full ember.
+ *
+ * The sentence itself is still the SERVER'S — matched out of the list rather
+ * than written here — so there is one copy of it and the plate cannot end up
+ * promising something the fight does not do.
+ */
+const DEATH_TERMS = 'Lose and you die'
+
+const deathTerms = computed(() =>
+  (battle.value?.warnings ?? []).find((w) => w.startsWith(DEATH_TERMS)) ?? null,
+)
+
+const gearWarnings = computed(() =>
+  (battle.value?.warnings ?? []).filter((w) => !w.startsWith(DEATH_TERMS)),
+)
 
 /**
  * §10.0 -- what the guild cell has to say at this settlement.
@@ -396,24 +413,36 @@ function hunted(): void {
         <!-- §9.5.3 -- while a pack holds the hex there are no verbs, only the
              two ways out of the pin. -->
         <template v-else-if="pinned">
+          <!--
+            Who, when, and what it costs — in that order and at three different
+            weights, because they are three different questions. It was four
+            sentences of the same size stacked in a column, which made the one
+            that mattered (the name) no louder than the clock.
+          -->
           <div class="pinned">
-            <strong class="tiny">{{ pack ? MONSTERS[pack.key]?.name : 'Something' }} is standing here</strong>
-            <span v-if="packBlock" class="tiny muted">{{ packBlock }}</span>
+            <div class="who">
+              <strong class="name">{{ pack ? MONSTERS[pack.key]?.name : 'Something' }}</strong>
+              <span v-if="packLeaves" class="tiny leaves">leaves in {{ packLeaves }}</span>
+            </div>
+
             <!--
-              §8.2 -- the one thing that is still said every time. An idle game
-              may never take something expensive by surprise, and the warnings
-              above it are the specific version of that: THIS fight finishes
-              THAT piece of gear.
+              §8.2 -- the one thing said every time. An idle game may never take
+              something expensive by surprise, and the warnings beside it are
+              the specific version of that: THIS fight finishes THAT piece of
+              gear.
             -->
-            <span v-for="warning in battle?.warnings ?? []" :key="warning" class="tiny warn">
+            <span v-if="deathTerms" class="tiny warn terms">{{ deathTerms }}</span>
+            <span v-for="warning in gearWarnings" :key="warning" class="tiny warn">
               {{ warning }}
             </span>
-            <span v-if="packLeaves" class="tiny muted">Moves on in {{ packLeaves }}</span>
 
-            <!-- §9.5.9 -- what the weapon brings to a long fight. Every dial
-                 is full, because every skill starts a fight on cooldown: a
-                 rout never sees one, and knowing that is part of deciding
-                 whether to close. -->
+            <!-- Why a tap would do nothing, when that is the case. -->
+            <span v-if="packBlock" class="tiny muted">{{ packBlock }}</span>
+
+            <!-- §9.5.9 -- what you have LEARNED, and nothing else. Every dial is
+                 full, because every skill starts a fight on cooldown: a rout
+                 never sees one, and knowing that is part of deciding whether to
+                 close. -->
             <BattleSkillRail v-if="packSkills.length" class="knows" :skills="packSkills" />
           </div>
 
@@ -689,12 +718,47 @@ function hunted(): void {
 .pinned {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 4px 2px;
+  gap: 3px;
+  padding: 2px 2px 4px;
+}
+
+/* The name and its clock on one line: who is here, and how long for. */
+.who {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+
+/* The loudest thing on the plate, because it is the thing that stopped you. It
+   was `tiny`, the same size as the three sentences under it, which left the
+   plate reading as four notes of equal weight instead of a name and its terms. */
+.name {
+  font-family: var(--font-display);
+  font-size: 15px;
+  line-height: 1.2;
+}
+
+/*
+ * "leaves in 5m 46s" rather than a line of its own reading "Moves on in ...":
+ * two words is enough to say which clock it is, and a bare figure beside a
+ * monster reads as how long until it hits you rather than until it goes.
+ */
+.leaves {
+  color: var(--vellum-dim);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .pinned .warn {
   color: var(--ember);
+}
+
+/* §13.3 -- ember is a state to deal with, and the terms of a loss are one. Two
+   ember lines in a row would be two alarms, so the standing one is dimmed a
+   step and a gear warning keeps the full colour. */
+.pinned .warn.terms {
+  color: #96534f;
 }
 
 .knows {

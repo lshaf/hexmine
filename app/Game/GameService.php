@@ -1947,6 +1947,19 @@ class GameService
             'odds' => round(Formulas::battleOdds($pair['attack'], $pair['defense'], $monster), 3),
             'job' => $job['job'],
             'jobLevel' => $job['level'],
+            // §9.5.9 -- the ones this character has actually LEARNED, keys and
+            // cooldowns only. The pin used to draw all three of the family off
+            // the client's mirror, which showed a fighter three skills they had
+            // never bought and could not use.
+            'skills' => array_values(array_map(
+                static fn (array $skill): array => [
+                    'key' => $skill['key'],
+                    'name' => $skill['name'],
+                    'glyph' => $skill['glyph'],
+                    'cooldown' => $skill['cooldown'],
+                ],
+                $job['family'] === null ? [] : $this->armedSkills($character, (string) $job['family']),
+            )),
             'wear' => $wear,
             'warnings' => $warnings,
         ];

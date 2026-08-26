@@ -515,6 +515,15 @@ export interface BattlePreview {
   /** §9.5.4 -- the battle job the equipped weapon levels, and where it stands. */
   job?: string | null
   jobLevel?: number
+  /**
+   * §9.5.9 -- the ones this character has LEARNED, and nothing else.
+   *
+   * Not derivable from the family: the three are tree nodes now, so which of
+   * them a fighter carries is a fact about what they have bought. The pin drew
+   * all three off the client's mirror and showed people skills they did not
+   * have.
+   */
+  skills?: Array<{ key: string; name: string; glyph: string; cooldown: number }>
   /** §9.5.6 -- what the exchange would take off the kit, and off the blade. */
   wear?: { pool: number; taken: number; weapon: number }
   /** §8.2 -- gear this fight could destroy outright, named before it happens. */
