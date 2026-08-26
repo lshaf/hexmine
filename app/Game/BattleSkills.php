@@ -342,11 +342,11 @@ final class BattleSkills
         }
 
         if (isset($skill['burn'])) {
-            $parts[] = (! empty($skill['pierce']) ? 'Hits through its guard, then burns' : 'Burns')
+            $parts[] = (! empty($skill['pierce']) ? 'Attack ignores defense, then burns' : 'Burns')
                 .' it for '.round($skill['tick'] * 100).'% of your attack a round for '
                 .self::rounds((int) $skill['burn']);
         } elseif (! empty($skill['pierce'])) {
-            $parts[] = 'Hits through its guard';
+            $parts[] = 'Attack ignores defense';
         }
 
         if (isset($skill['stun'])) {
