@@ -89,10 +89,11 @@ class SkillTreeController extends GameController
     /**
      * §9.5.9 -- the three a battle job knows, with this character's tree in them.
      *
-     * These are NOT tree nodes and never were: a skill comes with the weapon,
-     * not with a skill point. But the Jobs panel is where a player goes to ask
-     * "what does my Shieldbearer know", and answering that with thirty stat
-     * nodes and no mention of Shield Bash is the panel refusing the question.
+     * These are NOT tree nodes: a skill is bought with a point like one, and
+     * stored beside them, but it has no tier, no parent and no place in a
+     * depth. The Jobs panel is where a player goes to ask what a Shieldbearer
+     * knows, and answering with thirty stat nodes and no mention of Shield Bash
+     * is the panel refusing the question.
      *
      * Its own route rather than part of index() because index() is
      * player-independent and cacheable, and every figure here is the player's:
@@ -105,16 +106,37 @@ class SkillTreeController extends GameController
 
         $out = [];
 
+        $owned = $this->game->ownedNodes($character);
+        $levels = $this->game->jobLevelsFor($character);
+        $points = $this->game->skillPoints($character)['available'];
+
         foreach (Catalog::BATTLE_JOB_FOR_FAMILY as $family => $job) {
+            $level = $levels[$job] ?? 1;
+
+            // Every one of the three, known or not -- a skill you cannot use
+            // yet is the reason to keep levelling, and hiding it would make the
+            // job sheet say a Runecaster has nothing until it suddenly does.
             $out[$job] = array_values(array_map(
-                static fn (array $skill): array => [
-                    'key' => $skill['key'],
-                    'name' => $skill['name'],
-                    'glyph' => $skill['glyph'],
-                    'cooldown' => $skill['cooldown'],
-                    ...BattleSkills::summary($skill),
-                ],
-                $this->game->armedSkills($character, $family),
+                function (array $skill) use ($owned, $level, $points): array {
+                    $nodeKey = BattleSkills::nodeKey($skill['key']);
+                    $known = in_array($nodeKey, $owned, true);
+
+                    return [
+                        'key' => $skill['key'],
+                        'node' => $nodeKey,
+                        'name' => $skill['name'],
+                        'glyph' => $skill['glyph'],
+                        'cooldown' => $skill['cooldown'],
+                        'jobLevel' => $skill['jobLevel'],
+                        'known' => $known,
+                        'canLearn' => ! $known && $level >= $skill['jobLevel'] && $points >= 1,
+                        ...BattleSkills::summary($skill),
+                    ];
+                },
+                // Armed with nothing filtered, so the figures are this
+                // character's tree applied to all three rather than only the
+                // ones already learned.
+                BattleSkills::armed($family, $this->game->battleTreeFor($character, $family)),
             ));
         }
 

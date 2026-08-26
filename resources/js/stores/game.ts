@@ -341,6 +341,13 @@ export const useGame = defineStore('game', () => {
 
   async function buyNode(nodeKey: string): Promise<void> {
     await act(() => api.buyNode(nodeKey))
+
+    // §9.5.9 -- the battle skills are their own fetch, and buying a node moves
+    // them twice over: learning one flips it to known, and a skillPower or
+    // skillCooldown node moves every figure on all three. Re-read here at the
+    // mutation rather than from a watcher on the owned set, which is a derived
+    // Set and turned out not to fire.
+    await loadBattleSkills()
   }
 
   /**

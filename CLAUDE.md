@@ -1558,7 +1558,7 @@ removes the snowball problem (winners farming losers' gear) entirely, leaving
 only loot-table tuning.
 
 **Skills are §9.5.9**, and they are the one thing in a fight that is not a
-trade of blows. They come with the weapon rather than with a point, they all
+trade of blows. The weapon decides which three and a point buys them, they all
 start a fight on cooldown, and none of them can be steered.
 
 It happens in two places. **Dungeons** (§9.1–§9.4) are the deliberate expedition: you
@@ -2138,10 +2138,18 @@ its own problem:
 | | **Chain Arc** | 10 | a blow that is **bigger the deeper the fight has gone** |
 | | **Rune of Binding** | 15 | it loses its next answer |
 
-**They come with the WEAPON, never with a skill point.** §7.4.1 keeps job level
-as the proof you have done the work rather than a reward for it, so carrying a
-sword is what makes you a Swordhand and the three sword skills are simply what a
-sword *is*. What a point buys is the tree that sharpens them — `skillPower`,
+**The WEAPON decides which three; a skill point buys them.** §9.5.4 makes the
+family in the slot your class, so carrying a sword is what makes you a Swordhand
+— but the three sword skills are then *learned*, one point each, behind the
+battle job's level (1 / 5 / 12). A fighter who has spent nothing swings and does
+nothing else.
+
+*(They used to arrive with the weapon, on the argument that the three simply
+**are** what a sword is. That made a Runecaster's whole kit free the moment they
+picked up a wand, and left the battle trees buying nothing but percentages on
+skills nobody had chosen. Learning them is what makes the choice a choice.)*
+
+What a point ALSO buys is the tree that sharpens them — `skillPower`,
 `skillCooldown`, `skillStun` (§7.4.3), each capped so a maxed tree is worth
 about a rung of gear and never a tier of it.
 

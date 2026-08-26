@@ -1,13 +1,11 @@
 <script setup lang="ts">
 /**
- * §9.5.9 -- the three your weapon knows, named before anything happens.
+ * §9.5.9 -- the three your weapon can know, named before anything happens.
  *
- * THEY COME WITH THE WEAPON, NOT WITH A SKILL POINT, and that is the one thing
- * this list exists to say out loud. §7.4.1 keeps job level as the proof you
- * have done the work rather than a reward for it, so carrying a sword is what
- * makes you a Swordhand and the three sword skills are simply what a sword is.
- * A player who has spent no points and sees three skills armed is looking at
- * the rule working, and nothing on screen said so before this.
+ * THEY ARE LEARNED, one skill point each, behind the battle job's level. The
+ * family in the slot still decides WHICH three (§9.5.4) -- carrying a sword is
+ * what makes you a Swordhand -- but knowing them is a thing you spend for, and
+ * a fighter who has spent nothing swings and does nothing else.
  *
  * §9.5.9 also puts them on the fight PREVIEW, because whether to close at all
  * is the decision and against a long fight these are half of it. Same rows on
@@ -25,6 +23,18 @@ import type { BattleRound } from '@/game/types'
 type Row = SkillLike & {
   description?: string
   stats?: Array<{ label: string; value: string }>
+  /**
+   * §9.5.9 -- learned, or still to learn, and what learning it would take.
+   *
+   * All optional, and absent everywhere a skill cannot be learned: the pin, the
+   * bench and the receipt draw the same rows without any of this. They are here
+   * rather than only in the Jobs panel's own type so the `action` slot hands
+   * back something the caller can act on.
+   */
+  known?: boolean
+  node?: string
+  jobLevel?: number
+  canLearn?: boolean
 }
 
 const props = withDefaults(
@@ -52,18 +62,24 @@ const rows = computed(() =>
 <template>
   <div v-if="rows.length" class="skills">
     <p class="tiny muted lead">
-      <template v-if="family">Your {{ family }} knows these.</template>
-      <template v-else>Your weapon knows these.</template>
-      They come with the weapon, not with a skill point — a point buys the tree
-      that sharpens them.
+      <template v-if="family">Your {{ family }} can know these.</template>
+      <template v-else>These are learned on the Jobs sheet.</template>
+      One skill point each, and the tree sharpens what you have learned.
     </p>
 
-    <div v-for="row in rows" :key="row.key" class="skill">
+    <div v-for="row in rows" :key="row.key" class="skill" :class="{ unknown: row.known === false }">
       <div class="head">
         <SvgIcon :svg="row.svg" class="mark" />
         <strong class="tiny grow">{{ row.name }}</strong>
         <span v-if="row.fired !== null" class="label">×{{ row.fired }}</span>
         <span v-else class="label">{{ row.cooldown }} cd</span>
+        <!--
+          The Jobs panel puts a Learn button here; the pin, the bench and the
+          receipt put nothing. A slot rather than a prop, because what belongs
+          beside a skill is the caller's business and this component's only job
+          is to draw the skill.
+        -->
+        <slot name="action" :row="row" />
       </div>
 
       <p v-if="row.effect" class="tiny does">{{ row.effect }}</p>
@@ -79,6 +95,13 @@ const rows = computed(() =>
 </template>
 
 <style scoped>
+/* §9.5.9 -- not learned yet. Dimmed rather than hidden: a skill you cannot use
+   is the reason to keep levelling, and hiding it would make a job sheet say a
+   Runecaster has nothing until it suddenly has three. */
+.skill.unknown {
+  opacity: 0.62;
+}
+
 .skills {
   display: flex;
   flex-direction: column;

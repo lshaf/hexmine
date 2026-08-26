@@ -7,7 +7,11 @@ namespace Tests\Feature;
 use App\Game\Balance;
 use App\Game\BattleSkills;
 use App\Game\Formulas;
+use App\Game\GameException;
+use App\Game\GameService;
 use App\Game\Monsters;
+use App\Models\Player;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
@@ -21,6 +25,8 @@ use Tests\TestCase;
  */
 final class BattleSkillTest extends TestCase
 {
+    use RefreshDatabase;
+
     /** A kit good enough that fights run long enough for skills to matter. */
     private const ATTACK = 30;
 
@@ -372,6 +378,47 @@ final class BattleSkillTest extends TestCase
             $maxed['effect'],
             'the sentence did not move, so it is not reading the player\'s own figures',
         );
+    }
+
+    /**
+     * §9.5.9 -- a skill is learned, and until it is you swing and nothing else.
+     *
+     * The weapon still decides WHICH three (§9.5.4); knowing them is what costs
+     * a point. This is the gate itself: not what the panel draws, but what the
+     * exchange is handed.
+     */
+    public function test_a_battle_skill_is_carried_only_once_it_is_learned(): void
+    {
+        $game = app(GameService::class);
+        $character = $game->createCharacter(Player::create(['wallet' => '0xlearns']));
+        $character->update(['level' => 30]);
+
+        $this->assertSame(
+            [],
+            $game->armedSkills($character->fresh(), 'focus'),
+            'a fighter who has learned nothing walked in carrying skills',
+        );
+
+        // Runecaster 5 opens the first two; the third waits for 12.
+        $character->jobLevels()->updateOrCreate(['job_key' => 'runecaster'], ['level' => 5, 'xp' => 0]);
+        $character->unsetRelation('jobLevels');
+
+        $game->buyNode($character->fresh(), BattleSkills::nodeKey('ember_bolt'));
+
+        $armed = $game->armedSkills($character->fresh(), 'focus');
+        $this->assertCount(1, $armed);
+        $this->assertSame('ember_bolt', $armed[0]['key']);
+
+        // And it is a point, like any other thing bought in that panel.
+        $this->assertSame(1, $game->skillPoints($character->fresh())['spent']);
+
+        // The gate is the battle job's level, not the character's.
+        try {
+            $game->buyNode($character->fresh(), BattleSkills::nodeKey('rune_of_binding'));
+            $this->fail('a skill was learned below its job level');
+        } catch (GameException $e) {
+            $this->assertSame('job_level', $e->errorCode);
+        }
     }
 
     /**

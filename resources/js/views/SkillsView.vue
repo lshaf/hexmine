@@ -48,9 +48,6 @@ onMounted(() => {
   void game.loadBattleSkills()
 })
 
-// A bought node moves what the three are worth (§7.4.3), so they are re-read
-// rather than left at whatever they said when the panel opened.
-watch(() => game.ownedNodes.size, () => void game.loadBattleSkills())
 
 /** A different job is a different sheet; keep nothing selected across it. */
 watch(job, () => {
@@ -471,8 +468,18 @@ const scopedName = computed(() =>
   picked.value && SCOPED.has(chosen.value?.def.effect.kind ?? '') ? jobDef.value?.name : undefined,
 )
 
-/** §9.5.9 -- the three this job knows, if it is one of the three that do. */
+/** §9.5.9 -- the three this job can know, learned or not. */
 const knows = computed(() => game.battleSkills[job.value] ?? [])
+
+/** Why the button is dead, in the same words a tree node uses. */
+function learnBlock(row: { known?: boolean; jobLevel?: number; canLearn?: boolean }): string {
+  if (row.known) return 'Learned.'
+  if (jobRow.value.level < (row.jobLevel ?? 1)) {
+    return `Needs ${jobDef.value?.name} level ${row.jobLevel}. You are ${jobRow.value.level}.`
+  }
+
+  return row.canLearn ? 'Ready to learn.' : 'No skill points left. Level up first.'
+}
 
 async function learn(): Promise<void> {
   if (!picked.value) return
@@ -570,10 +577,9 @@ async function learn(): Promise<void> {
 
         <!--
           §9.5.9 -- what this job KNOWS, before what it can buy.
-          The three come with the weapon rather than with a skill point, so they
-          are not tree nodes and never appear in the strata below. A player
-          opening Shieldbearer to see what a Shieldbearer does was being shown
-          thirty stat nodes and no mention of Shield Bash.
+          The weapon decides which three (§9.5.4) and a point buys them, but
+          they are not tree NODES: no tier, no parent, no place in a depth. So
+          they sit above the strata rather than in them.
         -->
         <section v-if="knows.length" class="knows">
           <!--
@@ -581,7 +587,21 @@ async function learn(): Promise<void> {
             rows under it were the same numbers a second time -- "Stuns it for
             2 rounds." over `Stun: 2 rounds`. The cooldown is on the chip.
           -->
-          <BattleSkillList :skills="knows" :family="null" :detail="false" />
+          <BattleSkillList :skills="knows" :family="null" :detail="false">
+            <template #action="{ row }">
+              <button
+                v-if="!row.known"
+                class="btn btn-sm"
+                :class="{ 'btn-primary': row.canLearn }"
+                type="button"
+                :disabled="game.busy || !row.canLearn"
+                :title="learnBlock(row)"
+                @click="row.node && game.buyNode(row.node)"
+              >
+                Learn · 1 point
+              </button>
+            </template>
+          </BattleSkillList>
         </section>
 
         <!-- The strata. Depth in the gutter, the seam beside it. -->

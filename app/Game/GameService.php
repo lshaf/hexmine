@@ -1724,13 +1724,38 @@ class GameService
      */
     public function armedSkills(Character $character, string $family): array
     {
+        return BattleSkills::armed(
+            $family,
+            $this->battleTreeFor($character, $family),
+            // §9.5.9 -- what this character actually knows. A skill is learned
+            // with a point now rather than arriving with the weapon, so a
+            // fighter who has spent nothing swings and does nothing else.
+            $this->ownedNodes($character),
+        );
+    }
+
+    /**
+     * §7.4.3 -- the battle tree's skill upgrades, for a caller outside this
+     * class. The panel needs them to show what all three are worth, including
+     * the two nobody has learned yet.
+     *
+     * @return array{power:float,cooldown:int,stun:int}
+     */
+    public function battleTreeFor(Character $character, string $family): array
+    {
         $tree = $this->battleTree($character, $family);
 
-        return BattleSkills::armed($family, [
+        return [
             'power' => $tree['skillPower'],
             'cooldown' => $tree['skillCooldown'],
             'stun' => $tree['skillStun'],
-        ]);
+        ];
+    }
+
+    /** Job levels, for a caller outside this class. */
+    public function jobLevelsFor(Character $character): array
+    {
+        return $this->jobLevels($character);
     }
 
     private function battleTree(Character $character, ?string $family): array
@@ -1820,11 +1845,9 @@ class GameService
             $pair['defense'],
             $pool,
             $monster,
-            BattleSkills::armed($job['family'], [
-                'power' => $tree['skillPower'],
-                'cooldown' => $tree['skillCooldown'],
-                'stun' => $tree['skillStun'],
-            ]),
+            // The preview is a promise (§9.5.5), so it swings exactly what the
+            // fight will: only what has been learned.
+            $this->armedSkills($character, (string) $job['family']),
         );
 
         // §9.5.6 -- the same one bill the fight will charge, so the preview and
@@ -2046,11 +2069,7 @@ class GameService
             // tree decides how good they are. Read HERE with everything else
             // about the kit, because the fight is settled the instant you
             // close: swapping weapons while the clock runs buys nothing.
-            $armedSkills = BattleSkills::armed($job['family'], [
-                'power' => $tree['skillPower'],
-                'cooldown' => $tree['skillCooldown'],
-                'stun' => $tree['skillStun'],
-            ]);
+            $armedSkills = $this->armedSkills($character, (string) $job['family']);
 
             $fight = Formulas::resolveBattle(
                 $pair['attack'],
@@ -5931,9 +5950,54 @@ class GameService
      * the tree, the server decides what may be bought (§16). The unique index on
      * (character, node) is the last line of defense against a doubled request.
      */
+    /**
+     * §9.5.9 -- learn one of the three a battle job knows.
+     *
+     * Gated by the battle job's level rather than by a parent skill: the three
+     * are alternatives a fighter accumulates, not a chain, so there is nothing
+     * for one to follow.
+     *
+     * @param  array<string,mixed>  $skill
+     * @return array{node:string,points:array<string,int>}
+     */
+    private function learnBattleSkill(Character $character, string $nodeKey, array $skill): array
+    {
+        if ($character->nodes()->where('node_key', $nodeKey)->exists()) {
+            throw new GameException("You already know {$skill['name']}.", 'owned');
+        }
+
+        $job = Catalog::BATTLE_JOB_FOR_FAMILY[$skill['family']];
+        $jobLevel = $this->jobLevels($character)[$job] ?? 1;
+
+        if ($jobLevel < $skill['jobLevel']) {
+            $name = Jobs::JOBS[$job]['name'];
+            throw new GameException(
+                "{$skill['name']} needs {$name} level {$skill['jobLevel']}. You are level {$jobLevel}.",
+                'job_level',
+            );
+        }
+
+        if ($this->skillPoints($character)['available'] < 1) {
+            throw new GameException('No skill points left. Level up first.', 'no_points');
+        }
+
+        CharacterNode::create(['character_id' => $character->id, 'node_key' => $nodeKey]);
+
+        return ['node' => $nodeKey, 'points' => $this->skillPoints($character->fresh())];
+    }
+
     public function buyNode(Character $character, string $nodeKey): array
     {
         return DB::transaction(function () use ($character, $nodeKey) {
+            // §9.5.9 -- a battle skill is learned with a point like a node, and
+            // is stored beside them, but it is NOT one: it has no tier, no
+            // parent and no place in a depth. Its own gate, and then the same
+            // ledger.
+            $skill = BattleSkills::forNodeKey($nodeKey);
+            if ($skill !== null) {
+                return $this->learnBattleSkill($character, $nodeKey, $skill);
+            }
+
             $node = Jobs::node($nodeKey);
             if ($node === null) {
                 throw new GameException('No such skill.', 'not_found');

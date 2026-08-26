@@ -61,6 +61,7 @@ final class BattleSkills
         // more rounds of both wear streams. Every one of these converts the
         // thing it is good at into the thing it is not.
         'shield_bash' => [
+            'jobLevel' => 1,
             'family' => 'shield',
             'name' => 'Shield Bash',
             'glyph' => 'bash',
@@ -70,6 +71,7 @@ final class BattleSkills
             'description' => 'They teach you early that the rim is a weapon. Most people find out later.',
         ],
         'anvil_stance' => [
+            'jobLevel' => 5,
             'family' => 'shield',
             'name' => 'Anvil Stance',
             'glyph' => 'anvil',
@@ -80,6 +82,7 @@ final class BattleSkills
             'description' => 'Feet planted, shoulder set. Let it come.',
         ],
         'wardens_toll' => [
+            'jobLevel' => 12,
             'family' => 'shield',
             'name' => "Warden's Toll",
             'glyph' => 'toll',
@@ -96,6 +99,7 @@ final class BattleSkills
         // were already going to be long, by making every round after this one
         // worth slightly more than the last.
         'onslaught' => [
+            'jobLevel' => 1,
             'family' => 'sword',
             'name' => 'Onslaught',
             'glyph' => 'onslaught',
@@ -105,6 +109,7 @@ final class BattleSkills
             'description' => 'Never give it a round to think in.',
         ],
         'sunder' => [
+            'jobLevel' => 5,
             'family' => 'sword',
             'name' => 'Sunder',
             'glyph' => 'sunder',
@@ -114,6 +119,7 @@ final class BattleSkills
             'description' => 'Armor was only ever a delay.',
         ],
         'riposte' => [
+            'jobLevel' => 12,
             'family' => 'sword',
             'name' => 'Riposte',
             'glyph' => 'riposte',
@@ -129,6 +135,7 @@ final class BattleSkills
         // else in the kit -- a runecaster that has not finished the fight is
         // losing it. All three are about the clock.
         'ember_bolt' => [
+            'jobLevel' => 1,
             'family' => 'focus',
             'name' => 'Ember Bolt',
             'glyph' => 'ember',
@@ -140,6 +147,7 @@ final class BattleSkills
             'description' => 'It goes in cold and it does not come out.',
         ],
         'chain_arc' => [
+            'jobLevel' => 5,
             'family' => 'focus',
             'name' => 'Chain Arc',
             'glyph' => 'arc',
@@ -150,6 +158,7 @@ final class BattleSkills
             'description' => 'You have been holding this since the first round.',
         ],
         'rune_of_binding' => [
+            'jobLevel' => 12,
             'family' => 'focus',
             'name' => 'Rune of Binding',
             'glyph' => 'bind',
@@ -180,6 +189,27 @@ final class BattleSkills
             self::SKILLS,
             static fn (array $skill): bool => $skill['family'] === $family,
         );
+    }
+
+    /**
+     * The skill a stored node key names, or null if it names anything else.
+     *
+     * This is what keeps battle skills and tree nodes in one table without
+     * either having to know about the other: a key either resolves here or it
+     * resolves in Jobs::NODES, never both.
+     *
+     * @return array<string,mixed>|null
+     */
+    public static function forNodeKey(string $nodeKey): ?array
+    {
+        if (! str_starts_with($nodeKey, 'battle.')) {
+            return null;
+        }
+
+        $key = substr($nodeKey, strlen('battle.'));
+        $skill = self::SKILLS[$key] ?? null;
+
+        return $skill === null ? null : $skill + ['key' => $key];
     }
 
     /** @return array<string,mixed>|null */
@@ -371,7 +401,25 @@ final class BattleSkills
      * @param  array{power?:float,cooldown?:int,stun?:int}  $tree
      * @return list<array<string,mixed>>
      */
-    public static function armed(?string $family, array $tree = []): array
+    /**
+     * §9.5.9 -- the node key a learned skill is stored under.
+     *
+     * They live in `character_nodes` beside the trees because that is what the
+     * table is: things learned with a skill point. The prefix keeps them out of
+     * `Jobs::NODES` -- a battle skill is not a tree node and must never appear
+     * in a depth -- while the point ledger counts the row like any other.
+     */
+    public static function nodeKey(string $key): string
+    {
+        return 'battle.'.$key;
+    }
+
+    /**
+     * @param  list<string>  $learned  raw node keys, as stored
+     * @param  array<string,mixed>  $tree
+     * @return list<array<string,mixed>>
+     */
+    public static function armed(?string $family, array $tree = [], ?array $learned = null): array
     {
         $power = max(0.0, min((float) ($tree['power'] ?? 0.0), Balance::SKILL_BATTLE_POWER_CAP));
         $shorter = max(0, min((int) ($tree['cooldown'] ?? 0), Balance::SKILL_BATTLE_COOLDOWN_CAP));
@@ -380,6 +428,13 @@ final class BattleSkills
         $out = [];
 
         foreach (self::forFamily($family) as $key => $skill) {
+            // §9.5.9 -- known, or not carried. Null means "every one of them",
+            // which is what the bench at /battle asks for: it simulates a kit
+            // nobody owns, so there is nobody for it to ask what they know.
+            if ($learned !== null && ! in_array(self::nodeKey($key), $learned, true)) {
+                continue;
+            }
+
             $armed = $skill + ['key' => $key];
 
             // Never under the floor, or a skill fires every round and the whole

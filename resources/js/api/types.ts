@@ -597,9 +597,15 @@ export interface ActionResult<T = unknown> {
 /** §9.5.9 -- a skill as the panel draws it: what it does, and its figures. */
 export interface BattleSkillRow {
   key: string
+  /** The key it is stored under once learned, and the one buyNode takes. */
+  node: string
   name: string
   glyph: string
   cooldown: number
+  /** §9.5.9 -- the battle job level it opens at. */
+  jobLevel: number
+  known: boolean
+  canLearn: boolean
   effect: string
   stats: Array<{ label: string; value: string }>
 }
