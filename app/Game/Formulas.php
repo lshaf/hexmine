@@ -848,16 +848,93 @@ final class Formulas
      * Zero is also what a broken piece is worth, which the caller refuses
      * rather than paying: an idle game must not take something for nothing.
      */
+    /**
+     * §8.2 -- what the trader gives for a piece of gear, as it stands.
+     *
+     * The basis is the shelf price where there is one and what the PARTS cost
+     * where there is not, which is the same pair §8.3 prices the shelf from.
+     * Then half of it, then scaled by what is left of the durability.
+     *
+     * The fallback is the fix for a real hole. §8.2 used to say a crafted piece
+     * "has no shelf price to halve and salvage is its exit", which lumped a
+     * common Hewn Axe in with an epic Mythril Pickaxe -- and the reason it gave
+     * (gold buys the bottom two rungs and never the top) only ever argued for
+     * excluding the top. The catalog was already inconsistent about it: a
+     * Notched Sword is common, craftable AND stocked, so it sold, while a
+     * Tempered Sword is common and craftable and was not stocked, so it did
+     * not. Nothing a player can see distinguishes those two.
+     */
     public static function resaleValue(array $def, int $durability): int
     {
-        $price = $def['goldPrice'] ?? 0;
         $max = $def['maxDurability'] ?? 0;
+        if ($max <= 0 || $durability <= 0) {
+            return 0;
+        }
 
-        if ($price <= 0 || $max <= 0 || $durability <= 0) {
+        $price = self::resaleBasis($def);
+        if ($price <= 0) {
             return 0;
         }
 
         return (int) floor($price * Balance::RESALE_RATE * (min($durability, $max) / $max));
+    }
+
+    /**
+     * What an undamaged piece is worth to the trader before wear comes off.
+     *
+     * Zero means the trader does not deal in it at all, which is a different
+     * thing from a piece worn down to nothing -- the shop lists the second and
+     * refuses it, so a player looking for their axe finds it and is told why.
+     */
+    public static function resaleBasis(array $def): int
+    {
+        // §3.2 -- gold reaches the bottom two rungs and stops. Checked on the
+        // PRICE rather than at the till, so the shelf, the client's preview and
+        // the sale itself cannot come to three different answers. It is what
+        // keeps the make-cost fallback below from handing an epic a gold value
+        // it was never supposed to have (§8.0: minting is that rung's exit).
+        if (Balance::rarityRank($def['rarity'] ?? 'common') > Balance::rarityRank(Balance::SHOP_RARITY_CAP)) {
+            return 0;
+        }
+
+        // §8.2 -- what a thing is MADE OF, whenever that is knowable. A shelf
+        // price is make-cost marked up by half plus the bench time (§8.3), and
+        // neither of those is yours to sell back: you did not pay the markup and
+        // the trader is not buying your afternoon.
+        //
+        // This is the rule that keeps gather-craft-sell from being a slow gold
+        // press. Six uncommon battle pieces were through the gap -- 41g of
+        // materials made an Iron Broadsword that sold for 53g -- because their
+        // shelf tag is set by the durability valuation rather than by their
+        // parts, and half of it still cleared the parts. A shelf price is
+        // ALWAYS above make cost by construction, so reading the parts first is
+        // the whole fix.
+        $parts = self::makeCost($def);
+        if ($parts > 0) {
+            return $parts;
+        }
+
+        // Nothing to make it from: it is shop stock and nothing else, so the
+        // only price it has is the one on the shelf.
+        return $def['goldPrice'] ?? 0;
+    }
+
+    /**
+     * §8.3 -- what a thing's parts fetch at the NPC's own poor rate.
+     *
+     * The shelf marks this up by half and adds bench time; a sale back never
+     * does either, which is what keeps the round trip a loss (§8.2) and keeps
+     * the bench from being a gold press: half of what the materials were worth
+     * is strictly less than selling the materials.
+     */
+    public static function makeCost(array $def): int
+    {
+        $worth = 0;
+        foreach ($def['inputs'] ?? [] as $key => $qty) {
+            $worth += ((Catalog::material($key)['npcPrice'] ?? 0) * $qty);
+        }
+
+        return $worth;
     }
 
     /**
@@ -878,12 +955,7 @@ final class Formulas
      */
     public static function consumableResale(array $def): int
     {
-        $worth = 0;
-        foreach ($def['inputs'] ?? [] as $key => $qty) {
-            $worth += ((Catalog::material($key)['npcPrice'] ?? 0) * $qty);
-        }
-
-        return (int) floor($worth * Balance::RESALE_RATE);
+        return (int) floor(self::makeCost($def) * Balance::RESALE_RATE);
     }
 
     public static function salvageYield(array $def): array

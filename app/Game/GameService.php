@@ -6255,7 +6255,10 @@ class GameService
 
             $gold = Formulas::resaleValue($def, (int) $item->durability);
 
-            if (($def['goldPrice'] ?? 0) <= 0) {
+            // §3.2 -- above the second rung there is no price at all, whether
+            // the piece was bought or made. Minting is that gear's exit (§8.0),
+            // and salvage is the one that stays open at every rung.
+            if (Formulas::resaleBasis($def) <= 0) {
                 throw new GameException(
                     "The trader does not deal in {$def['name']}. Scrap it for materials instead.",
                     'not_sellable',

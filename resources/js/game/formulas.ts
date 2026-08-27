@@ -118,13 +118,48 @@ export function aggregateAfterSwap(
  * that gear's exit. Zero is also what a broken piece is worth, and the server
  * refuses rather than paying it.
  */
+/**
+ * §8.2 -- what the trader gives for a piece of gear, as it stands.
+ *
+ * The basis is the shelf price where there is one and what the PARTS cost where
+ * there is not -- the same pair §8.3 prices the shelf from -- then half of it,
+ * then scaled by what is left of the durability.
+ */
 export function resaleValue(def: ItemDef, durability: number): number {
-  const price = def.goldPrice ?? 0
   const max = def.maxDurability ?? 0
+  if (max <= 0 || durability <= 0) return 0
 
-  if (price <= 0 || max <= 0 || durability <= 0) return 0
+  const price = resaleBasis(def)
+  if (price <= 0) return 0
 
   return Math.floor(price * EQUIPMENT.resaleRate * (Math.min(durability, max) / max))
+}
+
+/**
+ * What an undamaged piece is worth before wear comes off. Zero means the trader
+ * does not deal in it at all, which is a different thing from a piece worn down
+ * to nothing: the shop lists the second and refuses it.
+ */
+export function resaleBasis(def: ItemDef): number {
+  // §3.2 -- gold reaches the bottom two rungs and stops.
+  if (def.rarity !== 'common' && def.rarity !== 'uncommon') return 0
+
+  // §8.2 -- what it is MADE OF wherever that is knowable. A shelf price is
+  // make-cost marked up plus bench time (§8.3), and neither is yours to sell
+  // back. Only shop stock with no recipe falls through to the tag.
+  const parts = makeCost(def)
+
+  return parts > 0 ? parts : (def.goldPrice ?? 0)
+}
+
+/** §8.3 -- what a thing's parts fetch at the NPC's own poor rate. */
+export function makeCost(def: ItemDef): number {
+  let worth = 0
+  for (const [key, qty] of Object.entries(def.inputs ?? {})) {
+    worth += (MATERIALS[key as MaterialKey]?.npcPrice ?? 0) * (qty as number)
+  }
+
+  return worth
 }
 
 /**
@@ -136,12 +171,7 @@ export function resaleValue(def: ItemDef, durability: number): number {
  * and with no wear term because a potion has no durability to have spent.
  */
 export function consumableResale(def: ItemDef): number {
-  let worth = 0
-  for (const [key, qty] of Object.entries(def.inputs ?? {})) {
-    worth += (MATERIALS[key as MaterialKey]?.npcPrice ?? 0) * (qty as number)
-  }
-
-  return Math.floor(worth * EQUIPMENT.resaleRate)
+  return Math.floor(makeCost(def) * EQUIPMENT.resaleRate)
 }
 
 export function salvageYield(def: ItemDef): Partial<Record<string, number>> {

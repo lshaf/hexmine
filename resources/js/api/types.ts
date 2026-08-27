@@ -648,6 +648,18 @@ export interface CollectResult {
     consumable: boolean
     quantity?: number
     durability?: number
+    /** The row it landed on, so the receipt can talk about the object itself. */
+    itemId?: string
+    /**
+     * §8.0.1 -- the lines the bench rolled onto it.
+     *
+     * The server has always sent these; nothing read them until the receipt
+     * did. They are the whole reason two of one recipe are not the same object,
+     * and the hand-over is the one moment a player finds out which one they got
+     * -- so a plate that omitted them was leaving out the interesting half of an
+     * hour at the anvil. Empty is a normal outcome, not a broken one.
+     */
+    options?: ItemOption[]
   } | null
   /** Units that did not fit: the §2 per-wallet cap, or a full bag (§7.6). */
   lostToOverflow: number

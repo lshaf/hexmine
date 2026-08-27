@@ -1403,19 +1403,46 @@ the game, §11.1.)*
   it stacks and has no durability to price it by. Consumables were the one thing
   in the bag whose only exit was the mouth.
 
+  **What it is worth is what it is MADE OF wherever that is knowable, and the
+  shelf price only where it is not.** A crafted piece is not a piece with no
+  price — it is a piece nobody stocks, and those are different things. The catalog proved it by accident: a Notched Sword is
+  common, craftable *and* stocked, so it sold, while a Tempered Sword is common
+  and craftable and unstocked, so it did not, and nothing a player can see tells
+  those two apart.
+
   Four refusals, each closing a hole rather than being a nicety. Not away from a
   settlement — the trader is an NPC who stands somewhere (§6). Not off your own
   belt: a sale is a trade, and losing the worn tool to a mistap is worse than
-  losing one out of the pack, so stow it first. Not what the trader does not
-  stock — gold buys the bottom two rungs and never the top (§3.2), so a crafted
-  or NFT piece has no shelf price to halve and salvage is its exit. And not for
-  nothing: a piece worn past the point where half its price still rounds to a
-  coin is refused rather than taken for zero.
+  losing one out of the pack, so stow it first. Not above the second rung — gold
+  buys the bottom two and never the top (§3.2), so an epic or better has no
+  price at all whether it was bought or made: minting is that rung's exit (§8.0)
+  and salvage is the one open everywhere. And not for nothing: a piece worn past
+  the point where half its price still rounds to a coin is refused rather than
+  taken for zero.
+
+  *(It used to read "a crafted or NFT piece has no shelf price to halve", which
+  put a common Hewn Axe in the same sentence as an epic Mythril Pickaxe. The
+  reason it gave — gold buys the bottom two rungs and never the top — only ever
+  argued for excluding the top.)*
 
   **Two numbers hold this in place and neither is optional.** The round trip must
   lose money, or a trader is a gold faucet with no work in it. And repairing must
   stay cheaper than selling-and-rebuying at *every* wear level, or the largest
-  sink in the game (§11.1) quietly switches itself off. Both are pinned by tests,
+  sink in the game (§11.1) quietly switches itself off.
+
+  **And a third: the trader never pays for the markup or the bench time.** A
+  shelf price is make-cost plus half again plus the minutes (§8.3), so it is
+  *always* above what the thing is made of — which meant half of it could still
+  clear the parts, and for six uncommon battle pieces it did: 41g of materials
+  made an Iron Broadsword that sold for 53g. Gather, craft, sell was a slow gold
+  press with no cap on it, which is exactly the shape §2 cares about.
+
+  So resale reads the **parts** wherever a thing has a recipe, and the shelf tag
+  only where it has none. One rule, and it prices a stocked-and-craftable piece
+  the same as the craft-only piece beside it — the two used to differ by nothing
+  a player could see. A test sweeps all 49 craftable pieces; none turns a
+  profit. You did not pay the markup, and the trader is not buying your
+  afternoon. Both are pinned by tests,
   because the resale rate and the NPC's repair rate are set independently and
   nothing else would keep them in the right order.
 - **Nothing is destroyed without warning.** Durability is on the item, and any
@@ -1570,6 +1597,21 @@ once is still the walking, up to §6.3's ten.
 **The two banks are counted apart**, because they are two buildings. A run of
 planks must never close the forge, and while both were counted off one number it
 did exactly that.
+
+**The hand-over plate is about the OBJECT**, because §8.0.1 makes a craft a
+reveal: two of one recipe are never the same thing, and this is the one moment
+a player finds out which one they got. So it draws the piece — its silhouette,
+its rung, what it is worth in the same chips the trader and the bag use — and
+lands last on **what the bench rolled onto it**, with *no lines* said plainly
+where nothing did, because nothing is a normal outcome rather than a fault.
+
+*(It used to be a name and a durability figure over a row of XP. The server had
+been sending the rolled lines the whole time and nothing read them, so the most
+interesting half of an hour at the anvil arrived unmentioned.)*
+
+A potion has neither a rolled line nor a durability (§7.4.3), so its plate is
+the flask, the rung and the count — and never a stat block reporting that it
+has no stats.
 
 #### The claim happens at the bench
 

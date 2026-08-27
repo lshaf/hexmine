@@ -32,9 +32,11 @@
  * what dropped, only how to show it (§16).
  */
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { MATERIALS, SKILL_BY_KEY } from '@/game/catalog'
-import { materialAccent, materialIcon, skillIcon } from '@/icons/procedural'
+import { ITEM_BY_KEY, MATERIALS, SKILL_BY_KEY } from '@/game/catalog'
+import { optionStatLine } from '@/game/formulas'
+import { itemIcon, materialAccent, materialIcon, skillIcon } from '@/icons/procedural'
 import SvgIcon from '@/components/SvgIcon.vue'
+import StatChips from '@/components/StatChips.vue'
 import type { CollectResult } from '@/api/types'
 
 const props = defineProps<{ haul: CollectResult }>()
@@ -70,6 +72,51 @@ const line = computed(() =>
  * reading the wrong half of the result.
  */
 const made = computed(() => props.haul.made ?? null)
+
+/**
+ * §8.4 / §8.0.1 -- what came off the bench, as an OBJECT rather than a name.
+ *
+ * A craft receipt used to be a string and a durability figure over a row of XP.
+ * That is the least a bench hands over: the thing has a rarity, a silhouette,
+ * a pair or a work stat, and -- the part that actually makes an hour at the
+ * anvil worth watching for -- whatever the bench rolled onto it.
+ *
+ * §8.0.1 is emphatic that the roll is the point: two of the same recipe are
+ * never the same object, and this is the one moment a player finds out which
+ * one they got. The server has always sent the lines. Nothing read them.
+ */
+const madeDef = computed(() => (made.value ? (ITEM_BY_KEY[made.value.key] ?? null) : null))
+
+const madeRolls = computed(() => made.value?.options ?? [])
+
+const madeIcon = computed(() => {
+  const def = madeDef.value
+  if (!def) return ''
+
+  // §13.1 -- the slot picks the silhouette and rarity owns the frame. A potion
+  // has no slot on purpose (§8.4), and falls back to the flask.
+  return itemIcon({
+    slot: def.slot,
+    family: def.family,
+    rarity: def.rarity,
+    palette: def.palette,
+    size: 42,
+  })
+})
+
+/**
+ * §7.4.3 -- how much of the durability was the Smith rather than the recipe.
+ *
+ * Printed only when a node actually moved it, because "60 durability" says
+ * nothing about whether that was a good craft and "+6 over standard" says
+ * exactly that. It is the one number on the plate the player earned twice.
+ */
+const overStandard = computed(() => {
+  const base = madeDef.value?.maxDurability ?? 0
+  const got = made.value?.durability ?? 0
+
+  return base > 0 && got > base ? got - base : 0
+})
 
 const jobName = computed(() => {
   const key = props.haul.job
@@ -155,15 +202,58 @@ onBeforeUnmount(() => {
           {{ line ?? (made ? 'Off the bench' : 'Brought back') }}
         </span>
 
-        <p v-if="made" class="tally made">
-          <strong class="figure">{{ made.name }}</strong>
-          <span v-if="made.quantity && made.quantity > 1" class="unit label">
-            ×{{ made.quantity }}
-          </span>
-          <span v-else-if="made.durability" class="unit label">
-            {{ made.durability }} durability
-          </span>
-        </p>
+        <!-- §8.4 -- the object, not its name. A bench hands over one thing and
+             the plate is about that thing: its silhouette, its rung, what it is
+             worth, and what the bench rolled onto it.
+
+             ONE template around the whole craft branch, because the haul tally
+             below is its `v-else`: three elements sat between the two and the
+             pair came apart, which put "0 units brought back" under a potion. -->
+        <template v-if="made">
+        <div class="made">
+          <SvgIcon v-if="madeIcon" :svg="madeIcon" class="made-icon" />
+
+          <div class="made-of">
+            <strong class="figure" :class="`rarity-${madeDef?.rarity ?? 'common'}`">
+              {{ made.name }}
+            </strong>
+            <span class="made-sub label">
+              <span v-if="madeDef" class="rung">{{ madeDef.rarity }}</span>
+              <span v-if="made.quantity && made.quantity > 1" class="mono">×{{ made.quantity }}</span>
+              <span v-else-if="made.durability" class="mono">{{ made.durability }} dur</span>
+              <!-- §7.4.3 -- the half of that figure the Smith is responsible
+                   for. Silent when a node did not move it. -->
+              <span v-if="overStandard" class="mono over">+{{ overStandard }} over standard</span>
+            </span>
+          </div>
+        </div>
+
+        <!-- §9.5.4 -- what it is worth, in the same row the trader, the bench,
+             the almanac and the bag all use, so a piece reads the same wherever
+             it is met. A potion has no stats and draws nothing. -->
+        <div v-if="madeDef && !made.consumable" class="made-stats">
+          <StatChips :def="madeDef" :options="madeRolls" />
+        </div>
+
+        <!-- §8.0.1 -- the payoff, and the reason this plate exists at all: two
+             of one recipe are never the same object. Last, because it is what
+             the hour was for. Nothing rolled is a NORMAL outcome and says so
+             plainly rather than leaving a gap the player has to interpret. -->
+        <div v-if="madeDef && !made.consumable" class="rolled" :class="{ plain: !madeRolls.length }">
+          <span class="rolled-label label">{{ madeRolls.length ? 'Rolled' : 'No lines' }}</span>
+          <template v-if="madeRolls.length">
+            <span
+              v-for="(option, i) in madeRolls"
+              :key="i"
+              class="roll mono tiny"
+              :style="{ transitionDelay: `${220 + i * 70}ms` }"
+            >
+              {{ optionStatLine(option, madeDef) }}
+            </span>
+          </template>
+          <span v-else class="tiny muted">It came out plain. The next one may not.</span>
+        </div>
+        </template>
 
         <p v-else class="tally">
           <strong class="figure">{{ counted }}</strong>
@@ -247,9 +337,109 @@ onBeforeUnmount(() => {
 <style scoped>
 /* A name, not a figure -- so it is set at a size a name can live at rather than
    the display size a single digit needs. */
-.tally.made .figure {
-  font-size: 25px;
-  line-height: 1.15;
+/* ------------------------------------------------------- off the bench §8.4 */
+
+/*
+ * The object gets the room the tally gets on a haul, because it IS the tally:
+ * one thing, and everything below it is what that thing turned out to be.
+ */
+.made {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+}
+
+.made-icon {
+  flex: 0 0 auto;
+}
+
+.made-of {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.made .figure {
+  font-size: 22px;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+
+.made-sub {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--vellum-dim);
+}
+
+.rung {
+  text-transform: capitalize;
+}
+
+/* §7.4.3 -- the bench's own doing rather than the recipe's, so it reads as a
+   thing that went right rather than as another figure. */
+.over {
+  color: var(--sap);
+}
+
+.made-stats {
+  margin: -2px 0 -1px;
+}
+
+/*
+ * §8.0.1 -- the roll, and it arrives LAST.
+ *
+ * The plate has one orchestrated beat (see the note on `settled`): it rises,
+ * the bar wipes, the tally runs up. A craft has no count to run, so this is
+ * what the beat lands on -- which is right, because it is the only part of an
+ * hour at the anvil the player could not have predicted.
+ */
+.rolled {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px 9px;
+  padding: 7px 9px;
+  background: rgba(0, 0, 0, 0.22);
+  border-left: 2px solid var(--copper);
+}
+
+/* Nothing rolled is a normal outcome (§8.0.1), so it is drawn quiet rather
+   than absent: a gap where the lines go reads as something withheld. */
+.rolled.plain {
+  border-left-color: var(--line);
+}
+
+.rolled-label {
+  color: var(--copper);
+  letter-spacing: 0.14em;
+}
+
+.rolled.plain .rolled-label {
+  color: var(--vellum-dim);
+}
+
+.roll {
+  color: var(--vellum);
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.24s ease, transform 0.24s ease;
+}
+
+.settled .roll {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .roll {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
 }
 
 .wrap {

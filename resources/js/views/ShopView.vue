@@ -9,7 +9,7 @@
 import { computed, ref } from 'vue'
 import { useGame } from '@/stores/game'
 import { ITEM_BY_KEY, MATERIALS, shopItems } from '@/game/catalog'
-import { consumableResale, resaleValue } from '@/game/formulas'
+import { consumableResale, resaleBasis, resaleValue } from '@/game/formulas'
 import { itemIcon, materialIcon } from '@/icons/procedural'
 import SvgIcon from '@/components/SvgIcon.vue'
 import StatChips from '@/components/StatChips.vue'
@@ -74,7 +74,7 @@ const atSettlement = computed(() => game.currentSettlement !== null)
  */
 const resellable = computed(() =>
   game.equipment
-    .filter((e) => !e.equipped && (ITEM_BY_KEY[e.key]?.goldPrice ?? 0) > 0)
+    .filter((e) => !e.equipped && resaleBasis(ITEM_BY_KEY[e.key] ?? ({} as never)) > 0)
     .map((e) => {
       const def = ITEM_BY_KEY[e.key]!
 
@@ -240,8 +240,9 @@ const owned = (key: string) => game.equipment.filter((e) => e.key === key).lengt
         <template v-if="resellable.length">
           <p class="label group">Equipment</p>
           <p class="tiny muted lead">
-            Half the shelf price, and only for what the trader stocks. Wear comes
-            off the top, so a battered tool fetches a battered tool's price.
+            Half of what it is worth — the shelf price, or what the parts cost if
+            nobody stocks it. Wear comes off the top, so a battered tool fetches
+            a battered tool's price.
           </p>
 
           <div v-for="row in resellable" :key="row.item.id" class="inset row-item">
@@ -256,7 +257,7 @@ const owned = (key: string) => game.equipment.filter((e) => e.key === key).lengt
                 <span class="mono tiny muted">{{ row.wear }}% left</span>
               </div>
               <div class="tiny muted">
-                {{ row.def.goldPrice }}g new · {{ row.gold }}g as it stands
+                {{ resaleBasis(row.def) }}g undamaged · {{ row.gold }}g as it stands
               </div>
             </div>
             <button

@@ -5053,6 +5053,95 @@ final class GameLoopTest extends TestCase
     }
 
     /**
+     * §3.2 -- and the make-cost fallback stops dead at the second rung.
+     *
+     * Without this the fallback would quietly hand every epic and legendary a
+     * gold value, which is the bridge §2 exists to keep shut: minting is that
+     * gear's exit (§8.0), and salvage is the one open at every rung.
+     */
+    public function test_gear_above_the_second_rung_has_no_price_at_all(): void
+    {
+        $this->standAtWoodcuttingVillage();
+
+        $def = Catalog::item('mythril_pickaxe');
+        $this->assertSame(0, Formulas::resaleBasis($def));
+        $this->assertSame(0, Formulas::resaleValue($def, (int) $def['maxDurability']));
+
+        $item = CharacterItem::create([
+            'character_id' => $this->character->id,
+            'item_key' => 'mythril_pickaxe',
+            'durability' => $def['maxDurability'],
+            'equipped' => false,
+            'options' => [],
+        ]);
+
+        $this->expectException(GameException::class);
+        $this->game->sellItem($this->character->fresh(), $item->id);
+    }
+
+    /**
+     * §2 -- and the bench must not become a gold press either.
+     *
+     * Same argument as the potions below: if a crafted piece sold for more than
+     * the materials that went into it, the loop would be gather, craft, sell.
+     * Half of the parts is strictly under the parts, and wear only ever takes
+     * more off.
+     */
+    public function test_no_craftable_piece_sells_for_more_than_its_materials(): void
+    {
+        $checked = 0;
+
+        foreach (Catalog::items() as $key => $def) {
+            if (empty($def['inputs']) || ! empty($def['consumable'])) {
+                continue;
+            }
+
+            $parts = Formulas::makeCost($def);
+            if ($parts <= 0 || Formulas::resaleBasis($def) <= 0) {
+                continue;
+            }
+
+            $checked++;
+
+            // Undamaged, which is the best case a seller can present.
+            $this->assertLessThan(
+                $parts,
+                Formulas::resaleValue($def, (int) ($def['maxDurability'] ?? 1)),
+                "{$key} pays more sold than the materials it was made of",
+            );
+        }
+
+        $this->assertGreaterThan(40, $checked, 'the sweep found almost no craftable gear');
+    }
+
+    /**
+     * §8.2 -- and the same rule said the other way: the trader never pays for
+     * the markup or the bench time, only for the parts.
+     *
+     * A shelf price is make-cost plus half again plus the minutes (§8.3), so it
+     * is ALWAYS above what the thing is made of. Reading the parts first is what
+     * keeps a stocked-and-craftable piece priced like the craft-only piece
+     * beside it -- the two used to differ by nothing a player could see.
+     */
+    public function test_the_trader_prices_a_craftable_piece_off_its_parts_not_its_shelf_tag(): void
+    {
+        $stocked = Catalog::item('iron_broadsword');
+
+        $this->assertGreaterThan(0, $stocked['goldPrice'] ?? 0, 'iron_broadsword is not stocked any more');
+        $this->assertSame(Formulas::makeCost($stocked), Formulas::resaleBasis($stocked));
+        $this->assertLessThan(
+            $stocked['goldPrice'],
+            Formulas::resaleBasis($stocked),
+            'the shelf tag is not above what the piece is made of, so §8.3 has moved',
+        );
+
+        // Shop stock with no recipe has only the one price, and keeps it.
+        $plain = Catalog::item('stone_axe');
+        $this->assertSame([], $plain['inputs'] ?? []);
+        $this->assertSame($plain['goldPrice'], Formulas::resaleBasis($plain));
+    }
+
+    /**
      * §8.2 -- a potion sells, by the flask, priced off its own recipe.
      *
      * The third exit a brew has. Gear already had one; consumables were the
@@ -5225,9 +5314,14 @@ final class GameLoopTest extends TestCase
         foreach (Catalog::items() as $key => $def) {
             $price = $def['goldPrice'] ?? 0;
             $max = $def['maxDurability'] ?? 0;
-            if ($price <= 0 || $max <= 0 || isset($def['inputs'])) {
+            if ($price <= 0 || $max <= 0) {
                 continue;
             }
+
+            // Craftable stock is in the sweep now. It used to be skipped
+            // because a crafted piece fetched nothing at all; it fetches its
+            // parts today, which is still well under the shelf tag, so churning
+            // one is dearer than ever and the guarantee only got stronger.
 
             for ($durability = 0; $durability <= $max; $durability++) {
                 $missing = $max - $durability;
@@ -5248,23 +5342,39 @@ final class GameLoopTest extends TestCase
     }
 
     /**
-     * §3.2 -- gold buys the bottom two rungs and never the top, so there is no
-     * shelf price to halve for a crafted piece. §8.2's salvage is its exit.
+     * §8.2 -- the trader takes a piece off the bench, priced off its parts.
+     *
+     * This used to assert the opposite: no shelf price, no sale, salvage is the
+     * exit. That put a common Hewn Axe in the same sentence as an epic Mythril
+     * Pickaxe, while the reason given -- gold buys the bottom two rungs and
+     * never the top -- only ever argued for excluding the top. A player with a
+     * bagful of their own crafting found none of it listed at the trader, which
+     * is how it surfaced.
+     *
+     * Through the real bench, because the value maths and the sale have to agree
+     * about an item that actually came off one.
      */
-    public function test_the_trader_will_not_take_gear_it_does_not_stock(): void
+    public function test_the_trader_takes_a_crafted_piece_priced_off_its_parts(): void
     {
         $this->standAtWoodcuttingVillage();
         $this->give(['wood' => 12, 'planks' => 8, 'heartknot' => 8]);
 
-        $axe = $this->craftNow('hewn_axe')['made'];
-        $this->assertSame(0, Catalog::item('hewn_axe')['goldPrice'] ?? 0);
+        $def = Catalog::item('hewn_axe');
+        $this->assertSame(0, $def['goldPrice'] ?? 0, 'hewn_axe is stocked now, pick another craft-only piece');
 
-        try {
-            $this->game->sellItem($this->character->fresh(), (int) $axe['itemId']);
-            $this->fail('the trader bought crafted gear');
-        } catch (GameException $e) {
-            $this->assertSame('not_sellable', $e->errorCode);
-        }
+        $axe = $this->craftNow('hewn_axe')['made'];
+        $parts = Formulas::makeCost($def);
+        $this->assertGreaterThan(0, $parts, 'a crafted axe is made of nothing');
+
+        // Straight off the bench, so undamaged: exactly half of the parts.
+        $expected = (int) floor($parts * Balance::RESALE_RATE);
+        $before = (int) $this->character->fresh()->gold;
+
+        $sale = $this->game->sellItem($this->character->fresh(), (int) $axe['itemId']);
+
+        $this->assertSame($expected, $sale['gold']);
+        $this->assertSame($before + $expected, (int) $this->character->fresh()->gold);
+        $this->assertLessThan($parts, $sale['gold'], 'crafting and selling turned a profit');
     }
 
     /** A sale is a trade: the tool comes off the belt first, deliberately. */
