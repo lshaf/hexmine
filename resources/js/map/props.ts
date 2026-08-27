@@ -158,6 +158,46 @@ function column(x: number, y: number, scale: number, color: string): string {
 }
 
 /** Granite: one flat slab the weather never got under. */
+/**
+ * §5.2 -- dead ground. A crack in the pan, lying flat.
+ *
+ * Every other treatment in this file stands something UP: trees, columns,
+ * shards, stalks. This one deliberately stands nothing, because the absence is
+ * half the message -- a hex with nothing on its surface reads as nothing to
+ * work before the grey has finished saying it. Flat marks only, and squashed
+ * the way the tile itself is (§13.2), so they lie ON the ground rather than
+ * across it.
+ */
+function crack(x: number, y: number, scale: number, color: string): string {
+  const w = 14 * scale
+  const line = shade(color, -0.38)
+
+  return (
+    `<path d="M${(x - w / 2).toFixed(1)},${y.toFixed(1)} ` +
+    `l${(w * 0.28).toFixed(1)},${(-1.6 * scale).toFixed(1)} ` +
+    `l${(w * 0.24).toFixed(1)},${(2.1 * scale).toFixed(1)} ` +
+    `l${(w * 0.48).toFixed(1)},${(-1.1 * scale).toFixed(1)}" ` +
+    `fill="none" stroke="${line}" stroke-width="${(1.1 * scale).toFixed(2)}" ` +
+    `stroke-linecap="round" stroke-linejoin="round"/>`
+  )
+}
+
+/** A flat stone sitting in the pan -- the only thing dead ground carries. */
+function pebble(x: number, y: number, scale: number, color: string): string {
+  const w = 5 * scale
+  const h = 2.4 * scale
+
+  return (
+    `<path d="M${(x - w).toFixed(1)},${y.toFixed(1)} ` +
+    `L${(x - w * 0.45).toFixed(1)},${(y - h).toFixed(1)} ` +
+    `L${(x + w * 0.5).toFixed(1)},${(y - h * 0.85).toFixed(1)} ` +
+    `L${(x + w).toFixed(1)},${(y + h * 0.15).toFixed(1)} ` +
+    `L${(x + w * 0.3).toFixed(1)},${(y + h).toFixed(1)} ` +
+    `L${(x - w * 0.5).toFixed(1)},${(y + h * 0.9).toFixed(1)}Z" ` +
+    `fill="${shade(color, -0.2)}"/>`
+  )
+}
+
 function shelf(x: number, y: number, scale: number, color: string): string {
   const w = 15 * scale
   const h = 5 * scale
@@ -694,6 +734,19 @@ export function tileProps(tile: Tile, depleted: boolean): string {
     case 'shelf': {
       const p = spot(0)
       out += shelf(p.x * 0.35, p.y + 2, depleted ? 0.7 : 0.95, base)
+      break
+    }
+    // §5.2 -- dead ground. Two cracks and a stone, and nothing standing: the
+    // bare surface is what says there is nothing here to work.
+    case 'barren': {
+      for (let i = 0; i < 2; i++) {
+        const p = spot(i)
+        out += crack(p.x * 0.8, p.y + 3, 0.8 + rand01(hash2(i, tile.col, seed)) * 0.45, base)
+      }
+      if (rand01(hash2(tile.col, tile.row, seed ^ 0x5d)) > 0.45) {
+        const p = spot(2)
+        out += pebble(p.x * 0.7, p.y + 1, 0.75, base)
+      }
       break
     }
     case 'glass': {

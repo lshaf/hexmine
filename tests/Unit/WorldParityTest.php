@@ -33,7 +33,7 @@ final class WorldParityTest extends TestCase
      */
     public function test_hash_matches_javascript(): void
     {
-        $seed = 0x5eed1a3f;
+        $seed = 0x5EED1A3F;
 
         $expected = [
             '0,0' => 2588526122,
@@ -173,6 +173,140 @@ final class WorldParityTest extends TestCase
     }
 
     /** §9.1 -- exactly five dungeons, one per biome, all in the capital ring. */
+    /**
+     * §5.2 -- each ring carries the share of workable ground it is meant to.
+     *
+     * Balance::MINEABLE_SHARE is the design number, in the units it was decided
+     * in; Balance::BARREN_THRESHOLD is where the field has to be cut to produce
+     * it. Nothing derives one from the other -- the water, the towns and the
+     * five dungeon mouths take their own bite of the same ground, and the field
+     * is smooth rather than uniform -- so the thresholds are CALIBRATED by
+     * scripts/calibrate_barren.php and this is what keeps them honest.
+     *
+     * It fails when a share is edited without recalibrating, when the map seed
+     * moves, or when anything else starts competing for the same hexes. The fix
+     * is to re-run the calibrator and paste, never to widen the tolerance.
+     *
+     * Sampled on a stride rather than tile by tile: a quarter of 160,801 hexes
+     * is forty thousand, which pins a percentage far tighter than one point.
+     */
+    public function test_every_ring_carries_the_share_of_workable_ground_it_promises(): void
+    {
+        $radius = Balance::mapRadius();
+        $total = [];
+        $seams = [];
+
+        for ($col = -$radius; $col <= $radius; $col += 2) {
+            for ($row = -$radius; $row <= $radius; $row += 2) {
+                $tile = WorldGen::generateTile($col, $row, 0);
+                $ring = $tile['ring'];
+                $total[$ring] = ($total[$ring] ?? 0) + 1;
+                if ($tile['material'] !== null) {
+                    $seams[$ring] = ($seams[$ring] ?? 0) + 1;
+                }
+            }
+        }
+
+        foreach (Balance::MINEABLE_SHARE as $ring => $share) {
+            $this->assertArrayHasKey($ring, $total, "no {$ring} ring tiles were sampled");
+
+            $actual = ($seams[$ring] ?? 0) / $total[$ring];
+
+            $this->assertEqualsWithDelta(
+                $share,
+                $actual,
+                0.015,
+                sprintf(
+                    'the %s ring is %.1f%% workable, not %.1f%% -- re-run scripts/calibrate_barren.php',
+                    $ring,
+                    $actual * 100,
+                    $share * 100,
+                ),
+            );
+        }
+    }
+
+    /**
+     * §5.2 -- dead ground arrives in regions, not as speckle.
+     *
+     * §5.3 wants a mentally navigable map and gets it by clustering the biomes;
+     * half an outer ring of independently-rolled dead hexes would undo that at
+     * a stroke. A clustered field shows up as neighbours agreeing far more
+     * often than chance. At the outer ring's ~48% cut independent rolls would
+     * agree p^2 + (1-p)^2 = about HALF the time; the clustered field agrees
+     * roughly nine times in ten, the remainder being hexes on the edge of a
+     * region. The bar sits between the two, well clear of both.
+     */
+    public function test_dead_ground_comes_in_regions_rather_than_speckle(): void
+    {
+        $agree = 0;
+        $pairs = 0;
+
+        for ($col = -60; $col <= 60; $col++) {
+            for ($row = -60; $row <= 60; $row++) {
+                $here = WorldGen::isBarren($col, $row, 'outer');
+                foreach ([[1, 0], [0, 1]] as [$dc, $dr]) {
+                    $pairs++;
+                    if ($here === WorldGen::isBarren($col + $dc, $row + $dr, 'outer')) {
+                        $agree++;
+                    }
+                }
+            }
+        }
+
+        $this->assertGreaterThan(
+            0.8,
+            $agree / $pairs,
+            'neighbouring hexes disagree too often -- the field has stopped clustering',
+        );
+    }
+
+    /**
+     * §5.2 -- the center is ordinary contested ground, not a hole in the map.
+     *
+     * It was barren of everything while the dungeon mouths were the only thing
+     * standing there. Now it rolls on the inner ring's own table, so it carries
+     * the same grades at the same rate -- including Tier 3 -- and it pays the
+     * contested premium rather than the 0.0 a barren ring paid.
+     */
+    public function test_the_center_is_contested_ground_and_pays_like_it(): void
+    {
+        $this->assertSame(
+            WorldGen::ringYield('inner'),
+            WorldGen::ringYield('center'),
+            'the center pays a different premium from the ring it belongs to',
+        );
+
+        $radius = Balance::mapRadius();
+        $seams = 0;
+        $rares = 0;
+
+        for ($col = -$radius; $col <= $radius; $col++) {
+            for ($row = -$radius; $row <= $radius; $row++) {
+                if (WorldGen::ringOf($col, $row) !== 'center') {
+                    continue;
+                }
+
+                $tile = WorldGen::generateTile($col, $row, 0);
+                if ($tile['material'] === null) {
+                    continue;
+                }
+
+                $seams++;
+                if (str_ends_with((string) $tile['variant'], '_epic')) {
+                    $rares++;
+                }
+            }
+        }
+
+        $this->assertGreaterThan(0, $seams, 'the center gave up no material at all');
+        $this->assertGreaterThan(
+            0,
+            $rares,
+            'the center carries no Tier 3, so it is not rolling on the inner table',
+        );
+    }
+
     public function test_there_are_exactly_five_dungeons(): void
     {
         $sites = WorldGen::dungeonSites();

@@ -72,6 +72,7 @@ export const VARIANT_TINT: Record<VariantKey, string> = {
   grassland_uncommon: '#b6b073',
   grassland_rare: '#8f9552',
   grassland_epic: '#9fa878',
+  barren: '#c2b9aa',
 }
 
 /** What the map calls the ground under your feet. */
@@ -96,6 +97,7 @@ export const VARIANT_LABEL: Record<VariantKey, string> = {
   grassland_uncommon: 'Flax Meadow',
   grassland_rare: 'Hemp Field',
   grassland_epic: 'Silkweave Fen',
+  barren: 'Dead Ground',
 }
 
 export const VARIANT_DESCRIPTION: Record<VariantKey, string> = {
@@ -119,6 +121,7 @@ export const VARIANT_DESCRIPTION: Record<VariantKey, string> = {
   grassland_uncommon: 'Blue at the top for a week a year, then worth cutting.',
   grassland_rare: 'Stems over head height. You lose sight of the next hex in it.',
   grassland_epic: 'Something has been spinning in the tall grass. Contested ground.',
+  barren: 'Scoured down to the pan. Nothing grows and nothing seams.',
 }
 
 export const VARIANT_RAW: Material[] = [
@@ -183,6 +186,7 @@ export const VARIANT_PROPS: Record<VariantKey, string> = {
   grassland_uncommon: 'flowering',
   grassland_rare: 'tall',
   grassland_epic: 'silk',
+  barren: 'barren',
 }
 
 /** §5.3 -- which ground a material comes off, for the almanac. */
@@ -212,28 +216,33 @@ export const VARIANT_BY_MATERIAL: Record<string, VariantKey> = {
 /**
  * §5.2 -- how far in you have to walk before a grade turns up at all.
  * Derived from the weight table, so it cannot disagree with the roll.
+ *
+ * The center is listed wherever the inner ring is, because it rolls on
+ * the inner ring's column (WorldGen::variantOf): it IS contested ground,
+ * not a fourth kind of country. Dead ground turns up in all four.
  */
 export const VARIANT_RINGS: Record<VariantKey, string[]> = {
-  forest: ['outer', 'mid', 'inner'],
-  forest_uncommon: ['mid', 'inner'],
-  forest_rare: ['inner'],
-  forest_epic: ['inner'],
-  mountain: ['outer', 'mid', 'inner'],
-  mountain_uncommon: ['mid', 'inner'],
-  mountain_rare: ['inner'],
-  mountain_epic: ['inner'],
-  plains: ['outer', 'mid', 'inner'],
-  plains_uncommon: ['mid', 'inner'],
-  plains_rare: ['inner'],
-  plains_epic: ['inner'],
-  badlands: ['outer', 'mid', 'inner'],
-  badlands_uncommon: ['mid', 'inner'],
-  badlands_rare: ['inner'],
-  badlands_epic: ['inner'],
-  grassland: ['outer', 'mid', 'inner'],
-  grassland_uncommon: ['mid', 'inner'],
-  grassland_rare: ['inner'],
-  grassland_epic: ['inner'],
+  forest: ['outer', 'mid', 'inner', 'center'],
+  forest_uncommon: ['mid', 'inner', 'center'],
+  forest_rare: ['inner', 'center'],
+  forest_epic: ['inner', 'center'],
+  mountain: ['outer', 'mid', 'inner', 'center'],
+  mountain_uncommon: ['mid', 'inner', 'center'],
+  mountain_rare: ['inner', 'center'],
+  mountain_epic: ['inner', 'center'],
+  plains: ['outer', 'mid', 'inner', 'center'],
+  plains_uncommon: ['mid', 'inner', 'center'],
+  plains_rare: ['inner', 'center'],
+  plains_epic: ['inner', 'center'],
+  badlands: ['outer', 'mid', 'inner', 'center'],
+  badlands_uncommon: ['mid', 'inner', 'center'],
+  badlands_rare: ['inner', 'center'],
+  badlands_epic: ['inner', 'center'],
+  grassland: ['outer', 'mid', 'inner', 'center'],
+  grassland_uncommon: ['mid', 'inner', 'center'],
+  grassland_rare: ['inner', 'center'],
+  grassland_epic: ['inner', 'center'],
+  barren: ['outer', 'mid', 'inner', 'center'],
 }
 
 /** §7.2 -- which gathering line a grade belongs to. */

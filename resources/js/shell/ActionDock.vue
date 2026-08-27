@@ -67,6 +67,26 @@ const ready = computed(() => Boolean(working.value && working.value.endsAt <= ga
 const seam = computed(() => Boolean(underfoot.value?.material))
 
 /**
+ * Why this hex offers nothing, on the hexes where that is not self-evident.
+ *
+ * The dock draws a verb per thing you can do here and nothing when there is
+ * nothing -- which was fine while the only groundless hexes were lakes, towns
+ * and dungeon mouths, because every one of those explains itself by the way it
+ * is drawn. §5.2's dead ground does not: it is ground, it looks like ground,
+ * and a player standing on it got an empty dock and no word about why.
+ *
+ * Only when the row would otherwise be EMPTY, and never on a settlement, where
+ * the header has already said what the place is and the reason underneath would
+ * be a second answer to a question nobody asked.
+ */
+const emptyReason = computed(() => {
+  if (working.value || pinned.value || seam.value || herd.value || corpse.value) return null
+  if (here.value) return null
+
+  return underfoot.value?.reason ?? null
+})
+
+/**
  * §4.0 -- the same hex worked by hand, costed by the server beside the seam.
  *
  * Bare hands are not a worse version of mining, they are the other verb, so
@@ -370,6 +390,13 @@ function hunted(): void {
             Herd moves on in {{ herdLeaves }}
           </span>
         </span>
+
+        <!-- §5.2 -- why this hex offers nothing, on the hexes where that is not
+             self-evident. It belongs in THIS column rather than beside the
+             verbs: it is a fact about the ground you are standing on, so it
+             reads down from the ring to the name to the reason, and it wraps
+             against the header's own width instead of fighting it for one. -->
+        <span v-if="emptyReason" class="tiny muted empty">{{ emptyReason }}</span>
       </div>
 
       <div class="actions">
@@ -516,6 +543,7 @@ function hunted(): void {
             :hint="huntHint"
             @activate="hunted"
           />
+
         </template>
 
         <!-- Settlement-only. Absent in the field rather than grayed: the point
@@ -752,6 +780,14 @@ function hunted(): void {
 
 .pinned .warn {
   color: var(--ember);
+}
+
+/* §5.2 -- the third line of the header, under the ring and the name.
+   Muted rather than ember: dead ground is not a state to deal with (§13.3), it
+   is simply what this hex is, and it will be what it is tomorrow. */
+.empty {
+  line-height: 1.35;
+  text-wrap: pretty;
 }
 
 /* §13.3 -- ember is a state to deal with, and the terms of a loss are one. Two

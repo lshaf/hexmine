@@ -36,6 +36,30 @@ WEIGHTS = {
 GRADES = ['common', 'uncommon', 'rare', 'epic']
 RINGS = ['outer', 'mid', 'inner']
 
+# --------------------------------------------------------------- dead ground
+# §5.2 -- ground with no seam in it at all, whatever biome it interrupts.
+#
+# Not a sixth biome and not a fifth grade: it belongs to no biome, carries no
+# material, and never appears in the weight table, because it is not something
+# a hex ROLLS. WorldGen decides it from a clustered field before the roll
+# happens, so it is emitted here only for the four per-key tables the renderer
+# reads -- tint, label, description, props.
+#
+# The tint is a neutral grey, and that is the one colour §13.3 reserves for it:
+# a DEPLETED tile keeps its own biome colour, "never gray -- the land is drained,
+# not dead, and it will regrow". Dead ground is the other thing, so it gets the
+# colour that sentence was holding back.
+#
+# BLEACHED rather than dark, and that is the whole of why this value. The five
+# biome fills run lum 110-155, so a dark grey sits below all of them -- which
+# put half the map in shadow and, worse, collapsed against unscouted ground:
+# §13.2 dims everything past the sight ring by 42%, and dark grey dimmed is a
+# dark green dimmed. Bleached clears the lot of them (186 -> 108 dimmed, against
+# grassland's 90), so a waste reads as a waste from across the map, which is
+# exactly what §5.6 promises about terrain: you can always see THAT it is there.
+BARREN = ('barren', 'Dead Ground', '#c2b9aa', 'barren')
+BARREN_DESCRIPTION = 'Scoured down to the pan. Nothing grows and nothing seams.'
+
 PALETTE = {
     'forest': 'wood', 'mountain': 'iron', 'plains': 'pelt',
     'badlands': 'stone', 'grassland': 'fiber',
@@ -311,18 +335,21 @@ def emit_ts():
     o.write('export const VARIANT_TINT: Record<VariantKey, string> = {\n')
     for biome, grade, tile, tint, raw, refined, props in rows():
         o.write(f"  {variant_key(biome, grade)}: '{tint}',\n")
+    o.write(f"  {BARREN[0]}: '{BARREN[2]}',\n")
     o.write('}\n\n')
 
     o.write('/** What the map calls the ground under your feet. */\n')
     o.write('export const VARIANT_LABEL: Record<VariantKey, string> = {\n')
     for biome, grade, tile, tint, raw, refined, props in rows():
         o.write(f'  {variant_key(biome, grade)}: {ts_str(tile)},\n')
+    o.write(f'  {BARREN[0]}: {ts_str(BARREN[1])},\n')
     o.write('}\n\n')
 
     o.write('export const VARIANT_DESCRIPTION: Record<VariantKey, string> = {\n')
     for biome, grade, tile, tint, raw, refined, props in rows():
         desc = TILE_DESCRIPTIONS.get(tile, '')
         o.write(f'  {variant_key(biome, grade)}: {ts_str(desc)},\n')
+    o.write(f'  {BARREN[0]}: {ts_str(BARREN_DESCRIPTION)},\n')
     o.write('}\n\n')
 
     o.write('export const VARIANT_RAW: Material[] = [\n')
@@ -351,6 +378,7 @@ def emit_ts():
     o.write('export const VARIANT_PROPS: Record<VariantKey, string> = {\n')
     for biome, grade, tile, tint, raw, refined, props in rows():
         o.write(f"  {variant_key(biome, grade)}: '{props}',\n")
+    o.write(f"  {BARREN[0]}: '{BARREN[3]}',\n")
     o.write('}\n\n')
 
     o.write('/** §5.3 -- which ground a material comes off, for the almanac. */\n')
@@ -362,11 +390,18 @@ def emit_ts():
     o.write('/**\n')
     o.write(' * §5.2 -- how far in you have to walk before a grade turns up at all.\n')
     o.write(' * Derived from the weight table, so it cannot disagree with the roll.\n')
+    o.write(' *\n')
+    o.write(' * The center is listed wherever the inner ring is, because it rolls on\n')
+    o.write(" * the inner ring's column (WorldGen::variantOf): it IS contested ground,\n")
+    o.write(' * not a fourth kind of country. Dead ground turns up in all four.\n')
     o.write(' */\n')
     o.write('export const VARIANT_RINGS: Record<VariantKey, string[]> = {\n')
     for biome, grade, tile, tint, raw, refined, props in rows():
         rings = [r for i, r in enumerate(RINGS) if WEIGHTS[grade][i] > 0]
+        if 'inner' in rings:
+            rings = rings + ['center']
         o.write(f"  {variant_key(biome, grade)}: [{', '.join(ts_str(r) for r in rings)}],\n")
+    o.write(f"  {BARREN[0]}: [{', '.join(ts_str(r) for r in RINGS + ['center'])}],\n")
     o.write('}\n\n')
 
     o.write('/** §7.2 -- which gathering line a grade belongs to. */\n')
@@ -380,7 +415,9 @@ def emit_ts():
 
 def emit_keys():
     """The VariantKey union, for hand-pasting into types.ts if it ever drifts."""
-    return '\n'.join(f"  | '{variant_key(b, g)}'" for b, g, *_ in rows())
+    keys = [variant_key(b, g) for b, g, *_ in rows()] + [BARREN[0]]
+
+    return '\n'.join(f"  | '{k}'" for k in keys)
 
 
 if __name__ == '__main__':

@@ -150,9 +150,16 @@ const minutes = (seconds: number) => Math.round(seconds / 60)
  */
 function ringNote(variant: string): string {
   const rings = VARIANT_RINGS[variant as keyof typeof VARIANT_RINGS] ?? []
-  if (rings.length >= 3) return ''
-  if (rings.length === 1) return ', contested ring only'
-  return ', middle ring and inward'
+
+  // Asked of the rings themselves rather than of how many there are. It used to
+  // count -- three or more meant everywhere, one meant contested -- and that
+  // broke the moment §5.2's center joined the list it belongs to: every
+  // inner-bearing grade gained a ring and slid one rung down the phrase, so
+  // uncommon ground quietly stopped saying where it was.
+  if (rings.includes('outer')) return ''
+  if (rings.includes('mid')) return ', middle ring and inward'
+
+  return ', contested ring only'
 }
 
 export function materialSources(mat: Material): SourceLine[] {

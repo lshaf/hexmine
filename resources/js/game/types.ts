@@ -162,6 +162,8 @@ export type VariantKey =
   | 'grassland_uncommon'
   | 'grassland_rare'
   | 'grassland_epic'
+  /** §5.2 -- ground with no seam in it, belonging to no biome. Not a grade. */
+  | 'barren'
 
 /**
  * §4 Tier 1 -- the alchemist's second stock. What LIVES on a kind of ground, as

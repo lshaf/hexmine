@@ -203,22 +203,60 @@ cross-map travel — same design pressure as biome-locked mining.
   would be a free rung of tool and would make the ladder optional.
 
 ### 5.2 Ring layout (concentric, drives generation)
-| Ring | Contents |
-|---|---|
-| Outer | Villages (dense), safe mining (low yield), most spawns |
-| Mid | Cities, mixed safe/contested mining |
-| Inner (capital ring) | **Capitals.** Contested PvP-yield mining, **rare materials spawn here** |
-| Center | **Barren of everything.** Dungeon entrances and nothing else — no settlement stands here. |
+| Ring | Contents | Ground with a seam in it |
+|---|---|---|
+| Outer | Villages (dense), safe mining (low yield), most spawns | **50%** |
+| Mid | Cities, mixed safe/contested mining | **60%** |
+| Inner (capital ring) | **Capitals.** Contested PvP-yield mining, **rare materials spawn here** | **70%** |
+| Center | Dungeon entrances. **No settlement stands here** — but the ground is the contested ring's own. | **75%** |
+
+**Half the outer rim has no seam in it at all, and the share climbs the whole
+way in.** `Balance::MINEABLE_SHARE`. What misses out is **dead ground** — not
+depleted, which is drained and regrows in about nine hours (§5.1), but ground
+that never carried anything and never will. It has its own variant, its own
+name on the card, and the one colour §13.3 held back for it.
+
+The gradient runs the same direction as the two that were already there — Tier 3
+density (§4) and the pack rate (§9.5.1) — so the middle of the map is richer,
+more dangerous and more contested by **one** gradient rather than three. It is
+also the answer to a question the flat map never asked: with 96% of every ring
+workable, *where* you stood barely mattered, and the only thing distinguishing
+one forest hex from the next was its grade roll.
+
+**Dead ground is terrain, so §5.6 draws it at any distance**, which is what lets
+the regions be large. `Balance::BARREN_CELL` is 5, and the field it is cut from
+is smooth noise rather than a per-hex roll — §5.3 makes the same argument about
+biomes, and half a ring of independently-rolled dead hexes would be exactly the
+speckle that rules out. A waste you can see from four days away is a route to
+plan around; one you discover by walking into it would be a trap.
+
+Two consequences worth stating, because both are deliberate:
+
+- **A village can stand in a waste.** Settlement sites are placed on their own
+  lattice and know nothing about the field, so some of the 698 villages have
+  little workable ground around them. That is a place with a bench and no seam,
+  which is a real thing for a map to have.
+- **Spawning refuses dead ground** (§5.4), and has to: §12 step 1 is *bring back
+  branches bare-handed*, and a hex with no branches would soft-lock the arc
+  before it started.
+
+**The center is no longer barren of everything.** It was, and the sentence that
+justified it — *the last step inward is a raid, never an errand* — is carried by
+the settlement ban rather than by the emptiness: no village, city or capital
+stands there, so nothing but a dungeon is worth walking to it for. What it is
+made of is the inner ring's own table, rolled on the inner ring's column, paying
+the inner ring's premium. It is the contested ring's ground with the towns taken
+out, and the walk to a dungeon mouth now crosses country rather than a void.
 
 The two opposing pulls (outward for resources, inward for processing + dungeons)
 force constant traffic through the contested middle ring. This is intentional.
 
-**Capitals stand in the contested ring, not the dead center**, and that is the
+**Capitals stand in the contested ring, not the center**, and that is the
 sharpest version of the same pull: the best bench in the game, the only one that
 runs all five lines and reaches epic, sits on ground other prospectors are
 working. You cannot process at the top tier without walking into the PvP band.
-The center stays reserved for dungeon mouths, so the last step inward is a raid,
-never an errand.
+No settlement of any tier stands in the center, so the last step inward is a
+raid and never an errand — it is the ban that carries that, not the emptiness.
 
 ### 5.3 Biomes
 Clustered regions (Voronoi-style from seed points), **not** random noise — players need a
@@ -226,7 +264,9 @@ mentally navigable map. Rare-material biome variants sit inside/near the PvP rin
 
 **Four grades a biome, and the grade is a rung of the equipment ladder.** Base,
 Better, Best, Contested — each named for a tool rung, each giving up a better
-material than the one under it.
+material than the one under it. **Dead ground is none of them** (§5.2): it
+belongs to no biome and is not a fifth grade, because it is not something a hex
+rolls — the field decides it before the roll happens.
 
 **Better ground is more work, and the rung it is named for is how much more.**
 A hex's HP roll (§7.3) is scaled by its grade, and the scale is the *attack of
@@ -2715,6 +2755,17 @@ badlands   #96604c   grassland #a8a05c
 ```
 Depleted tiles use a darker/desaturated variant of their **own biome color**, never gray —
 the land is drained, not dead, and it will regrow.
+
+**Gray is dead ground's**, and that sentence is what reserved it (§5.2). It is
+`#c2b9aa` — bleached rather than dark, and that is not taste: the five biome
+fills run luminance 110–155, so a dark gray sits under all of them and collapses
+against unscouted ground, which §13.2 dims by 42%. Bleached clears the lot, so a
+waste reads as a waste from across the map.
+
+**Its props are the other half of the message: nothing stands.** Every other
+treatment stands something up — trees, peaks, columns, stalks. Dead ground draws
+cracks lying flat and the occasional stone, so the absence is legible before the
+colour has finished saying it.
 
 **Ember and sap are a pair, and neither may do the other's job.** Ember marks a
 state to deal with — a full bag, a broken tool, a destructive button. Sap marks

@@ -93,6 +93,14 @@ class GameService
                     if (WorldGen::waterAt($col, $row) !== null) {
                         continue;
                     }
+                    // §5.2 -- and nobody starts on dead ground, for exactly the
+                    // same reason and a sharper one: half the outer rim has no
+                    // seam in it now, so an unguarded spawn opens §12 step 1 --
+                    // "bring back branches bare-handed" -- on a hex that has no
+                    // branches and never will.
+                    if (WorldGen::isBarren($col, $row, 'outer')) {
+                        continue;
+                    }
 
                     $fallback = ['col' => $col, 'row' => $row];
                     if ($this->findNearbySettlement($col, $row, $range, 'woodcutting') !== null) {
@@ -1494,6 +1502,12 @@ class GameService
             'extractionsMax' => Balance::TILE_EXTRACTIONS_MAX,
             'rareSpawnChance' => Balance::RARE_SPAWN_CHANCE,
             'slotsPerTile' => Balance::SLOTS_PER_TILE,
+            // §5.2 -- dead ground. Sent rather than compiled in for the same
+            // reason the pack odds are: the field is mirrored, the numbers are
+            // not, so recalibrating a ring's share cannot silently desync the
+            // client's map from the server's.
+            'barrenCell' => Balance::BARREN_CELL,
+            'barrenThreshold' => Balance::BARREN_THRESHOLD,
             'herdLifetimeMs' => Balance::scaled(Balance::HERD_LIFETIME_MS),
             'herdChance' => Balance::HERD_CHANCE,
             // §9.5.1 -- sent rather than compiled in, like every other
@@ -2861,7 +2875,11 @@ class GameService
                 // bug in the map.
                 $tile['water'] === 'lake' => 'Open water. There is nothing here to work, by hand or otherwise.',
                 $tile['water'] === 'river' => 'A waterway. There is nothing here to work, by hand or otherwise.',
-                $tile['ring'] === 'center' => 'The capital ring is barren. Nothing grows or seams here.',
+                // §5.2 -- dead ground, and it is worth saying it is PERMANENT.
+                // A depleted hex refuses in almost the same words and comes
+                // back in nine hours; this one never had a seam, so a player
+                // told only "nothing here" would stand and wait for it.
+                $tile['variant'] === 'barren' => 'Nothing seams here, and nothing ever will.',
                 $tile['settlement'] !== null => 'Settlements sit on worked ground. Nothing left to take.',
                 default => 'Nothing mineable here.',
             };

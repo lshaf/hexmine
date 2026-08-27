@@ -102,9 +102,11 @@ final class WorldGen
     public static function ringYield(string $ring): float
     {
         return match ($ring) {
-            'inner' => 1.9,
+            // The center is the contested ring's own ground, not a hole in the
+            // map: it was 0.0 while §5.2 kept it barren of everything, and a
+            // seam that pays nothing would be a worse lie than no seam at all.
+            'center', 'inner' => 1.9,
             'mid' => 1.35,
-            'center' => 0.0,
             default => 1.0,
         };
     }
@@ -124,21 +126,21 @@ final class WorldGen
             return self::$cellCache[$cacheKey];
         }
 
-        $hx = Hash::hash2($cx, $cy, Balance::mapSeed() ^ 0xb10e);
-        $hy = Hash::hash2($cy, $cx, Balance::mapSeed() ^ 0xb11e);
-        $hMix = Hash::hash2($cx * 7 + $cy * 13, $cx - $cy, Balance::mapSeed() ^ 0xb12e);
+        $hx = Hash::hash2($cx, $cy, Balance::mapSeed() ^ 0xB10E);
+        $hy = Hash::hash2($cy, $cx, Balance::mapSeed() ^ 0xB11E);
+        $hMix = Hash::hash2($cx * 7 + $cy * 13, $cx - $cy, Balance::mapSeed() ^ 0xB12E);
 
         $hCoarse = Hash::hash2(
             (int) floor($cx / Balance::BIOME_REGION_CELLS),
             (int) floor($cy / Balance::BIOME_REGION_CELLS),
-            Balance::mapSeed() ^ 0xc0a5,
+            Balance::mapSeed() ^ 0xC0A5,
         );
         $coarse = Catalog::BIOMES[Hash::randInt($hCoarse, 0, count(Catalog::BIOMES) - 1)];
 
         $biome = Hash::rand01($hMix) < self::COARSE_DOMINANCE
             ? $coarse
             : Catalog::BIOMES[Hash::randInt(
-                Hash::hash2($cx, $cy, Balance::mapSeed() ^ 0xd1a1),
+                Hash::hash2($cx, $cy, Balance::mapSeed() ^ 0xD1A1),
                 0,
                 count(Catalog::BIOMES) - 1,
             )];
@@ -204,6 +206,61 @@ final class WorldGen
      * an ulp of the edge would flip a hex between water and land depending on
      * whose libm answered, and PHP and JS have to agree on every tile.
      */
+    // --------------------------------------------------------- dead ground
+
+    /**
+     * §5.2 -- smooth noise in [0,1], the field dead ground is cut out of.
+     *
+     * Value noise on a coarse lattice, smoothstepped between corners, which is
+     * the cheapest thing that clusters. It has to cluster: §5.3 argues biomes
+     * are Voronoi regions rather than noise because "players need a mentally
+     * navigable map", and half an outer ring of independently-rolled dead hexes
+     * would be exactly the speckle that rules out.
+     *
+     * The column axis is stretched by ASPECT for the same reason the lakes and
+     * the biome regions stretch theirs: hexes are wider than they are tall
+     * (§13.2), so an unstretched field would draw regions out along the columns
+     * and they would read as stripes rather than as country.
+     */
+    public static function barrenField(int $col, int $row): float
+    {
+        $cell = Balance::BARREN_CELL;
+        $x = $col / ($cell / self::ASPECT);
+        $y = $row / $cell;
+
+        $x0 = (int) floor($x);
+        $y0 = (int) floor($y);
+        $fx = self::smoothstep($x - $x0);
+        $fy = self::smoothstep($y - $y0);
+
+        $seed = Balance::mapSeed() ^ 0x2B1E;
+        $c00 = Hash::rand01(Hash::hash2($x0, $y0, $seed));
+        $c10 = Hash::rand01(Hash::hash2($x0 + 1, $y0, $seed));
+        $c01 = Hash::rand01(Hash::hash2($x0, $y0 + 1, $seed));
+        $c11 = Hash::rand01(Hash::hash2($x0 + 1, $y0 + 1, $seed));
+
+        return ($c00 * (1 - $fx) + $c10 * $fx) * (1 - $fy)
+            + ($c01 * (1 - $fx) + $c11 * $fx) * $fy;
+    }
+
+    private static function smoothstep(float $t): float
+    {
+        return $t * $t * (3 - 2 * $t);
+    }
+
+    /**
+     * §5.2 -- is this hex dead ground?
+     *
+     * Dead is not depleted. A depleted hex is drained and regrows in about nine
+     * hours (§5.1); this one never had a seam and never will, so it keeps no
+     * timer, shows no remnants and is drawn in grey rather than in a tired
+     * version of its own biome (§13.3).
+     */
+    public static function isBarren(int $col, int $row, string $ring): bool
+    {
+        return self::barrenField($col, $row) < (Balance::BARREN_THRESHOLD[$ring] ?? 0.0);
+    }
+
     public static function waterAt(int $col, int $row): ?string
     {
         if (self::lakeAt($col, $row)) {
@@ -250,12 +307,12 @@ final class WorldGen
 
         $amplitude = self::riverAmplitude();
         $a = Hash::randInt(
-            Hash::hash2($cell, $index, Balance::mapSeed() ^ 0x21ce),
+            Hash::hash2($cell, $index, Balance::mapSeed() ^ 0x21CE),
             -$amplitude,
             $amplitude,
         );
         $b = Hash::randInt(
-            Hash::hash2($cell + 1, $index, Balance::mapSeed() ^ 0x21ce),
+            Hash::hash2($cell + 1, $index, Balance::mapSeed() ^ 0x21CE),
             -$amplitude,
             $amplitude,
         );
@@ -304,7 +361,7 @@ final class WorldGen
     {
         $cell = Balance::LAKE_CELL;
 
-        if (Hash::rand01(Hash::hash2($cellCol, $cellRow, Balance::mapSeed() ^ 0x1a4e)) > Balance::LAKE_CHANCE) {
+        if (Hash::rand01(Hash::hash2($cellCol, $cellRow, Balance::mapSeed() ^ 0x1A4E)) > Balance::LAKE_CHANCE) {
             return null;
         }
 
@@ -314,17 +371,17 @@ final class WorldGen
 
         return [
             $cellCol * $cell + Hash::randInt(
-                Hash::hash2($cellCol, $cellRow, Balance::mapSeed() ^ 0x1a5e),
+                Hash::hash2($cellCol, $cellRow, Balance::mapSeed() ^ 0x1A5E),
                 $inset,
                 $cell - $inset - 1,
             ),
             $cellRow * $cell + Hash::randInt(
-                Hash::hash2($cellRow, $cellCol, Balance::mapSeed() ^ 0x1a6e),
+                Hash::hash2($cellRow, $cellCol, Balance::mapSeed() ^ 0x1A6E),
                 $inset,
                 $cell - $inset - 1,
             ),
             Hash::randInt(
-                Hash::hash2($cellCol + $cellRow, $cellCol - $cellRow, Balance::mapSeed() ^ 0x1a7e),
+                Hash::hash2($cellCol + $cellRow, $cellCol - $cellRow, Balance::mapSeed() ^ 0x1A7E),
                 Balance::LAKE_MIN_RADIUS,
                 Balance::LAKE_MAX_RADIUS,
             ),
@@ -340,7 +397,7 @@ final class WorldGen
         // §13.2 -- hexes are wider than they are tall, so the same weighting
         // the biome regions use keeps a lake round on screen instead of drawn
         // out along the columns.
-        $wobble = Hash::rand01(Hash::hash2($col, $row, Balance::mapSeed() ^ 0x1a8e))
+        $wobble = Hash::rand01(Hash::hash2($col, $row, Balance::mapSeed() ^ 0x1A8E))
             * Balance::LAKE_EDGE_WOBBLE - Balance::LAKE_EDGE_WOBBLE / 2;
 
         for ($i = -1; $i <= 1; $i++) {
@@ -412,7 +469,7 @@ final class WorldGen
         'outer' => 'village',
         'mid' => 'city',
         'inner' => 'capital', // contested, and where the best bench stands
-        'center' => null,     // dungeon mouths only, and barren of everything else
+        'center' => null,     // dungeon mouths only: no settlement of any tier stands here
     ];
 
     /** Weakest first. A tier yields to everything above it and to nothing below. */
@@ -534,8 +591,8 @@ final class WorldGen
 
     private static function nameFor(int $col, int $row, string $tier): string
     {
-        $hp = Hash::hash2($col, $row, Balance::mapSeed() ^ 0x7ae1);
-        $hs = Hash::hash2($row, $col, Balance::mapSeed() ^ 0x7ae2);
+        $hp = Hash::hash2($col, $row, Balance::mapSeed() ^ 0x7AE1);
+        $hs = Hash::hash2($row, $col, Balance::mapSeed() ^ 0x7AE2);
 
         $base = Catalog::NAME_PREFIXES[Hash::randInt($hp, 0, count(Catalog::NAME_PREFIXES) - 1)]
             .Catalog::NAME_SUFFIXES[Hash::randInt($hs, 0, count(Catalog::NAME_SUFFIXES) - 1)];
@@ -665,7 +722,7 @@ final class WorldGen
 
         $lifetime = Balance::scaled(Balance::HERD_LIFETIME_MS);
         $bucket = intdiv($now, $lifetime);
-        $h = Hash::hash2($col * 31 + $bucket, $row * 17 + $bucket, Balance::mapSeed() ^ 0xbeef);
+        $h = Hash::hash2($col * 31 + $bucket, $row * 17 + $bucket, Balance::mapSeed() ^ 0xBEEF);
 
         if (Hash::rand01($h) > Balance::HERD_CHANCE) {
             return null;
@@ -698,13 +755,13 @@ final class WorldGen
 
         $lifetime = Balance::scaled(Balance::PACK_LIFETIME_MS);
         $offset = Hash::randInt(
-            Hash::hash2($col, $row, Balance::mapSeed() ^ 0x9ac1),
+            Hash::hash2($col, $row, Balance::mapSeed() ^ 0x9AC1),
             0,
             max(0, $lifetime - 1),
         );
 
         $bucket = intdiv($now + $offset, $lifetime);
-        $h = Hash::hash2($col * 37 + $bucket, $row * 19 + $bucket, Balance::mapSeed() ^ 0x5eed);
+        $h = Hash::hash2($col * 37 + $bucket, $row * 19 + $bucket, Balance::mapSeed() ^ 0x5EED);
 
         if (Hash::rand01($h) > (Balance::PACK_CHANCE[$ring] ?? 0.0)) {
             return null;
@@ -718,7 +775,7 @@ final class WorldGen
         }
 
         $pick = Hash::randInt(
-            Hash::hash2($col * 41 + $bucket, $row * 23 + $bucket, Balance::mapSeed() ^ 0x77a3),
+            Hash::hash2($col * 41 + $bucket, $row * 23 + $bucket, Balance::mapSeed() ^ 0x77A3),
             0,
             count($pool) - 1,
         );
@@ -747,11 +804,17 @@ final class WorldGen
     public static function variantOf(int $col, int $row, string $biome, string $ring): array
     {
         $variants = Variants::BIOME_VARIANTS[$biome];
-        $roll = Hash::rand01(Hash::hash2($col, $row, Balance::mapSeed() ^ 0xc3));
+        $roll = Hash::rand01(Hash::hash2($col, $row, Balance::mapSeed() ^ 0xC3));
+
+        // §5.2 -- the center rolls on the inner ring's table, because it IS the
+        // contested ring: the same grades, the same Tier 3 rate. The weight
+        // table has three columns and gains no fourth, so the alias lives here
+        // rather than as a duplicated column that could drift from its twin.
+        $column = $ring === 'center' ? 'inner' : $ring;
 
         $seen = 0.0;
         foreach ($variants as $variant) {
-            $seen += $variant['weights'][$ring] ?? 0.0;
+            $seen += $variant['weights'][$column] ?? 0.0;
             if ($roll < $seen) {
                 return $variant;
             }
@@ -815,12 +878,13 @@ final class WorldGen
         $settlement = self::settlementAt($col, $row);
         $dungeon = self::dungeonAt($col, $row);
 
-        $hTime = Hash::hash2($col, $row, Balance::mapSeed() ^ 0xa1);
-        $hYield = Hash::hash2($col, $row, Balance::mapSeed() ^ 0xb2);
+        $hTime = Hash::hash2($col, $row, Balance::mapSeed() ^ 0xA1);
+        $hYield = Hash::hash2($col, $row, Balance::mapSeed() ^ 0xB2);
         $baseYield = Hash::randInt($hYield, Balance::TILE_YIELD_MIN, Balance::TILE_YIELD_MAX);
 
-        // §5.2 -- the capital ring is barren. That is the pressure that forces
-        // traffic outward for materials and inward for processing.
+        // §5.2 -- what pressure there is toward the middle is the seam gradient
+        // now (MINEABLE_SHARE), not a hole in the map. The center used to be
+        // excluded here outright.
         //
         // A depleted tile keeps its material: it is drained, not dead (§5.1), and
         // callers gate on regrowsAt. The UI needs the material to keep rendering
@@ -833,9 +897,16 @@ final class WorldGen
             ? self::waterAt($col, $row)
             : null;
 
+        // §5.2 -- dead ground, and the one thing that decides whether a hex has
+        // a seam in it at all. The center used to be excluded here outright --
+        // "barren of everything" -- and is now ordinary contested ground that
+        // takes its chances with the same field as the three rings around it.
+        $barren = $settlement === null && $water === null && $dungeon === null
+            && self::isBarren($col, $row, $ring);
+
         $variant = null;
         $material = null;
-        if ($ring !== 'center' && $settlement === null && $water === null) {
+        if (! $barren && $settlement === null && $water === null) {
             $variant = self::variantOf($col, $row, $biome, $ring);
             $material = $variant['material'];
         }
@@ -846,7 +917,9 @@ final class WorldGen
             'col' => $col,
             'row' => $row,
             'biome' => $biome,
-            'variant' => $variant['key'] ?? $biome,
+            // Dead ground belongs to no biome, so it says so rather than
+            // wearing the colour of the country it interrupts.
+            'variant' => $variant['key'] ?? ($barren ? 'barren' : $biome),
             'ring' => $ring,
             'material' => $material,
             'hp' => self::tileHp($hTime, $variant['grade'] ?? 'common'),
@@ -861,7 +934,11 @@ final class WorldGen
             // nothing grazes a town: a settlement is worked ground (§6), and a
             // deer in the market square is the same category error as a pack
             // camped on the only five-line bench in the region (§9.5.1).
-            'herdUntil' => $water === null && $settlement === null && $dungeon === null
+            //
+            // Nothing grazes dead ground either, and that one is the plainest
+            // of the three: §5.2's barren is scoured to the pan, and a herd
+            // needs something to have been eating.
+            'herdUntil' => $water === null && $settlement === null && $dungeon === null && ! $barren
                 ? self::herdUntil($col, $row, $biome, $now)
                 : null,
             // §9.5.1 -- nothing camps on open water, and nothing camps on a
@@ -876,7 +953,7 @@ final class WorldGen
                 && empty($mutation['packCleared'])
                 ? self::packAt($col, $row, $ring, $now)
                 : null,
-            'propSeed' => Hash::hash2($col, $row, Balance::mapSeed() ^ 0xf00d),
+            'propSeed' => Hash::hash2($col, $row, Balance::mapSeed() ^ 0xF00D),
         ];
     }
 }

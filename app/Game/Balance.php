@@ -19,6 +19,7 @@ namespace App\Game;
 final class Balance
 {
     public const MINUTE = 60_000;
+
     public const HOUR = 60 * self::MINUTE;
 
     // ---------------------------------------------------------------- map §5
@@ -64,7 +65,7 @@ final class Balance
             return self::$mapSeed;
         }
 
-        $seed = config('game.map.seed', 0x5eed1a3f);
+        $seed = config('game.map.seed', 0x5EED1A3F);
 
         return self::$mapSeed = (is_string($seed) ? intval($seed, 0) : (int) $seed) & 0xFFFFFFFF;
     }
@@ -94,12 +95,74 @@ final class Balance
 
     /** Biome lattice, §5.3. Cell size in tiles, and cells per coherent region. */
     public const BIOME_CELL = 9;
+
     public const BIOME_REGION_CELLS = 5;
 
     /** Normalised radius boundaries for the ring layout, §5.2. */
     public const RING_CENTER = 0.08;
+
     public const RING_INNER = 0.34;
+
     public const RING_MID = 0.64;
+
+    // ------------------------------------------------------- dead ground §5.2
+
+    /**
+     * How much of each ring carries a seam at all.
+     *
+     * The design intent, in the numbers it was decided in: half the outer rim
+     * is workable, and the share climbs the whole way in. It runs the same
+     * direction as the two things that already climb inward -- Tier 3 density
+     * (§4) and the pack rate (§9.5.1) -- so the middle of the map is richer,
+     * more dangerous and more contested by one gradient rather than three.
+     *
+     * Ground that misses out is DEAD, not depleted: it carries no material,
+     * never regrows, and is drawn in the one colour §13.3 held back for it.
+     *
+     * This is a share of EVERY tile in the ring, so the lakes and the towns
+     * count toward the part that is not workable. A test pins each ring to
+     * within a point of its share.
+     */
+    public const MINEABLE_SHARE = [
+        'outer' => 0.50,
+        'mid' => 0.60,
+        'inner' => 0.70,
+        'center' => 0.75,
+    ];
+
+    /**
+     * Where the dead-ground field is cut, per ring.
+     *
+     * The field is smooth noise in [0,1] (WorldGen::barrenField), so these are
+     * quantiles rather than probabilities: a hex is dead when its field value
+     * falls below its ring's cut. CALIBRATED, not chosen -- each one is the
+     * quantile that lands the ring on MINEABLE_SHARE once the water, the towns
+     * and the five dungeon mouths have taken their share of the same ground.
+     *
+     * Recalibrate with scripts/calibrate_barren.php if a share or the map seed
+     * moves. The test is what actually holds the shares honest.
+     */
+    public const BARREN_THRESHOLD = [
+        'outer' => 0.4896,
+        'mid' => 0.4141,
+        'inner' => 0.3659,
+        'center' => 0.2733,
+    ];
+
+    /**
+     * Hexes per lattice cell of the dead-ground field.
+     *
+     * Five, so dead ground arrives in REGIONS rather than as speckle. §5.3
+     * makes the same argument about biomes: clustered, "not random noise --
+     * players need a mentally navigable map", and half a ring of salt-and-
+     * pepper barren hexes is exactly the noise that rules out.
+     *
+     * Large regions are safe here for a reason particular to this map: dead
+     * ground is TERRAIN, so §5.6 draws it at any distance through the fog. A
+     * waste you can see from four days away is a route to plan around, not a
+     * trap to walk into.
+     */
+    public const BARREN_CELL = 5;
 
     // ------------------------------------------------------------- mining §7.3
 
@@ -118,6 +181,7 @@ final class Balance
      * reason they are these numbers -- there is a test pinning it.
      */
     public const TILE_HP_MIN = 2700;
+
     public const TILE_HP_MAX = 5400;
 
     /**
@@ -163,6 +227,7 @@ final class Balance
      * ladder on the easiest hexes.
      */
     public const MINING_FLOOR_SECONDS = 60;
+
     public const MINING_CEILING_SECONDS = 60 * 60;
 
     /**
@@ -227,6 +292,7 @@ final class Balance
      * rule -- you cannot re-roll a hex, and you cannot have one to yourself.
      */
     public const TILE_EXTRACTIONS_MIN = 6;
+
     public const TILE_EXTRACTIONS_MAX = 10;
 
     /**
@@ -235,6 +301,7 @@ final class Balance
      * so the band is stated once rather than spelled into each of them.
      */
     public const TILE_YIELD_MIN = 3;
+
     public const TILE_YIELD_MAX = 8;
 
     /** Chance an inner-ring tile carries its rare variant, §5.2 / §4. */
@@ -285,6 +352,7 @@ final class Balance
     // ------------------------------------------------------------- hunting §5.5
 
     public const HERD_LIFETIME_MS = 4 * self::HOUR;
+
     public const HERD_CHANCE = 0.06;
 
     /**
@@ -716,7 +784,9 @@ final class Balance
 
     /** Speed multiplier by settlement tier -- lower is faster. */
     public const SPEED_VILLAGE = 1.0;
+
     public const SPEED_CITY = 0.75;
+
     public const SPEED_CAPITAL = 0.55;
 
     /** Presence bonus, §6.2. */
@@ -725,6 +795,7 @@ final class Balance
     // ----------------------------------------------------------- character §7
 
     public const STARTING_GOLD = 25;
+
     /**
      * §7.4.1 -- 100 levels, and one skill point each. The cap is the point: 100
      * points buys three complete 30-node trees with 10 spare, deliberately just
@@ -1136,8 +1207,11 @@ final class Balance
     public const SCRAP_XP_RATE = 0.25;
 
     public const DRAIN_PER_MINE = 1;
+
     public const DRAIN_PER_RAID = 4;
+
     public const SALVAGE_RATE = 0.25;
+
     public const REPAIR_COST_RATE = 0.6;
 
     /**

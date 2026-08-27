@@ -57,6 +57,9 @@ export interface WorldConfig {
   extractionsMax: number
   rareSpawnChance: number
   slotsPerTile: number
+  /** §5.2 -- the dead-ground field: its lattice, and where each ring cuts it. */
+  barrenCell: number
+  barrenThreshold: Record<Ring, number>
   herdLifetimeMs: number
   herdChance: number
   /** §9.5.1 -- how long a pack stands, and the odds by ring. */
@@ -253,6 +256,54 @@ export const coarseRegionHexes = (): number => cfg().biomeCell * cfg().biomeRegi
  * ulp of the edge would flip a hex between water and land depending on whose
  * libm answered, and the two generators have to agree on every tile.
  */
+/**
+ * §5.2 -- smooth noise in [0,1], the field dead ground is cut out of.
+ *
+ * The mirror of WorldGen::barrenField(). Value noise on a coarse lattice,
+ * smoothstepped between corners, which is the cheapest thing that clusters --
+ * and it has to cluster, because §5.3 wants a mentally navigable map and half
+ * an outer ring of independently-rolled dead hexes would be pure speckle.
+ *
+ * The column axis is stretched by ASPECT like the lakes and the biome regions,
+ * so regions read as country rather than as stripes down the columns (§13.2).
+ */
+export function barrenField(col: number, row: number): number {
+  const c = cfg()
+  const x = col / (c.barrenCell / ASPECT)
+  const y = row / c.barrenCell
+
+  const x0 = Math.floor(x)
+  const y0 = Math.floor(y)
+  const fx = smoothstep(x - x0)
+  const fy = smoothstep(y - y0)
+
+  const seed = c.seed ^ 0x2b1e
+  const c00 = rand01(hash2(x0, y0, seed))
+  const c10 = rand01(hash2(x0 + 1, y0, seed))
+  const c01 = rand01(hash2(x0, y0 + 1, seed))
+  const c11 = rand01(hash2(x0 + 1, y0 + 1, seed))
+
+  return (
+    (c00 * (1 - fx) + c10 * fx) * (1 - fy) + (c01 * (1 - fx) + c11 * fx) * fy
+  )
+}
+
+function smoothstep(t: number): number {
+  return t * t * (3 - 2 * t)
+}
+
+/**
+ * §5.2 -- is this hex dead ground?
+ *
+ * Dead is not depleted. A depleted hex is drained and regrows in about nine
+ * hours (§5.1); this one never had a seam and never will, so it keeps no timer,
+ * shows no remnants, and is drawn in grey rather than in a tired version of its
+ * own biome (§13.3).
+ */
+export function isBarren(col: number, row: number, ring: Ring): boolean {
+  return barrenField(col, row) < (cfg().barrenThreshold[ring] ?? 0)
+}
+
 export function waterAt(col: number, row: number): WaterKind | undefined {
   if (lakeAt(col, row)) return 'lake'
 
@@ -732,9 +783,15 @@ export function variantOf(
   const variants = BIOME_VARIANTS[biome]
   const roll = rand01(hash2(col, row, cfg().seed ^ 0xc3))
 
+  // §5.2 -- the center rolls on the inner ring's table, because it IS the
+  // contested ring: same grades, same Tier 3 rate. The weight table has three
+  // columns and gains no fourth, so the alias lives here rather than as a
+  // duplicated column that could drift from its twin.
+  const column = ring === 'center' ? 'inner' : (ring as 'outer' | 'mid' | 'inner')
+
   let seen = 0
   for (const variant of variants) {
-    seen += variant.weights[ring as 'outer' | 'mid' | 'inner'] ?? 0
+    seen += variant.weights[column] ?? 0
     if (roll < seen) return variant
   }
 
@@ -796,8 +853,9 @@ export function generateTile(
   const hYield = hash2(col, row, c.seed ^ 0xb2)
   const baseYield = randInt(hYield, c.yieldMin, c.yieldMax)
 
-  // §5.2 -- the capital ring is barren of resources. That is the pressure that
-  // forces traffic outward for materials and inward for processing.
+  // §5.2 -- what pressure there is toward the middle is the seam gradient now
+  // (barrenThreshold), not a hole in the map. The center used to be excluded
+  // here outright.
   //
   // A depleted tile keeps its material: it is drained, not dead (§5.1), and
   // callers gate on regrowsAt. The UI needs it to draw the right remnants.
@@ -806,10 +864,18 @@ export function generateTile(
   // water is the cheaper of the two to bend.
   const water = !settlement && !dungeon ? waterAt(col, row) : undefined
 
+  // §5.2 -- dead ground, and the one thing that decides whether a hex has a
+  // seam in it at all. The center used to be excluded outright -- "barren of
+  // everything" -- and is now ordinary contested ground taking its chances with
+  // the same field as the three rings around it.
+  const barren = !settlement && !water && !dungeon && isBarren(col, row, ring)
+
   let material: MaterialKey | undefined
-  let variant: VariantKey = biome
+  // Dead ground belongs to no biome, so it says so rather than wearing the
+  // colour of the country it interrupts.
+  let variant: VariantKey = barren ? 'barren' : biome
   let grade = 'common'
-  if (ring !== 'center' && !settlement && !water) {
+  if (!barren && !settlement && !water) {
     const picked = variantOf(col, row, biome, ring)
     variant = picked.key
     grade = picked.grade
@@ -836,7 +902,12 @@ export function generateTile(
     // §5.5 -- a herd stands on open ground. Nothing grazes a lake, and nothing
     // grazes a town: a settlement is worked ground (§6), and a deer in the
     // market square is the same category error as a pack camped on a capital.
-    herdUntil: water || settlement || dungeon ? undefined : herdUntil(col, row, biome, now),
+    //
+    // Nothing grazes dead ground either, and that one is the plainest of the
+    // three: §5.2's barren is scoured to the pan, and a herd needs something to
+    // have been eating.
+    herdUntil:
+      water || settlement || dungeon || barren ? undefined : herdUntil(col, row, biome, now),
     // §9.5.1 -- nothing camps on water, a settlement or a dungeon mouth. The
     // second is the load-bearing one: a pack on a capital would lock a region
     // out of the only five-line bench it has.

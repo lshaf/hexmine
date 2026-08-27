@@ -24,9 +24,16 @@
     "extractionsMax": 10,
     "rareSpawnChance": 0.18,
     "slotsPerTile": 2,
-    "herdLifetimeMs": 240000,
+    "barrenCell": 5,
+    "barrenThreshold": {
+        "outer": 0.4896,
+        "mid": 0.4141,
+        "inner": 0.3659,
+        "center": 0.2733
+    },
+    "herdLifetimeMs": 1440000,
     "herdChance": 0.06,
-    "packLifetimeMs": 120000,
+    "packLifetimeMs": 720000,
     "packChance": {
         "outer": 0.04,
         "mid": 0.1,
