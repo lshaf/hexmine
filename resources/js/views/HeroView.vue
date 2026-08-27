@@ -158,8 +158,10 @@ const lines = computed(() =>
       // carries, and rarity is most of what a player is looking for here.
       icon: def ? itemIcon({ slot: def.slot, family: def.family, rarity: def.rarity, palette: def.palette, size: 30 }) : null,
       durability: tool?.durability ?? 0,
-      maxDurability: def?.maxDurability ?? 1,
-      wear: tool ? (tool.durability / (def!.maxDurability ?? 1)) * 100 : 0,
+      // §7.4.3 -- the piece's ceiling, which a Smith's node can raise above
+      // the recipe's.
+      maxDurability: tool?.maxDurability || (def?.maxDurability ?? 1),
+      wear: tool ? (tool.durability / Math.max(1, tool.maxDurability || (def!.maxDurability ?? 1))) * 100 : 0,
       broken: tool ? tool.durability <= 0 : false,
       yield: game.toolYield?.[skill.key] ?? 0,
     }

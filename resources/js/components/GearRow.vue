@@ -23,9 +23,18 @@ import type { OwnedItem } from '@/game/types'
 const props = defineProps<{ item: OwnedItem }>()
 
 const def = computed(() => ITEM_BY_KEY[props.item.key]!)
+
+/**
+ * §7.4.3 -- this piece's ceiling, not the recipe's.
+ *
+ * A Smith's `craftDurability` raises the max of what they make, so the bar has
+ * to measure against the object rather than against the catalog -- otherwise a
+ * well-made piece reads past 100% and its extra looks like a rendering fault.
+ */
+const ceiling = computed(() => props.item.maxDurability || (def.value.maxDurability ?? 1))
 const broken = computed(() => props.item.durability <= 0)
 const percent = computed(
-  () => (props.item.durability / (def.value.maxDurability ?? 1)) * 100,
+  () => (props.item.durability / Math.max(1, ceiling.value)) * 100,
 )
 </script>
 
@@ -68,7 +77,7 @@ const percent = computed(
       <div class="bar grow" :class="percent < 25 ? 'bar-ember' : ''">
         <span :style="{ width: `${percent}%` }" />
       </div>
-      <span class="tiny mono muted">{{ item.durability }}/{{ def.maxDurability }}</span>
+      <span class="tiny mono muted">{{ item.durability }}/{{ ceiling }}</span>
     </div>
   </div>
 

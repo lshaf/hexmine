@@ -648,6 +648,8 @@ export interface CollectResult {
     consumable: boolean
     quantity?: number
     durability?: number
+    /** §7.4.3 -- the ceiling a Smith's node may have raised above the recipe's. */
+    maxDurability?: number
     /** The row it landed on, so the receipt can talk about the object itself. */
     itemId?: string
     /**

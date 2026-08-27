@@ -105,15 +105,17 @@ const madeIcon = computed(() => {
 })
 
 /**
- * §7.4.3 -- how much of the durability was the Smith rather than the recipe.
+ * §7.4.3 -- how much of the ceiling was the Smith rather than the recipe.
  *
- * Printed only when a node actually moved it, because "60 durability" says
- * nothing about whether that was a good craft and "+6 over standard" says
- * exactly that. It is the one number on the plate the player earned twice.
+ * Printed only when a node actually moved it, because "60 dur" says nothing
+ * about whether that was a good craft and "+6 over standard" says exactly that.
+ * It is the one figure on the plate the player earned twice, and it is worth
+ * saying because it is PERMANENT: the piece keeps the higher ceiling through
+ * every repair for the rest of its life.
  */
 const overStandard = computed(() => {
   const base = madeDef.value?.maxDurability ?? 0
-  const got = made.value?.durability ?? 0
+  const got = made.value?.maxDurability ?? made.value?.durability ?? 0
 
   return base > 0 && got > base ? got - base : 0
 })

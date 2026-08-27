@@ -5342,6 +5342,71 @@ final class GameLoopTest extends TestCase
     }
 
     /**
+     * §7.4.3 -- `craftDurability` raises the MAX, and the piece keeps it.
+     *
+     * It used to write the bonus into the current fill and leave the ceiling at
+     * the recipe's, which made the node worth exactly one craft: the bar read
+     * past 100%, resale clamped the fraction back to 1, and the first mend set
+     * durability to the catalog max and threw the extra away for good. A Smith
+     * deep enough in the tree to buy it got a piece that was better right up
+     * until it was repaired once.
+     *
+     * So the ceiling rides the ROW. This walks the whole life of one piece:
+     * made high, worn down, mended, and still high.
+     */
+    public function test_a_well_made_piece_keeps_its_higher_ceiling_through_a_repair(): void
+    {
+        $this->standAtWoodcuttingVillage();
+
+        $def = Catalog::item('hewn_axe');
+        $base = (int) $def['maxDurability'];
+        $raised = $base + 12;
+
+        $item = CharacterItem::create([
+            'character_id' => $this->character->id,
+            'item_key' => 'hewn_axe',
+            'durability' => $raised,
+            'max_durability' => $raised,
+            'equipped' => false,
+            'options' => [],
+        ]);
+
+        $this->assertSame($raised, $item->maxDurability(), 'the piece is not carrying its own ceiling');
+
+        // Worn down, then mended: the repair fills it to the PIECE's ceiling.
+        $item->durability = 10;
+        $item->save();
+        $this->give(array_map(fn ($q) => $q * 40, $def['inputs']));
+
+        $this->game->repairItem($this->character->fresh(), $item->id);
+
+        $this->assertSame(
+            $raised,
+            (int) $item->fresh()->durability,
+            'the mend filled it to the recipe max and the bonus was lost',
+        );
+        $this->assertSame($raised, $item->fresh()->maxDurability());
+    }
+
+    /**
+     * §7.4.3 -- and a piece nobody improved just uses the recipe's ceiling.
+     *
+     * Null on the row rather than a copy of the catalog figure, so a recipe
+     * retuned tomorrow moves every ordinary piece with it and leaves the
+     * well-made ones where their Smith put them.
+     */
+    public function test_an_ordinary_piece_takes_its_ceiling_from_the_recipe(): void
+    {
+        $item = $this->boughtItem();
+
+        $this->assertNull($item->fresh()->max_durability);
+        $this->assertSame(
+            (int) Catalog::item('stone_axe')['maxDurability'],
+            $item->fresh()->maxDurability(),
+        );
+    }
+
+    /**
      * §8.2 -- the trader takes a piece off the bench, priced off its parts.
      *
      * This used to assert the opposite: no shelf price, no sale, salvage is the

@@ -459,6 +459,15 @@ export interface OwnedItem {
   id: string
   key: string
   durability: number
+  /**
+   * §7.4.3 -- THIS piece's ceiling, which is not always the catalog's.
+   *
+   * `craftDurability` raises the max of what a Smith makes, so two copies of one
+   * recipe can differ. Everything that measures wear, prices a resale or offers
+   * a repair has to read it here; the catalog's figure is the shelf's, not the
+   * object's.
+   */
+  maxDurability: number
   equipped: boolean
   /** Rolled lines. Empty for commons, unless a capital bazaar added one. */
   options: ItemOption[]

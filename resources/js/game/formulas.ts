@@ -125,14 +125,16 @@ export function aggregateAfterSwap(
  * there is not -- the same pair §8.3 prices the shelf from -- then half of it,
  * then scaled by what is left of the durability.
  */
-export function resaleValue(def: ItemDef, durability: number): number {
-  const max = def.maxDurability ?? 0
-  if (max <= 0 || durability <= 0) return 0
+export function resaleValue(def: ItemDef, durability: number, max?: number): number {
+  // §7.4.3 -- the PIECE's ceiling where the caller knows it. The catalog's is
+  // the shelf's figure, right only where there is no piece yet.
+  const ceiling = max || (def.maxDurability ?? 0)
+  if (ceiling <= 0 || durability <= 0) return 0
 
   const price = resaleBasis(def)
   if (price <= 0) return 0
 
-  return Math.floor(price * EQUIPMENT.resaleRate * (Math.min(durability, max) / max))
+  return Math.floor(price * EQUIPMENT.resaleRate * (Math.min(durability, ceiling) / ceiling))
 }
 
 /**
@@ -184,8 +186,11 @@ export function salvageYield(def: ItemDef): Partial<Record<string, number>> {
 }
 
 /** Repair cost, §8.2: cheaper than crafting new, but not dramatically so. */
-export function repairCost(def: ItemDef, missingDurability: number): Record<string, number> {
-  const fraction = missingDurability / (def.maxDurability ?? 1)
+export function repairCost(def: ItemDef, missingDurability: number, max?: number): Record<string, number> {
+  // §7.4.3 -- against the PIECE's ceiling where the caller knows it. A recipe's
+  // materials buy one full piece, so a full mend costs one recipe's worth
+  // however many points that is: a well-made piece is cheaper to keep.
+  const fraction = missingDurability / Math.max(1, max || (def.maxDurability ?? 1))
   const out: Record<string, number> = {}
   for (const [key, qty] of Object.entries(def.inputs ?? {})) {
     const amount = Math.ceil((qty as number) * fraction * EQUIPMENT.repairCostRate)

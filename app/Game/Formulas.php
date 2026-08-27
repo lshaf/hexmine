@@ -864,9 +864,12 @@ final class Formulas
      * Tempered Sword is common and craftable and was not stocked, so it did
      * not. Nothing a player can see distinguishes those two.
      */
-    public static function resaleValue(array $def, int $durability): int
+    public static function resaleValue(array $def, int $durability, ?int $max = null): int
     {
-        $max = $def['maxDurability'] ?? 0;
+        // §7.4.3 -- the PIECE's ceiling where the caller knows it, because a
+        // well-made one is above the catalog's. Falling back to the catalog is
+        // right for a shelf tag, where there is no piece yet.
+        $max = $max ?: (int) ($def['maxDurability'] ?? 0);
         if ($max <= 0 || $durability <= 0) {
             return 0;
         }
@@ -972,9 +975,14 @@ final class Formulas
     }
 
     /** Repair cost, §8.2: cheaper than crafting new, but not dramatically so. */
-    public static function repairCost(array $def, int $missingDurability): array
+    public static function repairCost(array $def, int $missingDurability, ?int $max = null): array
     {
-        $fraction = $missingDurability / $def['maxDurability'];
+        // §7.4.3 -- against the PIECE's ceiling. A recipe's materials buy one
+        // full piece, so a full mend costs one recipe's worth however many
+        // points that turns out to be -- which means a well-made piece is
+        // cheaper to keep per point, and that is the node paying out a second
+        // time rather than a rounding artefact.
+        $fraction = $missingDurability / max(1, $max ?: (int) ($def['maxDurability'] ?? 1));
         $out = [];
         foreach ($def['inputs'] ?? [] as $key => $qty) {
             $amount = (int) ceil($qty * $fraction * Balance::REPAIR_COST_RATE);

@@ -1393,6 +1393,22 @@ the game, §11.1.)*
 
 - Repair costs refined + raid materials, scaled to rarity tier, and is only ever
   possible **above** zero. There is no resurrection.
+- **A piece carries its own ceiling, not its recipe's.** §7.4.3's
+  `craftDurability` raises the max of what a Smith makes, so two copies of one
+  recipe can differ — and everything that measures wear, prices a resale or
+  offers a mend reads the ceiling off the *object*.
+
+  It used to write the bonus into the current fill and leave the ceiling at the
+  recipe's, which made the node worth exactly one craft: the bar read past 100%,
+  resale clamped the fraction back to 1, and the first repair filled the piece to
+  the catalog max and threw the extra away for good. A Smith deep enough in the
+  tree to buy it got a piece that was better right up until it was mended once.
+
+  It now pays out **twice, permanently**. The piece holds more, and a full mend
+  costs one recipe's worth of materials however many points that turns out to be
+  — so a well-made piece is cheaper to keep per point as well as longer-lived.
+  What it does *not* change is what the trader gives for it: the parts are the
+  same parts (§8.2 above), and craftsmanship is labour like the bench time.
 - Discard returns a **small % salvage** — clears inventory bloat, gives obsolete gear an exit
 - **Sell it back for gold** — half the shelf price, multiplied by the fraction of
   durability left. A piece has three exits and they are deliberately different:

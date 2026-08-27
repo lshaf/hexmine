@@ -81,8 +81,11 @@ const resellable = computed(() =>
       return {
         item: e,
         def,
-        gold: resaleValue(def, e.durability),
-        wear: Math.round((e.durability / (def.maxDurability ?? 1)) * 100),
+        // §7.4.3 -- the piece's own ceiling, not the recipe's: a Smith's node
+        // raises one and not the other, and measuring against the catalog put a
+        // well-made piece past 100% and clamped its resale back down.
+        gold: resaleValue(def, e.durability, e.maxDurability),
+        wear: Math.round((e.durability / Math.max(1, e.maxDurability || (def.maxDurability ?? 1))) * 100),
       }
     })
     .sort((a, b) => b.gold - a.gold),

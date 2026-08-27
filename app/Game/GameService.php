@@ -498,13 +498,16 @@ class GameService
 
     // -------------------------------------------------------------- equipment
 
-    /** @return array<int,array{key:string,durability:int,equipped:bool}> */
+    /** @return array<int,array{key:string,durability:int,maxDurability:int,equipped:bool}> */
     private function itemRows(Character $character): array
     {
         return $character->items->map(fn (CharacterItem $i) => [
             'id' => $i->id,
             'key' => $i->item_key,
             'durability' => $i->durability,
+            // §7.4.3 -- the piece's own ceiling. Two copies of one recipe can
+            // differ, so nothing downstream may read it off the catalog.
+            'maxDurability' => $i->maxDurability(),
             'equipped' => $i->equipped,
             'options' => $i->options ?? [],
         ])->all();
@@ -638,7 +641,9 @@ class GameService
 
         $weights = [];
         foreach ($combat as $item) {
-            $weights[$item['id']] = max(1, (int) (Catalog::item($item['key'])['maxDurability'] ?? 1));
+            // §9.5.6 -- weighted by what a piece was BUILT to take, which for a
+            // well-made one is above what the catalog says (§7.4.3).
+            $weights[$item['id']] = max(1, (int) ($item['maxDurability'] ?? 1));
         }
 
         $out = [];
@@ -5600,14 +5605,22 @@ class GameService
             ];
         }
 
-        // §7.4.3 -- a better-made thing lasts longer. Capped, because
-        // durability is the repair sink and this thins it.
-        $durability = (int) round($def['maxDurability'] * (1 + $effects['craftDurability']));
+        // §7.4.3 -- a better-made thing lasts longer, and what it raises is the
+        // CEILING. Capped, because durability is the repair sink and this thins
+        // it.
+        //
+        // It used to write the bonus into the fill and leave the ceiling at the
+        // catalog's, which made the node worth one craft: the bar read past
+        // 100%, resale clamped the fraction back to 1, and the first mend set
+        // durability to the catalog max and threw the extra away for good.
+        $max = (int) round($def['maxDurability'] * (1 + $effects['craftDurability']));
+        $durability = $max;
 
         $item = CharacterItem::create([
             'character_id' => $character->id,
             'item_key' => $itemKey,
             'durability' => $durability,
+            'max_durability' => $max,
             'equipped' => false,
             'options' => $this->rollFor(
                 $character,
@@ -5624,6 +5637,7 @@ class GameService
                 'consumable' => false,
                 'itemId' => (string) $item->id,
                 'durability' => $durability,
+                'maxDurability' => $max,
                 'options' => $item->options ?? [],
             ],
             'job' => $jobKey,
@@ -6179,14 +6193,18 @@ class GameService
         DB::transaction(function () use ($character, $itemId) {
             $item = $this->ownedItem($character, $itemId);
             $def = Catalog::item($item->item_key);
-            $missing = $def['maxDurability'] - $item->durability;
+            // §7.4.3 -- the PIECE's ceiling, not the catalog's. A Smith's node
+            // raises one and not the other, and mending to the catalog max is
+            // exactly how the bonus used to be destroyed.
+            $max = $item->maxDurability();
+            $missing = $max - $item->durability;
 
             if ($missing <= 0) {
                 throw new GameException('Nothing to repair.', 'noop');
             }
 
             if (isset($def['inputs'])) {
-                $cost = Formulas::repairCost($def, $missing);
+                $cost = Formulas::repairCost($def, $missing, $max);
                 foreach ($cost as $key => $qty) {
                     if ($this->held($character, $key) < $qty) {
                         $name = Catalog::material($key)['name'] ?? $key;
@@ -6200,7 +6218,7 @@ class GameService
                 // Basic gear is repaired by the NPC for gold, §3.2 -- which means
                 // standing in front of one.
                 $this->requireSettlement($character, 'trade');
-                $gold = (int) ceil(($def['goldPrice'] ?? 20) * ($missing / $def['maxDurability']) * 0.6);
+                $gold = (int) ceil(($def['goldPrice'] ?? 20) * ($missing / max(1, $max)) * 0.6);
                 if ($character->gold < $gold) {
                     throw new GameException('Not enough gold.', 'no_gold');
                 }
@@ -6208,7 +6226,7 @@ class GameService
                 $character->save();
             }
 
-            $item->durability = $def['maxDurability'];
+            $item->durability = $max;
             $item->save();
         });
     }
@@ -6253,7 +6271,7 @@ class GameService
                 );
             }
 
-            $gold = Formulas::resaleValue($def, (int) $item->durability);
+            $gold = Formulas::resaleValue($def, (int) $item->durability, $item->maxDurability());
 
             // §3.2 -- above the second rung there is no price at all, whether
             // the piece was bought or made. Minting is that gear's exit (§8.0),
@@ -6433,6 +6451,9 @@ class GameService
                 'id' => (string) $i->id,
                 'key' => $i->item_key,
                 'durability' => $i->durability,
+                // §7.4.3 -- and the client needs it too: the wear bar, the
+                // resale figure and the repair row all measure against it.
+                'maxDurability' => $i->maxDurability(),
                 'equipped' => $i->equipped,
                 'options' => $i->options ?? [],
             ])->values()->all(),

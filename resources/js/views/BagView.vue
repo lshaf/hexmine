@@ -618,7 +618,7 @@ async function scrap(item: OwnedItem): Promise<void> {
                   <span class="eyebrow">Equipped</span>
                   <div class="side-head">
                     <strong class="tiny" :class="`rarity-${wornDef.rarity}`">{{ wornDef.name }}</strong>
-                    <span class="tiny mono muted">{{ worn.durability }}/{{ wornDef.maxDurability }}</span>
+                    <span class="tiny mono muted">{{ worn.durability }}/{{ worn.maxDurability || wornDef.maxDurability }}</span>
                   </div>
                   <StatChips :def="wornDef" :options="worn.options ?? []" />
                 </div>
