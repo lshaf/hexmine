@@ -5787,11 +5787,63 @@ class GameService
         }
 
         $this->grantJobXp($character, 'explorer', $hexes * Balance::EXPLORER_XP_PER_HEX);
+        $this->claimWayfaring($character);
 
         // §12 -- the same hexes, counted once. Paid on ground actually
         // crossed, so a journey abandoned halfway credits the half that
         // happened -- the same arithmetic the Explorer is paid on.
         $this->fireQuest($character, 'travel', $hexes);
+    }
+
+    /**
+     * §7.5 -- take every wayfaring skill the road has already paid for.
+     *
+     * The Explorer tree costs no skill point: the walk is its price and the job
+     * level is the receipt (§7.4.1 keeps the hundred points for the bought
+     * trees). So there is nothing for a press to decide -- it cannot be
+     * declined, it cannot be spent elsewhere, and there is no wrong order to
+     * take them in. A button whose only answer is yes is a chore.
+     *
+     * Called wherever Explorer XP is granted, which is only ever walking, so it
+     * cannot miss a level. It also sweeps up anything a character was already
+     * owed: the loop repeats until a pass claims nothing, because a row's second
+     * and third nodes hang off the first and can come due in the same breath.
+     *
+     * What it must NOT do is arrive silently -- that was the whole argument for
+     * pressing. The state carries the owned nodes already, so the client says so
+     * when the list grows without being asked; see the note in the store.
+     *
+     * @return list<string> the node keys newly claimed
+     */
+    public function claimWayfaring(Character $character): array
+    {
+        $claimed = [];
+        $levels = $this->jobLevels($character);
+
+        do {
+            $again = false;
+            $owned = $character->nodes()->pluck('node_key')->all();
+
+            foreach (Jobs::NODES as $key => $node) {
+                if (! Jobs::isAutomatic($node['job']) || in_array($key, $owned, true)) {
+                    continue;
+                }
+                if (($levels[$node['job']] ?? 1) < $node['jobLevel']) {
+                    continue;
+                }
+                if (array_diff($node['requires'], $owned) !== []) {
+                    continue;
+                }
+
+                CharacterNode::create(['character_id' => $character->id, 'node_key' => $key]);
+                $claimed[] = $key;
+                $again = true;
+            }
+
+            $character->unsetRelation('nodes');
+        } while ($again);
+
+        return $claimed;
     }
 
     /**
@@ -6095,14 +6147,11 @@ class GameService
                 throw new GameException("You already have {$node['name']}.", 'owned');
             }
 
-            // §7.5 -- a wayfaring skill is CLAIMED, not bought. The walking is
-            // its price and the job level is the receipt, so no point is spent;
-            // everything else about taking it is the same as any other node.
-            //
-            // It used to arrive on its own the moment the level did. Nothing
-            // announced it, so the reward for a thousand hexes was a panel that
-            // had quietly changed since you last looked at it. Pressing for it
-            // is the difference between being paid and finding money.
+            // §7.5 -- a wayfaring skill costs no point: the walking is its price
+            // and the job level is the receipt. It is claimed by claimWayfaring()
+            // the moment the road pays for it, so this path is only ever reached
+            // by a client asking for one it already has -- which the `owned`
+            // check above has already refused.
             if (! Jobs::isAutomatic($node['job'])) {
                 $points = $this->skillPoints($character);
                 if ($points['available'] < 1) {

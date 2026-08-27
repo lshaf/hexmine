@@ -1034,7 +1034,7 @@ a waiting room.
 | | Explorer | Every other job |
 |---|---|---|
 | Tree | **15 nodes, 3/3/3/3/3** | 30 nodes, 6/8/8/6/2 |
-| Cost | **No skill point — claimed at its job level** | 1 skill point each |
+| Cost | **No skill point — handed over at its job level** | 1 skill point each |
 | Levels from | **Hexes crossed** | Bench work, or raiding |
 | Pays in | **Capability only — never a stat** | Stats, and the work of the job |
 | Gating | **One skill per level**, every 2nd level, 2 → 30 | A whole depth at once, at 1 / 5 / 12 / 20 / 28 |
@@ -1105,13 +1105,24 @@ whole argument is that idle time must not be a faucet.
 one such tree.** A second free tree would not be a new job, it would be a hole
 in the 100-point cap (§7.4.1).
 
-**They are claimed, not granted.** Free is not the same as automatic: the walk
-is the price and the job level is the receipt, but the skill is still taken by
-pressing for it. Arriving on its own meant the reward for a thousand hexes was
-a panel that had quietly changed since you last looked at it — nothing
-announced it, and there was no moment where it was given to you.
+**The road hands them over.** A wayfaring skill is claimed the moment the
+walking pays for it, without being asked — because there is nothing for a press
+to decide. It cannot be declined, it cannot be spent elsewhere, and there is no
+wrong order to take them in, so the button's only answer was yes, and a button
+whose only answer is yes is a chore.
 
-So a wayfaring node is **a row like every other node**, and the point ledger
+**What the press was protecting is still protected, in the right place.** The
+reason it existed was real: a reward arriving on its own is a panel that quietly
+changed since you last looked at it, with no moment where it was given to you.
+So the moment moved to where moments belong — the state already carries the
+owned nodes, so a list that grew on its own is announced as it lands. Nothing
+on the server has to remember what a client has been told.
+
+*(It was a press for a while. The lesson worth keeping is that "free" and
+"automatic" really are different, and the thing that makes automatic safe is not
+the press — it is that something says so.)*
+
+A wayfaring node is still **a row like every other node**, and the point ledger
 stays honest by asking what KIND a row is rather than by keeping some rows out
 of the table. That is the one place this differs from every other tree: the
 `spent` count skips them.

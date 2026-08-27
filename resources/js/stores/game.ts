@@ -343,7 +343,9 @@ export const useGame = defineStore('game', () => {
   }
 
   async function buyNode(nodeKey: string): Promise<void> {
-    await act(() => api.buyNode(nodeKey))
+    // Quiet: buying one already says so through act(), and the node landing in
+    // the owned list is the same event rather than a second one.
+    await act(() => api.buyNode(nodeKey), 'good', true)
 
     // §9.5.9 -- the battle skills are their own fetch, and buying a node moves
     // them twice over: learning one flips it to known, and a skillPower or
@@ -567,21 +569,61 @@ export const useGame = defineStore('game', () => {
     if (log.value.length > 40) log.value.pop()
   }
 
-  function absorb(next: PlayerState): void {
+  /**
+   * §7.5 -- a skill that arrives without being asked for still has to be said.
+   *
+   * The Explorer tree claims itself the moment the road pays for it: it costs no
+   * point, so there is nothing for a press to decide and a button whose only
+   * answer is yes is a chore. But the reason it used to need pressing was real
+   * -- arriving on its own meant the reward for a thousand hexes was a panel
+   * that had quietly changed since you last looked at it, with no moment where
+   * it was given to you.
+   *
+   * So the moment is here. The state carries the owned nodes, so a list that
+   * grew on its own is a claim, and nothing on the server has to remember what
+   * this client has already been told.
+   *
+   * `quiet` is for buying one, which announces itself through `act()`. Anything
+   * that walks in during a plain refresh is the road paying out.
+   */
+  function absorb(next: PlayerState, quiet = false): void {
+    const before = state.value?.nodes
+
     clockOffset.value = next.serverTime - Date.now()
     state.value = next
+
+    if (quiet || !before) return
+
+    const known = new Set(before)
+    const fresh = next.nodes.filter((key) => !known.has(key))
+    if (fresh.length === 0) return
+
+    // Named where the tree happens to be loaded, counted where it is not: the
+    // catalog is fetched lazily when the skills panel first opens, and a toast
+    // is not worth a round trip the player did not ask for.
+    const named = fresh
+      .map((key) => tree.value?.nodes[key]?.name)
+      .filter((name): name is string => Boolean(name))
+
+    note(
+      named.length === fresh.length
+        ? `The road paid: ${named.join(', ')}.`
+        : `The road paid: ${fresh.length} new Explorer ${fresh.length === 1 ? 'skill' : 'skills'}.`,
+      'good',
+    )
   }
 
   /** Wrap an API action: single-flight, state absorption, error surfacing. */
   async function act<T>(
     run: () => Promise<{ data: T; state: PlayerState; message?: string }>,
     tone: LogEntry['tone'] = 'good',
+    quiet = false,
   ): Promise<T | null> {
     if (busy.value) return null
     busy.value = true
     try {
       const result = await run()
-      absorb(result.state)
+      absorb(result.state, quiet)
       if (result.message) note(result.message, tone)
       return result.data
     } catch (error) {

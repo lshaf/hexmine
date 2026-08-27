@@ -195,9 +195,9 @@ function stateOf(key: string, def: NodeDef): NodeState {
   if (game.ownedNodes.has(key)) return 'owned'
   if (jobRow.value.level < def.jobLevel) return 'locked-level'
   if (!def.requires.every((r) => game.ownedNodes.has(r))) return 'locked-parent'
-  // §7.5 -- free, but still taken. Walking is the price and the job level is
-  // the receipt, so the only thing between a reached node and having it is
-  // pressing for it.
+  // §7.5 -- a wayfaring node reached but not owned cannot happen for long: the
+  // road claims it the moment it is paid for. It shows as open for the blink
+  // between arriving and the state coming back.
   if (automatic.value) return 'open'
   if (game.skillPoints.available < 1) return 'no-points'
   return 'open'
@@ -219,7 +219,7 @@ function reasonFor(key: string, def: NodeDef): string {
     case 'no-points':
       return 'No points left. Level up to earn one.'
     default:
-      return automatic.value ? 'Ready to claim.' : 'Ready to learn.'
+      return automatic.value ? 'Walked for. Yours.' : 'Ready to learn.'
   }
 }
 
@@ -472,11 +472,14 @@ function effectTotal(key: string, effect: NodeEffect): { now: string; cap: strin
 
 
 /**
- * §7.5 -- free skills reached and not yet taken, per job.
+ * §7.5 -- wayfaring skills the road has paid for and not yet handed over.
+ *
+ * All but always zero, because claiming happens on arrival. It survives as the
+ * badge for the blink between the two, and as the honest answer for a character
+ * whose last walk predates the tree claiming itself.
  *
  * Zero for every bought tree: an unspent point is a decision, and colouring it
- * as something waiting would nag a player for not having committed yet. A
- * wayfaring node has nothing to decide -- it is paid for and sitting there.
+ * as something waiting would nag a player for not having committed yet.
  */
 function claimable(key: string): number {
   const t = tree.value
@@ -606,7 +609,7 @@ async function learn(): Promise<void> {
             footnote restating that, were three copies of one sentence stacked
             around a tree nobody could see for the prose.
           -->
-          <p v-if="automatic" class="tiny granted">Free — walk far enough, then claim.</p>
+          <p v-if="automatic" class="tiny granted">Free — walk far enough and it is yours.</p>
 
         </header>
 
@@ -690,7 +693,7 @@ async function learn(): Promise<void> {
             :disabled="game.busy || stateOf(chosen.key, chosen.def) !== 'open'"
             @click="learn"
           >
-            {{ automatic ? 'Claim' : 'Learn · 1 point' }}
+            {{ automatic ? 'Take it' : 'Learn · 1 point' }}
           </button>
         </div>
       </div>

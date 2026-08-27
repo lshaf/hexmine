@@ -3859,26 +3859,16 @@ final class GameLoopTest extends TestCase
     }
 
     /**
-     * §7.5 -- walk far enough, then take what the walking opened.
+     * §7.5 -- walk far enough and the road hands it over.
      *
-     * Free is not automatic: reaching the level makes a skill claimable and
-     * nothing more. Declaration order is dependency order, so claiming down the
-     * list never asks for a parent that is not already held.
+     * The real path rather than a loop of buyNode: claimWayfaring() is what the
+     * game calls, so a test that reached the same rows another way would stop
+     * proving the thing it is here to prove.
      */
     private function claimExplorerTo(int $level): void
     {
         $this->explorerAt($level);
-
-        $held = $this->game->ownedNodes($this->character->fresh());
-
-        foreach (Jobs::nodesFor('explorer') as $key => $node) {
-            if ($node['jobLevel'] > $level || in_array($key, $held, true)) {
-                continue;
-            }
-
-            $this->game->buyNode($this->character->fresh(), $key);
-        }
-
+        $this->game->claimWayfaring($this->character->fresh());
         $this->character->unsetRelation('nodes');
     }
 
@@ -3933,28 +3923,28 @@ final class GameLoopTest extends TestCase
     }
 
     /**
-     * §7.5 -- the chain is free, and free still has to be taken.
+     * §7.5 -- the road hands its skills over, and they cost no point.
+     *
+     * They used to need pressing for, on the argument that a reward arriving on
+     * its own is a panel that quietly changed. The press was the wrong answer to
+     * a real problem: a wayfaring node cannot be declined, cannot be spent
+     * elsewhere and has no wrong order to take it in, so the button's only
+     * answer was yes. What the press was protecting -- that there is a MOMENT
+     * where it is given to you -- is the client's job now: the state carries the
+     * owned nodes, so a list that grew on its own is announced.
      *
      * If a wayfaring node ever cost a point, the hundred-point cap (§7.4.1)
      * would quietly become ninety-five, and the tree that is supposed to reward
      * walking would start competing with the benches instead.
      */
-    public function test_explorer_skills_are_claimed_and_cost_no_points(): void
+    public function test_explorer_skills_are_claimed_by_walking_and_cost_no_points(): void
     {
-        // A character who has walked nowhere owns nothing, and reaching the
-        // level does not hand anything over either.
+        // A character who has walked nowhere owns nothing.
         $this->assertNotContains('explorer.deep_pockets', $this->game->ownedNodes($this->character));
-
-        $this->explorerAt(2);
-        $this->assertNotContains(
-            'explorer.deep_pockets',
-            $this->game->ownedNodes($this->character->fresh()),
-            'a wayfaring skill arrived on its own -- it is claimed, not granted',
-        );
 
         // §7.5 -- one skill per level, not a row at a time. Level 2 opens the
         // first of row one and nothing else in it.
-        $this->game->buyNode($this->character->fresh(), 'explorer.deep_pockets');
+        $this->claimExplorerTo(2);
         $owned = $this->game->ownedNodes($this->character->fresh());
         $this->assertContains('explorer.deep_pockets', $owned);
         $this->assertNotContains('explorer.second_strap', $owned, 'the whole row opened for one level');
@@ -3970,14 +3960,54 @@ final class GameLoopTest extends TestCase
         );
     }
 
-    /** And no amount of points buys one early: the walking is the price. */
-    public function test_an_explorer_skill_cannot_be_claimed_early(): void
+    /**
+     * §7.5 -- and the walking is still the price: no level, no skill.
+     *
+     * The claim sweeps what the road has paid for and not one node further, so
+     * a character parked at level 1 has nothing waiting however many character
+     * levels they have banked.
+     */
+    public function test_the_road_hands_over_nothing_it_has_not_paid_for(): void
     {
         $this->character->update(['level' => 40]);
         $this->explorerAt(1);
 
+        $this->assertSame([], $this->game->claimWayfaring($this->character->fresh()));
+        $this->assertNotContains(
+            'explorer.deep_pockets',
+            $this->game->ownedNodes($this->character->fresh()),
+        );
+
         $this->expectException(GameException::class);
         $this->game->buyNode($this->character->fresh(), 'explorer.deep_pockets');
+    }
+
+    /**
+     * §7.5 -- walking claims it, and the walk is the only thing that does.
+     *
+     * End to end through travel rather than by poking the job level: this is
+     * the hook, and a claim that fired anywhere else would be a second way in.
+     */
+    public function test_a_walk_long_enough_hands_the_first_skill_over(): void
+    {
+        $this->assertNotContains('explorer.deep_pockets', $this->game->ownedNodes($this->character));
+
+        // Two Explorer levels is a short walk, and a walk is all it may cost.
+        $this->explorerAt(1);
+        $this->character->jobLevels()->where('job_key', 'explorer')->update([
+            'xp' => Balance::jobXpForLevel(2) - Balance::EXPLORER_XP_PER_HEX,
+        ]);
+        $this->character->unsetRelation('jobLevels');
+
+        $far = $this->game->travelTo($this->character->fresh(), (int) $this->character->col + 1, (int) $this->character->row);
+        $this->assertNotNull($far);
+        $this->arrive($this->character);
+
+        $this->assertContains(
+            'explorer.deep_pockets',
+            $this->game->ownedNodes($this->character->fresh()),
+            'the road paid for a skill and did not hand it over',
+        );
     }
 
     /** §7.5 -- two hexes of eye on top of the base one, earned one at a time. */

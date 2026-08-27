@@ -115,7 +115,7 @@ final class Jobs
      * @var array<string,array<string,string>>
      */
     public const JOBS = [
-        'explorer' => ['name' => 'Explorer', 'kind' => self::WAYFARING, 'source' => 'travel', 'palette' => 'fiber', 'description' => 'Levels by walking. Its skills cost no point -- walk far enough and claim them.'],
+        'explorer' => ['name' => 'Explorer', 'kind' => self::WAYFARING, 'source' => 'travel', 'palette' => 'fiber', 'description' => 'Levels by walking. Its skills cost no point -- walk far enough and they are yours.'],
         'woodcutting' => ['name' => 'Woodcutting', 'kind' => self::GATHERING, 'source' => 'woodcutting', 'palette' => 'wood', 'description' => 'Forest work. Its level is the skill you already carry, and it still takes time off the mine.'],
         'mining' => ['name' => 'Mining', 'kind' => self::GATHERING, 'source' => 'mining', 'palette' => 'iron', 'description' => 'Mountain seams, and the patience a shaft asks for.'],
         'hunting' => ['name' => 'Hunting', 'kind' => self::GATHERING, 'source' => 'hunting', 'palette' => 'pelt', 'description' => 'Any ground a herd wanders onto. Pelt, horn, sinew, and the animal itself.'],
