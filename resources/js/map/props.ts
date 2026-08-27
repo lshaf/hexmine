@@ -158,6 +158,73 @@ function column(x: number, y: number, scale: number, color: string): string {
 }
 
 /** Granite: one flat slab the weather never got under. */
+/*
+ * §5.2 -- the five dead grounds.
+ *
+ * Four drawings across the five, and each is the LIVING silhouette with the
+ * life taken out of it: a snag is a conifer stripped to its trunk, scree is a
+ * peak collapsed, stubble is a tuft cut off at the ankle. Plains and grassland
+ * share one, because they share one alive. That is what makes a waste read as
+ * forest-that-died rather than as a sixth kind of country -- which matters,
+ * because the fill underneath is the biome's own and the props are the whole
+ * of the tell.
+ *
+ * They are drawn in the biome's colour, drained: shade(base, -0.3) desaturated
+ * toward the fill it stands on, so at a glance the hex is the right country and
+ * on a second look nothing on it is alive. There is no grey anywhere here --
+ * grey said "different place", and this has to say "same place, finished".
+ */
+
+/** Forest: a conifer with the canopy gone. */
+function snag(x: number, y: number, scale: number, color: string): string {
+  const wood = shade(color, -0.5)
+  const h = 13 * scale
+
+  return (
+    rect(x - 1.1 * scale, y - h, 2.2 * scale, h, wood) +
+    // Two broken limbs, one each side, so the trunk is not a fence post.
+    `<path d="M${x},${(y - h * 0.72).toFixed(1)} l${(4.5 * scale).toFixed(1)},${(-2.6 * scale).toFixed(1)}" ` +
+    `stroke="${wood}" stroke-width="${(1.5 * scale).toFixed(2)}" stroke-linecap="round"/>` +
+    `<path d="M${x},${(y - h * 0.46).toFixed(1)} l${(-3.8 * scale).toFixed(1)},${(-2.1 * scale).toFixed(1)}" ` +
+    `stroke="${wood}" stroke-width="${(1.3 * scale).toFixed(2)}" stroke-linecap="round"/>`
+  )
+}
+
+/** Mountain: the peak come down. Same footprint, a third of the height. */
+function scree(x: number, y: number, scale: number, color: string): string {
+  const h = 7 * scale
+  const w = 13 * scale
+  const lit = shade(color, -0.12)
+  const dark = shade(color, -0.42)
+
+  return (
+    poly(`${x},${y - h} ${x + w},${y} ${x - w},${y}`, dark) +
+    poly(`${x},${y - h} ${x},${y} ${x - w},${y}`, lit) +
+    // A block or two off the face, sitting where it fell.
+    rect(x + w * 0.45, y - 2.4 * scale, 3.2 * scale, 2.4 * scale, dark) +
+    rect(x - w * 0.7, y - 1.8 * scale, 2.4 * scale, 1.8 * scale, dark)
+  )
+}
+
+/**
+ * Plains and grassland: a tuft cut off at the ankle.
+ *
+ * ONE treatment for the two of them, because the living map already draws them
+ * alike -- both grades run the `tufts` props. A distinct dead plains would be
+ * inventing a difference the country itself does not have; what tells them
+ * apart is the name on the card (Dust Flat against Stubble), which is where the
+ * difference actually lives.
+ */
+function stubble(x: number, y: number, color: string): string {
+  const c = shade(color, -0.38)
+
+  return (
+    poly(`${x},${y - 2.4} ${x + 1.1},${y} ${x - 1.1},${y}`, c) +
+    poly(`${x - 3},${y - 1.6} ${x - 2.1},${y} ${x - 3.9},${y}`, c) +
+    poly(`${x + 3.2},${y - 2} ${x + 4.1},${y} ${x + 2.3},${y}`, c)
+  )
+}
+
 /**
  * §5.2 -- dead ground. A crack in the pan, lying flat.
  *
@@ -626,6 +693,71 @@ function waterProp(tile: Tile): string {
  * Everything that stands on top of a tile. `y` values are negative-up from the
  * tile center, matching the hex geometry origin.
  */
+/**
+ * §5.2 -- what stands on dead ground, per biome.
+ *
+ * Five, because a dead forest and a dead mountain are not the same picture and
+ * flattening them into one grey treatment made every waste on the map the same
+ * place. Each is its biome's own silhouette with nothing alive in it, drawn in
+ * the biome's own colour drained -- so the hex still reads as the country it is
+ * in, which is what keeps it hidden until you are standing near it.
+ *
+ * Cracks are the common thread: every one of the five shows the pan through,
+ * because that is the one thing all dead ground has in common.
+ */
+function deadProps(
+  tile: Tile,
+  base: string,
+  seed: number,
+  spot: (index: number) => { x: number; y: number },
+): string {
+  let out = ''
+
+  // The ground itself, under whatever is left standing on it.
+  for (let i = 0; i < 2; i++) {
+    const p = spot(i)
+    out += crack(p.x * 0.8, p.y + 4, 0.7 + rand01(hash2(i, tile.col, seed)) * 0.4, base)
+  }
+
+  switch (tile.biome) {
+    case 'forest': {
+      const count = 1 + randInt(hash2(tile.col, tile.row, seed ^ 0x91), 0, 1)
+      for (let i = 0; i < count; i++) {
+        const p = spot(i + 2)
+        out += snag(p.x, p.y + 2, 0.8 + rand01(hash2(i, tile.row, seed)) * 0.35, base)
+      }
+      break
+    }
+    case 'mountain': {
+      const p = spot(2)
+      out += scree(p.x * 0.6, p.y + 3, 0.85 + rand01(hash2(tile.col, tile.row, seed)) * 0.3, base)
+      break
+    }
+    case 'badlands': {
+      // The one biome whose living props are already bare rock, so what marks
+      // it dead is that the shards are down: a flat stone in the pan instead.
+      const p = spot(2)
+      out += pebble(p.x * 0.7, p.y + 2, 0.8, base)
+      if (rand01(hash2(tile.row, tile.col, seed ^ 0x77)) > 0.55) {
+        const q = spot(3)
+        out += pebble(q.x * 0.5, q.y - 1, 0.6, base)
+      }
+      break
+    }
+    default: {
+      // Plains and grassland, drawn alike because they are drawn alike alive.
+      const count = 2 + randInt(hash2(tile.col, tile.row, seed ^ 0xa3), 0, 1)
+      for (let i = 0; i < count; i++) {
+        const p = spot(i + 2)
+        out += stubble(p.x, p.y + 3, base)
+      }
+      break
+    }
+  }
+
+  return out
+}
+
 export function tileProps(tile: Tile, depleted: boolean): string {
   if (tile.dungeon) return dungeonProp()
   if (tile.settlement) return settlementProp(tile.settlement.tier, tile.propSeed)
@@ -640,6 +772,14 @@ export function tileProps(tile: Tile, depleted: boolean): string {
     const hy = hash2(tile.col + index * 191, tile.row + index * 37, seed)
     return { x: randInt(hx, -17, 17), y: randInt(hy, -4, 9) }
   }
+
+  // §5.2 -- dead ground answers first, and it answers by BIOME rather than by
+  // variant. It has no variant of its own on purpose: the fill under it is the
+  // country's own colour, so at a distance -- where §13.2 draws the fill and
+  // nothing else -- a waste is indistinguishable from the ground around it, and
+  // the only way to find workable hexes is to walk close enough to see what is
+  // standing on them. That is the whole point of it blending.
+  if (tile.dead) return deadProps(tile, base, seed, spot)
 
   // §5.3 -- the treatment comes off the variant, not the biome. Four grades of
   // forest are four different stands of trees; the base grade is the one that
@@ -736,19 +876,7 @@ export function tileProps(tile: Tile, depleted: boolean): string {
       out += shelf(p.x * 0.35, p.y + 2, depleted ? 0.7 : 0.95, base)
       break
     }
-    // §5.2 -- dead ground. Two cracks and a stone, and nothing standing: the
-    // bare surface is what says there is nothing here to work.
-    case 'barren': {
-      for (let i = 0; i < 2; i++) {
-        const p = spot(i)
-        out += crack(p.x * 0.8, p.y + 3, 0.8 + rand01(hash2(i, tile.col, seed)) * 0.45, base)
-      }
-      if (rand01(hash2(tile.col, tile.row, seed ^ 0x5d)) > 0.45) {
-        const p = spot(2)
-        out += pebble(p.x * 0.7, p.y + 1, 0.75, base)
-      }
-      break
-    }
+
     case 'glass': {
       const count = depleted ? 1 : 2
       for (let i = 0; i < count; i++) {
@@ -917,6 +1045,50 @@ export function waterGlyph(biome: Biome, kind: WaterKind, size = 34): string {
     `<path d="${HEX_SIDE_PATH}" fill="${shade(top, -0.4)}"/>` +
     `<path d="${HEX_TOP_PATH}" fill="${top}" stroke="${shade(top, -0.2)}" stroke-width="0.5"/>` +
     waterProp(tile) +
+    '</svg>'
+  )
+}
+
+/**
+ * §5.2 -- one hex of dead ground, for the tile card's portrait.
+ *
+ * The same argument as waterGlyph beside it: a single object, no backing slab,
+ * drawn by the very function that draws it on the map. The portrait slot is
+ * answering "what is this hex", and for dead ground the honest answer is the
+ * ground itself -- the biome's own colour with a snag or a scree slope on it,
+ * exactly what you are looking at underfoot.
+ *
+ * A seam fills this slot with its material and a settlement with its lines, so
+ * a waste filling it with a blank pin was the one kind of ground whose portrait
+ * said nothing at all. That is the hex a player most needs to recognise, since
+ * it is the one the map is deliberately not telling them about at a distance.
+ */
+export function deadGlyph(biome: Biome, size = 34): string {
+  const tile = {
+    col: 0,
+    row: 0,
+    biome,
+    variant: biome as VariantKey,
+    dead: true,
+    propSeed: SPECIMEN_SEED,
+    settlement: undefined,
+    dungeon: undefined,
+    water: undefined,
+    herdUntil: undefined,
+  } as unknown as Tile
+
+  const top = variantColor(biome as VariantKey)
+
+  // Tight to the slab: half a hex above the center, half plus its depth below.
+  const w = HEX_W
+  const boxH = HEX_H + 12
+
+  return (
+    `<svg viewBox="${-w / 2} ${-HEX_H / 2 - 2} ${w} ${boxH}" width="${size}" ` +
+    `height="${Math.round((size * boxH) / w)}" aria-hidden="true">` +
+    `<path d="${HEX_SIDE_PATH}" fill="${shade(top, -0.4)}"/>` +
+    `<path d="${HEX_TOP_PATH}" fill="${top}" stroke="${shade(top, -0.2)}" stroke-width="0.5"/>` +
+    tileProps(tile, false) +
     '</svg>'
   )
 }

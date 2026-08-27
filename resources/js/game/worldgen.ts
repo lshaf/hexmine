@@ -871,9 +871,7 @@ export function generateTile(
   const barren = !settlement && !water && !dungeon && isBarren(col, row, ring)
 
   let material: MaterialKey | undefined
-  // Dead ground belongs to no biome, so it says so rather than wearing the
-  // colour of the country it interrupts.
-  let variant: VariantKey = barren ? 'barren' : biome
+  let variant: VariantKey = biome
   let grade = 'common'
   if (!barren && !settlement && !water) {
     const picked = variantOf(col, row, biome, ring)
@@ -889,6 +887,11 @@ export function generateTile(
     variant,
     ring,
     material,
+    // §5.2 -- no seam, and never will have one. NOT a variant of its own: dead
+    // ground wears the colour of the country it sits in, so a waste is
+    // invisible at a distance and obvious underfoot. What tells you is the
+    // props, and §13.2 draws those in sight only.
+    dead: barren,
     hp: tileHp(hTime, grade),
     baseYield,
     extractions: tileExtractions(baseYield),

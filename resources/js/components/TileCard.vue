@@ -18,11 +18,10 @@ import { useGame } from '@/stores/game'
 import { MATERIALS, RING_LABEL, SKILL_BY_KEY, skillForMaterial } from '@/game/catalog'
 import { formatDuration, formatSpan } from '@/game/formulas'
 import { MINING } from '@/game/balance'
-import { waterLabel } from '@/game/water'
-import { VARIANT_LABEL } from '@/game/variants'
+import { groundLabel } from '@/game/ground'
 import { hexDistance } from '@/map/hexGeometry'
 import { materialIcon } from '@/icons/procedural'
-import { dungeonProp, waterGlyph } from '@/map/props'
+import { deadGlyph, dungeonProp, waterGlyph } from '@/map/props'
 import HexAction from '@/shell/HexAction.vue'
 import SvgIcon from './SvgIcon.vue'
 import LineMarks from './LineMarks.vue'
@@ -68,23 +67,45 @@ const seam = computed(() => Boolean(!unseen.value && preview.value?.material))
 
 
 /**
- * The portrait's material, scouted or not.
+ * The portrait's material -- the SERVER's, and only where it has one.
  *
- * The server's preview when there is one, and the tile's own material when
- * there is not -- which out of sight is every time, because the preview
- * endpoint refuses unscouted ground (§5.6). That is not a leak: a hex's variant
- * is a pure function of (col, row, seed), the map already paints the fogged
- * tile in that variant's own tint, and the card's title has always named it
- * ("Ironwood Grove"). A blank portrait over a title that named the ground was
- * the card being coy about something it had just said.
+ * It used to fall back to the tile's own material out of sight, on the argument
+ * that a variant is a pure function of (col, row, seed) and the map was already
+ * painting the fogged hex in that variant's tint anyway, so a blank portrait
+ * was the card being coy about something it had just said.
  *
- * What stays fogged is the live half the server owns: how much is left, who is
- * standing on it, what the work would cost.
+ * That argument died with §5.2. Dead ground wears its biome's own fill, so the
+ * map now says nothing at a distance about whether a hex can be worked at all
+ * -- and a card that answered it anyway would be handing back the exact thing
+ * the fog was rearranged to withhold. Whether there is a seam out there is the
+ * question the walk exists to answer.
  */
 const mat = computed(() => {
-  const key = preview.value?.material ?? tile.value?.material
+  const key = preview.value?.material
 
   return key ? MATERIALS[key] : null
+})
+
+/**
+ * §5.2 -- unscouted open country wears dead ground's face.
+ *
+ * The card has to look the SAME for a live hex and a dead one out there, or it
+ * gives away what the map is holding back -- and of the two faces it could pick
+ * for both, this is the right one: it says "assume there is nothing here until
+ * you have been", which is what makes finding a live seam a discovery rather
+ * than makes arriving at a waste a disappointment.
+ *
+ * Open country only. §5.6 is explicit that a place's identity is terrain and
+ * the fog was never entitled to it, so a settlement keeps its name and its
+ * lines, water keeps its name, and a dungeon mouth keeps its glyph -- at any
+ * distance. What the fog owns is what the ground would PAY.
+ */
+const deadFace = computed(() => {
+  const t = tile.value
+  if (!t) return false
+  if (t.settlement || t.water || t.dungeon) return false
+
+  return t.dead || unseen.value
 })
 
 /**
@@ -257,13 +278,13 @@ const title = computed(() => {
   // back out there is live state, and a lake is terrain: the client derives it
   // from the seed like every other hex, so pretending not to know would be a
   // fog the map does not actually have.
-  if (t.water) return waterLabel(t.biome, t.water)
+  if (t.water) return groundLabel(t)
 
   if (unseen.value && !t.settlement) {
-    return t.dungeon ? 'A way down' : VARIANT_LABEL[t.variant]
+    return t.dungeon ? 'A way down' : groundLabel(t, deadFace.value)
   }
 
-  return t.settlement?.name ?? t.dungeon?.name ?? VARIANT_LABEL[t.variant]
+  return t.settlement?.name ?? t.dungeon?.name ?? groundLabel(t)
 })
 
 // A new hex is a fresh question; do not carry the previous one's expansion.
@@ -301,6 +322,10 @@ watch(open, (isOpen) => {
                  uses, and the mouth is the one the map puts on the hex. -->
             <SvgIcon v-else-if="tile.water" :svg="waterGlyph(tile.biome, tile.water, 34)" />
             <SvgIcon v-else-if="tile.dungeon" :svg="dungeonSpecimen" />
+            <!-- §5.2 -- dead ground gets its own hex rather than the blank pin,
+                 and so does anything unscouted: out there the two have to look
+                 alike, or the card answers the question the walk is for. -->
+            <SvgIcon v-else-if="deadFace" :svg="deadGlyph(tile.biome, 34)" />
             <span v-else class="pin" aria-hidden="true" />
           </span>
 

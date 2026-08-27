@@ -213,8 +213,25 @@ cross-map travel — same design pressure as biome-locked mining.
 **Half the outer rim has no seam in it at all, and the share climbs the whole
 way in.** `Balance::MINEABLE_SHARE`. What misses out is **dead ground** — not
 depleted, which is drained and regrows in about nine hours (§5.1), but ground
-that never carried anything and never will. It has its own variant, its own
-name on the card, and the one colour §13.3 held back for it.
+that never carried anything and never will.
+
+**It is not a variant, and that is the load-bearing part.** A dead hex keeps its
+biome's own variant and its own fill, and carries a `dead` flag instead. What
+tells you is **what stands on it** — and §13.2 draws props inside sight and
+nowhere else. So a waste is *invisible at a distance and obvious underfoot*,
+which is the whole design: finding workable ground is something you do by
+walking, not by reading the map from four days away.
+
+**Five dead grounds, one per biome**, each its own silhouette with the life
+taken out of it — a snag is a conifer stripped to the trunk, scree is a peak
+come down, stubble is a tuft cut at the ankle. Named the way the water is
+(§5.3): Deadwood · Scree · Dust Flat · Hardpan · Stubble. A dead forest and a
+dead mountain are not the same place, and one shared word for both would throw
+that away.
+
+*(It was a single grey `barren` variant, bleached bright enough to read from
+across the map. That was backwards — it handed the player the answer for free,
+and every waste on the map was the same place.)*
 
 The gradient runs the same direction as the two that were already there — Tier 3
 density (§4) and the pack rate (§9.5.1) — so the middle of the map is richer,
@@ -223,12 +240,16 @@ also the answer to a question the flat map never asked: with 96% of every ring
 workable, *where* you stood barely mattered, and the only thing distinguishing
 one forest hex from the next was its grade roll.
 
-**Dead ground is terrain, so §5.6 draws it at any distance**, which is what lets
-the regions be large. `Balance::BARREN_CELL` is 5, and the field it is cut from
-is smooth noise rather than a per-hex roll — §5.3 makes the same argument about
-biomes, and half a ring of independently-rolled dead hexes would be exactly the
-speckle that rules out. A waste you can see from four days away is a route to
-plan around; one you discover by walking into it would be a trap.
+**The regions are large, and being unable to see them is what gives that
+teeth.** `Balance::BARREN_CELL` is 5, and the field is smooth noise rather than
+a per-hex roll — §5.3 makes the same argument about biomes, and half a ring of
+independently-rolled dead hexes would be speckle rather than country.
+
+What keeps it from being a trap is that **you are never blind about where you
+are standing**: the disc of seven always tells you which of your neighbours can
+be worked. What you cannot do is see the answer from the far side of the map.
+Biome is still drawn at any distance, so heading for the right *country* is
+free; finding the live ground inside it is the walk.
 
 Two consequences worth stating, because both are deliberate:
 
@@ -264,9 +285,10 @@ mentally navigable map. Rare-material biome variants sit inside/near the PvP rin
 
 **Four grades a biome, and the grade is a rung of the equipment ladder.** Base,
 Better, Best, Contested — each named for a tool rung, each giving up a better
-material than the one under it. **Dead ground is none of them** (§5.2): it
-belongs to no biome and is not a fifth grade, because it is not something a hex
-rolls — the field decides it before the roll happens.
+material than the one under it. **Dead ground is none of them** (§5.2): it is
+not a fifth grade and not a variant at all, because it is not something a hex
+rolls — the field decides it before the roll happens, and the hex keeps whatever
+variant and colour its biome would have given it.
 
 **Better ground is more work, and the rung it is named for is how much more.**
 A hex's HP roll (§7.3) is scaled by its grade, and the scale is the *attack of
@@ -358,6 +380,26 @@ free, at any distance, and draws a **settlement glyph and its name** wherever
 anybody lives. What it does *not* have is anything the server alone knows:
 depletion timers, who is mining where, what a hex would pay. That is the whole
 of the difference between scouted ground and the rest.
+
+**The land is the BIOME, and what a hex holds is not the land.** Out there a hex
+is painted in its biome's own colour and named for its biome's dead ground
+(§5.2) — so a live seam, a rare grade and a waste are one picture until you have
+walked to them. Close up the variant paints itself and the card names it, and
+that difference is what the walk buys.
+
+Two things used to give it away and no longer do. The map painted a fogged tile
+in its **variant's** tint, so an Ironwood Grove was a different green from four
+days off — which said both *there is a seam here* and *this good*. And the tile
+card filled its portrait from the client's own copy of the material, on the
+argument that the tint had already said it. Both were true readings of a map
+where every hex had something in it; neither survives half a rim of dead ground
+that wears the same fill as the living country beside it.
+
+**The pessimistic face is the deliberate one.** An unscouted hex wears dead
+ground's name and dead ground's portrait, rather than a live hex's. Of the two
+faces the card could pick for both, that is the one that makes finding a seam a
+discovery — the other makes arriving at a waste a disappointment, and an idle
+game has better uses for a player's walk than teaching them not to hope.
 
 **A place's identity is terrain, and the fog was never entitled to it.** Name,
 tier and the lines it runs (§6) all fall out of `(col, row, seed)`, and the
@@ -2754,6 +2796,12 @@ The working approach, after several failed attempts:
   is on the tile card, in the portrait slot a seam fills with its material: a
   comb of the materials each line turns out (§6), on the same nested lattice
   the map itself tiles with.
+- **Dead ground fills that slot with a hex of itself** (§5.2) — the biome's own
+  fill with a snag or a scree slope on it, drawn by the very function that draws
+  it on the map, exactly as water and a dungeon mouth are. It is the one kind of
+  country the map deliberately withholds at a distance, so the card is where a
+  player learns what it looks like; a blank pin there left the one hex worth
+  recognising as the only one whose portrait said nothing.
 - **One exception, and it is one wallet wide: your own corpse** (§9.5.7). It is
   drawn through any fog at any distance, because it holds a row of yours on a
   24h clock. Anybody else's obeys the fog like everything else.
@@ -2774,16 +2822,20 @@ badlands   #96604c   grassland #a8a05c
 Depleted tiles use a darker/desaturated variant of their **own biome color**, never gray —
 the land is drained, not dead, and it will regrow.
 
-**Gray is dead ground's**, and that sentence is what reserved it (§5.2). It is
-`#c2b9aa` — bleached rather than dark, and that is not taste: the five biome
-fills run luminance 110–155, so a dark gray sits under all of them and collapses
-against unscouted ground, which §13.2 dims by 42%. Bleached clears the lot, so a
-waste reads as a waste from across the map.
+**Dead ground has no colour of its own at all** (§5.2), and that is deliberate:
+it wears its biome's fill, so at a distance — where §13.2 draws the fill and
+nothing else — a waste and the country around it are the same picture. The tell
+is entirely in the props, which are drawn in sight and nowhere else.
 
-**Its props are the other half of the message: nothing stands.** Every other
-treatment stands something up — trees, peaks, columns, stalks. Dead ground draws
-cracks lying flat and the occasional stone, so the absence is legible before the
-colour has finished saying it.
+**What the props say is that nothing is alive.** Each of the five is its biome's
+own silhouette emptied out — bare snags where the conifers were, scree where the
+peak was, stubble where the tufts were — drawn in the biome's own colour
+drained, never in gray. Gray would say *different place*; this has to say *same
+place, finished*. Cracks in the pan are the one thing all five share.
+
+*(A single bleached `barren` tint was tried first. It read beautifully and
+defeated the purpose: the wastes were legible from across the map, so there was
+nothing left to go and find out.)*
 
 **Ember and sap are a pair, and neither may do the other's job.** Ember marks a
 state to deal with — a full bag, a broken tool, a destructive button. Sap marks

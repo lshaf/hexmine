@@ -162,8 +162,6 @@ export type VariantKey =
   | 'grassland_uncommon'
   | 'grassland_rare'
   | 'grassland_epic'
-  /** §5.2 -- ground with no seam in it, belonging to no biome. Not a grade. */
-  | 'barren'
 
 /**
  * §4 Tier 1 -- the alchemist's second stock. What LIVES on a kind of ground, as
@@ -689,8 +687,18 @@ export interface Tile {
   /** §5.3 -- which of the biome's four grades this ground is. */
   variant: VariantKey
   ring: Ring
-  /** Undefined on barren capital-ring tiles, §5.2. */
+  /** Undefined wherever there is no seam: dead ground, water, a town, §5.2. */
   material?: MaterialKey
+  /**
+   * §5.2 -- dead ground: no seam, and never will have one.
+   *
+   * Told apart from the other reasons `material` is missing, because it is the
+   * only one that looks like ordinary country. A lake and a town announce
+   * themselves; this wears the biome's own colour on purpose, so that finding
+   * workable ground is something you do by walking rather than by reading the
+   * map from four days away.
+   */
+  dead: boolean
   /** §7.3 -- how much work this hex is. The world rolls HP and nothing else. */
   hp: number
   /** Units yielded per mine before bonuses. */

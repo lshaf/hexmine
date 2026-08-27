@@ -917,11 +917,14 @@ final class WorldGen
             'col' => $col,
             'row' => $row,
             'biome' => $biome,
-            // Dead ground belongs to no biome, so it says so rather than
-            // wearing the colour of the country it interrupts.
-            'variant' => $variant['key'] ?? ($barren ? 'barren' : $biome),
+            'variant' => $variant['key'] ?? $biome,
             'ring' => $ring,
             'material' => $material,
+            // §5.2 -- no seam, and never will have one. It is NOT a variant of
+            // its own: dead ground wears the colour of the country it sits in,
+            // so a waste is invisible at a distance and obvious underfoot. What
+            // tells you is the props, and §13.2 draws those in sight only.
+            'dead' => $barren,
             'hp' => self::tileHp($hTime, $variant['grade'] ?? 'common'),
             'baseYield' => $baseYield,
             'extractions' => self::tileExtractions($baseYield),

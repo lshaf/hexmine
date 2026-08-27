@@ -54,6 +54,7 @@ for (const line of lines) {
     variant,
     ring,
     material,
+    dead,
     hp,
     baseYield,
     extractions,
@@ -73,6 +74,10 @@ for (const line of lines) {
     tile.variant,
     tile.ring,
     tile.material ?? '-',
+    // §5.2 -- dead ground wears its biome's own variant and colour, so it shows
+    // in no other column here. Without it this passes while the two generators
+    // disagree about which half of the map can be worked at all.
+    tile.dead ? 'dead' : '-',
     String(tile.hp),
     String(tile.baseYield),
     String(tile.extractions),
@@ -90,6 +95,7 @@ for (const line of lines) {
     variant,
     ring,
     material,
+    dead,
     hp,
     baseYield,
     extractions,

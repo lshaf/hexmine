@@ -65,7 +65,7 @@ final class WorldParityTest extends TestCase
         $this->assertNotEmpty($lines);
 
         foreach ($lines as $line) {
-            [$coord, $biome, $variant, $ring, $material, $baseSeconds, $baseYield, $extractions, $settlement, $dungeon, $water, $pack, $propSeed]
+            [$coord, $biome, $variant, $ring, $material, $dead, $baseSeconds, $baseYield, $extractions, $settlement, $dungeon, $water, $pack, $propSeed]
                 = explode('|', $line);
 
             [$col, $row] = array_map('intval', explode(',', $coord));
@@ -78,6 +78,7 @@ final class WorldParityTest extends TestCase
                 $tile['variant'],
                 $tile['ring'],
                 $tile['material'] ?? '-',
+                $tile['dead'] ? 'dead' : '-',
                 $tile['hp'],
                 $tile['baseYield'],
                 $tile['extractions'],
@@ -92,7 +93,7 @@ final class WorldParityTest extends TestCase
 
             // Silence unused-variable noise while keeping the destructure
             // readable as documentation of the fixture format.
-            unset($biome, $variant, $ring, $material, $baseSeconds, $baseYield, $extractions, $settlement, $dungeon, $water, $pack, $propSeed);
+            unset($biome, $variant, $ring, $material, $dead, $baseSeconds, $baseYield, $extractions, $settlement, $dungeon, $water, $pack, $propSeed);
         }
     }
 
@@ -224,6 +225,47 @@ final class WorldParityTest extends TestCase
                 ),
             );
         }
+    }
+
+    /**
+     * §5.2 -- dead ground wears its biome's own colour, and that is the rule.
+     *
+     * It carries a flag rather than a variant of its own, so a hex with no seam
+     * in it draws exactly the fill a living hex of that biome draws. §13.2 puts
+     * props inside sight and nothing else out there, so the whole tell is what
+     * STANDS on the hex -- which makes a waste invisible from across the map and
+     * plain from one hex away.
+     *
+     * That is the difference between a map you read and a map you walk. A dead
+     * variant with a tint of its own was tried first and it answered the
+     * question for free.
+     */
+    public function test_dead_ground_is_not_a_variant_and_keeps_its_biome_colour(): void
+    {
+        $radius = Balance::mapRadius();
+        $checked = 0;
+
+        for ($col = -$radius; $col <= $radius; $col += 7) {
+            for ($row = -$radius; $row <= $radius; $row += 7) {
+                $tile = WorldGen::generateTile($col, $row, 0);
+                if (! $tile['dead']) {
+                    continue;
+                }
+
+                $checked++;
+
+                // The biome's base variant, exactly as a living hex of the same
+                // country would carry -- no key of its own to hang a tint on.
+                $this->assertSame(
+                    $tile['biome'],
+                    $tile['variant'],
+                    "dead ground at {$col},{$row} has stopped wearing its biome",
+                );
+                $this->assertNull($tile['material'], "dead ground at {$col},{$row} has a seam");
+            }
+        }
+
+        $this->assertGreaterThan(100, $checked, 'the sample found almost no dead ground');
     }
 
     /**

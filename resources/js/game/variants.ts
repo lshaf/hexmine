@@ -72,7 +72,6 @@ export const VARIANT_TINT: Record<VariantKey, string> = {
   grassland_uncommon: '#b6b073',
   grassland_rare: '#8f9552',
   grassland_epic: '#9fa878',
-  barren: '#c2b9aa',
 }
 
 /** What the map calls the ground under your feet. */
@@ -97,7 +96,6 @@ export const VARIANT_LABEL: Record<VariantKey, string> = {
   grassland_uncommon: 'Flax Meadow',
   grassland_rare: 'Hemp Field',
   grassland_epic: 'Silkweave Fen',
-  barren: 'Dead Ground',
 }
 
 export const VARIANT_DESCRIPTION: Record<VariantKey, string> = {
@@ -121,7 +119,6 @@ export const VARIANT_DESCRIPTION: Record<VariantKey, string> = {
   grassland_uncommon: 'Blue at the top for a week a year, then worth cutting.',
   grassland_rare: 'Stems over head height. You lose sight of the next hex in it.',
   grassland_epic: 'Something has been spinning in the tall grass. Contested ground.',
-  barren: 'Scoured down to the pan. Nothing grows and nothing seams.',
 }
 
 export const VARIANT_RAW: Material[] = [
@@ -186,7 +183,6 @@ export const VARIANT_PROPS: Record<VariantKey, string> = {
   grassland_uncommon: 'flowering',
   grassland_rare: 'tall',
   grassland_epic: 'silk',
-  barren: 'barren',
 }
 
 /** §5.3 -- which ground a material comes off, for the almanac. */
@@ -242,7 +238,6 @@ export const VARIANT_RINGS: Record<VariantKey, string[]> = {
   grassland_uncommon: ['mid', 'inner', 'center'],
   grassland_rare: ['inner', 'center'],
   grassland_epic: ['inner', 'center'],
-  barren: ['outer', 'mid', 'inner', 'center'],
 }
 
 /** §7.2 -- which gathering line a grade belongs to. */

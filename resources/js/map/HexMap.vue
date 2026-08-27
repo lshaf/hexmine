@@ -304,13 +304,21 @@ const renderTiles = computed<RenderTile[]>(() =>
     // waterway belongs to the badlands or the forest rather than cutting one
     // uniform blue line across five kinds of country. Never depleted: there is
     // nothing on it to work out.
+    const distance = hexDistance(props.characterCol, props.characterRow, tile.col, tile.row)
+    const inSight = distance <= props.sight
+
+    // §5.2 -- out of sight a hex is painted in its BIOME's colour, not its
+    // variant's. Dead ground already wears the biome fill, so a fogged tile
+    // showing a variant tint would say "not dead, and this good" from four
+    // days away -- which is the one thing §5.6 says the fog owns: what the
+    // ground would pay. Close up the variant paints itself again, and that
+    // difference is the reward for having walked.
+    const ground = inSight ? tile.variant : (tile.biome as typeof tile.variant)
     const base = tile.water
       ? waterColor(tile.biome, tile.water)
       : depleted
-        ? depletedColor(tile.variant)
-        : variantColor(tile.variant)
-    const distance = hexDistance(props.characterCol, props.characterRow, tile.col, tile.row)
-    const inSight = distance <= props.sight
+        ? depletedColor(ground)
+        : variantColor(ground)
     const corpse = carrierAt.value.get(`${tile.col},${tile.row}`) ?? null
 
     // Unscouted is communicated with a darker SOLID fill, never opacity --

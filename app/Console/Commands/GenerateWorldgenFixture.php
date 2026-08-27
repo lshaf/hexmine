@@ -31,8 +31,8 @@ class GenerateWorldgenFixture extends Command
         // exactly as the server would, without a running app.
         file_put_contents(
             base_path('tests/Fixtures/world-config.json'),
-            json_encode(app(GameService::class)->worldConfig(), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."
-",
+            json_encode(app(GameService::class)->worldConfig(), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES).'
+',
         );
 
         // Strides coprime with the map so 240 samples spread over the whole
@@ -66,6 +66,11 @@ class GenerateWorldgenFixture extends Command
                 $tile['variant'],
                 $tile['ring'],
                 $tile['material'] ?? '-',
+                // §5.2 -- dead ground wears its biome's own variant and colour,
+                // so it is invisible in every other column here. Without it the
+                // fixture would pass while the two generators disagreed about
+                // which half of the map can be worked at all.
+                $tile['dead'] ? 'dead' : '-',
                 $tile['hp'],
                 $tile['baseYield'],
                 $tile['extractions'],

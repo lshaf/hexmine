@@ -17,8 +17,7 @@ import { useGame } from '@/stores/game'
 import { api } from '@/api/client'
 import { MONSTERS } from '@/game/monsters'
 import { RECIPES, RING_LABEL, SKILL_BY_KEY } from '@/game/catalog'
-import { VARIANT_LABEL } from '@/game/variants'
-import { waterLabel } from '@/game/water'
+import { groundLabel } from '@/game/ground'
 import { formatDuration, placeLabel } from '@/game/formulas'
 import { worldParams } from '@/game/worldgen'
 import HexAction from './HexAction.vue'
@@ -51,7 +50,7 @@ const placeName = computed(() => {
   const tile = standing.value
   if (!tile) return 'Unsurveyed'
 
-  return tile.water ? waterLabel(tile.biome, tile.water) : VARIANT_LABEL[tile.variant]
+  return groundLabel(tile)
 })
 
 /**

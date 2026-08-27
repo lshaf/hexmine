@@ -2879,7 +2879,7 @@ class GameService
                 // A depleted hex refuses in almost the same words and comes
                 // back in nine hours; this one never had a seam, so a player
                 // told only "nothing here" would stand and wait for it.
-                $tile['variant'] === 'barren' => 'Nothing seams here, and nothing ever will.',
+                $tile['dead'] => 'Nothing seams here, and nothing ever will.',
                 $tile['settlement'] !== null => 'Settlements sit on worked ground. Nothing left to take.',
                 default => 'Nothing mineable here.',
             };
