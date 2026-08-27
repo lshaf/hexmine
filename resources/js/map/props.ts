@@ -1077,9 +1077,33 @@ export function deadGlyph(biome: Biome, size = 34): string {
     herdUntil: undefined,
   } as unknown as Tile
 
-  const top = variantColor(biome as VariantKey)
+  return groundHex(biome, tileProps(tile, false), size)
+}
 
-  // Tight to the slab: half a hex above the center, half plus its depth below.
+/**
+ * §5.6 -- one hex of unscouted country: the biome's colour, and nothing on it.
+ *
+ * The same drawing the MAP makes out there, which is the whole argument for it.
+ * Beyond the sight ring §13.2 paints terrain and no props at all, so a portrait
+ * with props would be the card claiming to know something the map does not --
+ * live conifers would assert a seam, snags would assert a waste, and the two
+ * have to look alike or the fog is decoration.
+ *
+ * Bare ground is what "I have not been there" looks like, and it is a great
+ * deal more honest than the blank pin this replaced: that was a hole where the
+ * tile should be, on a card whose whole left-hand column is the tile.
+ */
+export function unscoutedGlyph(biome: Biome, size = 34): string {
+  return groundHex(biome, '', size)
+}
+
+/**
+ * The slab both of them are drawn on: a tile seen from the map's own angle.
+ *
+ * Tight to the slab -- half a hex above the center, half plus its depth below.
+ */
+function groundHex(biome: Biome, inner: string, size: number): string {
+  const top = variantColor(biome as VariantKey)
   const w = HEX_W
   const boxH = HEX_H + 12
 
@@ -1088,7 +1112,7 @@ export function deadGlyph(biome: Biome, size = 34): string {
     `height="${Math.round((size * boxH) / w)}" aria-hidden="true">` +
     `<path d="${HEX_SIDE_PATH}" fill="${shade(top, -0.4)}"/>` +
     `<path d="${HEX_TOP_PATH}" fill="${top}" stroke="${shade(top, -0.2)}" stroke-width="0.5"/>` +
-    tileProps(tile, false) +
+    inner +
     '</svg>'
   )
 }

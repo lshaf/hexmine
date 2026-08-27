@@ -21,7 +21,7 @@ import { MINING } from '@/game/balance'
 import { groundLabel } from '@/game/ground'
 import { hexDistance } from '@/map/hexGeometry'
 import { materialIcon } from '@/icons/procedural'
-import { deadGlyph, dungeonProp, waterGlyph } from '@/map/props'
+import { deadGlyph, dungeonProp, unscoutedGlyph, waterGlyph } from '@/map/props'
 import HexAction from '@/shell/HexAction.vue'
 import SvgIcon from './SvgIcon.vue'
 import LineMarks from './LineMarks.vue'
@@ -328,6 +328,10 @@ watch(open, (isOpen) => {
                  falls through to the pin, so a live hex and a dead one are one
                  picture until the walk is done. -->
             <SvgIcon v-else-if="deadFace" :svg="deadGlyph(tile.biome, 34)" />
+            <!-- §5.6 -- unscouted: the biome's ground with nothing on it, which
+                 is exactly what the map draws out there. Props either way would
+                 be the card knowing more than the map does. -->
+            <SvgIcon v-else-if="unseen" :svg="unscoutedGlyph(tile.biome, 34)" />
             <span v-else class="pin" aria-hidden="true" />
           </span>
 
