@@ -382,8 +382,8 @@ depletion timers, who is mining where, what a hex would pay. That is the whole
 of the difference between scouted ground and the rest.
 
 **The land is the BIOME, and what a hex holds is not the land.** Out there a hex
-is painted in its biome's own colour and named for its biome's dead ground
-(§5.2) — so a live seam, a rare grade and a waste are one picture until you have
+is painted in its biome's own colour and named for its biome and nothing more —
+so a live seam, a rare grade and a waste (§5.2) are one picture until you have
 walked to them. Close up the variant paints itself and the card names it, and
 that difference is what the walk buys.
 
@@ -395,11 +395,17 @@ argument that the tint had already said it. Both were true readings of a map
 where every hex had something in it; neither survives half a rim of dead ground
 that wears the same fill as the living country beside it.
 
-**The pessimistic face is the deliberate one.** An unscouted hex wears dead
-ground's name and dead ground's portrait, rather than a live hex's. Of the two
-faces the card could pick for both, that is the one that makes finding a seam a
-discovery — the other makes arriving at a waste a disappointment, and an idle
-game has better uses for a player's walk than teaching them not to hope.
+**The biome is the one answer that is true at any distance**, which is why it is
+the one the card gives. You can see that there is forest over the hill; you
+cannot see whether the stand is worth cutting, and you cannot see whether it is
+dead. So a fogged Ironwood Grove, a fogged plain forest and a fogged Deadwood
+all read *Forest*, and every one of them resolves on arrival. The portrait slot
+holds a blank pin out there — no report, agreeing with the name above it.
+
+*(Naming every fogged hex for its dead ground was tried first. It hid the seam
+just as well and told a small lie to do it: the card asserted Deadwood over
+ground that turned out to be living, and then changed its mind when you got
+there. Hiding a fact and inventing one are not the same move.)*
 
 **A place's identity is terrain, and the fog was never entitled to it.** Name,
 tier and the lines it runs (§6) all fall out of `(col, row, seed)`, and the

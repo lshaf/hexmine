@@ -87,26 +87,23 @@ const mat = computed(() => {
 })
 
 /**
- * §5.2 -- unscouted open country wears dead ground's face.
+ * §5.2 -- the dead-ground portrait, for scouted ground only.
  *
- * The card has to look the SAME for a live hex and a dead one out there, or it
- * gives away what the map is holding back -- and of the two faces it could pick
- * for both, this is the right one: it says "assume there is nothing here until
- * you have been", which is what makes finding a live seam a discovery rather
- * than makes arriving at a waste a disappointment.
+ * Out of sight the slot falls through to the blank pin, and that is the honest
+ * answer rather than a missing one: the title says "Forest", the pin says no
+ * report, and the two agree. A dead hex drawn under a live biome name would be
+ * the card asserting something it cannot know, which is exactly what naming
+ * every fogged hex "Deadwood" did before.
  *
- * Open country only. §5.6 is explicit that a place's identity is terrain and
- * the fog was never entitled to it, so a settlement keeps its name and its
- * lines, water keeps its name, and a dungeon mouth keeps its glyph -- at any
- * distance. What the fog owns is what the ground would PAY.
+ * So out there every hex looks alike whatever is under it -- which is the whole
+ * point -- and the tell arrives when you do.
+ *
+ * §5.6 is explicit that a place's identity is terrain and the fog was never
+ * entitled to it, so a settlement keeps its name and its lines, water keeps its
+ * name, and a dungeon mouth keeps its glyph at any distance. What the fog owns
+ * is what the ground would PAY.
  */
-const deadFace = computed(() => {
-  const t = tile.value
-  if (!t) return false
-  if (t.settlement || t.water || t.dungeon) return false
-
-  return t.dead || unseen.value
-})
+const deadFace = computed(() => Boolean(tile.value?.dead) && !unseen.value)
 
 /**
  * §6 -- what the settlement standing here refines, said as the material each
@@ -281,7 +278,11 @@ const title = computed(() => {
   if (t.water) return groundLabel(t)
 
   if (unseen.value && !t.settlement) {
-    return t.dungeon ? 'A way down' : groundLabel(t, deadFace.value)
+    // `unseen`, not `deadFace`: out here the argument is that we have not
+    // LOOKED, which is true of a live hex and a dead one alike. Passing the
+    // dead-portrait flag would have named the dead ones and left the living
+    // ones named for their variant -- the leak, with an extra step.
+    return t.dungeon ? 'A way down' : groundLabel(t, true)
   }
 
   return t.settlement?.name ?? t.dungeon?.name ?? groundLabel(t)
@@ -323,8 +324,9 @@ watch(open, (isOpen) => {
             <SvgIcon v-else-if="tile.water" :svg="waterGlyph(tile.biome, tile.water, 34)" />
             <SvgIcon v-else-if="tile.dungeon" :svg="dungeonSpecimen" />
             <!-- §5.2 -- dead ground gets its own hex rather than the blank pin,
-                 and so does anything unscouted: out there the two have to look
-                 alike, or the card answers the question the walk is for. -->
+                 once you are near enough to have looked. Out of sight this
+                 falls through to the pin, so a live hex and a dead one are one
+                 picture until the walk is done. -->
             <SvgIcon v-else-if="deadFace" :svg="deadGlyph(tile.biome, 34)" />
             <span v-else class="pin" aria-hidden="true" />
           </span>

@@ -33,15 +33,22 @@ export const DEAD_LABEL: Record<Biome, string> = {
 /**
  * The name of the ground itself -- never a settlement's, never a dungeon's.
  *
- * `asDead` forces the dead name for ground the player has not scouted (§5.2).
- * Out there a live hex and a dead one have to read alike, or the card gives
- * away what the map is holding back -- and naming the variant was the loudest
- * possible way to give it away, since "Ironwood Grove" says both that there is
- * a seam and exactly how good it is.
+ * `unscouted` names the hex for its BIOME and stops there (§5.2). From a
+ * distance you can see that there is forest over the hill; you cannot see
+ * whether the stand is worth cutting, and you cannot see whether it is dead.
+ * So a fogged Ironwood Grove, a fogged plain forest and a fogged Deadwood all
+ * read "Forest", and every one of them resolves on arrival.
+ *
+ * Naming the variant was the loudest possible way to give the game away --
+ * "Ironwood Grove" says both that there is a seam and exactly how good it is.
+ * Naming it for dead ground hid that just as well and told a small lie to do
+ * it: the card asserted Deadwood over ground that turned out to be living.
+ * The biome is the one answer that is true at any distance.
  */
-export function groundLabel(tile: Tile, asDead = false): string {
+export function groundLabel(tile: Tile, unscouted = false): string {
   if (tile.water) return waterLabel(tile.biome, tile.water)
-  if (tile.dead || asDead) return DEAD_LABEL[tile.biome]
+  if (unscouted) return VARIANT_LABEL[tile.biome]
+  if (tile.dead) return DEAD_LABEL[tile.biome]
 
   return VARIANT_LABEL[tile.variant]
 }
