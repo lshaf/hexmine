@@ -977,21 +977,76 @@ final class Formulas
     /** Repair cost, §8.2: cheaper than crafting new, but not dramatically so. */
     public static function repairCost(array $def, int $missingDurability, ?int $max = null): array
     {
+        $inputs = $def['inputs'] ?? [];
+        if ($inputs === [] || $missingDurability <= 0) {
+            return [];
+        }
+
         // §7.4.3 -- against the PIECE's ceiling. A recipe's materials buy one
         // full piece, so a full mend costs one recipe's worth however many
         // points that turns out to be -- which means a well-made piece is
         // cheaper to keep per point, and that is the node paying out a second
         // time rather than a rounding artefact.
         $fraction = $missingDurability / max(1, $max ?: (int) ($def['maxDurability'] ?? 1));
-        $out = [];
-        foreach ($def['inputs'] ?? [] as $key => $qty) {
-            $amount = (int) ceil($qty * $fraction * Balance::REPAIR_COST_RATE);
-            if ($amount > 0) {
-                $out[$key] = $amount;
-            }
+
+        // §8.2 -- a repair costs a SHARE OF THE RECIPE, and the share is how
+        // much is missing. The total is worked out first and the materials are
+        // dealt out of it afterwards, which is what makes the bill scale.
+        //
+        // It used to ceil() each material on its own, and on a recipe with any
+        // small input that flattened the whole curve: every quantity above zero
+        // rounded to a full unit, so a one-point scratch on a Hewn Axe cost
+        // three materials and grinding it half away cost four. It also
+        // overcharged the top -- a full mend came to eight where
+        // REPAIR_COST_RATE says six.
+        $total = (int) ceil(array_sum($inputs) * $fraction * Balance::REPAIR_COST_RATE);
+        if ($total <= 0) {
+            return [];
         }
 
-        return $out;
+        return self::dealOut($inputs, $total);
+    }
+
+    /**
+     * Hand out `$total` whole units across `$parts`, keeping their proportions.
+     *
+     * Largest remainder, so the split matches the recipe as closely as whole
+     * units allow and the pieces always sum to exactly what was asked for.
+     * Anything that rounds to nothing drops out rather than being charged as a
+     * token unit -- a bill of "one of everything" is the flat curve again.
+     *
+     * @param  array<string,int>  $parts
+     * @return array<string,int>
+     */
+    private static function dealOut(array $parts, int $total): array
+    {
+        $sum = array_sum($parts);
+        if ($sum <= 0) {
+            return [];
+        }
+
+        $out = [];
+        $remainders = [];
+        $dealt = 0;
+
+        foreach ($parts as $key => $qty) {
+            $exact = $total * ($qty / $sum);
+            $whole = (int) floor($exact);
+            $out[$key] = $whole;
+            $remainders[$key] = $exact - $whole;
+            $dealt += $whole;
+        }
+
+        arsort($remainders);
+        foreach (array_keys($remainders) as $key) {
+            if ($dealt >= $total) {
+                break;
+            }
+            $out[$key]++;
+            $dealt++;
+        }
+
+        return array_filter($out, static fn (int $n) => $n > 0);
     }
 
     // ------------------------------------------------------------- mining §7.3

@@ -79,6 +79,11 @@ const percent = computed(
       </div>
       <span class="tiny mono muted">{{ item.durability }}/{{ ceiling }}</span>
     </div>
+
+    <!-- §8.2 -- what a mend would take, where the caller has one to show. It
+         belongs under the wear bar because it is the same fact read forward:
+         the bar is what is gone, this is what getting it back costs. -->
+    <slot name="cost" />
   </div>
 
   <div class="row-actions">

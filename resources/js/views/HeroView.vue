@@ -31,6 +31,7 @@ import { formatPercent, formatStat } from '@/game/formulas'
 import { CHARACTER, EQUIPMENT } from '@/game/balance'
 import { itemIcon, skillIcon } from '@/icons/procedural'
 import GearRow from '@/components/GearRow.vue'
+import RepairCost from '@/components/RepairCost.vue'
 import SvgIcon from '@/components/SvgIcon.vue'
 import type { EquipSlot, OwnedItem, StatKey } from '@/game/types'
 
@@ -300,6 +301,11 @@ const ceilings = computed(() =>
               </div>
               <span class="tiny mono muted">{{ line.durability }}/{{ line.maxDurability }}</span>
             </div>
+
+            <!-- §8.2 -- what the mend takes, before the button is pressed. It
+                 is the largest continuous sink in the game (§11.1), so it is
+                 the decision rather than a footnote to it. -->
+            <RepairCost v-if="line.tool" :item="line.tool" />
           </template>
 
           <!-- Empty reads as the slot it is waiting for, the same way the worn
@@ -329,6 +335,7 @@ const ceilings = computed(() =>
       <div v-for="slot in WORN" :key="slot.key" class="inset row-item">
         <template v-if="equipped[slot.key]">
           <GearRow :item="equipped[slot.key]!">
+            <template #cost><RepairCost :item="equipped[slot.key]!" /></template>
             <button class="btn btn-sm" type="button" :disabled="game.busy" @click="game.repair(equipped[slot.key]!.id)">
               Repair
             </button>

@@ -421,7 +421,29 @@ final class PackPinTest extends TestCase
             return;
         }
 
-        $this->assertLessThan($road['hexes'], $road['stopHex'], 'reported a blocker but did not stop short');
+        // At or before the destination, not strictly before it: a pack standing
+        // on the LAST hex blocks the road and stops it exactly at the end, which
+        // is the honest answer -- you walk the whole way and are pinned on
+        // arrival. This asserted "strictly before" and so failed whenever the
+        // bucket happened to put a pack on the target hex, which got likelier
+        // when the outer roads doubled their spawn rate.
+        $this->assertLessThanOrEqual(
+            $road['hexes'],
+            $road['stopHex'],
+            'reported a blocker past the end of the road',
+        );
+
+        // What actually has to be true either way: the stop is where the pack
+        // is. That is the assertion the strict one was standing in for.
+        //
+        // Asked at the moment you would STEP on it, not at now(): §9.5.1 packs
+        // are time-bucketed, so the road scans each hex at its own arrival time
+        // and a hex holding a pack when you get there may hold none this second.
+        $stopped = $road['path'][$road['stopHex']];
+        $this->assertNotNull(
+            WorldGen::generateTile((int) $stopped[0], (int) $stopped[1], (int) $road['stopAt'])['pack'] ?? null,
+            'the road stopped somewhere that has no pack when you would reach it',
+        );
 
         // And the prediction is the decision: walking the clock past the stop
         // lands the character exactly where the road said it would.

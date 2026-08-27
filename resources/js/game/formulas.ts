@@ -187,15 +187,47 @@ export function salvageYield(def: ItemDef): Partial<Record<string, number>> {
 
 /** Repair cost, §8.2: cheaper than crafting new, but not dramatically so. */
 export function repairCost(def: ItemDef, missingDurability: number, max?: number): Record<string, number> {
+  const inputs = Object.entries(def.inputs ?? {}) as Array<[string, number]>
+  if (inputs.length === 0 || missingDurability <= 0) return {}
+
   // §7.4.3 -- against the PIECE's ceiling where the caller knows it. A recipe's
   // materials buy one full piece, so a full mend costs one recipe's worth
   // however many points that is: a well-made piece is cheaper to keep.
   const fraction = missingDurability / Math.max(1, max || (def.maxDurability ?? 1))
+
+  // §8.2 -- a repair costs a SHARE OF THE RECIPE, and the share is how much is
+  // missing. The total first, the materials dealt out of it after: ceiling each
+  // material on its own flattened the curve, because any quantity above zero
+  // rounded to a whole unit and a scratch cost one of everything.
+  const sum = inputs.reduce((n, [, qty]) => n + qty, 0)
+  const total = Math.ceil(sum * fraction * EQUIPMENT.repairCostRate)
+  if (total <= 0) return {}
+
+  // Largest remainder, so the split keeps the recipe's proportions and the
+  // pieces sum to exactly the total.
   const out: Record<string, number> = {}
-  for (const [key, qty] of Object.entries(def.inputs ?? {})) {
-    const amount = Math.ceil((qty as number) * fraction * EQUIPMENT.repairCostRate)
-    if (amount > 0) out[key] = amount
+  const remainders: Array<[string, number]> = []
+  let dealt = 0
+
+  for (const [key, qty] of inputs) {
+    const exact = total * (qty / sum)
+    const whole = Math.floor(exact)
+    out[key] = whole
+    remainders.push([key, exact - whole])
+    dealt += whole
   }
+
+  remainders.sort((a, b) => b[1] - a[1])
+  for (const [key] of remainders) {
+    if (dealt >= total) break
+    out[key]++
+    dealt++
+  }
+
+  for (const key of Object.keys(out)) {
+    if (out[key] === 0) delete out[key]
+  }
+
   return out
 }
 

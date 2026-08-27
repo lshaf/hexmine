@@ -15,7 +15,27 @@ return [
     |
     */
 
-    'default' => env('CACHE_STORE', 'database'),
+    /*
+     * Redis, not the database.
+     *
+     * The cache is not an optimisation here -- App\Game\Tiles keeps hex
+     * depletion in it and App\Game\Packs keeps the cleared flags (§5.1,
+     * §9.5.1), so a map read is a Cache::many() over the whole disc in sight and
+     * a mine is a write. That is the hottest path in the game and it was going
+     * through a MySQL table on every hex.
+     *
+     * Redis was already a hard dependency rather than a nicety: config/wax.php
+     * pins the login replay-lock store to it, so a box that cannot reach Redis
+     * cannot log anybody in. Defaulting the cache elsewhere only meant the two
+     * halves disagreed about where transient state lived.
+     *
+     * THE DATABASE STORE IS NOT A FALLBACK ANY MORE. Its `cache` and
+     * `cache_locks` tables are gone and their migration with them, so pointing
+     * CACHE_STORE back at it would fail on the first write rather than quietly
+     * work. That is deliberate: two places for transient state is how you get a
+     * box whose depletion timers disagree with its login locks.
+     */
+    'default' => env('CACHE_STORE', 'redis'),
 
     /*
     |--------------------------------------------------------------------------
