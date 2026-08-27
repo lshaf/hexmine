@@ -225,14 +225,28 @@ final class Catalog
     /**
      * §8.0.1 -- what a rolled line may land on.
      *
-     * A line-locked tool draws from mine stats only. Rolling `travelSpeed` onto
-     * an axe would be worth nothing (walking is not woodcutting) *and* would
-     * invite equipping all five tools to stack five travel lines -- the exact
-     * hole the line-lock exists to close.
+     * **A rolled line is drawn from what the piece is FOR.** That is one rule
+     * with three answers, because §8 gives equipment three jobs:
+     *
+     * - a **gathering tool** works one line and nothing else (§8 rule 1), so it
+     *   draws from the two mine stats. Rolling `travelSpeed` onto an axe would
+     *   be worth nothing -- walking is not woodcutting -- *and* would invite
+     *   equipping all five tools to stack five travel lines, the exact hole the
+     *   line-lock exists to close.
+     * - a **weapon** is combat only and never gathers (§8 rule 5), so it draws
+     *   from the pair and its percentage twins. A sword rolling "+4% hunting
+     *   yield" was the same category error read from the other side: the one
+     *   slot in the game that does no work at all, paying out on work.
+     * - **worn gear** genuinely does both. §9.5.4 makes armor "one set with two
+     *   axes, not a second wardrobe" -- a coat is on your back down a mine, on
+     *   the road, at a bench and in a fight -- so it is the one pool that
+     *   reaches every stat there is.
      */
     public const OPTION_STATS_TOOL = ['yield', 'tripReduction'];
 
-    public const OPTION_STATS_WORN = ['yield', 'tripReduction', 'travelSpeed', 'processingSpeed'];
+    public const OPTION_STATS_WEAPON = ['power', 'defense'];
+
+    public const OPTION_STATS_WORN = ['yield', 'tripReduction', 'travelSpeed', 'processingSpeed', 'power', 'defense'];
 
     /**
      * §8.0.1 -- the two stats a worn line may be pointed at ONE gathering line,
@@ -266,12 +280,36 @@ final class Catalog
     public const OPTION_FLAT_WORN = ['attack', 'defense'];
 
     /**
-     * §8.0.1 -- every (stat, scope, kind) a roll on this slot may land on.
+     * §9.5.4 -- a focus keeps nothing off you, of either kind.
      *
+     * "Defense belongs to armor, to the shield, and to the sword. A focus has
+     * none at all -- a focus that also held a little of it would be the
+     * balanced one twice, and the glass cannon is the point." A rolled line is
+     * luck rather than budget, but a wand that can come out of the bench
+     * guarding says the same wrong thing about what a wand is.
+     */
+    public const OPTION_FAMILY_NO_DEFENSE = ['focus'];
+
+    /**
+     * §8.0.1 -- every (stat, scope, kind) a roll on this piece may land on.
+     *
+     * Takes the whole def rather than the slot, because the `weapon` slot holds
+     * three families and one of them (§9.5.4) may not roll a guard.
+     *
+     * @param  array<string,mixed>  $def
      * @return array<int,array{stat:string,scope:?string,kind:string}>
      */
-    public static function optionRollsFor(string $slot): array
+    public static function optionRollsFor(array $def): array
     {
+        // §8.5 -- no slot is a consumable, and a potion has no rolled line at
+        // all: it is drunk once and gone, so there is nothing for an option to
+        // sit on. Falling through to the worn pool would have put "+4% mining
+        // yield" on a flask the moment anything asked.
+        $slot = (string) ($def['slot'] ?? '');
+        if ($slot === '') {
+            return [];
+        }
+
         $lines = fn (array $stats, string $kind) => array_map(
             static fn (string $stat) => ['stat' => $stat, 'scope' => null, 'kind' => $kind],
             $stats,
@@ -284,6 +322,22 @@ final class Catalog
             );
         }
 
+        if ($slot === 'weapon') {
+            $pool = array_merge(
+                $lines(self::OPTION_STATS_WEAPON, 'percent'),
+                $lines(self::OPTION_FLAT_WORN, 'flat'),
+            );
+
+            if (in_array($def['family'] ?? null, self::OPTION_FAMILY_NO_DEFENSE, true)) {
+                $pool = array_values(array_filter(
+                    $pool,
+                    static fn (array $entry) => $entry['stat'] !== 'defense',
+                ));
+            }
+
+            return $pool;
+        }
+
         $pool = $lines(self::OPTION_STATS_WORN, 'percent');
         foreach (self::OPTION_SCOPED_STATS as $stat) {
             foreach (self::SKILLS as $line) {
@@ -294,10 +348,13 @@ final class Catalog
         return array_merge($pool, $lines(self::OPTION_FLAT_WORN, 'flat'));
     }
 
-    /** @return array<int,string> */
-    public static function optionStatsFor(string $slot): array
+    /**
+     * @param  array<string,mixed>  $def
+     * @return array<int,string>
+     */
+    public static function optionStatsFor(array $def): array
     {
-        return array_values(array_unique(array_column(self::optionRollsFor($slot), 'stat')));
+        return array_values(array_unique(array_column(self::optionRollsFor($def), 'stat')));
     }
 
     /**

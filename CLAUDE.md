@@ -1359,6 +1359,43 @@ its yield is already woodcutting's yield — storing that twice would only be
 somewhere for the two to disagree. The screen still says *woodcutting yield* on
 an axe; it reads the line back off the slot.
 
+**A rolled line is drawn from what the piece is FOR.** One rule, three answers,
+because §8 gives equipment three jobs — and the pool is now the most legible
+difference between them:
+
+| Piece | May roll |
+|---|---|
+| **Gathering tool** | `yield`, `tripReduction`, and a solid `attack` that is §7.3's mining attack |
+| **Weapon** | `power`, `defense`, and the solid pair. Nothing else |
+| **Worn** | every stat there is, scoped or not, plus the solid pair |
+
+The weapon slot used to fall through to the worn pool, and that is how a sword
+came off the bench carrying *+4% hunting yield* — a work bonus on the one slot
+in the game that never works (§8 rule 5). The other half of the same mistake was
+quieter and just as wrong: a battle cuirass whose whole stat is `defense` could
+never roll one.
+
+**Worn gear is the one pool that reaches everything**, and that is §9.5.4 rather
+than laziness: armor is *one set with two axes, not a second wardrobe*. A coat
+is on your back down a mine, on the road, at a bench and in a fight, so there is
+no stat it has no business being good at.
+
+**A focus rolls no guard, of either kind.** §9.5.4 says a focus has none at all
+— *a focus that also held a little of it would be the balanced one twice, and
+the glass cannon is the point.* A rolled line is luck rather than budget, but a
+wand that can come out of the bench guarding says the same wrong thing about
+what a wand is. It is the only per-*family* rule in the pool.
+
+**A consumable has no pool.** No slot, nothing to sit on, and §8.5 already
+gives a potion its one effect. What made this worth writing down is that the
+pool used to be chosen by *not* being a tool, so anything without a slot got
+the coat's.
+
+**And the almanac says all of it, before anybody owns one.** What a piece *may*
+roll is a fact about the recipe rather than about the copy in a bag, which makes
+it the one screen that can tell you — the ceiling, the band, and the pool, on
+the same rail that says where the thing comes from.
+
 ### 8.0 Slots — a gathering tool per line, and combat kept separate
 
 Nine slots. Five are **gathering tools, one per skill line**; the rest are worn.
@@ -1498,6 +1535,25 @@ the game, §11.1.)*
   risk while you are down a mine.
 - Nothing minted can be destroyed, because minting takes it out of the game
   (§3.3). Destruction reaches every rung that is actually *in* a bag.
+- **A stowed piece mends, and so does a broken one.** Repair asks what a piece
+  is missing and never where it is being carried: an axe in the pack is the same
+  axe. It was only ever offered on the prospector sheet, which lists what you
+  are *wearing*, so a spare tool had to be put on before it could be fixed —
+  a rule nobody wrote, enforced by a missing button.
+- **The bill is said before the button, everywhere the button is.** What a mend
+  takes is the decision (§11.1 makes it the largest continuous sink in the
+  game), not a footnote to it, so the parts are listed under the wear bar with
+  anything you are short of in ember (§13.3). Basic gear says the trader mends
+  it for coin instead, which is a different bill and one only payable at a
+  settlement.
+- **The four verbs are glyphs, not words.** Equip, stow, repair and scrap are
+  the same four things wherever a piece is met, and four words typed out again
+  on every row spent more of it on the buttons than on the item. Equip and stow
+  are **one gesture reversed**, so they are one drawing reversed — the game's
+  own hexagon (§13) with the chevron pointing in or out. Repair is an **anvil**
+  and deliberately not the hammer: `craft` is already the hammer, and mending a
+  thing is not making one. A plate with room for words still says them beside
+  the glyph.
 - **Tuning decision still open:** repair cost must be cheaper than crafting new, but not
   dramatically so, or the crafting-materials sink stalls at endgame.
 

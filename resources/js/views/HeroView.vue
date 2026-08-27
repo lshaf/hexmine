@@ -32,6 +32,7 @@ import { CHARACTER, EQUIPMENT } from '@/game/balance'
 import { itemIcon, skillIcon } from '@/icons/procedural'
 import GearRow from '@/components/GearRow.vue'
 import RepairCost from '@/components/RepairCost.vue'
+import GearAction from '@/components/GearAction.vue'
 import SvgIcon from '@/components/SvgIcon.vue'
 import type { EquipSlot, OwnedItem, StatKey } from '@/game/types'
 
@@ -315,12 +316,8 @@ const ceilings = computed(() =>
         </div>
 
         <div v-if="line.tool" class="row-actions">
-          <button class="btn btn-sm" type="button" :disabled="game.busy" @click="game.repair(line.tool.id)">
-            Repair
-          </button>
-          <button class="btn btn-sm" type="button" :disabled="game.busy" @click="game.unequip(line.tool.id)">
-            Stow
-          </button>
+          <GearAction action="repair" label="Repair" :disabled="game.busy" @click="game.repair(line.tool.id)" />
+          <GearAction action="stow" label="Stow" :disabled="game.busy" @click="game.unequip(line.tool.id)" />
         </div>
       </div>
     </section>
@@ -336,12 +333,8 @@ const ceilings = computed(() =>
         <template v-if="equipped[slot.key]">
           <GearRow :item="equipped[slot.key]!">
             <template #cost><RepairCost :item="equipped[slot.key]!" /></template>
-            <button class="btn btn-sm" type="button" :disabled="game.busy" @click="game.repair(equipped[slot.key]!.id)">
-              Repair
-            </button>
-            <button class="btn btn-sm" type="button" :disabled="game.busy" @click="game.unequip(equipped[slot.key]!.id)">
-              Stow
-            </button>
+            <GearAction action="repair" label="Repair" :disabled="game.busy" @click="game.repair(equipped[slot.key]!.id)" />
+            <GearAction action="stow" label="Stow" :disabled="game.busy" @click="game.unequip(equipped[slot.key]!.id)" />
           </GearRow>
         </template>
 
@@ -371,23 +364,23 @@ const ceilings = computed(() =>
 
       <div v-for="item in stowed" :key="item.id" class="inset row-item">
         <GearRow :item="item">
-          <button
-            class="btn btn-sm"
-            type="button"
+          <!-- §8.2 -- a stowed piece mends too. The server never refused one;
+               the button simply was not here, so a broken axe had to be worn
+               before it could be fixed. -->
+          <template #cost><RepairCost :item="item" /></template>
+          <GearAction
+            action="equip"
+            label="Equip"
             :disabled="game.busy || item.durability <= 0"
             @click="game.equip(item.id)"
-          >
-            Equip
-          </button>
-          <button
-            class="btn btn-sm btn-danger"
-            type="button"
+          />
+          <GearAction action="repair" label="Repair" :disabled="game.busy" @click="game.repair(item.id)" />
+          <GearAction
+            action="scrap"
+            label="Scrap for parts"
             :disabled="game.busy"
-            title="Returns a small salvage"
             @click="game.discard(item.id)"
-          >
-            Scrap
-          </button>
+          />
         </GearRow>
       </div>
     </section>

@@ -431,6 +431,82 @@ export const TOOL_SLOT_SKILL: Record<GatherSlot, SkillKey> = {
 export const skillForSlot = (slot: EquipSlot): SkillKey | null =>
   (TOOL_SLOT_SKILL as Partial<Record<EquipSlot, SkillKey>>)[slot] ?? null
 
+/**
+ * §8.0.1 -- every (stat, scope, kind) a roll on this piece may land on.
+ *
+ * **A rolled line is drawn from what the piece is FOR**, which is one rule with
+ * three answers because §8 gives equipment three jobs. A gathering tool works
+ * one line and nothing else (§8 rule 1). A weapon is combat only and never
+ * gathers (§8 rule 5) -- it used to draw from the worn pool, which is how a
+ * sword came off the bench carrying "+4% hunting yield". Worn gear genuinely
+ * does both: §9.5.4 makes armor "one set with two axes, not a second
+ * wardrobe", so it is the one pool that reaches every stat there is.
+ *
+ * Mirrors `Catalog::optionRollsFor()`. The client needs it because the almanac
+ * is where a piece is read before it is owned, and what it *may* roll is part
+ * of what it is.
+ */
+export type OptionStat = StatKey | 'attack'
+
+export interface OptionRoll {
+  stat: OptionStat
+  scope: SkillKey | null
+  kind: 'percent' | 'flat'
+}
+
+const OPTION_STATS_TOOL: OptionStat[] = ['yield', 'tripReduction']
+const OPTION_STATS_WEAPON: OptionStat[] = ['power', 'defense']
+const OPTION_STATS_WORN: OptionStat[] = [
+  'yield',
+  'tripReduction',
+  'travelSpeed',
+  'processingSpeed',
+  'power',
+  'defense',
+]
+const OPTION_SCOPED_STATS: OptionStat[] = ['yield', 'tripReduction']
+const OPTION_FLAT_TOOL: OptionStat[] = ['attack']
+const OPTION_FLAT_WORN: OptionStat[] = ['attack', 'defense']
+
+/**
+ * §9.5.4 -- a focus keeps nothing off you, of either kind. "A focus that also
+ * held a little of it would be the balanced one twice, and the glass cannon is
+ * the point."
+ */
+const OPTION_FAMILY_NO_DEFENSE = ['focus']
+
+export function optionRollsFor(def: ItemDef): OptionRoll[] {
+  // §8.5 -- no slot is a consumable, and a potion has no rolled line at all.
+  if (!def.slot) return []
+
+  const lines = (stats: OptionStat[], kind: 'percent' | 'flat'): OptionRoll[] =>
+    stats.map((stat) => ({ stat, scope: null, kind }))
+
+  if (skillForSlot(def.slot) !== null) {
+    return [...lines(OPTION_STATS_TOOL, 'percent'), ...lines(OPTION_FLAT_TOOL, 'flat')]
+  }
+
+  if (def.slot === 'weapon') {
+    const pool = [
+      ...lines(OPTION_STATS_WEAPON, 'percent'),
+      ...lines(OPTION_FLAT_WORN, 'flat'),
+    ]
+
+    return def.family && OPTION_FAMILY_NO_DEFENSE.includes(def.family)
+      ? pool.filter((entry) => entry.stat !== 'defense')
+      : pool
+  }
+
+  const pool = lines(OPTION_STATS_WORN, 'percent')
+  for (const stat of OPTION_SCOPED_STATS) {
+    for (const skill of SKILL_LIST) {
+      pool.push({ stat, scope: skill.key, kind: 'percent' })
+    }
+  }
+
+  return [...pool, ...lines(OPTION_FLAT_WORN, 'flat')]
+}
+
 /** The slot a skill line draws its tool from. */
 export const slotForSkill = (skill: SkillKey): GatherSlot =>
   (Object.keys(TOOL_SLOT_SKILL) as GatherSlot[]).find(

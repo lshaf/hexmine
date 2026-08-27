@@ -81,6 +81,23 @@ export const ACTION_PATHS: Record<string, string> = {
   // document, not as an exclamation mark: nothing on this HUD shouts.
   quest: 'M6 3.5h9l3.5 3.5v10.5H6Z M15 3.5V7h3.5 M9 11h6 M9 14.5h6 M8.5 20.5a2 2 0 1 0 0-4 2 2 0 0 0 0 4',
   almanac: 'M7 4 11 6.3v4.6L7 13.2 3 10.9V6.3Z M14.5 7h6.5 M14.5 11h6.5 M3 17.5h18 M3 21h12',
+
+  /* §8 -- the three things you do to a piece of gear, drawn once so they read
+     the same on the prospector sheet and in the pack.
+
+     Equip and stow are ONE GESTURE REVERSED, so they are one drawing reversed:
+     the slot is the game's own hexagon (§13 -- the shape the map tiles with, the
+     shape an icon is framed in, and the shape an empty gear slot is already
+     drawn as), and the chevron inside it points in or out. The direction is
+     INSIDE the hex rather than an arrow beside it, because at fifteen pixels a
+     glyph gets to be one object: two of them was a blob and a tick. */
+  equip: 'M8.5 4h7L19.5 12 15.5 20h-7L4.5 12Z M8.5 13.5 12 10l3.5 3.5',
+  stow: 'M8.5 4h7L19.5 12 15.5 20h-7L4.5 12Z M8.5 10.5 12 14l3.5-3.5',
+  /* §8.2 -- an anvil, and deliberately not the hammer: `craft` is already the
+     hammer, and mending a thing is not making one. The horn and the waist are
+     what carry it at button size -- it is the one silhouette in the strip that
+     could be nothing else. */
+  repair: 'M4 7h11.5l4 2-4 2H4Z M8.5 11 7 15 5.5 19h13L17 15l-1.5-4',
 }
 
 /**

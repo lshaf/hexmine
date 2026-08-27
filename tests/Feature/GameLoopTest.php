@@ -3030,7 +3030,7 @@ final class GameLoopTest extends TestCase
 
                     $this->assertGreaterThanOrEqual($table[$tiers[0]][0], $option['value']);
                     $this->assertLessThanOrEqual($table[end($tiers)][1] * $top, $option['value']);
-                    $this->assertContains($option['stat'], Catalog::optionStatsFor($def['slot']));
+                    $this->assertContains($option['stat'], Catalog::optionStatsFor($def));
                 }
 
                 // One line per (stat, scope): two "+2% mining yield" rows on one
@@ -3193,6 +3193,113 @@ final class GameLoopTest extends TestCase
     }
 
     /** §8.0.1 -- gold buys a plain item. An option is what a bench puts on one. */
+    /**
+     * §8.0.1 -- a rolled line is drawn from what the piece is FOR.
+     *
+     * The weapon slot used to fall through to the worn pool, which is how a
+     * sword came off the bench carrying "+4% hunting yield" -- a work bonus on
+     * the one slot in the game that never works (§8 rule 5). Three jobs, three
+     * pools, and the sweep is over the whole catalog because the hole was a
+     * missing branch rather than a wrong entry.
+     */
+    public function test_a_rolled_line_belongs_to_the_piece_it_is_on(): void
+    {
+        $work = ['yield', 'tripReduction', 'travelSpeed', 'processingSpeed'];
+        $checked = ['tool' => 0, 'weapon' => 0, 'worn' => 0];
+
+        foreach (Catalog::items() as $key => $def) {
+            $slot = $def['slot'] ?? null;
+            if ($slot === null) {
+                continue;
+            }
+
+            $pool = Catalog::optionRollsFor($def);
+            $stats = array_column($pool, 'stat');
+
+            if (Catalog::skillForSlot($slot) !== null) {
+                $checked['tool']++;
+                // A tool is line-locked by its slot, so the road and the bench
+                // are not its business and neither is a scope.
+                $this->assertSame(['yield', 'tripReduction', 'attack'], $stats, "{$key}");
+                $this->assertSame([null, null, null], array_column($pool, 'scope'), "{$key}");
+
+                continue;
+            }
+
+            if ($slot === 'weapon') {
+                $checked['weapon']++;
+
+                foreach ($work as $stat) {
+                    $this->assertNotContains($stat, $stats, "{$key} can roll a work bonus");
+                }
+
+                // §9.5.4 -- and a focus keeps nothing off you, of either kind.
+                if (($def['family'] ?? null) === 'focus') {
+                    $this->assertNotContains('defense', $stats, "{$key} is a focus that guards");
+                }
+
+                continue;
+            }
+
+            $checked['worn']++;
+            // §9.5.4 -- worn gear is one set with two axes, so it is the one
+            // pool that reaches every stat there is.
+            foreach ([...$work, 'power', 'defense', 'attack'] as $stat) {
+                $this->assertContains($stat, $stats, "{$key} cannot roll {$stat}");
+            }
+        }
+
+        $this->assertGreaterThan(0, $checked['tool']);
+        $this->assertGreaterThan(0, $checked['weapon']);
+        $this->assertGreaterThan(0, $checked['worn']);
+    }
+
+    /**
+     * The option pool is hand-mirrored, so it can drift.
+     *
+     * The almanac reads it on the client -- what a piece MAY roll is part of
+     * what a piece is, and that screen is a pure read of the TS catalog. A pool
+     * that disagreed would promise a line the bench cannot produce.
+     */
+    public function test_the_option_pool_agrees_between_php_and_typescript(): void
+    {
+        $ts = file_get_contents(base_path('resources/js/game/catalog.ts'))
+            .file_get_contents(base_path('resources/js/game/balance.ts'));
+
+        $list = function (string $name) use ($ts): array {
+            $this->assertMatchesRegularExpression("/{$name}: OptionStat\[\] = \[([^\]]*)\]/s", $ts, "{$name} is not in catalog.ts");
+            preg_match("/{$name}: OptionStat\[\] = \[([^\]]*)\]/s", $ts, $m);
+
+            return array_values(array_filter(array_map(
+                static fn (string $part) => trim($part, " \n'"),
+                explode(',', $m[1]),
+            )));
+        };
+
+        $this->assertSame(Catalog::OPTION_STATS_TOOL, $list('OPTION_STATS_TOOL'));
+        $this->assertSame(Catalog::OPTION_STATS_WEAPON, $list('OPTION_STATS_WEAPON'));
+        $this->assertSame(Catalog::OPTION_STATS_WORN, $list('OPTION_STATS_WORN'));
+        $this->assertSame(Catalog::OPTION_SCOPED_STATS, $list('OPTION_SCOPED_STATS'));
+        $this->assertSame(Catalog::OPTION_FLAT_TOOL, $list('OPTION_FLAT_TOOL'));
+        $this->assertSame(Catalog::OPTION_FLAT_WORN, $list('OPTION_FLAT_WORN'));
+
+        // The bands too: the almanac quotes them as a range, and a client that
+        // read a different table would print a promise the server never made.
+        foreach (Balance::OPTION_ROLLS as $rarity => $count) {
+            $this->assertMatchesRegularExpression("/optionRolls: \{[^}]*{$rarity}: {$count},/s", $ts, "optionRolls.{$rarity}");
+        }
+        foreach (Balance::OPTION_VALUE as $tier => [$min, $max]) {
+            $this->assertMatchesRegularExpression("/optionValue: \{[^}]*{$tier}: \[{$min}, {$max}\],/s", $ts, "optionValue.{$tier}");
+        }
+        foreach (Balance::OPTION_FLAT_VALUE as $tier => [$min, $max]) {
+            $this->assertMatchesRegularExpression("/optionFlatValue: \{[^}]*{$tier}: \[{$min}, {$max}\],/s", $ts, "optionFlatValue.{$tier}");
+        }
+        $this->assertStringContainsString(
+            'optionScopedMultiplier: '.(int) Balance::OPTION_SCOPED_MULTIPLIER,
+            $ts,
+        );
+    }
+
     public function test_a_shop_item_never_carries_an_option(): void
     {
         $this->standAtWoodcuttingVillage();

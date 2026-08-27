@@ -30,6 +30,8 @@ import {
   SKILL_BY_KEY,
   SLOT_LABEL,
   ITEMS,
+  STAT_LABEL,
+  optionRollsFor,
   skillForSlot,
 } from '@/game/catalog'
 import {
@@ -66,6 +68,7 @@ import type {
   Material,
   MaterialKey,
   MaterialTier,
+  Rarity,
   VariantKey,
 } from '@/game/types'
 
@@ -86,6 +89,84 @@ function traderLine(def: ItemDef): { buy: number; sell: number } {
   const buy = def.goldPrice ?? 0
 
   return { buy, sell: resaleValue(def, def.maxDurability ?? 0) }
+}
+
+/**
+ * §8.0.1 -- what a bench might put on this piece, before anybody owns one.
+ *
+ * The almanac is the one screen that reads a piece you do not have, and until
+ * now it read only the half that is fixed. A rolled line is the other half:
+ * two of one recipe are never the same object, and *which* lines this
+ * particular recipe can come out carrying is a fact about the recipe rather
+ * than about the copy in somebody's bag.
+ *
+ * It says three things, because §8.0.1 says three things are random: how many
+ * (a ceiling, never a quota), what band they are drawn from, and from which
+ * pool. The pool is the interesting one now that it differs per piece -- an
+ * axe reaches two stats, a wand four, a coat every stat there is.
+ */
+const OPTION_TIERS = Object.keys(EQUIPMENT.optionValue) as (keyof typeof EQUIPMENT.optionValue)[]
+
+/** Everything at or below the piece's own rung -- a deeper bag, not a better one. */
+function optionTiersFor(rarity: Rarity): typeof OPTION_TIERS {
+  const out: typeof OPTION_TIERS = []
+  for (const tier of OPTION_TIERS) {
+    out.push(tier)
+    if (tier === rarity) break
+  }
+
+  return out
+}
+
+interface RollBrief {
+  ceiling: number
+  band: string
+  scopedBand: string | null
+  percent: string[]
+  flat: { label: string; value: string }[]
+  plainShelf: boolean
+}
+
+function rollBrief(def: ItemDef): RollBrief | null {
+  const ceiling = EQUIPMENT.optionRolls[def.rarity] ?? 0
+  if (!def.slot) return null
+
+  const tiers = optionTiersFor(def.rarity)
+  const low = EQUIPMENT.optionValue[tiers[0]!][0]
+  const high = EQUIPMENT.optionValue[tiers[tiers.length - 1]!][1]
+  const flatLow = EQUIPMENT.optionFlatValue[tiers[0]!][0]
+  const flatHigh = EQUIPMENT.optionFlatValue[tiers[tiers.length - 1]!][1]
+  const pct = (v: number) => Math.round(v * 1000) / 10
+
+  const pool = optionRollsFor(def)
+  const line = skillForSlot(def.slot)
+  const scoped = pool.some((entry) => entry.scope !== null)
+
+  return {
+    ceiling,
+    band: `${pct(low)}–${pct(high)}%`,
+    scopedBand: scoped
+      ? `${pct(low * EQUIPMENT.optionScopedMultiplier)}–${pct(high * EQUIPMENT.optionScopedMultiplier)}%`
+      : null,
+    // One name per stat: the five scoped copies of `yield` are the same line
+    // pointed somewhere, and listing them would be the same word six times.
+    percent: [
+      ...new Set(
+        pool
+          .filter((entry) => entry.kind === 'percent')
+          .map((entry) => STAT_LABEL[entry.stat as keyof typeof STAT_LABEL]),
+      ),
+    ],
+    flat: pool
+      .filter((entry) => entry.kind === 'flat')
+      .map((entry) => ({
+        // §7.3 -- a flat `attack` on a gathering tool is MINING attack, which
+        // is a different ladder wearing the same word (§8 rule 5).
+        label: entry.stat === 'attack' && line ? 'bite' : entry.stat === 'attack' ? 'atk' : 'def',
+        value: `+${flatLow}–${flatHigh}`,
+      })),
+    plainShelf: def.goldPrice !== undefined,
+  }
 }
 
 type Half = 'materials' | 'equipment' | 'tiles'
@@ -417,6 +498,9 @@ const FAMILY_JOB: Record<string, string> = {
 interface ItemEntry {
   item: ItemDef
   sources: SourceLine[]
+  /** §8.0.1 -- computed once per entry rather than per read: the template asks
+   *  about it half a dozen times, and it is the same answer every time. */
+  rolls: RollBrief | null
   hay: string
 }
 
@@ -432,6 +516,7 @@ const describe = (item: ItemDef): ItemEntry => {
   return {
     item,
     sources,
+    rolls: rollBrief(item),
     hay: [
       item.name,
       item.description,
@@ -730,6 +815,41 @@ function nature(item: ItemDef): string {
                       </span>
                     </div>
                     <p v-if="source.note" class="tiny muted note">{{ source.note }}</p>
+                  </dd>
+                </div>
+
+                <!-- §8.0.1 -- what a bench MIGHT put on it. The rail is
+                     narrower on a tool than on a coat and narrower again on a
+                     wand, which is the rule itself made visible: a rolled line
+                     is drawn from what the piece is for. -->
+                <div v-if="entry.rolls" class="rail rolls">
+                  <dt class="label">Rolls</dt>
+                  <dd>
+                    <template v-if="entry.rolls!.ceiling">
+                      <span class="where">
+                        Up to {{ entry.rolls!.ceiling }}
+                        {{ entry.rolls!.ceiling === 1 ? 'line' : 'lines' }},
+                        each {{ entry.rolls!.band }}<template
+                          v-if="entry.rolls!.scopedBand"
+                        >, or {{ entry.rolls!.scopedBand }} named to one
+                        gathering line and worth nothing on the other four</template>.
+                      </span>
+                      <div class="cost">
+                        <span v-for="name in entry.rolls!.percent" :key="name" class="pip roll">
+                          {{ name }}
+                        </span>
+                        <span v-for="(f, i) in entry.rolls!.flat" :key="i" class="pip roll solid">
+                          <span class="key">{{ f.label }}</span>
+                          <span class="mono">{{ f.value }}</span>
+                        </span>
+                      </div>
+                      <p v-if="entry.rolls!.plainShelf" class="tiny muted note">
+                        Nothing off a shelf ever rolls. A bought one is plain.
+                      </p>
+                    </template>
+                    <span v-else class="tiny muted">
+                      Never. A common piece is exactly what its recipe says.
+                    </span>
                   </dd>
                 </div>
 
@@ -1169,6 +1289,28 @@ section + section {
   font-family: var(--font-display);
   font-variant-numeric: tabular-nums;
   color: var(--gold);
+}
+
+/* §8.0.1 -- a maybe, not a fact, so it takes the dimmest road on the entry.
+   Everything else in the rails happened or will happen; this one is the bench's
+   luck, and it must not out-shout the recipe above it. */
+.rail.rolls {
+  --road: #4c5a51;
+}
+
+.pip.roll {
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  background: #1c2519;
+  color: #b7d6a4;
+}
+
+/* The solid pair is told apart by its label, never by its color (§9.5.4). */
+.pip.roll.solid .key {
+  font-size: 8.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--vellum-dim);
 }
 
 /* Buy-back is the lesser of the two numbers and reads as the lesser: same

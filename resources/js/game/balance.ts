@@ -255,6 +255,42 @@ export const EQUIPMENT = {
   } as const,
   /** Gold buys the bottom two rungs and nothing else, §3.2. */
   shopRarityCap: 'uncommon',
+  /**
+   * §8.0.1 -- how many rolled lines a rung may carry. A CEILING, never a quota:
+   * nothing up to it, so an uncommon may roll one or none. Only a crafted piece
+   * rolls at all -- gold buys a plain item at every shelf including a capital's.
+   */
+  optionRolls: {
+    common: 0,
+    uncommon: 1,
+    rare: 1,
+    epic: 2,
+    legendary: 3,
+    unique: 3,
+  } as const,
+  /**
+   * §8.0.1 -- what a line off each tier of the pool is worth. Every line rolls
+   * its OWN tier, drawn from the tiers at or below the item's rarity, so a
+   * legendary regularly carries a common-grade line.
+   */
+  optionValue: {
+    common: [0.01, 0.02],
+    uncommon: [0.01, 0.03],
+    rare: [0.02, 0.04],
+    epic: [0.03, 0.05],
+    legendary: [0.04, 0.06],
+  } as const,
+  /** §8.0.1 -- the same tiers as solid numbers, for a line on the pair. */
+  optionFlatValue: {
+    common: [1, 2],
+    uncommon: [1, 3],
+    rare: [2, 4],
+    epic: [3, 6],
+    legendary: [4, 8],
+  } as const,
+  /** §8.0.1 -- what naming one gathering line is worth, since it is worth
+   *  nothing on the other four. */
+  optionScopedMultiplier: 2,
   /** Diminishing returns on stacking, §8.1 rule 2: the nth item of the same
    *  stat contributes value * falloff^(n-1). */
   stackFalloff: 0.5,

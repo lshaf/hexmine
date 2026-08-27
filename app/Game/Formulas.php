@@ -150,7 +150,7 @@ final class Formulas
             return [];
         }
 
-        $pool = Catalog::optionRollsFor($def['slot'] ?? '');
+        $pool = Catalog::optionRollsFor($def);
         if ($pool === []) {
             return [];
         }

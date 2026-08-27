@@ -40,6 +40,8 @@ import {
   flatOption,
   statLine,
 } from '@/game/formulas'
+import GearAction from '@/components/GearAction.vue'
+import RepairCost from '@/components/RepairCost.vue'
 import StatChips from '@/components/StatChips.vue'
 import { itemIcon, materialIcon } from '@/icons/procedural'
 import SvgIcon from '@/components/SvgIcon.vue'
@@ -457,6 +459,17 @@ async function scrap(item: OwnedItem): Promise<void> {
   await game.discard(item.id)
   close()
 }
+
+/**
+ * §8.2 -- a stowed piece mends. It always could: the server has never asked
+ * whether a piece was worn, and the only thing keeping a broken axe out of the
+ * repair queue was that the button lived on the prospector sheet, where you can
+ * only reach gear you are already wearing.
+ */
+async function mend(item: OwnedItem): Promise<void> {
+  await game.repair(item.id)
+  close()
+}
 </script>
 
 <template>
@@ -659,23 +672,32 @@ async function scrap(item: OwnedItem): Promise<void> {
                 <StatChips :def="def" :options="picked.item.options ?? []" />
               </div>
 
+              <!-- §8.2 -- what a mend would take, on the plate that offers
+                   one. The bill is the decision, not a footnote to it. -->
+              <RepairCost :item="picked.item" />
+
               <div class="acts">
-                <button
-                  class="btn btn-sm"
-                  type="button"
+                <GearAction
+                  action="equip"
+                  label="Equip"
+                  wide
                   :disabled="game.busy || picked.item.durability <= 0"
-                  :title="picked.item.durability <= 0
-                    ? 'Broken — repair it first'
-                    : worn && wornDef
-                      ? `Swaps out the ${wornDef.name} — costs no strap`
-                      : 'Worn gear costs no strap'"
                   @click="equip(picked.item)"
-                >
-                  Equip
-                </button>
-                <button class="btn btn-sm btn-danger" type="button" :disabled="game.busy" @click="scrap(picked.item)">
-                  Scrap for parts
-                </button>
+                />
+                <GearAction
+                  action="repair"
+                  label="Repair"
+                  wide
+                  :disabled="game.busy"
+                  @click="mend(picked.item)"
+                />
+                <GearAction
+                  action="scrap"
+                  label="Scrap"
+                  wide
+                  :disabled="game.busy"
+                  @click="scrap(picked.item)"
+                />
               </div>
             </template>
           </div>
