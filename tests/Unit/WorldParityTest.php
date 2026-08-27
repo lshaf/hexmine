@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit;
 
 use App\Game\Balance;
+use App\Game\Catalog;
 use App\Game\Hash;
 use App\Game\WorldGen;
 use Tests\TestCase;
@@ -223,6 +224,91 @@ final class WorldParityTest extends TestCase
                     $actual * 100,
                     $share * 100,
                 ),
+            );
+        }
+    }
+
+    /**
+     * §2 / §4 -- Tier 3 is contested ground and nowhere else, ever.
+     *
+     * The two middle grades leak onto the rings outside their own at a few per
+     * cent, so that a recipe wanting one is cookable at the moment it would
+     * actually be an upgrade rather than only where it is already outclassed.
+     * The epic row is the one that may not: it is §4's Tier 3, capped per
+     * wallet, and the gate behind every mintable recipe. A lucky Tier 3 on the
+     * safe rim would be the grind->NFT path §2 exists to close, and it would
+     * arrive as a tuning tweak nobody read as one.
+     *
+     * Swept over the real map rather than over the weight table, because the
+     * table is one of two places this could go wrong and the roll is the other.
+     */
+    public function test_tier_three_never_spawns_outside_the_contested_ring(): void
+    {
+        $radius = Balance::mapRadius();
+        $seen = 0;
+
+        for ($col = -$radius; $col <= $radius; $col++) {
+            for ($row = -$radius; $row <= $radius; $row++) {
+                $tile = WorldGen::generateTile($col, $row, 0);
+                if ($tile['material'] === null) {
+                    continue;
+                }
+
+                if ((Catalog::material($tile['material'])['tier'] ?? 0) !== 3) {
+                    continue;
+                }
+
+                $seen++;
+                $this->assertContains(
+                    $tile['ring'],
+                    ['inner', 'center'],
+                    "Tier 3 turned up at {$col},{$row} in the {$tile['ring']} ring",
+                );
+            }
+        }
+
+        $this->assertGreaterThan(500, $seen, 'the sweep found almost no Tier 3');
+    }
+
+    /**
+     * §5.2 -- and every grade below it IS findable on the rim, thinly.
+     *
+     * The point of the leak: a grade sealed inside the ring that already
+     * outclasses it is a recipe nobody ever cooks. Thin enough to be luck --
+     * about one hex in fifty for an uncommon, one in two hundred for a rare --
+     * and never thin enough to be nothing.
+     */
+    public function test_the_middle_grades_turn_up_on_the_rim_as_a_lucky_find(): void
+    {
+        $radius = Balance::mapRadius();
+        $tiers = [];
+        $rim = 0;
+
+        for ($col = -$radius; $col <= $radius; $col += 2) {
+            for ($row = -$radius; $row <= $radius; $row += 2) {
+                $tile = WorldGen::generateTile($col, $row, 0);
+                if ($tile['material'] === null || $tile['ring'] !== 'outer') {
+                    continue;
+                }
+
+                $rim++;
+                $grade = str_contains((string) $tile['variant'], '_')
+                    ? substr((string) $tile['variant'], strrpos((string) $tile['variant'], '_') + 1)
+                    : 'common';
+                $tiers[$grade] = ($tiers[$grade] ?? 0) + 1;
+            }
+        }
+
+        $this->assertGreaterThan(0, $rim);
+
+        foreach (['uncommon', 'rare'] as $grade) {
+            $share = ($tiers[$grade] ?? 0) / $rim;
+
+            $this->assertGreaterThan(0, $share, "{$grade} ground is sealed out of the rim");
+            $this->assertLessThan(
+                0.05,
+                $share,
+                "{$grade} is {$share} of the rim -- that is a supply, not a lucky find",
             );
         }
     }

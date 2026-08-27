@@ -1027,15 +1027,22 @@ final class GameLoopTest extends TestCase
     }
 
     /**
-     * §5.2 -- the outer rim is safe ground and poor ground.
+     * §5.2 -- the outer rim is safe ground and poor ground, and the gradient in
+     * is the whole reason to walk.
      *
-     * Only the base grade spawns there, the Tier 3 rare only in the contested
-     * ring, and the rare grade with it. That gradient is the whole reason to
-     * walk inward, so it is asserted rather than left to the weight table.
+     * Asserted on where a grade is AT HOME rather than on where it can turn up
+     * at all, because the two middle grades leak outward at a few per cent: a
+     * grade sealed inside the ring that already outclasses it is a recipe
+     * nobody ever cooks. The leak has to stay a lucky find, so it is bounded
+     * here as well as floored.
+     *
+     * Contested is the exception and it is a §2 rule: Tier 3 is capped per
+     * wallet and gates every mintable recipe, so a lucky one on the safe rim
+     * would be the grind->NFT path the threat model exists to close.
      */
     public function test_grades_are_gated_by_ring(): void
     {
-        $expected = [
+        $home = [
             'common' => ['outer', 'mid', 'inner'],
             'uncommon' => ['mid', 'inner'],
             'rare' => ['inner'],
@@ -1046,16 +1053,42 @@ final class GameLoopTest extends TestCase
             foreach (Variants::BIOME_VARIANTS[$biome] as $variant) {
                 $rings = [];
                 foreach (['outer', 'mid', 'inner'] as $ring) {
-                    if ($variant['weights'][$ring] > 0) {
+                    if ($variant['weights'][$ring] >= 0.1) {
                         $rings[] = $ring;
                     }
                 }
 
                 $this->assertSame(
-                    $expected[$variant['grade']],
+                    $home[$variant['grade']],
                     $rings,
-                    "{$variant['key']} spawns in the wrong rings",
+                    "{$variant['key']} is at home in the wrong rings",
                 );
+
+                foreach (['outer', 'mid'] as $ring) {
+                    $weight = $variant['weights'][$ring];
+
+                    if ($variant['grade'] === 'epic') {
+                        $this->assertSame(
+                            0.0,
+                            (float) $weight,
+                            "Tier 3 leaked into the {$ring} ring -- that is a grind->NFT faucet",
+                        );
+
+                        continue;
+                    }
+
+                    // Everything below Tier 3 is findable everywhere, thinly.
+                    $this->assertGreaterThan(
+                        0,
+                        $weight,
+                        "{$variant['key']} is sealed out of the {$ring} ring",
+                    );
+                    $this->assertLessThanOrEqual(
+                        in_array($ring, $home[$variant['grade']], true) ? 1.0 : 0.05,
+                        $weight,
+                        "{$variant['key']} is a supply in the {$ring} ring, not a lucky find",
+                    );
+                }
             }
         }
 
@@ -1140,7 +1173,10 @@ final class GameLoopTest extends TestCase
      */
     public function test_the_variant_roll_is_stable_and_respects_its_ring(): void
     {
-        $legal = ['outer' => ['common'], 'mid' => ['common', 'uncommon']];
+        // §5.2 -- only Tier 3 is ring-gated now. The grades below it leak
+        // outward at a few per cent, so "legal" out here is a list of what may
+        // NOT turn up rather than of what may.
+        $forbidden = ['outer' => ['epic'], 'mid' => ['epic']];
         $seen = [];
 
         for ($col = 40; $col < 120; $col += 3) {
@@ -1157,10 +1193,10 @@ final class GameLoopTest extends TestCase
                 $this->assertSame($tile['variant'], $variant['key']);
                 $this->assertSame($variant['material'], $tile['material']);
 
-                if (isset($legal[$tile['ring']])) {
-                    $this->assertContains(
+                if (isset($forbidden[$tile['ring']])) {
+                    $this->assertNotContains(
                         $variant['grade'],
-                        $legal[$tile['ring']],
+                        $forbidden[$tile['ring']],
                         "a {$variant['grade']} hex turned up in the {$tile['ring']} ring",
                     );
                 }

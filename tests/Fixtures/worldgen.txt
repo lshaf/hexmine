@@ -44,7 +44,7 @@
 107,125|mountain|mountain|outer|-|dead|5200|4|10|-|-|-|-|3227843831
 -119,-64|plains|plains|outer|-|dead|4092|4|10|-|-|-|-|1757244746
 56,148|plains|plains|outer|pelt|-|4281|5|9|-|-|-|moss_hound:0|174176402
--170,-41|forest|forest|outer|wood|-|4345|3|10|-|-|-|-|2999766817
+-170,-41|forest|forest_rare|outer|heartoak|-|14483|3|10|-|-|-|-|2999766817
 5,171|forest|forest|outer|wood|-|4489|8|6|-|-|-|-|1689498096
 180,-18|mountain|mountain|outer|iron_ore|-|3785|6|8|-|-|-|-|1052380551
 -46,194|forest|forest|outer|wood|-|3664|8|6|-|-|-|-|1005276538
@@ -72,7 +72,7 @@
 195,46|forest|forest|outer|wood|-|3019|3|10|-|-|-|-|1333425135
 -31,-143|grassland|grassland|outer|-|dead|4312|7|7|-|-|-|-|203752234
 144,69|plains|plains|outer|pelt|-|4714|8|6|-|-|-|-|889600961
--82,-120|badlands|badlands|outer|stone|-|3811|7|7|-|-|-|-|37623096
+-82,-120|badlands|badlands_uncommon|outer|basalt|-|7622|7|7|-|-|-|-|37623096
 93,92|grassland|grassland|outer|fiber|-|4973|6|8|-|-|-|-|3114213252
 -133,-97|badlands|badlands|outer|stone|-|4759|8|6|-|-|-|-|2457612072
 42,115|grassland|grassland|mid|-|-|4572|7|7|-|-|lake|-|103097321
@@ -187,7 +187,7 @@
 -131,-35|mountain|mountain|outer|iron_ore|-|2725|3|10|-|-|-|-|1325348055
 44,177|badlands|badlands|outer|stone|-|3953|5|9|-|-|-|-|585338066
 -182,-12|forest|forest|outer|wood|-|3540|5|9|-|-|-|-|3421720437
--7,200|plains|plains|outer|pelt|-|3618|7|7|-|-|-|-|3648333464
+-7,200|plains|plains_uncommon|outer|thick_pelt|-|7236|7|7|-|-|-|-|3648333464
 168,11|mountain|mountain|outer|iron_ore|-|5144|8|6|-|-|-|-|179338520
 -58,-178|badlands|badlands|outer|-|dead|4056|5|9|-|-|-|-|68739788
 117,34|forest|forest|mid|-|dead|5090|7|7|-|-|-|-|932779167
@@ -228,7 +228,7 @@
 -174,-165|grassland|grassland|outer|fiber|-|4838|4|10|-|-|-|-|1894365743
 1,47|forest|forest_uncommon|inner|hardwood|-|7730|4|10|-|-|-|-|112936117
 176,-142|badlands|badlands|outer|stone|-|4177|6|8|-|-|-|-|1624730691
--50,70|grassland|grassland|mid|fiber|-|4068|7|7|-|-|-|-|3787019405
+-50,70|grassland|grassland_uncommon|mid|flax|-|8136|7|7|-|-|-|-|3787019405
 125,-119|badlands|badlands|outer|stone|-|3804|4|10|-|-|-|-|1110534394
 -101,93|forest|forest|outer|-|-|4053|5|9|-|-|river|-|3607254468
 74,-96|mountain|mountain|mid|iron_ore|-|3778|4|10|-|-|-|-|1853899123

@@ -19,33 +19,33 @@ export interface VariantDef {
 
 export const BIOME_VARIANTS: Record<Biome, VariantDef[]> = {
   forest: [
-    { key: 'forest', grade: 'common', name: 'Forest', material: 'wood', tint: '#5f8058', props: 'conifers', weights: { outer: 1.0, mid: 0.7, inner: 0.42 } },
-    { key: 'forest_uncommon', grade: 'uncommon', name: 'Hardwood Stand', material: 'hardwood', tint: '#6b8a4e', props: 'broadleaf', weights: { outer: 0.0, mid: 0.3, inner: 0.25 } },
-    { key: 'forest_rare', grade: 'rare', name: 'Old Growth', material: 'heartoak', tint: '#46654a', props: 'giants', weights: { outer: 0.0, mid: 0.0, inner: 0.15 } },
+    { key: 'forest', grade: 'common', name: 'Forest', material: 'wood', tint: '#5f8058', props: 'conifers', weights: { outer: 0.975, mid: 0.68, inner: 0.42 } },
+    { key: 'forest_uncommon', grade: 'uncommon', name: 'Hardwood Stand', material: 'hardwood', tint: '#6b8a4e', props: 'broadleaf', weights: { outer: 0.02, mid: 0.3, inner: 0.25 } },
+    { key: 'forest_rare', grade: 'rare', name: 'Old Growth', material: 'heartoak', tint: '#46654a', props: 'giants', weights: { outer: 0.005, mid: 0.02, inner: 0.15 } },
     { key: 'forest_epic', grade: 'epic', name: 'Ironwood Grove', material: 'ironwood', tint: '#55705f', props: 'ironwood', weights: { outer: 0.0, mid: 0.0, inner: 0.18 } },
   ],
   mountain: [
-    { key: 'mountain', grade: 'common', name: 'Mountain', material: 'iron_ore', tint: '#6d8399', props: 'peaks', weights: { outer: 1.0, mid: 0.7, inner: 0.42 } },
-    { key: 'mountain_uncommon', grade: 'uncommon', name: 'Hematite Ridge', material: 'hematite', tint: '#8a7a72', props: 'banded', weights: { outer: 0.0, mid: 0.3, inner: 0.25 } },
-    { key: 'mountain_rare', grade: 'rare', name: 'Crater Field', material: 'meteoric_iron', tint: '#5c6b7d', props: 'crater', weights: { outer: 0.0, mid: 0.0, inner: 0.15 } },
+    { key: 'mountain', grade: 'common', name: 'Mountain', material: 'iron_ore', tint: '#6d8399', props: 'peaks', weights: { outer: 0.975, mid: 0.68, inner: 0.42 } },
+    { key: 'mountain_uncommon', grade: 'uncommon', name: 'Hematite Ridge', material: 'hematite', tint: '#8a7a72', props: 'banded', weights: { outer: 0.02, mid: 0.3, inner: 0.25 } },
+    { key: 'mountain_rare', grade: 'rare', name: 'Crater Field', material: 'meteoric_iron', tint: '#5c6b7d', props: 'crater', weights: { outer: 0.005, mid: 0.02, inner: 0.15 } },
     { key: 'mountain_epic', grade: 'epic', name: 'Mythril Seam', material: 'mythril_ore', tint: '#7d93a8', props: 'mythril', weights: { outer: 0.0, mid: 0.0, inner: 0.18 } },
   ],
   plains: [
-    { key: 'plains', grade: 'common', name: 'Plains', material: 'pelt', tint: '#b08a5a', props: 'tufts', weights: { outer: 1.0, mid: 0.7, inner: 0.42 } },
-    { key: 'plains_uncommon', grade: 'uncommon', name: 'Herd Range', material: 'thick_pelt', tint: '#bb9a63', props: 'grazed', weights: { outer: 0.0, mid: 0.3, inner: 0.25 } },
-    { key: 'plains_rare', grade: 'rare', name: 'Dire Range', material: 'dire_pelt', tint: '#96703f', props: 'bones', weights: { outer: 0.0, mid: 0.0, inner: 0.15 } },
+    { key: 'plains', grade: 'common', name: 'Plains', material: 'pelt', tint: '#b08a5a', props: 'tufts', weights: { outer: 0.975, mid: 0.68, inner: 0.42 } },
+    { key: 'plains_uncommon', grade: 'uncommon', name: 'Herd Range', material: 'thick_pelt', tint: '#bb9a63', props: 'grazed', weights: { outer: 0.02, mid: 0.3, inner: 0.25 } },
+    { key: 'plains_rare', grade: 'rare', name: 'Dire Range', material: 'dire_pelt', tint: '#96703f', props: 'bones', weights: { outer: 0.005, mid: 0.02, inner: 0.15 } },
     { key: 'plains_epic', grade: 'epic', name: 'Beastfang Reach', material: 'beastfang_hide', tint: '#a37452', props: 'fangs', weights: { outer: 0.0, mid: 0.0, inner: 0.18 } },
   ],
   badlands: [
-    { key: 'badlands', grade: 'common', name: 'Badlands', material: 'stone', tint: '#96604c', props: 'shards', weights: { outer: 1.0, mid: 0.7, inner: 0.42 } },
-    { key: 'badlands_uncommon', grade: 'uncommon', name: 'Basalt Flats', material: 'basalt', tint: '#7a5347', props: 'columns', weights: { outer: 0.0, mid: 0.3, inner: 0.25 } },
-    { key: 'badlands_rare', grade: 'rare', name: 'Granite Shelf', material: 'granite', tint: '#a1756a', props: 'shelf', weights: { outer: 0.0, mid: 0.0, inner: 0.15 } },
+    { key: 'badlands', grade: 'common', name: 'Badlands', material: 'stone', tint: '#96604c', props: 'shards', weights: { outer: 0.975, mid: 0.68, inner: 0.42 } },
+    { key: 'badlands_uncommon', grade: 'uncommon', name: 'Basalt Flats', material: 'basalt', tint: '#7a5347', props: 'columns', weights: { outer: 0.02, mid: 0.3, inner: 0.25 } },
+    { key: 'badlands_rare', grade: 'rare', name: 'Granite Shelf', material: 'granite', tint: '#a1756a', props: 'shelf', weights: { outer: 0.005, mid: 0.02, inner: 0.15 } },
     { key: 'badlands_epic', grade: 'epic', name: 'Obsidian Flow', material: 'obsidian_shard', tint: '#5f4a52', props: 'glass', weights: { outer: 0.0, mid: 0.0, inner: 0.18 } },
   ],
   grassland: [
-    { key: 'grassland', grade: 'common', name: 'Grassland', material: 'fiber', tint: '#a8a05c', props: 'tufts', weights: { outer: 1.0, mid: 0.7, inner: 0.42 } },
-    { key: 'grassland_uncommon', grade: 'uncommon', name: 'Flax Meadow', material: 'flax', tint: '#b6b073', props: 'flowering', weights: { outer: 0.0, mid: 0.3, inner: 0.25 } },
-    { key: 'grassland_rare', grade: 'rare', name: 'Hemp Field', material: 'hemp', tint: '#8f9552', props: 'tall', weights: { outer: 0.0, mid: 0.0, inner: 0.15 } },
+    { key: 'grassland', grade: 'common', name: 'Grassland', material: 'fiber', tint: '#a8a05c', props: 'tufts', weights: { outer: 0.975, mid: 0.68, inner: 0.42 } },
+    { key: 'grassland_uncommon', grade: 'uncommon', name: 'Flax Meadow', material: 'flax', tint: '#b6b073', props: 'flowering', weights: { outer: 0.02, mid: 0.3, inner: 0.25 } },
+    { key: 'grassland_rare', grade: 'rare', name: 'Hemp Field', material: 'hemp', tint: '#8f9552', props: 'tall', weights: { outer: 0.005, mid: 0.02, inner: 0.15 } },
     { key: 'grassland_epic', grade: 'epic', name: 'Silkweave Fen', material: 'silkweave_fiber', tint: '#9fa878', props: 'silk', weights: { outer: 0.0, mid: 0.0, inner: 0.18 } },
   ],
 }
@@ -210,9 +210,13 @@ export const VARIANT_BY_MATERIAL: Record<string, VariantKey> = {
 }
 
 /**
- * §5.2 -- how far in you have to walk before a grade turns up at all.
- * Derived from the weight table, so it cannot disagree with the roll.
+ * §5.2 -- where a grade is AT HOME, which is not everywhere it can turn
+ * up. The two middle grades leak onto the rings outside their own at a
+ * few per cent (see the weight table); listing those as home ground
+ * would tell a prospector hardwood is a rim material, and it is not.
+ * VARIANT_LEAKS below carries the rest of the truth.
  *
+ * Derived from the weight table, so it cannot disagree with the roll.
  * The center is listed wherever the inner ring is, because it rolls on
  * the inner ring's column (WorldGen::variantOf): it IS contested ground,
  * not a fourth kind of country. Dead ground turns up in all four.
@@ -238,6 +242,37 @@ export const VARIANT_RINGS: Record<VariantKey, string[]> = {
   grassland_uncommon: ['mid', 'inner', 'center'],
   grassland_rare: ['inner', 'center'],
   grassland_epic: ['inner', 'center'],
+}
+
+/**
+ * §5.2 -- true where a grade also turns up OUTSIDE its home rings, thin
+ * enough to be a lucky find rather than a supply.
+ *
+ * The almanac says so, because a recipe you can only cook where it is
+ * already outclassed is a recipe nobody cooks -- and a prospector who
+ * never hears the leak exists will never look.
+ */
+export const VARIANT_LEAKS: Record<VariantKey, boolean> = {
+  forest: false,
+  forest_uncommon: true,
+  forest_rare: true,
+  forest_epic: false,
+  mountain: false,
+  mountain_uncommon: true,
+  mountain_rare: true,
+  mountain_epic: false,
+  plains: false,
+  plains_uncommon: true,
+  plains_rare: true,
+  plains_epic: false,
+  badlands: false,
+  badlands_uncommon: true,
+  badlands_rare: true,
+  badlands_epic: false,
+  grassland: false,
+  grassland_uncommon: true,
+  grassland_rare: true,
+  grassland_epic: false,
 }
 
 /** §7.2 -- which gathering line a grade belongs to. */

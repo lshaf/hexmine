@@ -285,7 +285,23 @@ mentally navigable map. Rare-material biome variants sit inside/near the PvP rin
 
 **Four grades a biome, and the grade is a rung of the equipment ladder.** Base,
 Better, Best, Contested — each named for a tool rung, each giving up a better
-material than the one under it. **Dead ground is none of them** (§5.2): it is
+material than the one under it.
+
+**No grade is sealed inside a ring except the last one.** The two middle grades
+leak onto the rings outside their own at a few per cent — about one hex in fifty
+for Better, one in two hundred for Best — so they are a lucky find out there and
+never a supply. That is the whole reason: a grade found only where it is already
+outclassed is a recipe nobody ever cooks. By the time you are standing in the
+mid ring for its material, the ring has handed you better gear than the material
+builds, and the recipe is dead on arrival. The leak is what lets a rim
+prospector build the thing at the moment it would actually be an upgrade.
+
+**Contested does not leak, and that is a §2 rule rather than a tuning value.**
+It is §4's Tier 3: capped per wallet, the gate behind every mintable recipe, and
+the reason §5.2 puts it in the PvP band — walking into the contested ring is the
+price of it. A lucky Tier 3 on the safe rim would be the grind→NFT path the
+threat model exists to close, arriving as a weight tweak nobody read as one.
+There is a test sweeping the whole map for it, and two asserts in the generator. **Dead ground is none of them** (§5.2): it is
 not a fifth grade and not a variant at all, because it is not something a hex
 rolls — the field decides it before the roll happens, and the hex keeps whatever
 variant and colour its biome would have given it.

@@ -27,7 +27,7 @@ import {
   stationForRarity,
 } from './catalog'
 import { BIOME_LABEL } from '@/theme/palette'
-import { VARIANT_BY_MATERIAL, VARIANT_LABEL, VARIANT_RINGS } from './variants'
+import { VARIANT_BY_MATERIAL, VARIANT_LABEL, VARIANT_LEAKS, VARIANT_RINGS } from './variants'
 import { REAGENTS } from './alchemy'
 import { COMPONENTS } from './components'
 import { CRITTERS } from './critters'
@@ -151,15 +151,24 @@ const minutes = (seconds: number) => Math.round(seconds / 60)
 function ringNote(variant: string): string {
   const rings = VARIANT_RINGS[variant as keyof typeof VARIANT_RINGS] ?? []
 
+  // §5.2 -- the two middle grades leak onto the rings outside their own at a few
+  // per cent, so "only" would be a lie and saying nothing would bury the one
+  // fact a rim prospector wants: that it is worth keeping an eye out. Said as a
+  // long shot, because that is what it is -- roughly one hex in fifty for an
+  // uncommon and one in two hundred for a rare.
+  const luck = VARIANT_LEAKS[variant as keyof typeof VARIANT_LEAKS]
+    ? ', and rarely further out'
+    : ''
+
   // Asked of the rings themselves rather than of how many there are. It used to
   // count -- three or more meant everywhere, one meant contested -- and that
   // broke the moment §5.2's center joined the list it belongs to: every
   // inner-bearing grade gained a ring and slid one rung down the phrase, so
   // uncommon ground quietly stopped saying where it was.
   if (rings.includes('outer')) return ''
-  if (rings.includes('mid')) return ', middle ring and inward'
+  if (rings.includes('mid')) return `, middle ring and inward${luck}`
 
-  return ', contested ring only'
+  return `, contested ring${luck || ' only'}`
 }
 
 export function materialSources(mat: Material): SourceLine[] {

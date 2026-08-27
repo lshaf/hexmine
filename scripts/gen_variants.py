@@ -20,18 +20,41 @@ import io
 
 # ------------------------------------------------------------------- weights
 # Which rings a grade may spawn in, and how often. §5.2 -- the outer rim is
-# safe and poor, the contested inner ring is where the good ground is. The
-# `epic` column is Balance::RARE_SPAWN_CHANCE and must stay 0.18, or §5.3's
+# safe and poor, the contested inner ring is where the good ground is.
+#
+# NO GRADE IS SEALED INSIDE A RING EXCEPT THE LAST ONE. A grade that could only
+# be found where it was already outclassed was a recipe nobody would ever cook:
+# by the time you are standing in the mid ring for its uncommon material, the
+# ring itself has handed you better gear than that material builds. So the two
+# middle grades leak outward at a low rate -- a lucky find rather than a supply
+# -- which is what lets an outer-rim prospector build the thing at the moment
+# it would actually be an upgrade.
+#
+# The leak is deliberately thin. It has to be findable across a session's
+# walking and never something you can go and farm; at these rates the outer rim
+# carries roughly one uncommon hex in fifty and one rare in two hundred.
+#
+# EPIC DOES NOT LEAK, and that one is a rule rather than a tuning value. The
+# epic row is §4's Tier 3, capped per wallet and the gate behind every mintable
+# recipe (§2) -- §5.2 puts it in the contested ring because walking into the
+# PvP band is the price of it. A lucky Tier 3 on the safe rim would be the
+# grind->NFT path the threat model exists to close.
+#
+# The `epic` column is Balance::RARE_SPAWN_CHANCE and must stay 0.18, or §5.3's
 # rare density moves.
 #
 # Each ring's column sums to 1.0. The walk that picks a variant relies on it.
 WEIGHTS = {
-    #           outer   mid    inner
-    'common':   (1.00,  0.70,  0.42),
-    'uncommon': (0.00,  0.30,  0.25),
-    'rare':     (0.00,  0.00,  0.15),
-    'epic':     (0.00,  0.00,  0.18),
+    #           outer    mid     inner
+    'common':   (0.975,  0.680,  0.42),
+    'uncommon': (0.020,  0.300,  0.25),
+    'rare':     (0.005,  0.020,  0.15),
+    'epic':     (0.000,  0.000,  0.18),
 }
+
+# Below this share of a ring's roll, a grade is a lucky find there rather than
+# something the ring is FOR. The almanac splits its wording on it.
+AT_HOME = 0.1
 
 GRADES = ['common', 'uncommon', 'rare', 'epic']
 RINGS = ['outer', 'mid', 'inner']
@@ -360,19 +383,37 @@ def emit_ts():
     o.write('}\n\n')
 
     o.write('/**\n')
-    o.write(' * §5.2 -- how far in you have to walk before a grade turns up at all.\n')
-    o.write(' * Derived from the weight table, so it cannot disagree with the roll.\n')
+    o.write(' * §5.2 -- where a grade is AT HOME, which is not everywhere it can turn\n')
+    o.write(' * up. The two middle grades leak onto the rings outside their own at a\n')
+    o.write(' * few per cent (see the weight table); listing those as home ground\n')
+    o.write(' * would tell a prospector hardwood is a rim material, and it is not.\n')
+    o.write(' * VARIANT_LEAKS below carries the rest of the truth.\n')
     o.write(' *\n')
+    o.write(' * Derived from the weight table, so it cannot disagree with the roll.\n')
     o.write(' * The center is listed wherever the inner ring is, because it rolls on\n')
     o.write(" * the inner ring's column (WorldGen::variantOf): it IS contested ground,\n")
     o.write(' * not a fourth kind of country. Dead ground turns up in all four.\n')
     o.write(' */\n')
     o.write('export const VARIANT_RINGS: Record<VariantKey, string[]> = {\n')
     for biome, grade, tile, tint, raw, refined, props in rows():
-        rings = [r for i, r in enumerate(RINGS) if WEIGHTS[grade][i] > 0]
+        rings = [r for i, r in enumerate(RINGS) if WEIGHTS[grade][i] >= AT_HOME]
         if 'inner' in rings:
             rings = rings + ['center']
         o.write(f"  {variant_key(biome, grade)}: [{', '.join(ts_str(r) for r in rings)}],\n")
+    o.write('}\n\n')
+
+    o.write('/**\n')
+    o.write(' * §5.2 -- true where a grade also turns up OUTSIDE its home rings, thin\n')
+    o.write(' * enough to be a lucky find rather than a supply.\n')
+    o.write(' *\n')
+    o.write(' * The almanac says so, because a recipe you can only cook where it is\n')
+    o.write(' * already outclassed is a recipe nobody cooks -- and a prospector who\n')
+    o.write(' * never hears the leak exists will never look.\n')
+    o.write(' */\n')
+    o.write('export const VARIANT_LEAKS: Record<VariantKey, boolean> = {\n')
+    for biome, grade, tile, tint, raw, refined, props in rows():
+        leaks = any(0 < w < AT_HOME for w in WEIGHTS[grade])
+        o.write(f"  {variant_key(biome, grade)}: {'true' if leaks else 'false'},\n")
     o.write('}\n\n')
 
     o.write('/** §7.2 -- which gathering line a grade belongs to. */\n')
@@ -408,6 +449,12 @@ if __name__ == '__main__':
     for i, ring in enumerate(RINGS):
         total = round(sum(WEIGHTS[g][i] for g in GRADES), 6)
         assert total == 1.0, f'{ring} weights sum to {total}, not 1'
+
+    # §2 -- Tier 3 is contested ground and nowhere else. A lucky epic on the
+    # safe rim would be a grind->NFT faucet, which is the one thing the threat
+    # model refuses outright.
+    assert WEIGHTS['epic'][0] == 0.0, 'Tier 3 leaked onto the outer rim'
+    assert WEIGHTS['epic'][1] == 0.0, 'Tier 3 leaked into the mid ring'
 
     assert WEIGHTS['epic'][2] == 0.18, 'the Tier 3 rate moved off RARE_SPAWN_CHANCE'
 
