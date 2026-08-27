@@ -2341,33 +2341,58 @@ final class GameLoopTest extends TestCase
         $this->assertGreaterThan($capped['rate'], $both['rate']);
     }
 
-    public function test_bare_hands_are_the_floor_under_the_tool_ladder(): void
+    /**
+     * §4.0 -- bare hands TIE the common rung, and what a tool buys at the
+     * bottom of the ladder is worth rather than speed.
+     *
+     * The two numbers are both 3 on purpose. Hands are gathering's rate and
+     * nothing else's: §8.0 rule 1 refuses a mine outright without the line's
+     * tool and points at the gather button instead, so the hex is worked with
+     * the tool or with the hands and the two never race on the same verb. What
+     * the first tool changes is what comes home -- §4.0, scrap sells for a gold
+     * and no recipe anywhere will take it, while the seam it displaced feeds
+     * every one of them.
+     *
+     * So the ladder is felt from the SECOND rung up, and the first rung is felt
+     * in the bag. This used to assert hands were strictly slower, which made a
+     * Stone Axe's whole argument "the same hex, faster" -- an argument §4.0 had
+     * already replaced with a better one.
+     */
+    public function test_bare_hands_tie_the_common_rung_and_lose_to_every_rung_above(): void
     {
-        $this->assertLessThan(
+        $this->assertSame(
             Balance::MINING_COMMON_ATTACK,
             Balance::BARE_HAND_ATTACK,
-            'bare hands out-work the cheapest tool in the game',
+            'hands and the cheapest tool have stopped taking the same bite',
         );
 
         $hex = Balance::TILE_HP_MIN;
 
-        // At every level of the line, and against every rung actually sold.
+        // At every level of the line, because the skill term is shared: a level
+        // that helped the hands and not the tool would break the tie sideways.
         foreach ([1, 10, 25, Balance::SKILL_MAX_LEVEL] as $level) {
-            $hands = Formulas::mineTime(
-                $hex,
-                $level,
-                0.0,
-                Balance::BARE_HAND_ATTACK,
-            )['total'];
+            $hands = Formulas::mineTime($hex, $level, 0.0, Balance::BARE_HAND_ATTACK)['total'];
 
-            foreach (['stone_axe', 'chipped_pick', 'crude_bow', 'iron_hatchet'] as $key) {
+            // The five rungs a village sells, one per line. Same bite as hands.
+            foreach (['stone_axe', 'chipped_pick', 'crude_bow'] as $key) {
                 $attack = Formulas::toolAttack(Catalog::item($key));
-                $tooled = Formulas::mineTime($hex, $level, 0.0, $attack)['total'];
+
+                $this->assertSame(
+                    $hands,
+                    Formulas::mineTime($hex, $level, 0.0, $attack)['total'],
+                    "{$key} no longer ties bare hands at line level {$level}",
+                );
+            }
+
+            // And everything above it is strictly faster, which is where the
+            // ladder starts being a ladder.
+            foreach (['hewn_axe', 'iron_hatchet', 'ironwood_axe'] as $key) {
+                $attack = Formulas::toolAttack(Catalog::item($key));
 
                 $this->assertLessThan(
                     $hands,
-                    $tooled,
-                    "{$key} is slower than bare hands at line level {$level}",
+                    Formulas::mineTime($hex, $level, 0.0, $attack)['total'],
+                    "{$key} is no faster than bare hands at line level {$level}",
                 );
             }
         }
@@ -2619,11 +2644,13 @@ final class GameLoopTest extends TestCase
         // they last. Distinct rungs only.
         $ladder = ['stone_axe', 'hewn_axe', 'iron_hatchet', 'ironwood_axe'];
         $hex = Balance::TILE_HP_MAX;
-        $last = Formulas::mineTime($hex, 1, 0.0, Balance::BARE_HAND_ATTACK)['total'];
 
-        // Bare hands are the floor under the ladder and are slower than any of
-        // it -- the hex is the same pile of work either way (§4.0).
-        $this->assertGreaterThan(30 * 60, $last);
+        // Bare hands are NOT the bottom of this ladder: they take the common
+        // rung's own bite (§4.0), so seeding the walk with them would ask the
+        // Stone Axe to beat a tie. What the first rung buys is what comes home,
+        // and the rung above it is where the clock starts moving -- which is
+        // exactly what this walk measures.
+        $last = INF;
 
         foreach ($ladder as $key) {
             $def = Catalog::item($key);

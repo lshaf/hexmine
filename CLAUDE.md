@@ -548,7 +548,7 @@ trip_time = clamp(hp / rate, 1min, 60min)
 - `hp`: **2,700–5,400**, rolled per tile, then **scaled by the tile's grade**
   (§5.3) — base ground untouched, up to ×4⅔ on contested. A herd is 4,500 (§5.5)
 - `attack`: **the whole base rate**, and it is the tool's — or, for gathering
-  alone, `BARE_HAND_ATTACK` (**2**)
+  alone, `BARE_HAND_ATTACK` (**3**, the common rung's own — see below)
 - `skill_attack`: `floor(level / 10)` — five more points at maxed line skill
 - `skill_bite`: whole points off the **line's own tree** (§7.4.3), up to
   `SKILL_BITE_CAP` (**5**)
@@ -599,14 +599,32 @@ term used to hand the very first level of a line a free point, so a panel
 describing what your skill was worth to this mine printed **+1** at a character
 who had never swung an axe.
 
-**Bare hands must stay under the cheapest tool, and that is a rule rather than a
-tuning value.** They were **4** while the number was the floor every verb stood
-on — shared by hands and tools alike, so sitting above the common rung meant
-nothing. The moment it became gathering's *whole* rate it started competing with
-the ladder directly, and at four it won: bare hands worked a hex in twelve
-minutes against a Stone Axe's fifteen, which turns §12 step 5 — buy the axe,
-work the same hex, see the payoff — into a hex that got **slower**. There is a
-test asserting every tool in the game beats bare hands at every level.
+**Bare hands take the common rung's own bite, and the tie is deliberate.**
+`BARE_HAND_ATTACK` and `MINING_COMMON_ATTACK` are both **3**, so a Stone Axe
+works a hex in exactly the time bare hands do.
+
+That is not the ladder failing to start. Hands are **gathering's rate and no
+other verb's**: §8.0 rule 1 refuses a mine outright without the line's tool and
+points at the gather button instead, so a hex is worked with the tool or with
+the hands and the two never race on the same verb. There is nothing for the
+first rung to be faster *than*.
+
+What it buys is what comes home. §4.0 is the whole argument: bare-handed work
+pays **scrap** — a gold apiece, no recipe anywhere will take it, and it grants
+the line a quarter XP — while the seam it displaced feeds every recipe in the
+game. §12 step 5 is *buy the axe, work the same hex, see the payoff*, and the
+payoff is the haul, not the clock.
+
+So **the ladder is felt from the second rung up**, and the first rung is felt in
+the bag. They were **4** for a while, which was worse than either reading: hands
+beat the axe outright, twelve minutes against fifteen. A test pins the tie at
+the bottom and pins every rung above it as strictly faster.
+
+*(It used to say hands must stay strictly under the cheapest tool, on the
+grounds that a bought tool should always be felt. That fought §4.0 rather than
+supporting it — if the first tool has to be faster as well as richer, then
+scrap's poverty is doing no work — and it left two tests failing against a
+constant that was right.)*
 
 *(The mine used to subtract flat minutes — twenty for skill, ten for
 best-in-slot. That made a good tool worth exactly as much on a poor hex as on a
@@ -617,7 +635,7 @@ The measured ladder, unskilled:
 
 | Rung | Attack | 2,700 HP | 5,400 HP |
 |---|---|---|---|
-| Bare hands *(gather only)* | 2 | 22.5m | 45m |
+| Bare hands *(gather only)* | 3 | **15m** | **30m** |
 | Village | 3 | **15m** | **30m** |
 | Crafted starter | 4 | 11m | 22.5m |
 | City | 6 | 7.5m | 15m |
@@ -630,10 +648,10 @@ The measured ladder, unskilled:
 Best tool, maxed skill and best-in-slot gear on the hardest hex: **3.3 minutes**.
 
 **Gathering is this same arithmetic with your hands in the tool's place** (§4.0).
-Not a separate verb with a separate schedule — the identical hex and the
-identical HP, worked at the one rate that needs no purchase, which is exactly
-why it is the floor under the ladder rather than a punishment. What it costs you
-is **worth**, not time: scrap sells for a gold and the seam does not.
+Not a separate verb with a separate schedule — the identical hex, the identical
+HP, and the identical *rate*, worked at the one rung that needs no purchase.
+That is exactly why it is a floor rather than a punishment. What it costs you is
+**worth**, not time: scrap sells for a gold and the seam does not.
 
 **A herd is a pile of work too** (§5.5). Hunting used to be a flat 25 minutes
 sitting deliberately *outside* this formula, because the old floor clamp would
