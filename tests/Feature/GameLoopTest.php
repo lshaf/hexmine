@@ -5052,6 +5052,116 @@ final class GameLoopTest extends TestCase
         $this->game->sellScrap($this->character->fresh());
     }
 
+    /**
+     * §8.2 -- a potion sells, by the flask, priced off its own recipe.
+     *
+     * The third exit a brew has. Gear already had one; consumables were the
+     * only thing in the bag with no way out but the mouth.
+     */
+    public function test_a_potion_sells_for_half_of_what_its_reagents_fetched(): void
+    {
+        $this->standAtWoodcuttingVillage();
+        $key = 'forest_draft';
+        $def = Catalog::item($key);
+        $this->character->consumables()->create(['item_key' => $key, 'quantity' => 5]);
+
+        $before = (int) $this->character->fresh()->gold;
+        $each = Formulas::consumableResale($def);
+        $this->assertGreaterThan(0, $each, 'a common draft is worth nothing at all');
+
+        $sale = $this->game->sellConsumable($this->character->fresh(), $key, 2);
+
+        $this->assertSame($each * 2, $sale['gold']);
+        $this->assertSame($before + $each * 2, (int) $this->character->fresh()->gold);
+        $this->assertSame(
+            3,
+            (int) $this->character->fresh()->consumables()->where('item_key', $key)->value('quantity'),
+            'the flasks that were not sold left the bag anyway',
+        );
+    }
+
+    /**
+     * §2 -- brewing must never be a way of turning reagents into more gold than
+     * the reagents were worth.
+     *
+     * This is the whole reason the rate is half. The consumable bench takes
+     * cheap raw and makes something a player wants; if the trader paid more for
+     * the flask than for the pile that went into it, the loop would be brew,
+     * sell, repeat -- a gold press with no work in it, run best by whoever has
+     * the most wallets (§2).
+     *
+     * Checked with the Alchemist's thumb on the scale too: `brewExtra` tops out
+     * at +35% flasks (§7.4.3), so the honest comparison is against a rack that
+     * size. Nothing else in the game would notice the day this went over 1.
+     */
+    public function test_no_potion_is_worth_more_sold_than_the_reagents_that_made_it(): void
+    {
+        $checked = 0;
+
+        foreach (Catalog::items() as $key => $def) {
+            if (empty($def['consumable']) || empty($def['inputs'])) {
+                continue;
+            }
+
+            $reagents = 0;
+            foreach ($def['inputs'] as $material => $qty) {
+                $reagents += (Catalog::material($material)['npcPrice'] ?? 0) * $qty;
+            }
+
+            if ($reagents <= 0) {
+                continue;
+            }
+
+            $checked++;
+            $flasks = 1 + Balance::SKILL_BREW_EXTRA_CAP;
+
+            $this->assertLessThan(
+                $reagents,
+                Formulas::consumableResale($def) * $flasks,
+                "{$key} pays more sold than its reagents did -- the bench is a gold press",
+            );
+        }
+
+        $this->assertGreaterThan(20, $checked, 'the sweep found almost no potions');
+    }
+
+    /**
+     * §3.2 -- gold stops at the second rung, and here that closes a real hole.
+     *
+     * Every epic and legendary draft wants a Tier 3 rare (§8.5), and those are
+     * capped per wallet. A gold price on one would turn a capped rare into
+     * uncapped coin, which is exactly the bridge §2 exists to keep shut.
+     */
+    public function test_the_trader_will_not_buy_a_potion_above_the_second_rung(): void
+    {
+        $this->standAtWoodcuttingVillage();
+
+        $key = null;
+        foreach (Catalog::items() as $candidate => $def) {
+            if (! empty($def['consumable'])
+                && Balance::rarityRank($def['rarity']) > Balance::rarityRank(Balance::SHOP_RARITY_CAP)) {
+                $key = $candidate;
+                break;
+            }
+        }
+
+        $this->assertNotNull($key, 'there is no potion above uncommon to test with');
+        $this->character->consumables()->create(['item_key' => $key, 'quantity' => 1]);
+
+        $this->expectException(GameException::class);
+        $this->game->sellConsumable($this->character->fresh(), $key, 1);
+    }
+
+    /** §3.2 -- the trader is an NPC who stands somewhere. So is this. */
+    public function test_selling_a_potion_needs_a_settlement(): void
+    {
+        $this->character->consumables()->create(['item_key' => 'forest_draft', 'quantity' => 1]);
+        $this->assertNull($this->game->currentSettlement($this->character->fresh()));
+
+        $this->expectException(GameException::class);
+        $this->game->sellConsumable($this->character->fresh(), 'forest_draft', 1);
+    }
+
     /** §8.2 -- half the shelf price, and wear comes off the top. */
     public function test_gear_sells_for_half_price_scaled_by_what_is_left(): void
     {

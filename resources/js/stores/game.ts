@@ -956,6 +956,11 @@ export const useGame = defineStore('game', () => {
     await act(() => api.sellEquipment(ownedId))
   }
 
+  /** §8.2 -- the same exit for a brew, by the flask. */
+  async function sellPotion(itemKey: string, quantity: number): Promise<void> {
+    await act(() => api.sellPotion(itemKey, quantity))
+  }
+
   /**
    * §7 -- claim a name.
    *
@@ -1016,7 +1021,7 @@ export const useGame = defineStore('game', () => {
     updateGuild, removeGuildMember, setGuildRole, withdrawApplication, decideApplication,
     donateToGuild, upgradeGuildFacility,
     startMining, startGathering, startHunt, collect, abandon, travelTo, cancelTravel, startProcessing, buy,
-    sell, sellAllScrap, sellItem, craft, equip, unequip, repair, discard, discardMaterial, drink, openPanel, closePanel,
+    sell, sellAllScrap, sellItem, sellPotion, craft, equip, unequip, repair, discard, discardMaterial, drink, openPanel, closePanel,
     battleSkills, loadTree, loadBattleSkills, buyNode,
     loadQuests, claimQuest, clearQuestReward,
     openStation, closeStation, loadBench,

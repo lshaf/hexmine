@@ -860,6 +860,32 @@ final class Formulas
         return (int) floor($price * Balance::RESALE_RATE * (min($durability, $max) / $max));
     }
 
+    /**
+     * §8.2 -- what the trader gives for a potion, per flask.
+     *
+     * A draft has no shelf price to halve: nothing stocks consumables, because
+     * §8.5 makes them a thing you BREW. So the price comes from the other half
+     * of §8.3's rule -- what the parts are worth at the NPC's own poor rate --
+     * and the same RESALE_RATE the gear exit uses is applied to that. No wear
+     * term, because a potion has no durability to have spent.
+     *
+     * Half is not a tuning value, it is the guard. Selling a brew must always
+     * come to LESS than selling the reagents that went into it, or the
+     * consumable bench is a gold press and §2's bot economics change: brew,
+     * sell, repeat. Half leaves room even at the Alchemist's cap -- +35% extra
+     * flasks (§7.4.3) still only reaches 0.675 of what the inputs fetched. A
+     * test pins that, because the day it goes over 1 nothing else would notice.
+     */
+    public static function consumableResale(array $def): int
+    {
+        $worth = 0;
+        foreach ($def['inputs'] ?? [] as $key => $qty) {
+            $worth += ((Catalog::material($key)['npcPrice'] ?? 0) * $qty);
+        }
+
+        return (int) floor($worth * Balance::RESALE_RATE);
+    }
+
     public static function salvageYield(array $def): array
     {
         $out = [];
@@ -1025,7 +1051,6 @@ final class Formulas
     }
 
     // --------------------------------------------------------- character §7.1
-
 
     /**
      * Apply XP, cascading level-ups if a large grant lands at once.

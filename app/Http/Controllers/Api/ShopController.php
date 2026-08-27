@@ -57,6 +57,35 @@ class ShopController extends GameController
     }
 
     /**
+     * §8.2 -- sell potions by the flask.
+     *
+     * By key and quantity like a material, not by id like gear: a draft has no
+     * durability, so one flask is worth exactly what the next one is and there
+     * is no object to name.
+     */
+    public function sellConsumable(Request $request): JsonResponse
+    {
+        $character = $this->character($request);
+
+        $validated = $request->validate([
+            'item' => ['required', 'string'],
+            'quantity' => ['required', 'integer', 'min:1', 'max:10000'],
+        ]);
+
+        $sold = $this->game->sellConsumable(
+            $character,
+            $validated['item'],
+            (int) $validated['quantity'],
+        );
+
+        return $this->respond(
+            $character,
+            ['gold' => $sold['gold']],
+            "Sold {$sold['quantity']} {$sold['name']} for {$sold['gold']} gold.",
+        );
+    }
+
+    /**
      * §4.0 -- dump every tier-zero stack in one trade.
      *
      * Its own route rather than a flag on sell(), for the same reason

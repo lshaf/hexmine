@@ -1399,6 +1399,10 @@ the game, §11.1.)*
   repair *keeps* it, salvage returns a fraction of what went *into* it, and a
   sale returns gold scaled by what is *left* of it.
 
+  **A potion sells too** (§8.5) — by the flask rather than by the object, since
+  it stacks and has no durability to price it by. Consumables were the one thing
+  in the bag whose only exit was the mouth.
+
   Four refusals, each closing a hole rather than being a nicety. Not away from a
   settlement — the trader is an NPC who stands somewhere (§6). Not off your own
   belt: a sale is a trade, and losing the worn tool to a mistap is worse than
@@ -1606,6 +1610,22 @@ the benches have five of their own, counted separately and refused separately.
 - **Being spent is the sink** (§11.1). Nothing here may ever be permanent — a
   permanent effect only accumulates, which the north star forbids. A charge is
   not permanent: it survives until it pays out exactly once.
+- **The trader takes a flask back**, at half what its reagents fetched at the
+  NPC's own poor rate. A brew has no shelf price to halve — nothing stocks
+  consumables, because this section makes them a thing you *make* — so §8.3's
+  other half prices it, and there is no wear term because a potion has nothing
+  to have spent.
+
+  **Half is the guard, not a tuning value.** Selling a brew must always come to
+  less than selling the reagents that went into it, or the consumable bench is a
+  gold press: brew, sell, repeat, best run by whoever has the most wallets (§2).
+  It holds even at the Alchemist's `brewExtra` cap — +35% flasks still reaches
+  only 0.675 of what the inputs fetched. There is a test sweeping all seventy.
+
+  **Only the bottom two rungs**, like every other sale (§3.2). That matters more
+  here than for gear: every epic and legendary draft wants a Tier 3 rare, and
+  those are capped per wallet — a gold price on one would turn a capped rare into
+  uncapped coin, which is the bridge §2 exists to keep shut.
 - **As many different effects at once as you like; the same effect never twice.**
   A woodcutting draft and a mining draft are *different things you are better
   at*, so both may be held, and so may a road tonic on top. Two drafts on the

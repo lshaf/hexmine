@@ -262,6 +262,13 @@ export class HttpDriver implements GameApi {
     return post<ActionResult<{ gold: number }>>(`/shop/equipment-sales/${ownedId}`, {})
   }
 
+  sellPotion(itemKey: string, quantity: number): Promise<ActionResult<{ gold: number }>> {
+    return post<ActionResult<{ gold: number }>>('/shop/potion-sales', {
+      item: itemKey,
+      quantity,
+    })
+  }
+
   getQuests(): Promise<Record<string, QuestDef>> {
     return request<{ quests: Record<string, QuestDef> }>('/quests').then((r) => r.quests)
   }

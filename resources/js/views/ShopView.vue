@@ -9,11 +9,11 @@
 import { computed, ref } from 'vue'
 import { useGame } from '@/stores/game'
 import { ITEM_BY_KEY, MATERIALS, shopItems } from '@/game/catalog'
-import { resaleValue } from '@/game/formulas'
+import { consumableResale, resaleValue } from '@/game/formulas'
 import { itemIcon, materialIcon } from '@/icons/procedural'
 import SvgIcon from '@/components/SvgIcon.vue'
 import StatChips from '@/components/StatChips.vue'
-import type { Material, MaterialKey } from '@/game/types'
+import type { Material, MaterialKey, Rarity } from '@/game/types'
 
 const game = useGame()
 
@@ -88,6 +88,32 @@ const resellable = computed(() =>
     .sort((a, b) => b.gold - a.gold),
 )
 
+/**
+ * §8.2 -- potions the trader will take, worth most first.
+ *
+ * Priced off the recipe rather than a shelf, because nothing stocks a brew
+ * (§8.5 makes it a thing you make) -- and deliberately under what its reagents
+ * would have fetched, or the alchemy bench would be a gold press.
+ *
+ * Epic and legendary drafts are absent for the reason gear's top rungs are:
+ * gold stops at the second rung (§3.2). It bites harder here, because every one
+ * of those wants a Tier 3 rare and those are capped per wallet -- a price on one
+ * would turn a capped rare into uncapped coin.
+ */
+const potions = computed(() =>
+  Object.entries(game.consumables)
+    .map(([key, qty]) => ({ key, qty, def: ITEM_BY_KEY[key] }))
+    .filter((row) => row.qty > 0 && row.def && sellableRarity(row.def.rarity))
+    .map((row) => ({ ...row, def: row.def!, each: consumableResale(row.def!) }))
+    .filter((row) => row.each > 0)
+    .sort((a, b) => b.each * b.qty - a.each * a.qty),
+)
+
+/** §3.2 -- gold reaches the bottom two rungs and stops. */
+function sellableRarity(rarity: Rarity): boolean {
+  return rarity === 'common' || rarity === 'uncommon'
+}
+
 /** Sell quantities the player actually reaches for. */
 function amounts(qty: number): number[] {
   return [1, 10, qty].filter((n, i, arr) => n > 0 && n <= qty && arr.indexOf(n) === i)
@@ -118,7 +144,7 @@ const owned = (key: string) => game.equipment.filter((e) => e.key === key).lengt
           never a strategy — and rare and raid materials are refused outright.
         </p>
 
-        <div v-if="!sellable.length && !resellable.length" class="inset empty">
+        <div v-if="!sellable.length && !resellable.length && !potions.length" class="inset empty">
           <p class="muted tiny" style="margin: 0">Nothing the trader will buy.</p>
         </div>
 
@@ -170,6 +196,44 @@ const owned = (key: string) => game.equipment.filter((e) => e.key === key).lengt
             </button>
           </div>
         </div>
+
+        <!-- §8.2 -- the same exit for a brew. No wear to scale by, so a flask
+             is worth what the next one is and they sell by the handful like a
+             material rather than one object at a time. -->
+        <template v-if="potions.length">
+          <p class="label group">Potions</p>
+          <p class="tiny muted lead">
+            Half of what the reagents fetched, so a brew is always worth more
+            drunk than sold.
+          </p>
+
+          <div v-for="row in potions" :key="row.key" class="inset row-item">
+            <SvgIcon
+              :svg="itemIcon({ rarity: row.def.rarity, palette: row.def.palette, size: 26 })"
+              boxed
+              :size="26"
+            />
+            <div class="grow">
+              <div class="row-between">
+                <strong class="tiny" :class="`rarity-${row.def.rarity}`">{{ row.def.name }}</strong>
+                <span class="mono tiny muted">{{ row.qty }} held</span>
+              </div>
+              <div class="tiny muted">{{ row.each }}g each</div>
+            </div>
+            <div class="row" style="gap: 5px">
+              <button
+                v-for="n in amounts(row.qty)"
+                :key="n"
+                class="btn btn-sm"
+                type="button"
+                :disabled="game.busy"
+                @click="game.sellPotion(row.key, n)"
+              >
+                {{ n === row.qty && row.qty > 1 ? 'All' : n }}
+              </button>
+            </div>
+          </div>
+        </template>
 
         <!-- §8.2 -- the third exit a piece of gear has. Repair keeps it, scrap
              returns materials, and this returns gold scaled by what is left. -->

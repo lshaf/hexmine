@@ -7,12 +7,13 @@
  * can *predict* and display them; it must never be the authority.
  */
 import { EQUIPMENT, MINING, PROCESSING, SKILLS } from './balance'
-import { ITEM_BY_KEY, LINE_STAT_LABEL, SKILL_BY_KEY, STAT_LABEL, skillForSlot } from './catalog'
+import { ITEM_BY_KEY, LINE_STAT_LABEL, MATERIALS, SKILL_BY_KEY, STAT_LABEL, skillForSlot } from './catalog'
 import type {
   BuffScope,
   Rarity,
   ItemDef,
   ItemOption,
+  MaterialKey,
   OwnedItem,
   SettlementTier,
   SkillKey,
@@ -124,6 +125,23 @@ export function resaleValue(def: ItemDef, durability: number): number {
   if (price <= 0 || max <= 0 || durability <= 0) return 0
 
   return Math.floor(price * EQUIPMENT.resaleRate * (Math.min(durability, max) / max))
+}
+
+/**
+ * §8.2 -- what the trader gives for a potion, per flask.
+ *
+ * The mirror of Formulas::consumableResale(). A draft has no shelf price to
+ * halve, because nothing stocks consumables -- so the price comes off what its
+ * reagents fetch at the NPC's own poor rate, at the same resale rate gear uses,
+ * and with no wear term because a potion has no durability to have spent.
+ */
+export function consumableResale(def: ItemDef): number {
+  let worth = 0
+  for (const [key, qty] of Object.entries(def.inputs ?? {})) {
+    worth += (MATERIALS[key as MaterialKey]?.npcPrice ?? 0) * (qty as number)
+  }
+
+  return Math.floor(worth * EQUIPMENT.resaleRate)
 }
 
 export function salvageYield(def: ItemDef): Partial<Record<string, number>> {

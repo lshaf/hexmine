@@ -848,6 +848,8 @@ export interface GameApi {
   sellScrap(): Promise<ActionResult<{ gold: number; rows: number }>>
   /** §8.2 -- sell one piece of gear back, priced off its remaining durability. */
   sellEquipment(ownedId: string): Promise<ActionResult<{ gold: number }>>
+  /** §8.2 -- sell potions by the flask. They stack and have no durability. */
+  sellPotion(itemKey: string, quantity: number): Promise<ActionResult<{ gold: number }>>
   /** §8.4 -- returns the bench JOB, because there is no item yet. */
   craftItem(itemKey: string): Promise<ActionResult<Job>>
 

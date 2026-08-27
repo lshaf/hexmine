@@ -10,8 +10,8 @@ use App\Http\Controllers\Api\GuildController;
 use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\MapController;
 use App\Http\Controllers\Api\MiningController;
-use App\Http\Controllers\Api\SettlementController;
 use App\Http\Controllers\Api\QuestController;
+use App\Http\Controllers\Api\SettlementController;
 use App\Http\Controllers\Api\ShopController;
 use App\Http\Controllers\Api\SkillTreeController;
 use App\Http\Controllers\Api\StateController;
@@ -111,6 +111,9 @@ Route::middleware(ResolveCharacter::class)->group(function () {
     // with a durability, and what it fetches depends on that.
     Route::post('/shop/equipment-sales/{item}', [ShopController::class, 'sellEquipment'])
         ->whereNumber('item');
+    // §8.2 -- potions go back by key and quantity, because they stack and have
+    // no durability: one flask is worth what the next one is.
+    Route::post('/shop/potion-sales', [ShopController::class, 'sellConsumable']);
 
     Route::post('/crafting', [CraftingController::class, 'store']);
 

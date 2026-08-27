@@ -5163,6 +5163,73 @@ class GameService
     }
 
     /**
+     * §8.2 -- the trader takes a potion off your hands, by the flask.
+     *
+     * The third exit a brew has, beside drinking it and letting it sit on a
+     * strap §7.6 charges for. Gear already had this; consumables were the one
+     * thing in the bag with no way out but the mouth.
+     *
+     * Priced from the recipe rather than a shelf (Formulas::consumableResale),
+     * because nothing stocks potions -- and priced UNDER what the reagents
+     * would have fetched, which is the rule that keeps the alchemy bench from
+     * being a gold press.
+     *
+     * @return array{gold:int,name:string,quantity:int}
+     */
+    public function sellConsumable(Character $character, string $key, int $quantity): array
+    {
+        return DB::transaction(function () use ($character, $key, $quantity) {
+            $def = Catalog::item($key);
+            if ($def === null || empty($def['consumable'])) {
+                throw new GameException('That is not something the trader buys.', 'not_found');
+            }
+
+            // The trader is an NPC who stands somewhere (§6), the same as for
+            // every other sale.
+            $this->requireSettlement($character, 'trade');
+
+            // §3.2 -- gold reaches the bottom two rungs and stops, exactly as it
+            // does for gear (§8.2: "not what the trader does not stock"). It
+            // matters more here than it looks: every epic and legendary draft
+            // wants a Tier 3 rare (§8.5), and those are capped per wallet. A
+            // gold price on one would turn a capped rare into uncapped coin,
+            // which is the hole §2 exists to keep shut.
+            if (Balance::rarityRank($def['rarity']) > Balance::rarityRank(Balance::SHOP_RARITY_CAP)) {
+                throw new GameException(
+                    "The trader does not deal in anything as fine as {$def['name']}.",
+                    'not_sellable',
+                );
+            }
+
+            $count = max(1, $quantity);
+            $row = $character->consumables()->where('item_key', $key)->first();
+            if ($row === null || $row->quantity < $count) {
+                throw new GameException("You do not have {$count} {$def['name']}.", 'insufficient');
+            }
+
+            $each = Formulas::consumableResale($def);
+            if ($each <= 0) {
+                throw new GameException(
+                    "The trader will not give a coin for {$def['name']}.",
+                    'worthless',
+                );
+            }
+
+            $row->quantity -= $count;
+            $row->quantity > 0 ? $row->save() : $row->delete();
+            $character->unsetRelation('consumables');
+
+            $gold = $each * $count;
+            $character->gold += $gold;
+            // §12 -- gold taken from traders, like every other sale.
+            $this->fireQuest($character, 'sell', $gold);
+            $character->save();
+
+            return ['gold' => $gold, 'name' => $def['name'], 'quantity' => $count];
+        });
+    }
+
+    /**
      * §4.0 -- empty the pack of everything that reaches no tier, in one trade.
      *
      * Tier zero is the whole test, so it takes the five biome scrap and the five
