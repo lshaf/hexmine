@@ -365,7 +365,7 @@ const ceilings = computed(() =>
          width saying it again. Which piece is in trouble is the one question
          this screen exists to answer at a glance. -->
     <section class="inset">
-      <div class="row-between" style="margin-bottom: 7px">
+      <div class="row-between" style="margin-bottom: 5px">
         <h3 class="head">Kit</h3>
         <span v-if="kitCondition" class="tiny mono muted">
           {{ kitCondition.held }} in hand · worst at {{ kitCondition.worst }}%
@@ -621,7 +621,7 @@ const ceilings = computed(() =>
 }
 
 .section {
-  margin-top: 12px;
+  margin-top: 10px;
 }
 
 .head {
@@ -751,13 +751,19 @@ const ceilings = computed(() =>
 .banks {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px 22px;
+  /* Wide enough to clear the icons' overflow: the art is scaled so its hexagon
+     lands on the cell, and its square viewBox reaches past that by a few
+     pixels, which is what put the WORN label against the row above it. */
+  gap: 17px 22px;
 }
 
+/* The icon overflows its own box by a few pixels -- it is scaled so its hexagon
+   lands on the cell, and its square viewBox is wider than that. The label needs
+   clearance from the spill, not from the box. */
 .bank {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 9px;
 }
 
 .bank-name {
@@ -771,8 +777,8 @@ const ceilings = computed(() =>
 .rack {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 13px;
-  --cell: 56px;
+  gap: 10px 13px;
+  --cell: 60px;
 }
 
 @media (max-width: 560px) {
@@ -996,7 +1002,7 @@ const ceilings = computed(() =>
 }
 
 .footnote {
-  margin: 9px 0 0;
+  margin: 6px 0 0;
   line-height: 1.5;
 }
 </style>

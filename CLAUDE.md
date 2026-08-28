@@ -1580,9 +1580,20 @@ the game, §11.1.)*
   nine pixels of lit length, which nothing can see, or the same nine pixels said
   as an absence above it, which anyone can.
 
-  **The icon fills its cell.** §13.1 gives every item its own hex frame, so a
-  smaller one drew a hexagon inside a hexagon — two rings saying one thing, with
-  the rarity colour on the inner and quieter of the two.
+  **The icon fills its cell, and the icon's own frame IS the cell.** §13.1
+  gives every item a hex frame, so a smaller one drew a hexagon inside a
+  hexagon — two rings saying one thing, with the rarity colour on the inner and
+  quieter of the two. Only a bare slot keeps the dark clipped box, because it
+  has no icon to be the shape.
+
+  **The hexagon here is regular, and that is not what `.icon-box` gives you.**
+  The clip is cut from whatever box it is handed, so a square one yields a
+  hexagon stretched 15% tall — circumradius R means a width of 2R against a
+  height of R√3, and those are never equal. That passes unnoticed anywhere the
+  hexagon stands alone, and fails the moment something regular is drawn against
+  it: the frame inside and the clip outside disagreed about what shape a
+  hexagon is. The cell is `W × 0.866W`, and the gauge is cut from the same
+  geometry.
 
   **Tapping one opens what it is**: the name, the rung, the rolled lines
   (§8.0.1), the exact figure, what a mend takes, and Repair · Stow. That is

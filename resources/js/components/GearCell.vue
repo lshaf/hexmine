@@ -48,11 +48,19 @@ const props = defineProps<{
  * and drifts a quarter of the width away at the top and the bottom, because
  * the box is square and the shape inside it is not.
  *
- * The viewBox is 125 wide against 100 tall and the element is 1.25 cells wide
- * against one tall, so the scale stays uniform and the stroke stays honest.
+ * The box is 125 wide against 86.6 tall because that is what a REGULAR hexagon
+ * measures: circumradius R gives a width of 2R and a height of R√3, so height
+ * is 0.866 of width and never equal to it. `.icon-box` cuts its clip from
+ * whatever box it is given, so a square one yields a hexagon stretched 15% tall
+ * -- which is fine where nothing else is drawn against it, and wrong here,
+ * because the icon inside draws its own regular frame (§13.1) and the two then
+ * disagree about what shape a hexagon is.
+ *
+ * The element is 1.25 cells wide against 0.866 tall, matching the viewBox, so
+ * the scale stays uniform and the stroke stays honest.
  */
 const VIEW_W = 125
-const VIEW_H = 100
+const VIEW_H = 86.6
 /** How far off the face the gauge stands, in the same units. */
 const CLEARANCE = 6
 const EDGE = `M${75 + CLEARANCE} 0 L${100 + CLEARANCE} ${VIEW_H / 2} L${75 + CLEARANCE} ${VIEW_H}`
@@ -88,7 +96,12 @@ const litTop = computed(() => VIEW_H * (1 - fraction.value))
     :title="label"
     :aria-label="label"
   >
-    <span class="icon-box art">
+    <!-- §13.1 -- a filled cell wears NO outer clip. The icon already draws a
+         hexagon, and its artwork deliberately spills a little past that frame;
+         a second hexagon over the top shaves the spill and leaves a blade cut
+         off flat. An empty cell has no icon to be the shape, so it keeps the
+         dark clipped box and the glyph sits well inside it. -->
+    <span class="art" :class="{ 'icon-box': !icon }">
       <SvgIcon v-if="icon" :svg="icon" :size="38" />
       <span v-else class="glyph" v-html="fallback" />
     </span>
@@ -117,8 +130,8 @@ const litTop = computed(() => VIEW_H * (1 - fraction.value))
 <style scoped>
 .cell {
   position: relative;
-  width: calc(var(--cell, 56px) * 1.25);
-  height: var(--cell, 56px);
+  width: calc(var(--cell, 60px) * 1.25);
+  height: calc(var(--cell, 60px) * 0.866);
   flex: 0 0 auto;
   padding: 0;
   border: 0;
@@ -133,7 +146,9 @@ const litTop = computed(() => VIEW_H * (1 - fraction.value))
 .art {
   position: absolute;
   inset: 0 auto 0 0;
-  width: var(--cell, 56px);
+  width: var(--cell, 60px);
+  display: grid;
+  place-items: center;
 }
 
 /* The wrapper has to be given the box before the art can be a share of it: an
@@ -145,15 +160,20 @@ const litTop = computed(() => VIEW_H * (1 - fraction.value))
   height: 100%;
 }
 
-/* Filling the box, not sitting in it. §13.1 gives every item icon its own hex
+/* Filling the cell, not sitting in it. §13.1 gives every item icon its own hex
    frame, so a smaller one drew a hexagon inside a hexagon -- two rings saying
    one thing, with the rarity colour on the inner and quieter of the two. At
    full size the frame IS the cell, which is what makes rarity readable across
-   a rack of nine. */
+   a rack of nine.
+
+   1.075 because the icon's viewBox is SQUARE and the regular hexagon it draws
+   is inscribed at 93% of that width. Scaling by 1/0.93 puts the drawn frame
+   exactly on the cell's own hexagon -- and its height lands at 0.866 of the
+   width on its own, which is the same geometry the gauge is cut from. */
 .art :deep(svg) {
   display: block;
-  width: 100%;
-  height: 100%;
+  width: calc(var(--cell, 60px) * 1.075);
+  height: calc(var(--cell, 60px) * 1.075);
 }
 
 .cell.bare .art {
@@ -175,12 +195,13 @@ const litTop = computed(() => VIEW_H * (1 - fraction.value))
 }
 
 /* The fallbacks are line glyphs rather than framed icons -- a skill mark and a
-   dashed hexagon -- so they keep their margin. Filling the box with a stroke
-   drawing would push it under the clip. */
+   dashed hexagon -- so they keep their margin. Sized off the cell rather than
+   as a percentage, because the box is no longer square and 58% of two different
+   edges is two different sizes. */
 .glyph :deep(svg) {
   display: block;
-  width: 58%;
-  height: 58%;
+  width: calc(var(--cell, 60px) * 0.5);
+  height: calc(var(--cell, 60px) * 0.5);
 }
 
 /* Laid over the whole cell rather than placed after it, because the path is
@@ -207,10 +228,17 @@ const litTop = computed(() => VIEW_H * (1 - fraction.value))
   stroke: #4d5c53;
 }
 
-/* The hexagon is clipped, so an outline would be cut away with the corners.
-   The lift is the fill instead, which is the one thing a clip cannot eat. */
-.cell:hover .art,
-.cell:focus-visible .art {
-  background: rgba(193, 121, 63, 0.24);
+/* A tint behind the art would paint a SQUARE now that a filled cell carries no
+   clip, and an outline on the cell would box in the gauge as well. Brightening
+   the drawing itself is the one lift that follows whatever shape is there. */
+.cell:hover .art {
+  filter: brightness(1.3);
+}
+
+/* Focus needs to be seen rather than felt, so it gets a real ring -- on the
+   button, which is the thing being focused, and never on the art. */
+.cell:focus-visible {
+  outline: 2px solid var(--copper);
+  outline-offset: 2px;
 }
 </style>
