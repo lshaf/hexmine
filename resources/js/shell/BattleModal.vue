@@ -50,6 +50,9 @@ const theirCrest = computed(() =>
     // §9.5.7 -- a carrier is a monster gone still, and it stays standing after
     // a loss: it is a debt, not a spawn.
     Boolean(props.battle.corpse) && won.value,
+    // §9.5.2 -- and WHICH one, so the plate draws the monster's own mark rather
+    // than a generic member of its profile.
+    props.battle.monster.key,
   ),
 )
 

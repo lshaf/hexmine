@@ -191,10 +191,25 @@ export type SpoilKey =
   | 'ember_gland'
   | 'grave_heart'
 
+/**
+ * §4 -- tier 0, and what a fight leaves that nobody wants. One per monster
+ * tier, dropped every time, worth a gold and wanted by no recipe.
+ *
+ * Its own type rather than a sixth SpoilKey, because a spoil is a LADDER the
+ * benches climb and these are not on it: filing them together would put a
+ * chipped fang in the armorer's list of inputs.
+ */
+export type TrophyKey =
+  | 'chipped_fang'
+  | 'cracked_horn'
+  | 'snapped_quill'
+  | 'charred_sinew'
+
 export type MaterialKey =
   | ScrapKey
   | JunkKey
   | SpoilKey
+  | TrophyKey
   | RawKey
   | GradeRawKey
   | ReagentKey

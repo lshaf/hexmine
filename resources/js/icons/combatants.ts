@@ -126,25 +126,149 @@ const MONSTER: Record<string, (hide: string, dark: string, lit: string) => strin
     <circle cx="25.6" cy="14.2" r="1.6" fill="${EYE}"/>`,
 }
 
+/*
+ * §9.5.2 -- the third axis, and the one the ROSTER owns.
+ *
+ * Profile says how a thing fights and tier says how far in it lives, which is
+ * everything a player has to ACT on -- but with twelve monsters it leaves two
+ * of them looking like one animal in two colours, and a bestiary you cannot
+ * tell apart is a list of numbers with pictures on it.
+ *
+ * So each monster gets exactly ONE mark, and the mark is whatever its own
+ * description already says it is: the Slag Ogre's girder, the Thornback's
+ * quills, the Iron Shrike's wings. Nothing invented -- if the sentence in the
+ * roster names a thing, that is the thing drawn, and if it names none the
+ * monster keeps the bare profile.
+ *
+ * One rather than several, and always a silhouette-level shape. These are read
+ * at 24px on a map tile before they are read at 44 on a plate, so a mark that
+ * needs the big size is a mark that is not there when it matters.
+ */
+const MONSTER_MARK: Record<string, (hide: string, dark: string, lit: string) => string> = {
+  /* "Runs the treeline in threes." Moss over the shoulders, in the one colour
+     on the plate that is not the hide -- it grew there, it is not part of it. */
+  moss_hound: () => `
+    <path d="M9.5 13.6 Q13 7.6 17 12 Q20 7.2 23.5 11.8 Q27.5 7.4 30.5 13.4 Z" fill="#5f8058"/>
+    <path d="M6.6 17.4 Q9 13.4 12 17 Z" fill="#5f8058"/>
+    <path d="M28 17.4 Q31 13.4 33.6 17.2 Z" fill="#5f8058"/>`,
+
+  /* "Its back plated over." A single rut line across the dome -- the wheel it
+     sits in, and the reason you step on it. */
+  ditch_crawler: (_hide, dark) => `
+    <path d="M0 29.5 Q10 26.5 20 29.5 Q30 32.5 40 29.5 L40 33 L0 33 Z" fill="${dark}"/>
+    <path d="M0 26.5 Q10 23.5 20 26.5" fill="none" stroke="${dark}" stroke-width="1.8"/>`,
+
+  /* "Crosses the road in one blur." The streaks it left, behind and low. */
+  rill_skitter: (_hide, _dark, lit) => `
+    <path d="M4 28.5 H13 M2.5 32 H10.5 M5.5 25 H11" stroke="${lit}" stroke-width="1.5" stroke-linecap="round"/>`,
+
+  /* "Swinging the same girder since." An I-beam across the fists. */
+  slag_ogre: (_hide, _dark, lit) => `
+    <path d="M4 32.5 L31 20 L33 24.4 L6 36.9 Z" fill="${lit}"/>
+    <path d="M28.6 18.4 L35.4 21.6 L33.4 26 L26.6 22.8 Z" fill="${lit}"/>`,
+
+  /* "Every quill points out." Along the top of the dome and nowhere else. */
+  thornback: (_hide, _dark, lit) => `
+    <path d="M8 15 L5 9.5 M13 11.6 L11.5 5.4 M20 10.4 L20 4 M27 11.6 L28.5 5.4 M32 15 L35 9.5"
+      stroke="${lit}" stroke-width="1.8" stroke-linecap="round"/>`,
+
+  /* "Whips out of a vent." One lash, curling away from the body. */
+  cinder_lash: (_hide, _dark, lit) => `
+    <path d="M14 30 Q4 28 6 20 Q7.5 14 13 15" fill="none" stroke="${lit}"
+      stroke-width="2.2" stroke-linecap="round"/>`,
+
+  /* "Fast over broken ground." The ridge it is named for, standing off the
+     back -- the swift profile's own spines, said louder. */
+  ridge_wyrm: (_hide, _dark, lit) => `
+    <path d="M14.6 30 L7.5 30.5 L13.8 26 L6.5 24 L13.6 20.6 L8.8 16.6 L15.4 16"
+      fill="none" stroke="${lit}" stroke-width="1.9" stroke-linejoin="round" stroke-linecap="round"/>`,
+
+  /* "Drops out of the sun." Wings, and they are the whole silhouette change. */
+  iron_shrike: (_hide, dark, lit) => `
+    <path d="M13.5 12.6 L3.6 16.6 L5.6 24.4 L13 18.6 Z" fill="${lit}"/>
+    <path d="M26.5 12.6 L36.4 16.6 L34.4 24.4 L27 18.6 Z" fill="${lit}"/>
+    <path d="M13.5 12.6 L3.6 16.6 L9 17.4 Z" fill="${dark}"/>
+    <path d="M26.5 12.6 L36.4 16.6 L31 17.4 Z" fill="${dark}"/>`,
+
+  /* "Bakes itself hard in the vents." The heat still in the seams: the one
+     mark drawn in the eye's amber, because it is the same thing being said --
+     something in there is still going. */
+  kiln_tortoise: () => `
+    <path d="M12 20.5 L15 14.5 M20 19.5 L20 13 M28 20.5 L25 14.5"
+      stroke="${EYE}" stroke-width="1.5" stroke-linecap="round"/>`,
+
+  /* "Whatever it was buried in, it is still wearing." A helm slit across the
+     front, which is also the sentence: there is no way in. */
+  barrow_knight: (_hide, _dark, lit) => `
+    <rect x="11" y="26.6" width="18" height="2.6" fill="${lit}"/>
+    <path d="M20 24.5 L20 33" stroke="${lit}" stroke-width="1.6"/>`,
+
+  /* "With the fire still on it." Embers going up off the shoulders. */
+  ash_revenant: () => `
+    <path d="M12 11 Q10.5 7 13 4.5 Q13.6 7.4 15.6 8.6 Q15 10.4 13.6 11 Z" fill="${EYE}"/>
+    <path d="M26 11.5 Q25 8.5 27 6.5 Q27.4 8.6 28.8 9.4 Q28.4 10.8 27.4 11.4 Z" fill="${EYE}"/>`,
+
+  /* "Keeps pace a ring behind you for a day." Bleached: the one monster whose
+     mark is the absence of colour, drawn over the hide it should have had. */
+  pale_stalker: (_hide, _dark, _lit) => `
+    <path d="M15 33 Q13.8 22 20 19 Q26.2 22 25 33 Z" fill="#cfc9bb"/>
+    <path d="M17.5 19.5 L18.6 10.5 L29 12.6 L27.6 17 L22.2 16 L22 19.5 Z" fill="#cfc9bb"/>
+    <path d="M22.2 16 L27.6 17 L29 12.6 Z" fill="#9d998e"/>
+    <circle cx="25.6" cy="14.2" r="1.6" fill="${EYE}"/>`,
+}
+
+/** The box every silhouette is drawn in, so a caller can scale it. */
+export const MONSTER_VIEW = VIEW
+
 /**
- * A monster's crest: what it is, and how far in it lives.
+ * The silhouette alone, unframed, in a 40x40 box.
+ *
+ * Exported because the MAP draws the same thing (§13.2): the creature standing
+ * on the hex has to be the creature in the modal, or the fight is about
+ * somebody else's monster. The frame is what differs -- a crest sits in a
+ * hexagon of its own, and on the map the tile is already the hexagon.
  *
  * `profile` decides the body and `tier` the hide, so the roster is covered by
- * three shapes rather than eight. An unknown profile falls back to the brute
+ * three shapes rather than twelve. An unknown profile falls back to the brute
  * rather than drawing nothing -- an empty frame in a fight reads as a bug.
  */
-export function monsterCrest(profile: string, tier: number, size = 40, dead = false): string {
+export function monsterBody(
+  profile: string,
+  tier: number,
+  dead = false,
+  key: string | null = null,
+): string {
   const hide = dead ? shade(hideFor(tier), -0.45) : hideFor(tier)
   const dark = shade(hide, -0.45)
   const lit = shade(hide, 0.26)
-  const body = (MONSTER[profile] ?? MONSTER.brute!)(hide, dark, lit)
+
+  // The mark goes ON the profile, never instead of it: what a player acts on is
+  // still the read -- widest at the shoulders, widest at the ground, or narrow.
+  const mark = (key && MONSTER_MARK[key]?.(hide, dark, lit)) ?? ''
+  const body = (MONSTER[profile] ?? MONSTER.brute!)(hide, dark, lit) + mark
 
   // §9.5.7 -- a carrier is the pack's shape gone still. Eyes are the pack's
   // whole tell on the map, so taking them away here is the same sentence said
   // on the plate: this one is not looking at you.
-  const still = dead ? body.replace(new RegExp(EYE, 'g'), shade(hide, -0.55)) : body
+  return dead ? body.replace(new RegExp(EYE, 'g'), shade(hide, -0.55)) : body
+}
 
-  return crest(hide, still, size)
+/** The hide a tier wears, for anything drawing beside a monster. */
+export const monsterHide = (tier: number, dead = false): string =>
+  dead ? shade(hideFor(tier), -0.45) : hideFor(tier)
+
+/**
+ * A monster's crest: what it is, how far in it lives, and the hexagon it fights
+ * on.
+ */
+export function monsterCrest(
+  profile: string,
+  tier: number,
+  size = 40,
+  dead = false,
+  key: string | null = null,
+): string {
+  return crest(monsterHide(tier, dead), monsterBody(profile, tier, dead, key), size)
 }
 
 /**

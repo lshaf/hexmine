@@ -11,6 +11,8 @@ import { hash2, rand01, randInt } from '@/game/hash'
 import { desaturate, shade, variantColor, waterColor } from '@/theme/palette'
 import { HEX_H, HEX_SIDE_PATH, HEX_TOP_PATH, HEX_W, ROW_STEP } from './hexGeometry'
 import { VARIANT_PROPS } from '@/game/variants'
+import { MONSTERS } from '@/game/monsters'
+import { MONSTER_VIEW, monsterBody } from '@/icons/combatants'
 import type { Biome, SettlementTier, Tile, VariantKey, WaterKind } from '@/game/types'
 
 /** Escape nothing -- all values are numbers we generate. Kept tiny on purpose. */
@@ -1285,35 +1287,55 @@ export function pocketSpecimen(biome: Biome, size = 54): string {
 }
 
 /**
- * §9.5.1 -- a pack on the hex.
+ * §9.5.1 -- a pack on the hex, and it is THE MONSTER rather than a stand-in.
  *
- * Read against the herd, which is the only other marker that comes and goes: a
- * herd is a pale brown animal side-on, this is a dark crouching mass with two
- * lit eyes. Eyes are the tell -- nothing else on the map has any, and at a
- * 58x34 hex two bright points on a dark shape read as "something is looking at
- * you" before the silhouette resolves into anything.
+ * It used to be one generic dark mass with two lit eyes, drawn the same for all
+ * of them: the map said *something* is here and the fight plate said *what*.
+ * Those are two answers to one question, and the map's was the one that decided
+ * whether to walk on -- so a Thornback and an Ash Revenant were the same
+ * picture right up until the preview.
  *
- * Solid fills only (§13.2). Ember rather than a biome color, because a pack
- * belongs to no ground: it walked here.
+ * The silhouette is the crest's own (`icons/combatants.ts`), unframed: profile
+ * decides the shape and tier the hide, so twelve monsters cost no new drawings
+ * and the thing standing on the hex is literally the thing in the modal. The
+ * frame is the only difference, and the tile already is one (§13.2).
+ *
+ * Solid fills, no alpha, and never a biome colour: a monster belongs to no
+ * ground -- it walked here, and the hide ramps toward §13.3's alarm colour as
+ * the rings go in.
  */
-function pack(x: number, y: number): string {
-  const hide = '#4a2b30'
-  const eye = '#e0a24a'
+function monsterOnGround(
+  key: string | null,
+  profile: string,
+  tier: number,
+  x: number,
+  y: number,
+  width: number,
+  dead = false,
+): string {
+  const s = width / MONSTER_VIEW
 
+  // The body is drawn standing on the box's floor, so the anchor is the FEET:
+  // a mark placed by its centre would float on a tall silhouette and sink on a
+  // squat one, and all three profiles have to plant on the same ground line.
   return (
-    `<path d="M${x - 8} ${y + 3} Q${x - 7} ${y - 6} ${x} ${y - 7}` +
-    ` Q${x + 7} ${y - 6} ${x + 8} ${y + 3} Z" fill="${hide}"/>` +
-    `<path d="M${x - 6} ${y - 5} L${x - 4} ${y - 9} L${x - 2} ${y - 5} Z" fill="${hide}"/>` +
-    `<path d="M${x + 6} ${y - 5} L${x + 4} ${y - 9} L${x + 2} ${y - 5} Z" fill="${hide}"/>` +
-    `<circle cx="${x - 3}" cy="${y - 3}" r="1.3" fill="${eye}"/>` +
-    `<circle cx="${x + 3}" cy="${y - 3}" r="1.3" fill="${eye}"/>` +
-    rect(x - 7, y + 2, 3, 2.4, shade(hide, -0.3)) +
-    rect(x + 4, y + 2, 3, 2.4, shade(hide, -0.3))
+    `<g transform="translate(${x - width / 2},${y - width}) scale(${s.toFixed(3)})">` +
+    monsterBody(profile, tier, dead, key) +
+    '</g>'
   )
 }
 
 export function packProp(tile: Tile): string {
-  return tile.pack ? pack(0, 4) : ''
+  const pack = tile.pack
+  if (!pack) return ''
+
+  const def = MONSTERS[pack.key]
+
+  // Right of centre rather than on it. The hex under your feet is the one case
+  // where a pack matters most and is also the one case with a prospector pin
+  // standing in the middle of it -- and a monster read through a pin is the
+  // pin's fault, not the monster's. Left of centre is the pocket's (§5.7).
+  return monsterOnGround(pack.key, def?.profile ?? 'brute', def?.tier ?? 1, 7, 11, 24)
 }
 
 /**
@@ -1343,6 +1365,13 @@ function corpse(x: number, y: number, mine: boolean): string {
     rect(x - 4, y - 10, 8, 1.8, bone) +
     `<circle cx="${x}" cy="${y - 13.5}" r="2.1" fill="${bone}"/>`
   )
+}
+
+/** Both the shape and the hide a monster wears, for anything drawn beside it. */
+export function monsterMark(key: string, width = 26, dead = false): string {
+  const def = MONSTERS[key]
+
+  return monsterOnGround(key, def?.profile ?? 'brute', def?.tier ?? 1, 0, width * 0.35, width, dead)
 }
 
 export function corpseProp(mine: boolean): string {

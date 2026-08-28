@@ -22,6 +22,7 @@ import { formatDuration, placeLabel } from '@/game/formulas'
 import { worldParams } from '@/game/worldgen'
 import HexAction from './HexAction.vue'
 import BattleSkillRail from './BattleSkillRail.vue'
+import MonsterPlate from './MonsterPlate.vue'
 import type { BattlePreview } from '@/api/types'
 
 const game = useGame()
@@ -168,6 +169,20 @@ const pinned = computed(() => Boolean(underfoot.value?.pinned))
 
 /** The pack itself is derived client-side, so the name costs no request. */
 const pack = computed(() => game.tileAt(game.character?.col ?? 0, game.character?.row ?? 0)?.pack)
+
+/**
+ * §9.5.2 -- the reference plate over the dock, open or not.
+ *
+ * Local state and no request: what a monster is, is catalog data the client
+ * already mirrors, so this cannot fail and cannot be stale. It closes itself
+ * when the pack goes -- a plate about a monster that is no longer standing
+ * there is a screen about nothing.
+ */
+const studying = ref(false)
+
+watch(pack, (p) => {
+  if (!p) studying.value = false
+})
 
 const packLeaves = computed(() => {
   const until = pack.value?.until
@@ -486,6 +501,20 @@ function hunted(): void {
             :hint="packBlock ?? ''"
             @activate="game.fight()"
           />
+
+          <!-- §9.5.2 -- the other thing you can do to a monster, and the only
+               one that costs nothing. The pin says who is here and the preview
+               says whether you win; neither says WHAT it is, and a player
+               meeting a Kiln Tortoise should be able to read its numbers off a
+               fight they have not taken yet. -->
+          <HexAction
+            v-if="pack"
+            small
+            icon="study"
+            label="Study"
+            hint="What it is, and what it pays"
+            @activate="studying = true"
+          />
         </template>
 
         <template v-else>
@@ -574,6 +603,17 @@ function hunted(): void {
         </template>
       </div>
     </div>
+
+    <!-- Teleported for the reason every other overlay is: the dock carries a
+         backdrop-filter, which would otherwise become the containing block for
+         anything fixed inside it. -->
+    <Teleport to="body">
+      <MonsterPlate
+        v-if="studying && pack"
+        :monster="pack.key"
+        @close="studying = false"
+      />
+    </Teleport>
   </div>
 </template>
 

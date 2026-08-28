@@ -107,6 +107,11 @@ export const ACTION_PATHS: Record<string, string> = {
      which is the game's own chamfer (§13) rather than a borrowed ribbon. The
      mark is a chalk tick, so a line already written and one not yet differ by
      the thing that was actually done to it. */
+  /* §9.5.2 -- looking a monster over before closing. A loupe, and the lens is
+     the game's own hexagon (§13): if a thing wants a circle it wants one of
+     the two shapes instead, and a magnifier is the most circular idea there
+     is. Hex lens, straight stem, nothing else. */
+  study: 'M14 3.4 19.6 6.6 19.6 13 14 16.2 8.4 13 8.4 6.6Z M9.8 14.4 4 20.4',
   slate: 'M4.5 4h11l4 4v12h-15Z M15.5 4v4h4',
   slateOn: 'M4.5 4h11l4 4v12h-15Z M15.5 4v4h4 M8 13.6l2.6 2.6L16 11',
 }

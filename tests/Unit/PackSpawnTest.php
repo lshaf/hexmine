@@ -138,7 +138,7 @@ final class PackSpawnTest extends TestCase
         }
     }
 
-    /** §9.5.2 -- a ring fights its own two and the two from outside it. */
+    /** §9.5.2 -- a ring fights its own three and the three from outside it. */
     public function test_a_pack_is_drawn_from_its_own_ring_pool(): void
     {
         $seen = [];
@@ -158,8 +158,25 @@ final class PackSpawnTest extends TestCase
             );
         }
 
-        $this->assertCount(2, $seen['outer'] ?? [], 'the outer ring should hold exactly two');
-        $this->assertCount(4, $seen['center'] ?? [], 'the center should hold four');
+        $this->assertCount(3, $seen['outer'] ?? [], 'the outer ring should hold exactly three');
+        $this->assertCount(6, $seen['center'] ?? [], 'the center should hold six');
+
+        // §9.5.2 -- and every ring runs all three PROFILES, which is what the
+        // third monster per band is for: the read that wears a weapon harder is
+        // met on the safe rim rather than for the first time at tier 3.
+        foreach (['outer', 'mid', 'inner', 'center'] as $ring) {
+            $profiles = array_unique(array_map(
+                static fn (string $key) => Monsters::ROSTER[$key]['profile'],
+                array_keys($seen[$ring] ?? []),
+            ));
+
+            sort($profiles);
+            $this->assertSame(
+                ['brute', 'carapace', 'swift'],
+                $profiles,
+                "the {$ring} ring does not run all three profiles",
+            );
+        }
     }
 
     /**

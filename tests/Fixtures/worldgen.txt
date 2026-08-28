@@ -97,7 +97,7 @@
 159,133|plains|plains|outer|-|dead|4511|5|9|-|-|-|-|-|4106814402
 -67,-56|plains|plains|mid|-|dead|4863|6|8|-|-|-|-|-|2137303212
 108,156|badlands|badlands|outer|stone|-|2875|3|10|-|-|-|-|-|3362982948
--118,-33|plains|plains|mid|-|dead|5360|6|8|-|-|-|ditch_crawler:0|-|456324960
+-118,-33|plains|plains|mid|-|dead|5360|6|8|-|-|-|rill_skitter:0|-|456324960
 57,179|mountain|mountain|outer|iron_ore|-|4299|6|8|-|-|-|-|-|1018542971
 -169,-10|forest|forest|outer|-|dead|5009|7|7|-|-|-|-|-|3726607706
 6,-199|badlands|badlands|outer|stone|-|2932|7|7|-|-|-|-|-|1010370064
@@ -144,7 +144,7 @@
 -37,72|grassland|grassland|mid|-|dead|3957|4|10|-|-|-|-|-|4232157781
 138,-117|mountain|mountain|outer|iron_ore|-|4839|8|6|-|-|-|-|-|636413963
 -88,95|mountain|mountain|outer|-|-|5125|4|10|-|-|river|-|-|331220116
-87,-94|forest|forest|outer|-|dead|3800|7|7|-|-|-|moss_hound:0|-|2454992137
+87,-94|forest|forest|outer|-|dead|3800|7|7|-|-|-|ditch_crawler:0|-|2454992137
 -139,118|forest|forest|outer|-|dead|5021|4|10|-|-|-|-|-|412496932
 36,-71|mountain|mountain|mid|iron_ore|-|3876|6|8|-|-|-|-|-|262958264
 -190,141|mountain|mountain|outer|iron_ore|-|5060|5|9|-|-|-|-|-|106498223
@@ -193,8 +193,8 @@
 117,34|forest|forest|mid|-|dead|5090|7|7|-|-|-|-|-|932779167
 -109,-155|forest|forest|outer|wood|-|4303|3|10|-|-|-|-|-|2348915516
 66,57|grassland|grassland|mid|-|dead|3369|8|6|-|-|-|-|-|3796006868
--160,-132|badlands|badlands|outer|-|dead|4257|4|10|-|-|-|ditch_crawler:0|-|292338999
-15,80|badlands|badlands|mid|-|dead|3151|4|10|-|-|-|ditch_crawler:0|-|1737296730
+-160,-132|badlands|badlands|outer|-|dead|4257|4|10|-|-|-|rill_skitter:0|-|292338999
+15,80|badlands|badlands|mid|-|dead|3151|4|10|-|-|-|rill_skitter:0|-|1737296730
 190,-109|forest|forest|outer|-|dead|2731|7|7|-|-|-|-|-|4287289122
 -36,103|plains|plains|mid|-|-|3482|3|10|-|-|river|-|-|4227901800
 139,-86|badlands|badlands|outer|stone|-|4233|3|10|-|-|-|-|-|3992819431
@@ -209,7 +209,7 @@
 110,-183|mountain|mountain|outer|-|dead|3835|3|10|-|-|-|-|-|3071153017
 -116,29|forest|forest|mid|wood|-|3301|8|6|-|-|-|-|-|722741152
 59,-160|forest|forest|outer|-|dead|3784|3|10|-|-|-|-|-|865208534
--167,52|grassland|grassland|outer|fiber|-|3219|8|6|-|-|-|ditch_crawler:0|-|3787621737
+-167,52|grassland|grassland|outer|fiber|-|3219|8|6|-|-|-|rill_skitter:0|-|3787621737
 8,-137|plains|plains|outer|pelt|-|4146|3|10|-|-|-|-|-|1780865228
 183,75|forest|forest|outer|-|dead|4513|5|9|-|-|-|-|-|1588159558
 -43,-114|mountain|mountain|mid|-|dead|3388|5|9|-|-|-|-|-|1376562595
@@ -239,6 +239,6 @@
 147,162|grassland|grassland|outer|fiber|-|4113|5|9|-|-|-|-|-|3229590334
 -79,-27|grassland|grassland|mid|fiber|-|5022|8|6|-|-|-|-|-|2709645735
 0,-10|plains|plains_epic|center|beastfang_hide|-|22008|4|10|-|rootvault|-|-|-|3326486250
-0,0|plains|plains_rare|center|dire_pelt|-|14360|5|9|-|-|-|iron_shrike:0|-|150178154
+0,0|plains|plains_rare|center|dire_pelt|-|14360|5|9|-|-|-|kiln_tortoise:0|-|150178154
 -200,-200|forest|forest|outer|-|dead|4627|5|9|-|-|-|-|-|2734018084
 200,200|badlands|badlands|outer|-|dead|4627|5|9|-|-|-|-|-|2734018084

@@ -488,7 +488,7 @@ onMounted(load)
               @click="monster = m.key"
             >
               <span class="hex tile sm">
-                <span class="face"><SvgIcon :svg="monsterCrest(m.profile, m.tier, 24)" /></span>
+                <span class="face"><SvgIcon :svg="monsterCrest(m.profile, m.tier, 24, false, m.key)" /></span>
               </span>
               <span class="grow">
                 <!-- Tier belongs with the profile: they are the two things a

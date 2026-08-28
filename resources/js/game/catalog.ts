@@ -39,6 +39,7 @@ import type {
   ScrapKey,
   SettlementTier,
   SpoilKey,
+  TrophyKey,
   Skill,
   SkillKey,
   StatKey,
@@ -65,6 +66,7 @@ export const MATERIALS: Record<MaterialKey, Material> = {
     | ComponentKey
     | CritterKey
     | SpoilKey
+    | TrophyKey
     | JunkKey
     | GradeRawKey
     | GradeRefinedKey,

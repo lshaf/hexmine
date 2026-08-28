@@ -2142,23 +2142,64 @@ That is the whole anti-farm argument, and it needs no cooldown: **you cannot
 re-roll a pack**, because after the roll there is no pack. Supply is capped by
 hexes and hours, not by patience.
 
-#### 9.5.2 The roster — eight monsters, four overlapping pools
+#### 9.5.2 The roster — twelve monsters, four overlapping pools
 
 | Ring | Pool | New here | Carried in from |
 |---|---|---|---|
-| Outer | 2 | 2 | — |
-| Mid | 4 | 2 | outer |
-| Inner | 4 | 2 | mid |
-| Center | 4 | 2 | inner |
+| Outer | 3 | 3 | — |
+| Mid | 6 | 3 | outer |
+| Inner | 6 | 3 | mid |
+| Center | 6 | 3 | inner |
 
-Eight in total, and the overlap is the design: walking inward you meet two you
-know how to fight and two you do not, so every ring is **legible and dangerous
-at the same time**. It also gives §5.2's barren center something to be, on the
-walk to a dungeon mouth.
+Twelve in total, and the overlap is the design: walking inward you meet three
+you know how to fight and three you do not, so every ring is **legible and
+dangerous at the same time**. It also gives §5.2's barren center something to
+be, on the walk to a dungeon mouth.
 
 Each carries its own `attack`, `defense` and a profile — a brute is high attack
 and low defense, a carapace the reverse, a fast one is middling in both and
 wears a weapon harder. The profile is what a player reads, not a level number.
+
+**Three per ring rather than two, and the third is what makes every ring run
+all three PROFILES.** It was two, which left the outer rim holding a brute and
+a carapace and no swift anywhere until the inner ring — so the one read that
+blunts a weapon (§9.5.6) was something a player met for the first time at tier
+3, in gear it was about to bill them for. There is a test asserting every ring
+runs all three.
+
+**A monster is drawn, and the drawing is the same one in both places.** The map
+used to put one generic dark mass with two lit eyes on every hex: the map said
+*something* is here and the fight plate said *what*, which is two answers to one
+question — and the map's was the one that decided whether to walk on. A
+Thornback and an Ash Revenant were the same picture until the preview.
+
+Three axes, and each owns exactly one thing:
+
+| Axis | Owns | Why |
+|---|---|---|
+| **Profile** | the silhouette | it is what you act on: wide at the shoulders, wide at the ground, or narrow |
+| **Tier** | the hide | bark on the safe rim climbing to §13.3's alarm colour, so a tier 4 is the warning colour wearing a body |
+| **The monster** | one mark | which of the twelve it is |
+
+**The mark is whatever the monster's own description already says it is** — the
+Slag Ogre's girder, the Thornback's quills, the Iron Shrike's wings, the Ash
+Revenant's embers. Nothing invented: if the sentence in the roster names a
+thing, that is the thing drawn. One mark each, never two, and always a
+silhouette-level shape — these are read at 24px on a map tile before they are
+read at 44 on a plate, so a mark that needs the big size is a mark that is not
+there when it matters.
+
+**The frame is the only difference between the two.** A crest sits in a
+hexagon of its own; on the map the tile already is one. The silhouette is
+literally the same function.
+
+**Studying one costs nothing** (§9.5.3's pin has two exits and this is neither).
+A `Study` plate beside the Fight button gives the name, the profile, the tier,
+the three solid numbers, what the profile *means*, where its wear lands, and
+what it pays — read straight off the catalog the client already mirrors, so it
+needs no request and cannot be stale. It deliberately says nothing about your
+side: whether you win and what it costs are the preview's, thirty pixels away,
+and saying them twice would make two answers out of one.
 
 #### 9.5.3 The pin — the road stops, and so does everything else
 
@@ -2593,6 +2634,7 @@ makes a whole new faucet safe under §2.
 |---|---|
 | **Gold**, on a win | fills §3.2's monster drops, and needs no bag row — which matters when the fight was not your idea. A loss pays nothing at all (§9.5.3) |
 | **Monster materials** | 2 families × 5 grades: a plate/hide line for the smith and armorer, an ichor/organ line for the consumable bench. Tier 1, biome-free, dropped by nothing else |
+| **Leavings** | a **Tier 0** line of four, one per monster tier, dropped every time. §4's junk argument applied to combat: the rubbish carried out alongside |
 | **Looted gear** | the kit the monster was using, at **5–50% durability**, rarity capped at **rare** |
 | **Battle job XP** | on a win only (§9.5.3) |
 | **Never** | Tier 3, Tier 4, or anything mintable |
@@ -2600,6 +2642,17 @@ makes a whole new faucet safe under §2.
 **The rarity cap on loot is a §2 rule, not a tuning value.** Epic is where gear
 becomes mintable (§8.0), and a monster that drops one is precisely the
 grind→NFT faucet the threat model exists to close.
+
+**The leavings are generous precisely because they are worthless.** A Chipped
+Fang fetches a gold and feeds no recipe (§4), so a drop nobody can build with
+cannot inflate anything — which lets the one part of a fight that always pays
+something sit outside the containment above without threatening it. What it
+actually spends is a **strap** (§7.6), and that is the interesting part: it is
+the one drop in the game that can be worth throwing away.
+
+One per *tier* rather than one per monster, and that is the bag again. Twelve
+trophies would be twelve rows, and a fight that costs you a strap is a fight
+that cost more than it paid.
 
 **Harder packs roll better options, not better rarity.** A tougher monster
 grants **extra option slots** (§8.0.1) on what it drops — the same mechanism the

@@ -292,6 +292,19 @@ final class Drops
             );
         }
 
+        // §4 -- the tier-0 leaving, every time. Worth a gold, wanted by no
+        // recipe, and generous precisely because of it: a drop nobody can build
+        // with cannot inflate anything, so it can be the one part of a fight
+        // that always pays something without touching §9.5.8's containment.
+        $trophy = Spoils::TROPHY_BY_TIER[$grade] ?? null;
+        if ($trophy !== null) {
+            $out[$trophy] = Hash::randInt(
+                Hash::hash2($seed, 29, Balance::mapSeed() ^ 0x5906),
+                self::TROPHY_MIN,
+                self::TROPHY_MAX,
+            );
+        }
+
         $above = Spoils::BY_GRADE[$grade + 1] ?? null;
         if ($above !== null
             && Hash::rand01(Hash::hash2($seed, 19, Balance::mapSeed() ^ 0x5904)) < self::RARE_SPOIL_CHANCE) {
@@ -305,6 +318,18 @@ final class Drops
 
         return $out;
     }
+
+    /**
+     * §4 -- what the tier-0 leaving pays. One or two, always.
+     *
+     * Bigger than the spoil lines on purpose and it costs the economy nothing:
+     * junk feeds no recipe and fetches a gold, so the only thing it spends is a
+     * strap (§7.6). Which is the interesting part -- it is the one drop in the
+     * game that can be worth throwing away.
+     */
+    public const TROPHY_MIN = 1;
+
+    public const TROPHY_MAX = 2;
 
     /** §9.5.8 -- the plate line drops every win; the ichor line about half. */
     public const PLATE_MIN = 1;
@@ -439,7 +464,7 @@ final class Drops
                 : $table;
 
             $total = array_sum($pool);
-            $roll = Hash::rand01(Hash::hash2($seed, $i, Balance::mapSeed() ^ 0xd309)) * $total;
+            $roll = Hash::rand01(Hash::hash2($seed, $i, Balance::mapSeed() ^ 0xD309)) * $total;
 
             $picked = (string) array_key_first($pool);
             $seen = 0.0;

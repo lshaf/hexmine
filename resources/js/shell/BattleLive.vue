@@ -103,7 +103,13 @@ const failing = computed(() => myPercent.value <= 25)
  * payload -- the job's own key says which of the three you fought with.
  */
 const theirCrest = computed(() =>
-  monsterCrest(monster.value?.profile ?? 'brute', monster.value?.tier ?? 1, 44),
+  monsterCrest(
+    monster.value?.profile ?? 'brute',
+    monster.value?.tier ?? 1,
+    44,
+    false,
+    monster.value?.key ?? null,
+  ),
 )
 
 const myCrest = computed(() =>
