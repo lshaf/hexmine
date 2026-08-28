@@ -2193,6 +2193,14 @@ there when it matters.
 hexagon of its own; on the map the tile already is one. The silhouette is
 literally the same function.
 
+**And the almanac carries the whole bestiary**, as a fourth half beside
+Materials, Equipment and Ground. It owes a monster the same two answers it owes
+everything else — where it comes from, and what comes off it — so each entry
+gives the crest, the profile, the three solid numbers, the rings it stands on
+(and which of them it is thickest on, since density climbs inward), and every
+drop drawn with its own glyph rather than spelled. Static like the rest of that
+screen: it talks to nothing and is correct with no character at all.
+
 **Studying one costs nothing** (§9.5.3's pin has two exits and this is neither).
 A `Study` plate beside the Fight button gives the name, the profile, the tier,
 the three solid numbers, what the profile *means*, where its wear lands, and

@@ -26,6 +26,7 @@ import {
   MATERIALS,
   RARITY_LABEL,
   RARITY_RANK,
+  RING_LABEL,
   SCOPE_ACTION,
   SKILL_BY_KEY,
   SLOT_LABEL,
@@ -49,6 +50,9 @@ import { formatPercent, resaleValue } from '@/game/formulas'
 import { EQUIPMENT, ECONOMY, PROCESSING, BAG } from '@/game/balance'
 import { ACTION_PATHS } from '@/icons/actions'
 import { CRITTER_BY_BIOME } from '@/game/critters'
+import { MONSTERS, MONSTERS_BY_RING } from '@/game/monsters'
+import { TROPHY_BY_TIER } from '@/game/spoils'
+import { monsterCrest } from '@/icons/combatants'
 import { BIOME_LABEL } from '@/theme/palette'
 import {
   BIOME_VARIANTS,
@@ -63,6 +67,7 @@ import SvgIcon from '@/components/SvgIcon.vue'
 import StatChips from '@/components/StatChips.vue'
 import type {
   Biome,
+  Ring,
   WaterKind,
   EquipSlot,
   ItemDef,
@@ -170,7 +175,7 @@ function rollBrief(def: ItemDef): RollBrief | null {
   }
 }
 
-type Half = 'materials' | 'equipment' | 'tiles'
+type Half = 'materials' | 'equipment' | 'tiles' | 'monsters'
 
 const half = ref<Half>('materials')
 const query = ref('')
@@ -463,6 +468,77 @@ const pocketEntries = computed(() =>
     .filter((e) => matches(e.hay)),
 )
 
+// -------------------------------------------------------------- monsters §9.5
+
+/**
+ * §9.5.2 -- the bestiary.
+ *
+ * The one thing on the map that is not terrain and not a settlement, and the
+ * only one you meet by being stopped rather than by going to it. The almanac
+ * owes it the same two answers it owes everything else: where it comes from,
+ * and what comes off it.
+ *
+ * Static like the rest of this screen. A monster's numbers are the same for
+ * everybody and the client already mirrors them, so this is a pure read -- no
+ * store, no request, correct with no character at all.
+ */
+const PROFILE_NOTE: Record<string, string> = {
+  brute: 'Hits hard, guards badly',
+  carapace: 'Guards hard, hits badly',
+  swift: 'Middling at both, and blunts what it is hit with',
+}
+
+/** §9.5.1 -- density climbs every ring inward, so the last one it stands on is
+ *  where you meet it most. A design rule rather than a figure: the odds
+ *  themselves are the server's and this screen talks to nothing. */
+const monsterEntries = computed(() =>
+  Object.values(MONSTERS)
+    .map((m) => {
+      const rings = (Object.keys(MONSTERS_BY_RING) as Ring[]).filter((r) =>
+        MONSTERS_BY_RING[r]!.includes(m.key),
+      )
+      const trophy = TROPHY_BY_TIER[m.tier]
+      const name = (key: string) => MATERIALS[key as MaterialKey]?.name ?? key
+
+      return {
+        ...m,
+        rings,
+        /* Where it is thickest: the innermost ring it stands on. */
+        home: rings[rings.length - 1] ?? 'outer',
+        // The MATERIAL rather than its name: every list in this almanac draws
+        // the thing beside the word, and a bestiary that only spelled its drops
+        // would be the one screen where you cannot recognise them on sight.
+        drops: [
+          MATERIALS[m.plate],
+          MATERIALS[m.ichor],
+          ...(m.rareSpoil ? [MATERIALS[m.rareSpoil]] : []),
+          ...(trophy ? [MATERIALS[trophy as MaterialKey]] : []),
+        ],
+        hay: [
+          m.name,
+          m.profile,
+          m.description,
+          ...rings.map((r) => RING_LABEL[r]),
+          name(m.plate),
+          name(m.ichor),
+          m.rareSpoil ? name(m.rareSpoil) : '',
+          trophy ? name(trophy) : '',
+        ].join(' '),
+      }
+    })
+    .filter((m) => matches(m.hay))
+    .sort((a, b) => a.tier - b.tier || a.name.localeCompare(b.name)),
+)
+
+/** By tier, which is the ring each one is NEW on -- the bestiary's own order. */
+const monsterBands = computed(() =>
+  [1, 2, 3, 4]
+    .map((tier) => ({ tier, entries: monsterEntries.value.filter((m) => m.tier === tier) }))
+    .filter((b) => b.entries.length > 0),
+)
+
+const monsterCount = computed(() => monsterEntries.value.length)
+
 const tileCount = computed(
   () =>
     tileGroups.value.reduce<number>((n, g) => n + g.entries.length, 0) +
@@ -651,6 +727,9 @@ function nature(item: ItemDef): string {
           </button>
           <button type="button" :class="{ on: half === 'tiles' }" @click="half = 'tiles'">
             Ground <span class="tally">{{ tileCount }}</span>
+          </button>
+          <button type="button" :class="{ on: half === 'monsters' }" @click="half = 'monsters'">
+            Monsters <span class="tally">{{ monsterCount }}</span>
           </button>
         </div>
 
@@ -1032,6 +1111,73 @@ function nature(item: ItemDef): string {
         </section>
       </template>
 
+      <!-- ------------------------------------------------------- monsters -->
+      <template v-if="half === 'monsters'">
+        <p v-if="!monsterCount" class="nothing tiny muted">
+          Nothing matches “{{ query }}”.
+        </p>
+
+        <!-- §9.5.2 -- by tier, which is the ring each one is NEW on. That is
+             the bestiary's own order and it is also the walk inward: the band
+             is the difficulty and the entries inside it are the three reads. -->
+        <section v-for="band in monsterBands" :key="band.tier">
+          <div class="sect">
+            <h3>Tier {{ band.tier }}</h3>
+            <span class="tally">{{ band.entries.length }}</span>
+          </div>
+
+          <div class="entries">
+            <article v-for="m in band.entries" :key="m.key" class="entry">
+              <div class="head">
+                <span class="specimen" v-html="monsterCrest(m.profile, m.tier, 66, false, m.key)" />
+                <div class="grow">
+                  <span class="label eyebrow">{{ m.profile }}</span>
+                  <strong class="name">{{ m.name }}</strong>
+                  <!-- §9.5.4/§9.5.5 -- the three solid numbers a fight is
+                       decided by. Flat, never percentages, so they are printed
+                       as figures rather than as chips with signs on them. -->
+                  <span class="figs tiny mono">
+                    {{ m.attack }} atk · {{ m.defense }} def · {{ m.hp }} pool
+                  </span>
+                </div>
+              </div>
+
+              <p class="tiny muted desc">{{ m.description }}</p>
+
+              <dl class="rails">
+                <!-- §9.5.2 -- the profile is what a player reads instead of a
+                     level, so it gets a line rather than an eyebrow: it is the
+                     one fact here that says how to FIGHT the thing. -->
+                <div class="rail out">
+                  <dt class="label">Fights</dt>
+                  <dd>{{ PROFILE_NOTE[m.profile] }}</dd>
+                </div>
+
+                <!-- Neutral rail: where a thing stands is a fact about the map
+                     rather than a road anything arrives by. -->
+                <div class="rail out">
+                  <dt class="label">Found</dt>
+                  <dd>
+                    {{ m.rings.map((r) => RING_LABEL[r]).join(' · ') }}
+                    <span class="muted"> — thickest on the {{ RING_LABEL[m.home].toLowerCase() }}</span>
+                  </dd>
+                </div>
+
+                <div class="rail" :style="{ '--road': SOURCE_COLOR.dungeon }">
+                  <dt class="label">Drops</dt>
+                  <dd class="pips">
+                    <span class="pip coin">{{ m.gold[0] }}–{{ m.gold[1] }} gold</span>
+                    <span v-for="d in m.drops" :key="d.key" class="pip mat">
+                      <SvgIcon :svg="materialIcon(d, 15)" />{{ d.name }}
+                    </span>
+                  </dd>
+                </div>
+              </dl>
+            </article>
+          </div>
+        </section>
+      </template>
+
       <p class="tiny muted footnote">
         <template v-if="half === 'materials'">
           Resources never move between players — there is no trade, no gift, no
@@ -1045,6 +1191,16 @@ function nature(item: ItemDef): string {
           working it, and what it would pay. Four grades a biome, and the better
           ground is further in on purpose.
         </template>
+        <template v-else-if="half === 'monsters'">
+          A pack stands on a hex for two hours and stops whoever walks onto it.
+          Density climbs every ring inward, and each ring runs all three reads —
+          so walking in you meet three you know how to fight and three you do
+          not. Clearing one removes it for everybody, win or lose, and there is
+          no second roll: supply is capped by hexes and hours rather than by
+          patience. Nothing here drops a rare material, a raid material, or
+          anything that can be minted.
+        </template>
+
         <template v-else>
           A bench reaches exactly as far as its tier, whatever you carry to it, and
           gold reaches the bottom two rungs and stops at every settlement — a shelf
@@ -1450,6 +1606,27 @@ section + section {
 
 .pip.mat {
   color: var(--vellum-dim);
+}
+
+/* §9.5 -- the three solid numbers, under the name rather than beside it. Flat
+   numbers have no roof (§9.5.4), so they get figures and never a meter. */
+.figs {
+  display: block;
+  margin-top: 3px;
+  color: var(--vellum-dim);
+}
+
+/* A dd holding pips is a row of them, not a sentence: without this the icons
+   and the names run into one another as one long string. */
+.rail dd.pips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px 9px;
+}
+
+.pip.coin {
+  color: var(--gold);
 }
 
 .note {
