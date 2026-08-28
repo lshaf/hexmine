@@ -523,7 +523,13 @@ piece of news on this map is a creature you simply see.)*
 
 It stands with the herd and the pack because it is the same kind of news —
 something alive is on this hex — and off to the **left of centre**, because all
-three can share a hex and the visitors own the middle. On plains a grazing herd
+three can share a hex and the visitors own the middle.
+
+**It carries a sap halo, and a pack carries an ember one** (§13.2's halo rule
+below). Two things stand on a hex and mean opposite things: a pack is a state to
+deal with and this is one worth crossing the screen for, which is exactly what
+§13.3 already defines that pair of colours as. The reading is learned once and
+holds everywhere. On plains a grazing herd
 and a hare can stand together, which is exactly right: they are two different
 pieces of news.
 
@@ -2203,6 +2209,35 @@ there when it matters.
 **The frame is the only difference between the two.** A crest sits in a
 hexagon of its own; on the map the tile already is one. The silhouette is
 literally the same function.
+
+**A pack wears an ember halo and a pocket's critter a sap one, and the halo is a
+solid ring rather than a blur.** §13.2 forbids alpha on the map — transparency
+ghosts through neighbouring hexes — so a real glow is not available, and at
+58×34 it would be the wrong idea anyway. What works is the silhouette drawn
+twice: once underneath with a fat stroke in the halo colour, once solid on top.
+The stroke's outer half survives as a hard ring the exact shape of the thing,
+made of nothing but solid fills.
+
+Both colours are **lifted in saturation, never toward white.** `shade()` blends
+to white, which turned ember into a pink outline and sap into a mint one — and a
+pastel ring reads as a highlighter drawn over the thing rather than as light
+coming off it. And the halo cannot simply *be* ember: §9.5.2's tier ramp ends
+there, so at full ember it would vanish on the one monster that most needs
+seeing.
+
+The width adds to whatever a path already carries, so a thin stroked detail — a
+hare's ears, a moth's antennae — needs a fatter halo than a filled body does
+before any rim survives. That is why the critters ask for more of it at half the
+size.
+
+**A carrier gets no halo** (§9.5.7). Ember says *deal with this now*, and a
+corpse is a debt on a 24-hour clock rather than something looking at you.
+
+**And the almanac's bestiary shows a monster ON A HEX**, not in a crest — the
+same drawing the map puts on the tile, halo and all. A crest is how a thing
+looks in a fight; the tile is how it looks while you are still deciding whether
+to have one, which is what a bestiary is read for. It stands on plain stone
+rather than a biome, because a monster belongs to no ground.
 
 **And the almanac carries the whole bestiary**, as a fourth half beside
 Materials, Equipment and Ground. It owes a monster the same two answers it owes

@@ -52,7 +52,6 @@ import { ACTION_PATHS } from '@/icons/actions'
 import { CRITTER_BY_BIOME } from '@/game/critters'
 import { MONSTERS, MONSTERS_BY_RING } from '@/game/monsters'
 import { TROPHY_BY_TIER } from '@/game/spoils'
-import { monsterCrest } from '@/icons/combatants'
 import { BIOME_LABEL } from '@/theme/palette'
 import {
   BIOME_VARIANTS,
@@ -61,7 +60,7 @@ import {
   type VariantDef,
 } from '@/game/variants'
 import { itemIcon, materialIcon } from '@/icons/procedural'
-import { pocketSpecimen, variantSpecimen, waterSpecimen } from '@/map/props'
+import { monsterSpecimen, pocketSpecimen, variantSpecimen, waterSpecimen } from '@/map/props'
 import { waterLabel } from '@/game/water'
 import SvgIcon from '@/components/SvgIcon.vue'
 import StatChips from '@/components/StatChips.vue'
@@ -1129,7 +1128,12 @@ function nature(item: ItemDef): string {
           <div class="entries">
             <article v-for="m in band.entries" :key="m.key" class="entry">
               <div class="head">
-                <span class="specimen" v-html="monsterCrest(m.profile, m.tier, 66, false, m.key)" />
+                <!-- §9.5.2 -- on a hex rather than in a crest. A crest is how
+                     it looks in a fight; this is how it looks while you are
+                     still deciding whether to have one, which is what a
+                     bestiary is read for -- and it is the same drawing the map
+                     puts on the tile, halo and all. -->
+                <span class="specimen" v-html="monsterSpecimen(m.key, 76)" />
                 <div class="grow">
                   <span class="label eyebrow">{{ m.profile }}</span>
                   <strong class="name">{{ m.name }}</strong>

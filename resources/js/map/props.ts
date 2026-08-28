@@ -1258,7 +1258,7 @@ export function herdProp(tile: Tile): string {
  * they are visitors on top of it.
  */
 export function pocketProp(tile: Tile): string {
-  return tile.pocketUntil ? POCKET_CRITTER[tile.biome](-13, 9) : ''
+  return tile.pocketUntil ? halo(POCKET_CRITTER[tile.biome](-13, 9), HALO_CRITTER, 3.4) : ''
 }
 
 /**
@@ -1281,7 +1281,7 @@ export function pocketSpecimen(biome: Biome, size = 54): string {
     `<svg viewBox="-31 -22 ${w} ${boxH}" width="${size}" height="${h}" aria-hidden="true">` +
     `<path d="${HEX_SIDE_PATH}" fill="${shade(top, -0.4)}"/>` +
     `<path d="${HEX_TOP_PATH}" fill="${top}" stroke="${shade(top, -0.2)}" stroke-width="0.5"/>` +
-    POCKET_CRITTER[biome](0, 8) +
+    halo(POCKET_CRITTER[biome](0, 8), HALO_CRITTER, 3.4) +
     '</svg>'
   )
 }
@@ -1304,6 +1304,51 @@ export function pocketSpecimen(biome: Biome, size = 54): string {
  * ground -- it walked here, and the hide ramps toward §13.3's alarm colour as
  * the rings go in.
  */
+/*
+ * §13.3 -- the halo, and why it is a solid ring rather than a blur.
+ *
+ * Two things stand on a hex and mean opposite things: a pack, which is a state
+ * to deal with, and the critter that found rich ground (§5.7), which is worth
+ * crossing the screen for. Ember and sap are already defined as exactly that
+ * pair, so the map spends them on exactly that pair and the reading is learned
+ * once.
+ *
+ * §13.2 forbids alpha on the map -- transparency ghosts through neighbouring
+ * hexes -- so a real glow is not available and would be the wrong idea anyway
+ * at 58x34. What works is the silhouette drawn twice: once underneath with a
+ * fat stroke, once solid on top. The stroke's outer half survives as a hard
+ * ring the exact shape of the thing, which reads as an aura and is made of
+ * nothing but solid fills.
+ *
+ * Lifted off the palette rather than picked: a tier-4 monster's hide IS ember
+ * (§9.5.2's ramp ends there), so a halo at full ember would vanish on the one
+ * monster that most needs to be seen.
+ */
+/*
+ * Lifted in SATURATION, not toward white. `shade()` blends to white, which
+ * turned ember into a pink outline and sap into a mint one -- and a pastel ring
+ * reads as a highlighter drawn over the thing rather than as light coming off
+ * it. A glow is a brighter colour, not a washed one.
+ *
+ * Hand-picked for that reason, and each is still plainly its palette colour:
+ * ember for a state to deal with, sap for one worth crossing the screen for.
+ */
+const HALO_MONSTER = '#e8503f'
+const HALO_CRITTER = '#8fd97a'
+
+/*
+ * The width is added to whatever the path already carries, so a thin stroked
+ * detail -- a hare's ears, a moth's antennae -- needs a fatter halo than a
+ * filled body does before any rim survives at all. That is why the critters
+ * ask for more of it than the monsters, at half their size.
+ */
+function halo(body: string, color: string, width = 3): string {
+  return (
+    `<g fill="${color}" stroke="${color}" stroke-width="${width}"` +
+    ` stroke-linejoin="round" stroke-linecap="round">${body}</g>${body}`
+  )
+}
+
 function monsterOnGround(
   key: string | null,
   profile: string,
@@ -1320,7 +1365,9 @@ function monsterOnGround(
   // squat one, and all three profiles have to plant on the same ground line.
   return (
     `<g transform="translate(${x - width / 2},${y - width}) scale(${s.toFixed(3)})">` +
-    monsterBody(profile, tier, dead, key) +
+    // §9.5.7 -- a carrier gets no halo. Ember says "deal with this now", and a
+    // corpse is a debt on a 24h clock rather than something looking at you.
+    (dead ? monsterBody(profile, tier, dead, key) : halo(monsterBody(profile, tier, false, key), HALO_MONSTER)) +
     '</g>'
   )
 }
@@ -1372,6 +1419,34 @@ export function monsterMark(key: string, width = 26, dead = false): string {
   const def = MONSTERS[key]
 
   return monsterOnGround(key, def?.profile ?? 'brute', def?.tier ?? 1, 0, width * 0.35, width, dead)
+}
+
+/**
+ * §9.5.2 -- one monster, off the map, standing on ground of the right ring.
+ *
+ * The almanac's own idiom (see variantSpecimen and pocketSpecimen): a hex with
+ * the thing on it, drawn by the function that draws it on the map. A crest is
+ * how a monster looks in a FIGHT; this is how it looks while you are still
+ * deciding whether to have one, which is what a bestiary is read for.
+ *
+ * The ground is the biome the entry is filed under -- there isn't one, because
+ * a monster belongs to no ground (§9.5.2) -- so it stands on plain stone: the
+ * ring's own dead-neutral fill, which is the honest answer to "where".
+ */
+export function monsterSpecimen(key: string, size = 66): string {
+  const def = MONSTERS[key]
+  const top = '#4b544d'
+  const w = 62
+  const boxH = 52
+  const h = Math.round((size * boxH) / w)
+
+  return (
+    `<svg viewBox="-31 -22 ${w} ${boxH}" width="${size}" height="${h}" aria-hidden="true">` +
+    `<path d="${HEX_SIDE_PATH}" fill="${shade(top, -0.4)}"/>` +
+    `<path d="${HEX_TOP_PATH}" fill="${top}" stroke="${shade(top, -0.2)}" stroke-width="0.5"/>` +
+    monsterOnGround(key, def?.profile ?? 'brute', def?.tier ?? 1, 0, 13, 30) +
+    '</svg>'
+  )
 }
 
 export function corpseProp(mine: boolean): string {
