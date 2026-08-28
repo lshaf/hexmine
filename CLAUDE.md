@@ -306,6 +306,23 @@ not a fifth grade and not a variant at all, because it is not something a hex
 rolls — the field decides it before the roll happens, and the hex keeps whatever
 variant and colour its biome would have given it.
 
+**A grade is what a hex MOSTLY carries, never all it carries.** The ladder ran
+one way: a common axe on a Hardwood Stand takes wood nearly every time and
+hardwood occasionally, but reach a grade and you took it on *every* swing. That
+made a hex a switch rather than a place. An Ironwood Grove is a grove of
+ironwood with ordinary trees standing in it, and a Hematite Ridge is rock that
+is mostly iron ore — so both tails exist now, and their shape is the rule:
+
+| | |
+|---|---|
+| A grade **above** what your tool reaches | a long shot, halving again for every further rung |
+| A grade **below** what you are cutting | merely uncommon, halving again the whole way down |
+
+Falling short of the grade you are working is more ordinary than exceeding it,
+so the lower tail is the heavier of the two. The grade still dominates — over
+half of every haul — or it would mean nothing. The weights are tuning; that both
+tails exist is not.
+
 **Better ground is more work, and the rung it is named for is how much more.**
 A hex's HP roll (§7.3) is scaled by its grade, and the scale is the *attack of
 the tool that grade is named for* over the common rung's:
@@ -2840,13 +2857,20 @@ was what made two skills at 79% and 92% indistinguishable. Readiness is told on
 the mark instead, which is where the eye already is: dim while it runs, copper
 when it is up, ink on a filled face for the one beat it goes.
 
-**They are named before the fight, and that is where the rule is said out
-loud.** The three sit on the pin's preview and on the bench, because a player
-who has spent no skill points and finds three skills armed is looking at
-§9.5.9 working rather than at a bug — so the list says *they come with the
-weapon, not with a skill point* in as many words. Before a fight they carry
-the sentence and the cooldown; every figure arrives with the fight, because
-every figure is the server's.
+**They are named on the bench, and that is where the rule is said out loud.**
+A player who has spent no skill points and finds three skills armed is looking
+at §9.5.9 working rather than at a bug — so the list says *they come with the
+weapon, not with a skill point* in as many words. Off a fight they carry the
+sentence and the cooldown; every figure arrives with the fight, because every
+figure is the server's.
+
+**They are NOT on the pin.** That plate is read with something standing on your
+hex, and what it holds is the decision and its terms — who, when it leaves, and
+what a loss costs (§9.5.7). Nine cold dials under that is a reference table
+where an answer should be. It was there on the argument that "whether to close
+at all is the decision, and against a long fight these are half of it", which is
+true and is an argument for reading them *somewhere*, not for reading them in
+the one place already carrying the urgent half.
 
 *(The client mirrors the nine — name, glyph, family, cooldown, and the effect
 SENTENCE — in `battleSkills.ts`, because the modal has to name a skill the

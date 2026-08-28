@@ -176,6 +176,19 @@ final class Drops
     }
 
     /**
+     * §5.3 -- how often a haul comes back a grade under the one being worked.
+     *
+     * Halved again for every further rung down, so the grade below is common
+     * enough to notice and two below is a curiosity. Above the primary's 8.0
+     * long shot on purpose: falling short of the grade you are cutting is more
+     * ordinary than exceeding it.
+     *
+     * A tuning value rather than a rule. What is NOT tunable is that it exists:
+     * §5.3's grades are what a hex mostly carries, never all it carries.
+     */
+    public const LOWER_GRADE_WEIGHT = 12.0;
+
+    /**
      * The line's own tool on the line's own ground.
      *
      * @return array<string,float>
@@ -187,6 +200,18 @@ final class Drops
         // Every rung you are short of the ground halves the odds again.
         for ($grade = $reach + 1; $grade <= $tileGrade; $grade++) {
             $table[$variants[$grade]['material']] = 8.0 / (2 ** ($grade - $reach - 1));
+        }
+
+        // §5.3 -- and the same tail going DOWN, because a seam is not uniform.
+        // An Ironwood Grove is a grove of ironwood with ordinary trees standing
+        // in it; a Mythril Seam runs through rock that is mostly iron. Without
+        // this, reaching a grade meant taking it on every single swing, which
+        // made a hex a switch rather than a place.
+        //
+        // Commoner than the long shots above, and deliberately: falling short
+        // of the grade you are cutting is more ordinary than exceeding it.
+        for ($grade = $reach - 1; $grade >= 0; $grade--) {
+            $table[$variants[$grade]['material']] = self::LOWER_GRADE_WEIGHT / (2 ** ($reach - $grade - 1));
         }
 
         // What else is lying about on that kind of ground. The bench stocks
@@ -235,6 +260,12 @@ final class Drops
 
         for ($grade = $reach + 1; $grade <= $tileGrade; $grade++) {
             $table[$plains[$grade]['material']] = 6.0 / (2 ** ($grade - $reach - 1));
+        }
+
+        // §5.3 -- and down, exactly as a seam does. A herd on beastfang ground
+        // is not made entirely of beastfang animals.
+        for ($grade = $reach - 1; $grade >= 0; $grade--) {
+            $table[$plains[$grade]['material']] = self::LOWER_GRADE_WEIGHT / (2 ** ($reach - $grade - 1));
         }
 
         foreach (self::herbsOf($biome) as $herb) {

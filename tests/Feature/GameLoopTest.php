@@ -776,6 +776,55 @@ final class GameLoopTest extends TestCase
     }
 
     /**
+     * §5.3 -- a grade is what a hex MOSTLY carries, never all it carries.
+     *
+     * The ladder ran one way: reach a grade and you took it on every swing.
+     * That made a hex a switch rather than a place -- an Ironwood Grove is a
+     * grove of ironwood with ordinary trees standing in it, and a Mythril Seam
+     * runs through rock that is mostly iron.
+     *
+     * Both tails are asserted, because the shape is the point: the grade above
+     * is a long shot and the grade below is merely uncommon.
+     */
+    public function test_the_grade_you_reach_is_mostly_what_you_take(): void
+    {
+        $tile = $this->tileOfGrade('forest', 3);
+        $table = Drops::table(Drops::MINING, $tile, 3);
+        $total = array_sum($table);
+
+        // The thing you came for still dominates, or the grade means nothing.
+        $this->assertGreaterThan(0.5, $table['ironwood'] / $total, 'the grade does not dominate');
+
+        // And every rung under it turns up, thinning the whole way down.
+        foreach (['heartoak', 'hardwood', 'wood'] as $lesser) {
+            $this->assertArrayHasKey($lesser, $table, "{$lesser} never turns up under ironwood");
+        }
+
+        $this->assertGreaterThan($table['hardwood'], $table['heartoak']);
+        $this->assertGreaterThan($table['wood'], $table['hardwood']);
+
+        // Falling short is commoner than exceeding: a grade under the one you
+        // are cutting is ordinary, a grade over it is luck.
+        $stretch = Drops::table(Drops::MINING, $tile, 2);
+        $this->assertGreaterThan(
+            $stretch['ironwood'],
+            $stretch['hardwood'],
+            'the grade below is rarer than the grade above',
+        );
+
+        // §5.3 -- base ground has nothing under it to fall to.
+        $base = Drops::table(Drops::MINING, $this->tileOfGrade('forest', 0), 3);
+        $this->assertSame(
+            ['wood'],
+            array_values(array_intersect(
+                array_keys($base),
+                ['wood', 'hardwood', 'heartoak', 'ironwood'],
+            )),
+            'base ground gave up a grade it does not carry',
+        );
+    }
+
+    /**
      * §4.0 -- gathering is a windfall, not a career.
      *
      * The gap between what bare hands bring back and what a tool brings back is

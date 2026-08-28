@@ -3057,7 +3057,7 @@ class GameService
         } elseif ($reach < $tileGrade) {
             $have = Catalog::material($variants[$reach]['material'])['name'];
             $best = Catalog::material($variants[$tileGrade]['material'])['name'];
-            $note = "This ground carries {$best}. Your tool reliably takes {$have} — the better grade is a long shot.";
+            $note = "This ground carries {$best}. Your tool mostly takes {$have} — the better grade is a long shot.";
         }
 
         // §4.0 -- bare hands are bare hands. Gathering pays the bare-handed rate
