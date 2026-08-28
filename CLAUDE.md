@@ -1552,8 +1552,11 @@ the game, §11.1.)*
   are **one gesture reversed**, so they are one drawing reversed — the game's
   own hexagon (§13) with the chevron pointing in or out. Repair is an **anvil**
   and deliberately not the hammer: `craft` is already the hammer, and mending a
-  thing is not making one. A plate with room for words still says them beside
-  the glyph.
+  thing is not making one. Scrap is a **bin**, and it is the one glyph in the
+  game that is a plain interface symbol rather than something off the subject's
+  own bench — it earns that because it is the only one of the four that does not
+  give the piece back, and nothing drawn from a forge says *gone* as fast. A
+  plate with room for words still says them beside the glyph.
 - **Tuning decision still open:** repair cost must be cheaper than crafting new, but not
   dramatically so, or the crafting-materials sink stalls at endgame.
 

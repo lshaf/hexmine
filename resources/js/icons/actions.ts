@@ -98,6 +98,11 @@ export const ACTION_PATHS: Record<string, string> = {
      what carry it at button size -- it is the one silhouette in the strip that
      could be nothing else. */
   repair: 'M4 7h11.5l4 2-4 2H4Z M8.5 11 7 15 5.5 19h13L17 15l-1.5-4',
+  /* §8.2 -- scrap: a bin, and the one glyph in the strip that is a plain
+     interface symbol rather than something off the subject's own bench. It
+     earns the exception by being the only one of the four that does not give
+     the piece back, and nothing drawn from a forge says "gone" as fast. */
+  scrap: 'M3.5 7h17 M9.5 7V4.8h5V7 M6 7l1.1 13.2h9.8L18 7 M10 10.8v5.8 M14 10.8v5.8',
 }
 
 /**

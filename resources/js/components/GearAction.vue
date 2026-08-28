@@ -31,7 +31,7 @@ withDefaults(
 /* §8.2 -- scrap is the one that does not give the piece back, so it is the one
    drawn in ember (§13.3: a state to deal with, and a destructive button is
    one). The other three are reversible in an action. */
-const GLYPH = { equip: 'equip', stow: 'stow', repair: 'repair', scrap: 'drop' } as const
+const GLYPH = { equip: 'equip', stow: 'stow', repair: 'repair', scrap: 'scrap' } as const
 </script>
 
 <template>
