@@ -1594,6 +1594,13 @@ the game, §11.1.)*
   the gauge off the box gave three shapes that agreed nowhere. The hexagon's
   **width** is the one dimension everything else derives from.
 
+  **The gauge starts and stops where the hexagon does**, with a one-pixel
+  hairline between them. Geometry alone does not give you that: `butt` caps cut
+  each end square across a path that meets the corner at 60°, so a chevron
+  drawn corner-to-corner paints two pixels short at the head and one at the
+  foot, while the hexagon's own stroke overhangs a little past both. The path
+  runs *past* the corners and the ends fall where they may.
+
   **One ground, drawn once, under every slot.** The dark hexagon is a polygon
   in the gauge's own SVG rather than a CSS clip on the art — exact geometry,
   behind the icon instead of cutting it, and one definition of the shape rather

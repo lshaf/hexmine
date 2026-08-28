@@ -47,7 +47,23 @@ const props = defineProps<{
 const VIEW_W = 112
 const VIEW_H = 86.6
 const CLEARANCE = 6
-const EDGE = `M${75 + CLEARANCE} 0 L${100 + CLEARANCE} ${VIEW_H / 2} L${75 + CLEARANCE} ${VIEW_H}`
+/*
+ * How far past the hexagon's corners the chevron runs, in the same units.
+ *
+ * `stroke-linecap: butt` cuts each end square across the path, and the path
+ * meets the corner at 60° — so the topmost pixel it paints sits a couple below
+ * the corner while the hexagon's own stroke overhangs a little above it. Left
+ * geometric, the gauge reads two pixels short at the top and one at the foot.
+ * Running the path past the corner and letting the ends fall where they may is
+ * what makes the two shapes start and stop together.
+ */
+const OVER = 2.0
+/** The path's own slope, so an extension follows the face rather than dropping straight. */
+const RUN = (OVER * 50) / VIEW_H
+const EDGE =
+  `M${75 + CLEARANCE - RUN} ${-OVER}` +
+  ` L${100 + CLEARANCE} ${VIEW_H / 2}` +
+  ` L${75 + CLEARANCE - RUN} ${VIEW_H + OVER}`
 /** The hexagon itself, in the same units — the ground every slot stands on. */
 const GROUND = `25,0 75,0 100,${VIEW_H / 2} 75,${VIEW_H} 25,${VIEW_H} 0,${VIEW_H / 2}`
 
@@ -69,8 +85,18 @@ const fraction = computed(() =>
   props.item ? Math.max(0, Math.min(1, props.item.durability / Math.max(1, ceiling.value))) : 0,
 )
 
-/** The window onto the scale: the bottom `fraction` of it, and nothing above. */
-const litTop = computed(() => VIEW_H * (1 - fraction.value))
+/**
+ * The window onto the scale: the bottom `fraction` of it, and nothing above.
+ *
+ * It has to reach past both corners, or the overrun that makes the gauge line
+ * up with the hexagon would be clipped straight back off -- at the foot always,
+ * and at the head once the piece is full.
+ */
+const clip = computed(() => {
+  const y = fraction.value >= 1 ? -OVER : VIEW_H * (1 - fraction.value)
+
+  return { y, h: VIEW_H + OVER - y }
+})
 </script>
 
 <template>
@@ -84,6 +110,10 @@ const litTop = computed(() => VIEW_H * (1 - fraction.value))
     <!-- Drawn BEFORE the art, because it carries the ground the art stands on.
          The chevron never crosses the hexagon, so nothing here can cover the
          icon. -->
+      <!-- The viewBox stays the cell's own box so the scale never shifts; the
+         chevron's overrun paints outside it, which `overflow: visible` allows
+         and which opening the viewBox would not -- that would letterbox the
+         whole drawing to fit a taller aspect. -->
     <svg class="gauge" :viewBox="`0 0 ${VIEW_W} ${VIEW_H}`" aria-hidden="true">
       <defs>
         <linearGradient :id="`${uid}-ramp`" x1="0" y1="1" x2="0" y2="0">
@@ -92,7 +122,7 @@ const litTop = computed(() => VIEW_H * (1 - fraction.value))
           <stop offset="1" stop-color="#8fbf7f" />
         </linearGradient>
         <clipPath :id="`${uid}-lit`">
-          <rect x="0" :y="litTop" :width="VIEW_W" :height="VIEW_H - litTop" />
+          <rect x="0" :y="clip.y" :width="VIEW_W" :height="clip.h" />
         </clipPath>
       </defs>
 
@@ -202,6 +232,9 @@ const litTop = computed(() => VIEW_H * (1 - fraction.value))
   width: 100%;
   height: 100%;
   pointer-events: none;
+  /* The chevron runs a little past the cell at both ends so it lines up with
+     the hexagon's painted edge; an SVG root crops to its viewport by default. */
+  overflow: visible;
 }
 
 .ground {
