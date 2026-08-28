@@ -1612,6 +1612,13 @@ the game, §11.1.)*
   (§8.0.1), the exact figure, what a mend takes, and Repair · Stow. That is
   §7.6's grammar indoors — a thing you tap opens what it is and the one or two
   things that can be done with it.
+
+  **The plate draws the same frame the rack does**, at the plate's size, and so
+  does every spare filed behind the slot. The rule above is about geometry
+  rather than about one screen: a square box wearing the hex clip is a hexagon
+  stretched 15% tall, and an icon set to some smaller pixel size rattles around
+  inside it. Both were true here while the rack beside it was right, which made
+  the frame around a piece mean two different shapes two taps apart.
 - **The stowed list is gone, and is not lost.** An unworn axe is filed **behind
   the axe slot**, which is where somebody looking for it would look, with the
   Equip button on the row it belongs to. A flat list of everything unworn was a

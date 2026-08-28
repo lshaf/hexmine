@@ -480,8 +480,10 @@ const ceilings = computed(() =>
         <div class="pop plate">
           <div class="pop-inner">
             <header class="pop-head">
-              <span class="icon-box art">
-                <SvgIcon v-if="picked.icon" :svg="picked.icon" :size="34" />
+              <!-- The same frame the rack draws, at the plate's size: the art
+                   fills its hexagon rather than rattling inside a square box. -->
+              <span class="hexicon head" :class="{ bare: !picked.icon }">
+                <SvgIcon v-if="picked.icon" :svg="picked.icon" />
                 <span v-else class="glyph" v-html="picked.fallback" />
               </span>
               <div class="grow">
@@ -572,7 +574,7 @@ const ceilings = computed(() =>
                 {{ picked.item ? 'Also for this slot' : 'In the pack' }}
               </span>
               <div v-for="c in candidates" :key="c.item.id" class="spare">
-                <span class="icon-box small"><SvgIcon :svg="c.icon" :size="22" /></span>
+                <span class="hexicon spare-icon"><SvgIcon :svg="c.icon" /></span>
                 <div class="grow">
                   <strong class="tiny" :class="`rarity-${c.def.rarity}`">{{ c.def.name }}</strong>
                   <span class="tiny mono muted">{{ c.item.durability }}/{{ c.ceiling }}</span>
@@ -827,9 +829,63 @@ const ceilings = computed(() =>
   gap: 11px;
 }
 
-.pop-head .art {
-  width: 44px;
-  height: 44px;
+/*
+ * §13.1's frame indoors, and the same three numbers GearCell derives:
+ *   height = 0.866 x width   the flats of a regular hexagon, which is what
+ *                            `--hex-clip` cuts only when the box is that shape
+ *   art    = 1.075 x width   the square viewBox whose inscribed hexagon is
+ *                            exactly `--hex` across the points
+ *
+ * A square box with the clip on it is a hexagon stretched 15% tall, and an icon
+ * set to some smaller pixel size rattles around inside it. Both were true here.
+ */
+.hexicon {
+  position: relative;
+  flex: 0 0 auto;
+  width: var(--hex);
+  height: calc(var(--hex) * 0.866);
+}
+
+/* The ground sits BEHIND the art rather than clipping it: item art is drawn to
+   spill past its own frame, and a clip on the box shears the blades off flat. */
+.hexicon::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.32);
+  clip-path: var(--hex-clip);
+}
+
+/* Centred by transform, because `place-items: center` start-aligns an item
+   LARGER than its track instead of centring it. */
+.hexicon :deep(.svg-icon) {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: block;
+  width: calc(var(--hex) * 1.075);
+  height: calc(var(--hex) * 1.075);
+}
+
+.hexicon :deep(.svg-icon svg) {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* A bare slot's glyph is smaller than its frame, so alignment centres it fine. */
+.hexicon.bare {
+  display: grid;
+  place-items: center;
+}
+
+.hexicon.head {
+  --hex: 52px;
+}
+
+.hexicon.spare-icon {
+  --hex: 34px;
 }
 
 .pop-head strong {
@@ -986,11 +1042,6 @@ const ceilings = computed(() =>
   align-items: baseline;
   gap: 7px;
   min-width: 0;
-}
-
-.icon-box.small {
-  width: 30px;
-  height: 30px;
 }
 
 .empty-note {
