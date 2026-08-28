@@ -374,7 +374,7 @@ export interface WorkPreview {
    */
   drops: MaterialKey[]
   /** Which of the three verbs this costing is for. */
-  activity: 'gathering' | 'mining' | 'hunting'
+  activity: 'gathering' | 'mining'
   /**
    * §5.7 -- when the pocket on this hex closes, or null if there is none.
    *
@@ -412,51 +412,8 @@ export interface TilePreview extends WorkPreview {
    * is the whole of what makes it the floor under the §8.0 ladder.
    */
   gather: WorkPreview
-  /** §5.5 -- the third verb on this hex, costed in the same request. */
-  hunt: HuntPreview
 }
 
-/**
- * §5.5 -- what working a herd here would cost and give.
- *
- * Separate from TilePreview rather than folded into it, because a hunt is a
- * different verb and not a mode of mining: it takes no tile slot, depletes
- * nothing, and pays a Tier 4 material the seam never does.
- */
-export interface HuntPreview {
-  canHunt: boolean
-  reason?: string | null
-  seconds: number
-  /** §7.3 -- a herd is a pile of work read exactly as a hex is, and the bow is
-   *  what gets through it. Same four numbers the seam reports. */
-  hp: number
-  toolAttack: number
-  skillAttack: number
-  /** §7.4.3 -- whole points of attack off the line's own tree. */
-  skillBite: number
-  rate: number
-  clamped: boolean
-  able: boolean
-  /** Server-clock deadline the herd wanders off at, or null if there is none. */
-  herdUntil: number | null
-  yield: number
-  material: MaterialKey | null
-  /** Always false: a hunt is refused outright without a bow, never downgraded. */
-  scrap: boolean
-  /** §4 -- what a herd on this ground can give up, most likely first. */
-  drops?: MaterialKey[]
-  note: string | null
-  unseen: boolean
-}
-
-/**
- * What the server sends for the disc in sight. Terrain is NOT in here -- the
- * client generates it from the world config (§5). These are the facts it cannot
- * derive, as compact tuples because this fires on arrival and departure.
- *
- *   depleted: [col, row, regrowsAt]
- *   occupied: [col, row, bodies, seats]
- */
 export interface MapMutations {
   depleted: Array<[number, number, number]>
   /**
@@ -869,8 +826,6 @@ export interface GameApi {
   startMining(col: number, row: number): Promise<ActionResult<Job>>
   /** §4.0 -- the same hex, by hand. Its own call because it is its own verb. */
   startGathering(col: number, row: number): Promise<ActionResult<Job>>
-  /** §5.5 -- work a herd marker. Its own verb, not a mode of mining. */
-  startHunt(col: number, row: number): Promise<ActionResult<Job>>
   /** §9.5.5 -- a battle job answers with a BattleResult, everything else a haul. */
   collectJob(jobId: string): Promise<ActionResult<CollectResult | BattleResult>>
   abandonJob(jobId: string): Promise<ActionResult<null>>

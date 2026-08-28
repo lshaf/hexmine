@@ -234,10 +234,10 @@ final class Balance
      * §4.0 -- what BARE HANDS take out of a hex per second, before the line
      * skill. Gathering's whole rate, and gathering's alone.
      *
-     * Mining and hunting never read this. A seam is worked with a pick and a
-     * herd is taken with a bow -- neither has a bare-handed mode, because §8.0
-     * rule 1 refuses the verb outright without its tool and points at the
-     * gather button instead. What a tool does is *be* the rate, not add to one.
+     * Mining never reads this. A seam is worked with the line's tool and has no
+     * bare-handed mode, because §8.0 rule 1 refuses the verb outright without
+     * one and points at the gather button instead. What a tool does is *be* the
+     * rate, not add to one.
      *
      * TWO, and it must stay under MINING_COMMON_ATTACK. It was four while this
      * number was the floor every verb stood on -- shared by hands and tool
@@ -349,23 +349,17 @@ final class Balance
     /** Per-hex jitter on the shoreline, so a lake is not a drawn circle. */
     public const LAKE_EDGE_WOBBLE = 0.7;
 
-    // ------------------------------------------------------------- hunting §5.5
-
-    public const HERD_LIFETIME_MS = 4 * self::HOUR;
-
-    public const HERD_CHANCE = 0.06;
-
     // ------------------------------------------------------- rich ground §5.7
 
     /**
      * §5.7 -- a pocket: ground that is briefly worth more than it usually is.
      *
-     * The herd's machinery on any workable hex, and deliberately NOT the herd's
-     * argument. A herd is hunting's own thing and stands on hunting's own
-     * ground (§5.5), because a line that pays out everywhere is a line the map
-     * cannot put anywhere. A pocket is not a line at all -- it is the hex being
-     * good today -- so it belongs to whichever line that hex already trains,
-     * and every one of the five gets the same chance at one.
+     * A pack's machinery (§9.5.1) on any workable hex: a time bucket hashed
+     * with the hex, derivable, costing no storage until somebody walks onto it.
+     *
+     * On ANY biome, because a pocket is not a line -- it is the hex being good
+     * today, so it belongs to whichever line that hex already trains, and every
+     * one of the five gets the same chance at one.
      */
     public const POCKET_LIFETIME_MS = 4 * self::HOUR;
 
@@ -395,6 +389,21 @@ final class Balance
      * and hours, exactly as §9.5.1 caps packs.
      */
     public const POCKET_YIELD = 1.5;
+
+    /**
+     * §5.7 -- and rich ground is a little likelier to give up the grade above
+     * what your tool reliably takes (§5.3).
+     *
+     * Rich means two things and this is the second: more of it, and better odds
+     * on the thing you are not equipped for. Applied to the UPWARD tail only --
+     * the long shot doubles from about one haul in twelve to one in six -- so
+     * it is felt exactly where "the better grade is a long shot" is the sentence
+     * on the card, and does nothing on ground your tool already tops out.
+     *
+     * It cannot reach past what the hex holds, because the tail it multiplies
+     * stops at the tile's own grade: §5.3's contested rule is untouched.
+     */
+    public const POCKET_REACH = 2.0;
 
     /**
      * §8.4 -- how long a bench holds onto a thing, by what it is making.
@@ -781,22 +790,6 @@ final class Balance
         'center' => 0.22,
     ];
 
-    /**
-     * Mirrors HUNTING in resources/js/game/balance.ts.
-     *
-     * A herd's HP, read exactly as a tile's is (§7.3). 4,500 is twenty-five
-     * minutes for a fresh hunter with a crude bow, which is what a hunt has
-     * always cost; what is new is that the bow now shortens it. It used to be a
-     * flat duration sitting outside Formulas::mineTime() because the old floor
-     * clamp would have rounded the difference away.
-     */
-    public const HERD_HP = 4500;
-
-    /** Pelt haul before skill, gear and ring are applied. */
-    public const HUNT_PELT_MIN = 2;
-
-    public const HUNT_PELT_MAX = 5;
-
     // ---------------------------------------------------------- processing §6
 
     /** Five open slots per feature, first-come-first-served, §6.1. */
@@ -981,10 +974,12 @@ final class Balance
      *
      * There is no mine timer to shave any more: a hex is HP and a tool is a
      * rate, so the only honest thing a gathering tree can sell is a faster
-     * rate. It used to sell `tripReduction`, which was a percentage on that
-     * rate and shared one clamp with gear, options and potions -- so a
-     * prospector in a decent coat had already spent the ceiling and the ten
-     * nodes they bought did nothing at all.
+     * rate. It used to sell `tripReduction`, a percentage on that rate sharing
+     * one clamp with gear, options and potions -- so a prospector in a decent
+     * coat had already spent the ceiling and the ten nodes they bought did
+     * nothing at all. That stat is gone from the game entirely now, for the
+     * same reason it left the trees: a percentage on a number the tool already
+     * sets is the tool's own ladder said twice.
      *
      * Five, and the number is the ladder rather than a feeling: the widest
      * single rung of §8.0's tool ladder is four (rare 10 to epic 14), and the

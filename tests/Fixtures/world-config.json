@@ -31,8 +31,6 @@
         "inner": 0.3659,
         "center": 0.2733
     },
-    "herdLifetimeMs": 1440000,
-    "herdChance": 0.06,
     "pocketLifetimeMs": 1440000,
     "pocketChance": 0.04,
     "pocketYield": 1.5,

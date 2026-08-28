@@ -337,9 +337,9 @@ function effectPhrase(effect: NodeEffect, jobName?: string): string {
 
   switch (effect.kind) {
     case 'stat':
-      // formatStat, not the local sign: a StatKey has its own reduction rule
-      // (`tripReduction` is stored as a share and read as a cut), and that rule
-      // belongs to the one function every other screen reads a stat through.
+      // formatStat, not the local sign: a StatKey may be stored as a share of
+      // what it removes rather than what it adds, and that rule belongs to the
+      // one function every other screen reads a stat through.
       return `${formatStat(effect.stat, effect.value)} ${on}${STAT_LABEL[effect.stat as StatKey].toLowerCase()}`
     case 'pair':
       return `+${n} ${effect.stat}`

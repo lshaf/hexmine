@@ -25,7 +25,7 @@ import {
   screenToTile,
   tileToScreen,
 } from './hexGeometry'
-import { corpseProp, dungeonGlyph, herdProp, packProp, pocketProp, settlementGlyph, tileProps } from './props'
+import { corpseProp, dungeonGlyph, packProp, pocketProp, settlementGlyph, tileProps } from './props'
 import { EMBER, GOLD, INK, VELLUM, VELLUM_DIM, depletedColor, shade, variantColor, waterColor } from '@/theme/palette'
 import { MINING } from '@/game/balance'
 import type { Job, Tile, TravelState } from '@/game/types'
@@ -194,7 +194,6 @@ interface RenderTile {
   side: string
   edge: string
   props: string
-  herd: string
   /** §5.7 -- the critter that found the rich ground, drawn inside sight only. */
   pocket: string
   /** §9.5.1 -- the pack standing here, drawn only inside sight. */
@@ -251,11 +250,11 @@ const RARE_KEYS = new Set<string>([
  * TWO COUNTS, because busy and shut are two different facts:
  *
  *  - `workers` is how many marks there are. Everybody at work here, whatever
- *    the verb -- a mine, a gather, a hunt, a fight.
+ *    the verb -- a mine, a gather, a fight.
  *  - `slotsUsed` picks the colour. Only mining takes one of the hex's two seats
- *    (§5.5: a herd is not a seat, and neither is a pack), so it is the only
- *    number that can refuse you -- and ember is kept for exactly that. Two
- *    hunters make a hex busy; they never make it shut.
+ *    -- a fight takes none, because nothing comes out of the ground for it --
+ *    so it is the only number that can refuse you, and ember is kept for
+ *    exactly that. A fight makes a hex busy; it never makes it shut.
  *
  * Both colours are picked on VALUE, and the reason is arithmetic rather than
  * taste. Every
@@ -354,7 +353,6 @@ const renderTiles = computed<RenderTile[]>(() =>
       side: shade(top, -0.4),
       edge: shade(top, -0.2),
       props: inSight ? tileProps(tile, depleted) : '',
-      herd: inSight ? herdProp(tile) : '',
       // §5.7 -- a pocket is live state and obeys the fog like the rest of it.
       // A hex being briefly worth more is exactly the kind of thing §5.6 keeps
       // outside the ring: you find rich ground by walking onto it.
@@ -502,10 +500,9 @@ const RARE_MARK = groundMark(6)
 
         <!-- Terrain and settlement props stand above the tile, in sight only. -->
         <g v-if="t.props" v-html="t.props" />
-        <g v-if="t.herd" v-html="t.herd" />
         <!-- §5.7 -- the critter that found the rich ground. It stands with the
-             herd and the pack because it is the same kind of news: something
-             alive is on this hex, and it is worth looking at. -->
+             pack because it is the same kind of news: something alive is on
+             this hex, and it is worth looking at. -->
         <g v-if="t.pocket" v-html="t.pocket" />
         <g v-if="t.pack" v-html="t.pack" />
         <g v-if="t.corpse" v-html="t.corpse" />

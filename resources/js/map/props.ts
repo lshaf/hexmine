@@ -336,17 +336,6 @@ function silk(x: number, y: number, color: string): string {
   )
 }
 
-/** Herd marker, §5.5 -- temporary, so it reads as a visitor not terrain. */
-function herd(x: number, y: number): string {
-  const body = '#6b4f39'
-  return (
-    `<ellipse cx="${x}" cy="${y - 5}" rx="5" ry="3.2" fill="${body}"/>` +
-    `<ellipse cx="${x + 6}" cy="${y - 3}" rx="3.6" ry="2.4" fill="${shade(body, -0.15)}"/>` +
-    rect(x - 3, y - 3, 1.2, 3, shade(body, -0.4)) +
-    rect(x + 2, y - 3, 1.2, 3, shade(body, -0.4))
-  )
-}
-
 /*
  * §5.7 -- rich ground, and the animals that found it first.
  *
@@ -356,11 +345,11 @@ function herd(x: number, y: number): string {
  * learn to read a hex by what is standing on it rather than by decoding a
  * symbol somebody drew on it.
  *
- * It reads against the herd, which is the only other living marker: a herd is a
- * BIG pale-brown body side-on with a second beast behind it, and every one of
- * these is small, single and shaped like nothing else on the map. On plains
- * both can stand on one hex, which is exactly right -- a grazing herd and a
- * hare are two different pieces of news.
+ * It reads against the pack, which is the only other living marker: a pack is a
+ * monster's own silhouette in an ember halo, and every one of these is small,
+ * green-rimmed and shaped like nothing else on the map. Both can stand on one
+ * hex, which is exactly right -- something hunting you and something that found
+ * good ground are two different pieces of news.
  *
  * Solid fills and two tones each (§13.2), because a critter drawn in one colour
  * on its own biome would be the thing §5.2 says about dead ground: invisible on
@@ -400,7 +389,7 @@ function dustleveret(x: number, y: number): string {
     `<ellipse cx="${x}" cy="${y - 4}" rx="6" ry="3.6" fill="${back}"/>` +
     `<ellipse cx="${x - 4}" cy="${y - 2.4}" rx="3.4" ry="1.8" fill="${belly}"/>` +
     `<ellipse cx="${x + 5}" cy="${y - 7}" rx="2.6" ry="2.2" fill="${back}"/>` +
-    // The ears, which are the whole of what tells a hare from a herd.
+    // The ears, which are the whole of what tells a hare from anything else.
     `<path d="M${x + 5} ${y - 9} L${x + 3.5} ${y - 15} M${x + 6.5} ${y - 9} L${x + 7} ${y - 15}" stroke="${back}" stroke-width="1.6" stroke-linecap="round" fill="none"/>`
   )
 }
@@ -1059,7 +1048,6 @@ export function variantSpecimen(variant: VariantKey, size = 66): string {
     propSeed: SPECIMEN_SEED,
     settlement: undefined,
     dungeon: undefined,
-    herdUntil: undefined,
   } as unknown as Tile
 
   const top = variantColor(variant)
@@ -1095,7 +1083,6 @@ export function variantSpecimen(variant: VariantKey, size = 66): string {
   )
 }
 
-/** Rendered separately so a herd can sit on top of whatever terrain is there. */
 /**
  * §5.3 -- one stretch of water, off the map, for the almanac.
  *
@@ -1126,7 +1113,6 @@ export function waterGlyph(biome: Biome, kind: WaterKind, size = 34): string {
     propSeed: SPECIMEN_SEED,
     settlement: undefined,
     dungeon: undefined,
-    herdUntil: undefined,
   } as unknown as Tile
 
   const top = waterColor(biome, kind)
@@ -1170,7 +1156,6 @@ export function deadGlyph(biome: Biome, size = 34): string {
     settlement: undefined,
     dungeon: undefined,
     water: undefined,
-    herdUntil: undefined,
   } as unknown as Tile
 
   return groundHex(biome, tileProps(tile, false), size)
@@ -1223,7 +1208,6 @@ export function waterSpecimen(biome: Biome, kind: WaterKind, size = 66): string 
     propSeed: SPECIMEN_SEED,
     settlement: undefined,
     dungeon: undefined,
-    herdUntil: undefined,
   } as unknown as Tile
 
   const top = waterColor(biome, kind)
@@ -1246,16 +1230,12 @@ export function waterSpecimen(biome: Biome, kind: WaterKind, size = 66): string 
   )
 }
 
-export function herdProp(tile: Tile): string {
-  return tile.herdUntil ? herd(0, 6) : ''
-}
-
 /**
  * §5.7 -- the critter that found the rich ground, if there is any.
  *
- * Off to the left of centre, because the herd and the pack own the middle of a
- * hex and all three can stand on one: a pocket is a fact about the ground and
- * they are visitors on top of it.
+ * Off to the left of centre, because the pack owns the middle of a hex and both
+ * can stand on one: a pocket is a fact about the ground and a pack is a visitor
+ * on top of it.
  */
 export function pocketProp(tile: Tile): string {
   return tile.pocketUntil ? halo(POCKET_CRITTER[tile.biome](-13, 9), HALO_CRITTER, 3.4) : ''

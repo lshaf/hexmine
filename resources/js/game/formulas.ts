@@ -406,11 +406,16 @@ export const formatPercent = (value: number): string =>
   `${value >= 0 ? '+' : ''}${Math.round(value * 1000) / 10}%`
 
 /**
- * The stats stored as a reduction. There is one, and the screen has to turn it
- * over: a mine cut by three minutes in ten is `-3% mine time`, and printing the
- * stored `+3%` next to the word "time" says the opposite of what it does.
+ * The stats stored as a reduction, and there are none left.
+ *
+ * There was one: `tripReduction`, a percentage off a mine's clock, which the
+ * screen had to turn over because "+3%" beside the word "time" says the
+ * opposite of what it does. §7.3 made a tool's attack the whole rate of a mine
+ * and the stat became the tool's own ladder said twice, so it is gone -- but
+ * the SET stays, because the day another stat is stored as a share of what it
+ * removes, this is the one place that has to know.
  */
-const REDUCTION_STATS = new Set<StatKey>(['tripReduction'])
+const REDUCTION_STATS = new Set<StatKey>()
 
 /**
  * A settlement said with its hex, §6.

@@ -71,9 +71,6 @@ Route::middleware(ResolveCharacter::class)->group(function () {
     // the one above: mining refuses without the line's tool, and gathering is
     // the answer to that refusal rather than a quieter version of it.
     Route::post('/gathering', [MiningController::class, 'gather']);
-    // §5.5 -- hunting is its own verb, not a mode of mining: it takes no tile
-    // slot, depletes nothing, and is the only Tier 4 faucet outside a dungeon.
-    Route::post('/hunting', [MiningController::class, 'hunt']);
 
     // §9.5.5 -- no coordinates: the only fight on offer is the one standing on
     // the hex under your feet, and asking about anyone else's would be a scanner.

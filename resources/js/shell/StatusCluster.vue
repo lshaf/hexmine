@@ -88,7 +88,6 @@ const pct = (s: Scale) => `${Math.min(100, Math.max(0, (s.at / s.of) * 100))}%`
  */
 const STAT_TONE: Record<StatKey, string> = {
   yield: 'var(--gold)',
-  tripReduction: 'var(--copper)',
   travelSpeed: 'var(--violet)',
   processingSpeed: '#8fbf7f',
   power: 'var(--ember)',

@@ -19,7 +19,6 @@ import { MONSTERS } from '@/game/monsters'
 import { RECIPES, RING_LABEL, SKILL_BY_KEY } from '@/game/catalog'
 import { groundLabel } from '@/game/ground'
 import { formatDuration, placeLabel } from '@/game/formulas'
-import { worldParams } from '@/game/worldgen'
 import HexAction from './HexAction.vue'
 import MonsterPlate from './MonsterPlate.vue'
 import type { BattlePreview } from '@/api/types'
@@ -54,10 +53,10 @@ const placeName = computed(() => {
 })
 
 /**
- * One mine at a time, so this is a single job or nothing -- and a hunt is a
+ * One mine at a time, so this is a single job or nothing -- and a gather is a
  * mine. Both pin you to the hex until you claim or drop, so both have to reach
- * this slot; reading only the mining job left a finished hunt with no way to
- * claim it and nothing on the dock saying why everything else was refused.
+ * this slot; reading only the dig left a finished gather with no way to claim
+ * it and nothing on the dock saying why everything else was refused.
  */
 const working = computed(() => game.fieldJob)
 const ready = computed(() => Boolean(working.value && working.value.endsAt <= game.now))
@@ -79,7 +78,7 @@ const seam = computed(() => Boolean(underfoot.value?.material))
  * be a second answer to a question nobody asked.
  */
 const emptyReason = computed(() => {
-  if (working.value || pinned.value || seam.value || herd.value || corpse.value) return null
+  if (working.value || pinned.value || seam.value || corpse.value) return null
   if (here.value) return null
 
   return underfoot.value?.reason ?? null
@@ -101,7 +100,7 @@ const gather = computed(() => underfoot.value?.gather)
  * A dead cell has to explain itself in a tooltip nobody opens on a phone, so
  * the cells stay live and the server answers -- once, in a toast, in the same
  * words the preview would have shown. The only thing that takes a verb off the
- * dock is the hex genuinely not having it: no seam, or no herd.
+ * dock is the hex genuinely not having it: no seam.
  */
 /**
  * §8.2 -- a mine that would finish a tool off says so on the button.
@@ -118,43 +117,6 @@ const mineHint = computed(
   () => underfoot.value?.reason ?? wearWarning.value ?? `${underfoot.value?.yield ?? 0} units`,
 )
 const gatherHint = computed(() => gather.value?.reason ?? `${gather.value?.yield ?? 0} units by hand`)
-
-/**
- * §5.5 -- a herd standing on this hex right now. Temporary and time-bucketed,
- * so the cell appears and leaves on its own; there is nothing to un-spawn.
- */
-const hunt = computed(() => underfoot.value?.hunt)
-const herd = computed(() => Boolean(hunt.value?.herdUntil))
-
-/**
- * How long the herd stays. The only clock on this dock counting something that
- * is not yours: a seam waits, a herd leaves (§5.5). That is the whole reason
- * the cell earns a countdown when Mine never has.
- *
- * Hidden while a mine runs -- one mine at a time means the herd is unactionable
- * then, and a countdown you cannot act on is noise.
- */
-const herdLeaves = computed(() => {
-  const until = hunt.value?.herdUntil
-  if (!until || working.value) return null
-
-  return formatDuration(until - game.now)
-})
-
-/**
- * The last quarter of the herd's stay: the offer is closing.
- *
- * A fraction of the lifetime rather than a fixed number of minutes, because
- * GAME_TIME_SCALE compresses the lifetime and an absolute threshold would read
- * "closing" for the whole window at a fast clock. worldParams() already carries
- * the scaled value the server generated the marker from.
- */
-const herdGoing = computed(() => {
-  const until = hunt.value?.herdUntil
-  if (!until) return false
-
-  return until - game.now < worldParams().herdLifetimeMs * 0.25
-})
 
 /**
  * §9.5.3 -- something is standing on this hex, and until it is not there is no
@@ -286,13 +248,6 @@ const corpseHint = computed(() => {
   return c.mine ? `${call}${c.label} comes home` : `${call}${c.label} burns if you take it`
 })
 
-const huntHint = computed(() => {
-  const h = hunt.value
-  if (!h) return ''
-  if (h.reason) return h.reason
-  return `${h.yield} units`
-})
-
 /**
  * What calling it off costs, §11.1 -- leaving a hex mid-progress forfeits the
  * partial yield. Said plainly, because it is the only thing this button does.
@@ -300,8 +255,8 @@ const huntHint = computed(() => {
 const cancelHint = computed(() => {
   if (!working.value) return ''
 
-  return working.value.kind === 'hunting'
-    ? 'Leaves the herd, and the time spent on it'
+  return working.value.kind === 'battle'
+    ? 'A fight cannot be walked away from'
     : 'Forfeits the dig, and frees you to move'
 })
 
@@ -315,7 +270,7 @@ const claimHint = computed(() => {
   }
 
   if (ready.value) return `${working.value.quantity} units waiting`
-  return working.value.kind === 'hunting' ? 'Still working this herd' : 'Still working this hex'
+  return 'Still working this hex'
 })
 
 /** Processing lines this settlement runs, §6. */
@@ -345,7 +300,7 @@ const doing = computed(() => {
   if (ready.value) return working.value.kind === 'battle' ? 'The fight is over' : 'Reward ready'
 
   const verb =
-    working.value.kind === 'battle' ? 'Fighting' : working.value.kind === 'hunting' ? 'Hunting' : 'Working'
+    working.value.kind === 'battle' ? 'Fighting' : 'Working'
 
   return `${verb} · ${formatDuration(working.value.endsAt - game.now)}`
 })
@@ -358,11 +313,6 @@ function mine(): void {
 function gathered(): void {
   const char = game.character
   if (char) void game.startGathering(char.col, char.row)
-}
-
-function hunted(): void {
-  const char = game.character
-  if (char) void game.startHunt(char.col, char.row)
 }
 </script>
 
@@ -383,11 +333,6 @@ function hunted(): void {
         <span class="named">
           <h2 class="place">{{ placeName }}</h2>
           <span v-if="doing" class="label doing" :class="{ ready }">{{ doing }}</span>
-          <!-- §5.5 -- perishable, so it says when it goes rather than that it is
-               here. "Herd" alone would read as scenery. -->
-          <span v-else-if="herdLeaves" class="label herd" :class="{ going: herdGoing }">
-            Herd moves on in {{ herdLeaves }}
-          </span>
         </span>
 
         <!-- §5.2 -- why this hex offers nothing, on the hexes where that is not
@@ -513,7 +458,7 @@ function hunted(): void {
             small
             icon="mine"
             label="Mine"
-            :primary="Boolean(underfoot?.canMine) && !herd"
+            :primary="Boolean(underfoot?.canMine)"
             :disabled="game.busy"
             :hint="mineHint"
             @activate="mine"
@@ -524,15 +469,12 @@ function hunted(): void {
             small
             icon="gather"
             label="Gather"
-            :primary="Boolean(gather?.canMine) && underfoot?.bare && !herd"
+            :primary="Boolean(gather?.canMine) && underfoot?.bare"
             :disabled="game.busy"
             :hint="gatherHint"
             @activate="gathered"
           />
 
-          <!-- §5.5 -- present only while a herd is. Beside the other two rather
-               than instead of them: a hunt takes no tile slot, so all three
-               verbs are genuinely available on the same hex at the same time. -->
           <!-- §9.5.7 -- the hook. Somebody's row is standing on this hex, and
                only its owner can take it back: anybody else killing it burns
                the row rather than moving it (§2). -->
@@ -547,23 +489,12 @@ function hunted(): void {
             @activate="game.fight()"
           />
 
-          <HexAction
-            v-if="herd"
-            small
-            icon="hunt"
-            label="Hunt"
-            :primary="Boolean(hunt?.canHunt)"
-            :disabled="game.busy"
-            :hint="huntHint"
-            @activate="hunted"
-          />
-
         </template>
 
         <!-- Settlement-only. Absent in the field rather than grayed: the point
              is that these people are not out here. -->
         <template v-if="here">
-          <span v-if="working || seam || herd" class="rule" aria-hidden="true" />
+          <span v-if="working || seam" class="rule" aria-hidden="true" />
           <HexAction small icon="trade" label="Trade" @activate="game.openPanel('shop')" />
           <HexAction small icon="craft" label="Craft" @activate="game.openPanel('craft')" />
           <HexAction
@@ -675,21 +606,24 @@ function hunted(): void {
   color: var(--gold);
 }
 
-/* Gold, because a herd is an opportunity rather than work in progress -- the
-   same reading the map already gives gold in §13.1. Ember once it is closing. */
-.herd {
-  color: var(--gold);
-}
-
-.herd.going {
-  color: var(--ember);
-}
-
 .actions {
   display: flex;
   align-items: flex-start;
   gap: 8px;
   margin-left: auto;
+  /* Never shrink. The pin's three lines of terms would otherwise squeeze the
+     two cells until the text ran up against them, which is what "the buttons
+     stay on the right" means: the column is fixed and the prose wraps against
+     it, not the other way round. */
+  flex: 0 0 auto;
+}
+
+/* §9.5.3 -- the pin is the one plate with three lines of text beside the cells,
+   so the cells hang from the top of it rather than floating in the middle of
+   it. Centred, they read as belonging to the middle line -- which is the terms
+   of a loss, not the thing you press. */
+.inner:has(.pinned) {
+  align-items: flex-start;
 }
 
 .rule {
@@ -725,7 +659,7 @@ function hunted(): void {
 
   /*
    * §9.5.3 -- a pack owns the hex, so the hex's own business is not on offer:
-   * you may not mine, gather, hunt or travel while it stands there. On a phone
+   * you may not mine, gather or travel while it stands there. On a phone
    * the two columns fought for the same 130px and the place name lost, which
    * left the dock reading "OPEN COUNTRY · O…" over a fight nobody could see the
    * terms of. The pack takes the row; where you are standing keeps the line
@@ -741,6 +675,11 @@ function hunted(): void {
 
   .inner:has(.pinned) .actions {
     margin-left: 0;
+  }
+
+  /* The terms wrap against the button column rather than running under it. */
+  .inner:has(.pinned) .pinned {
+    padding-right: 2px;
   }
 
   .pinned {

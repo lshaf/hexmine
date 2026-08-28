@@ -803,7 +803,7 @@ class GameService
         }
 
         $out = [];
-        foreach (['yield', 'tripReduction', 'travelSpeed', 'processingSpeed', 'power', 'defense'] as $stat) {
+        foreach (['yield', 'travelSpeed', 'processingSpeed', 'power', 'defense'] as $stat) {
             // Gear is scoped by the action, not the line: an axe is a forest
             // tool, and standing at a saw pit is not swinging it (§8 rule 1).
             $gear = Formulas::aggregateStat($items, $stat, $action);
@@ -1489,9 +1489,6 @@ class GameService
      */
     private function occupiedSlots(int $col, int $row): int
     {
-        // Mining only. §5.5 hunts sit on a hex without taking one of its two
-        // seats -- the pelts come off the herd, not out of the ground -- so
-        // counting them here would let a wandering herd close a seam.
         return GameJob::where('col', $col)
             ->where('row', $row)
             ->where('kind', 'mining')
@@ -1512,14 +1509,10 @@ class GameService
      */
     public function miningTrip(Character $character): ?GameJob
     {
-        // Hunting counts, §5.5. A herd is not a seam, but it is still a person
-        // out in the field, and a person is only in one place at a time -- so a
-        // hunt blocks a dig and a dig blocks a hunt.
-        //
-        // So does a fight (§9.5.5). It is the sharpest case of the same rule:
-        // you are swinging at something, and you are not also down a mine or
-        // walking away from it.
-        return $character->jobs()->whereIn('kind', ['mining', 'hunting', 'battle'])->first();
+        // A fight counts too (§9.5.5), and it is the sharpest case of the same
+        // rule: you are swinging at something, and you are not also down a mine
+        // or walking away from one.
+        return $character->jobs()->whereIn('kind', ['mining', 'battle'])->first();
     }
 
     public function buildTile(int $col, int $row, int $now): array
@@ -1597,8 +1590,6 @@ class GameService
             // client's map from the server's.
             'barrenCell' => Balance::BARREN_CELL,
             'barrenThreshold' => Balance::BARREN_THRESHOLD,
-            'herdLifetimeMs' => Balance::scaled(Balance::HERD_LIFETIME_MS),
-            'herdChance' => Balance::HERD_CHANCE,
             // §5.7 -- the pocket, sent for the same reason: the field is
             // mirrored and the numbers are not, so retuning how rich the ground
             // gets cannot silently desync the map the client draws.
@@ -1701,18 +1692,18 @@ class GameService
         // Two counts, because a hex is busy and shut for two different reasons.
         //
         // BODIES is everybody at work on the hex, whatever the verb: a mine, a
-        // gather (the same job with hands in the tool's place, §4.0), a hunt and
-        // a fight. That is what the map draws, because a hex somebody is
-        // standing on is not an empty one.
+        // gather (the same job with hands in the tool's place, §4.0) and a
+        // fight. That is what the map draws, because a hex somebody is standing
+        // on is not an empty one.
         //
         // SEATS is mining alone, exactly as occupiedSlots() counts it, and it is
-        // the only number that can refuse you: §5.5 says a herd is not one of
-        // the hex's two seats, so a hunt takes none and neither does a fight.
+        // the only number that can refuse you: a fight takes no seat, because
+        // nothing comes out of the ground for it.
         //
         // Keeping them apart is what lets the map say "busy" without ever
         // saying "shut" about ground that is open. One count did both jobs and
         // got one of them wrong whichever kind it filtered on.
-        $occupied = GameJob::whereIn('kind', ['mining', 'hunting', 'battle'])
+        $occupied = GameJob::whereIn('kind', ['mining', 'battle'])
             ->where('status', 'active')
             ->whereNotNull('col')
             ->whereBetween('col', [$minCol, $maxCol])
@@ -2941,9 +2932,9 @@ class GameService
             ];
         }
 
-        // §9.5.3 -- the pin. A pack on the hex under your feet stops mining,
-        // gathering and hunting ANYWHERE in sight, not merely on the hex it is
-        // standing on: you are not working while something is looking at you.
+        // §9.5.3 -- the pin. A pack on the hex under your feet stops mining and
+        // gathering ANYWHERE in sight, not merely on the hex it is standing on:
+        // you are not working while something is looking at you.
         $pin = $this->packHere($character);
 
         $tile = $this->buildTile($col, $row, $now);
@@ -3083,7 +3074,6 @@ class GameService
         $mine = Formulas::mineTime(
             $tile['hp'],
             $skillLevel,
-            $bonuses['tripReduction'],
             $gathering ? Balance::BARE_HAND_ATTACK : $this->lineToolAttack($character, $skillKey),
             // §7.4.3 -- the line's own tree, in whole points of the same attack
             // the tool carries. It counts bare-handed too: gathering a forest
@@ -3156,7 +3146,10 @@ class GameService
             // spreadsheet and the decision into arithmetic. What a prospector
             // is owed is what is here, which is a fact about the place; how
             // often is what the mine is for.
-            'drops' => Drops::kinds($activity, $tile, $gathering ? 0 : $reach),
+            // §5.7 -- rich ground reorders this list as well as fattening the
+            // haul: it widens the odds on the grade above your tool, and the
+            // card lists kinds most-likely-first.
+            'drops' => Drops::kinds($activity, $tile, $gathering ? 0 : $reach, $pocketUntil !== null),
             'activity' => $activity,
             // The line stays the tile's own even on a gathered haul: swinging
             // at a tree by hand is still woodcutting practice, §4.0, just poor.
@@ -3222,188 +3215,6 @@ class GameService
     public function previewGather(Character $character, int $col, int $row): array
     {
         return $this->previewTile($character, $col, $row, Drops::GATHERING);
-    }
-
-    // ----------------------------------------------------------- hunting §5.5
-
-    /**
-     * What working a herd on this hex would cost and give.
-     *
-     * Shaped like previewTile() and bounded by the same sight rule, because a
-     * herd is live state: whether one is standing here is exactly the kind of
-     * fact §5.6 keeps outside the disc.
-     *
-     * @return array<string,mixed>
-     */
-    public function previewHunt(Character $character, int $col, int $row): array
-    {
-        $now = $this->now();
-        $distance = HexGeometry::distance((int) $character->col, (int) $character->row, $col, $row);
-
-        $base = [
-            'canHunt' => false,
-            'reason' => null,
-            // §7.3 -- nothing costed until the bow and the line are known, and
-            // there is no bare-handed hunt to fall back on.
-            'seconds' => 0,
-            'hp' => Balance::HERD_HP,
-            'toolAttack' => 0,
-            'skillAttack' => 0,
-            'skillBite' => 0,
-            'rate' => 0.0,
-            'clamped' => false,
-            'able' => false,
-            'herdUntil' => null,
-            'yield' => 0,
-            'material' => null,
-            'scrap' => false,
-            'note' => null,
-            'unseen' => false,
-        ];
-
-        if ($distance > $this->sightRadius($character)) {
-            $base['reason'] = $this->isTraveling($character)
-                ? 'You are watching your feet. Nothing is scouted until you stop.'
-                : 'Too far to make out. Walk there and see for yourself.';
-            $base['unseen'] = true;
-
-            return $base;
-        }
-
-        $tile = $this->buildTile($col, $row, $now);
-        $herdUntil = $tile['herdUntil'] ?? null;
-
-        if ($herdUntil === null || $herdUntil <= $now) {
-            $base['reason'] = 'No herd here. They wander, and they do not stay long.';
-
-            return $base;
-        }
-
-        $base['herdUntil'] = $herdUntil;
-
-        // §8.0 rule 1 -- the bow is the hunting line's tool, and here it is not
-        // optional. Mining has a bare-handed floor because a hex is never
-        // blocked (§4.0); a hunt is not a hex, it is an animal, and you do not
-        // take one down by hand. This is the one refusal §4.0 does not cover,
-        // and it is what makes the bow the only tool with a gate behind it.
-        if (! $this->hasLineTool($character, 'hunting')) {
-            $base['reason'] = 'No bow. A herd is not something you take by hand.';
-            $base['note'] = 'Hunting needs a bow equipped — every other line will work bare-handed.';
-
-            return $base;
-        }
-
-        // §5.3 -- better ground carries better animals, capped by the bow, the
-        // same way a seam is capped by the pick.
-        $variants = Variants::BIOME_VARIANTS[$tile['biome']];
-        $tileGrade = 0;
-        foreach ($variants as $index => $variant) {
-            if ($variant['key'] === $tile['variant']) {
-                $tileGrade = $index;
-                break;
-            }
-        }
-
-        $bare = false;
-        $reach = min(Drops::toolGrade($this->lineToolRarity($character, 'hunting')), $tileGrade);
-        $material = Variants::BIOME_VARIANTS['plains'][$reach]['material'];
-        $bonuses = $this->bonuses($character, 'hunting');
-        $skillLevel = (int) ($character->skills()->where('skill_key', 'hunting')->value('level') ?? 1);
-
-        $rolled = Hash::randInt(
-            Hash::hash2($col, $row + $herdUntil, Balance::mapSeed() ^ 0x8EED),
-            Balance::HUNT_PELT_MIN,
-            Balance::HUNT_PELT_MAX,
-        );
-
-        // §7.3 -- a herd is a pile of work like a hex is, and the bow is what
-        // gets through it. It was a flat 25 minutes for as long as the floor
-        // clamp would have swallowed the difference; it no longer would.
-        $mine = Formulas::mineTime(
-            Balance::HERD_HP,
-            $skillLevel,
-            $bonuses['tripReduction'],
-            $this->lineToolAttack($character, 'hunting'),
-            (int) $this->jobEffects($character, 'hunting')['bite'],
-        );
-
-        $base['seconds'] = $mine['total'];
-        $base['hp'] = $mine['hp'];
-        $base['toolAttack'] = $mine['toolAttack'];
-        $base['skillAttack'] = $mine['skillAttack'];
-        $base['skillBite'] = $mine['skillBite'];
-        $base['rate'] = $mine['rate'];
-        $base['clamped'] = $mine['clamped'];
-        $base['able'] = $mine['able'];
-
-        $base['material'] = $material;
-        $base['scrap'] = $bare;
-        $base['yield'] = Formulas::mineYield(
-            $rolled,
-            $skillLevel,
-            $bonuses['yield'],
-            WorldGen::ringYield($tile['ring']),
-        );
-
-        $base['drops'] = Drops::kinds(Drops::HUNTING, $tile, $reach);
-
-        $working = $this->miningTrip($character);
-
-        $base['reason'] = match (true) {
-            $this->isTraveling($character) => 'You are on the road. Stop the journey, or wait until you arrive.',
-            $working !== null => $working->isReady($now)
-                ? 'Your reward is waiting. Claim it before working anything else.'
-                : 'You are already working a hex. Finish that one first.',
-            $distance !== 0 => 'You are standing elsewhere. Travel to this hex to hunt it.',
-            default => null,
-        };
-
-        $base['canHunt'] = $base['reason'] === null;
-
-        return $base;
-    }
-
-    /**
-     * §5.5 -- AP and time, no party and no raid charge.
-     *
-     * A hunt takes no tile slot and never depletes the tile: the pelts come off
-     * the herd, not out of the ground, so two miners can be working the same hex
-     * while everyone else hunts across it.
-     */
-    public function startHunt(Character $character, int $col, int $row): GameJob
-    {
-        return DB::transaction(function () use ($character, $col, $row) {
-            $preview = $this->previewHunt($character, $col, $row);
-
-            if (! $preview['canHunt']) {
-                throw new GameException($preview['reason'] ?? 'Cannot hunt here.', 'blocked');
-            }
-
-            $now = $this->now();
-
-            $job = GameJob::create([
-                'character_id' => $character->id,
-                'kind' => 'hunting',
-                'status' => 'active',
-                'col' => $col,
-                'row' => $row,
-                // No slot: a herd is not one of the hex's two seats, §5.5.
-                'slot' => null,
-                'material_key' => $preview['material'],
-                'quantity' => max(1, (int) $preview['yield']),
-                'skill_key' => 'hunting',
-                'started_at' => $now,
-                'ends_at' => $now + Balance::scaled((int) $preview['seconds'] * 1000),
-            ]);
-
-            // §8.5 -- the haul above already carries the charge, so this is
-            // where it is spent.
-            $this->spendBuffs($character, 'hunting');
-
-            $character->save();
-
-            return $job;
-        });
     }
 
     // ------------------------------------------------------------------ mining
@@ -3560,25 +3371,6 @@ class GameService
                     $now,
                 );
 
-            } elseif ($job->kind === 'hunting') {
-                [$gained, $lostToOverflow] = $this->grantHaul($character, $job);
-
-                $bare = Catalog::isScrap($job->material_key);
-                $xpAmount = $bare
-                    ? max(1, (int) round($job->quantity * 4 * Balance::SCRAP_XP_RATE))
-                    : $job->quantity * 4;
-
-                // A bow is drawn, so a bow wears. The other four slots idle,
-                // §8.0 rule 2 -- drainDurability already scopes to the line.
-                $durabilityLost = $this->drainDurability(
-                    $character,
-                    $this->tripDrain($character, $job, 'hunting'),
-                    'hunting',
-                    $destroyed,
-                );
-
-                // Nothing comes off the hex: a herd is not a seam, and it
-                // leaves on its own clock whatever anybody does here.
             } elseif ($job->kind === 'craft') {
                 // §8.4 -- the bench hands over one thing, not a haul. Nothing
                 // here goes through the material ledger, so `gained` stays
@@ -3681,9 +3473,21 @@ class GameService
      */
     private function grantHaul(Character $character, GameJob $job): array
     {
-        $tile = $this->buildTile((int) $job->col, (int) $job->row, $this->now());
+        // §5.7 -- the ground the mine STARTED on is the ground it pays from. A
+        // pocket that closed while the clock ran does not reach back and take
+        // the haul with it, and the quantity was fixed at engagement anyway
+        // (§16, the same rule a fight runs on) -- so reading `now()` here would
+        // have left the size of the haul and the shape of it disagreeing about
+        // whether the hex was rich.
+        $started = (int) $job->started_at;
+        $tile = $this->buildTile((int) $job->col, (int) $job->row, $started);
         $activity = Drops::activityFor($job->kind, (string) $job->material_key);
-        $table = Drops::tableFor($activity, $tile, (string) $job->material_key);
+        $table = Drops::tableFor(
+            $activity,
+            $tile,
+            (string) $job->material_key,
+            ($tile['pocketUntil'] ?? 0) > $started,
+        );
 
         // Seeded from the job, so a haul is settled the moment it is claimed
         // and cannot be re-rolled by claiming again (§16).
@@ -6543,7 +6347,7 @@ class GameService
             ];
         }
 
-        if ($job->kind === 'mining' || $job->kind === 'hunting') {
+        if ($job->kind === 'mining') {
             return $payload + [
                 'col' => $job->col,
                 'row' => $job->row,
@@ -6659,7 +6463,6 @@ class GameService
             'underfoot' => [
                 ...$this->previewTile($character, $character->col, $character->row),
                 'gather' => $this->previewGather($character, $character->col, $character->row),
-                'hunt' => $this->previewHunt($character, $character->col, $character->row),
             ],
             'shopStock' => $this->shopStock($character),
             // §7.4 -- what the tree panel needs about *this* character. The tree

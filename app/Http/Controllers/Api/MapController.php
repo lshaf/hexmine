@@ -46,7 +46,6 @@ class MapController extends GameController
         return response()->json([
             ...$this->game->previewTile($character, $col, $row),
             'gather' => $this->game->previewGather($character, $col, $row),
-            'hunt' => $this->game->previewHunt($character, $col, $row),
         ]);
     }
 }

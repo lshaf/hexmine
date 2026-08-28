@@ -53,7 +53,7 @@ SLOTS = dict(LINES, **WORN)
 # the haul is. Worn gear keeps a percentage, because a coat has no attack of its
 # own to lead with.
 STAT = {
-    'armor': 'tripReduction', 'boots': 'travelSpeed', 'gloves': 'processingSpeed',
+    'armor': 'yield', 'boots': 'travelSpeed', 'gloves': 'processingSpeed',
 }
 
 # §7.3 -- the top of the tool ladder, in mining attack.

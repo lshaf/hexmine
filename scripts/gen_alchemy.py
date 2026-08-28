@@ -92,11 +92,6 @@ YIELD_WORD = {
     'woodcutting': 'Forest', 'mining': 'Deepseam', 'hunting': 'Beastcall',
     'quarrying': 'Stonecut', 'harvesting': 'Fieldwise',
 }
-SPEED_WORD = {
-    'woodcutting': 'Swiftaxe', 'mining': 'Quickpick', 'hunting': 'Lightfoot',
-    'quarrying': 'Quarry', 'harvesting': 'Sicklehand',
-}
-
 # Where a scope's ingredients come from, for scopes that are not a biome line.
 # `battle` is the odd one: its recipe runs on the ichor line (§9.5.8) rather
 # than on a biome's herbs, and the biome named here only decides its palette.
@@ -121,8 +116,6 @@ PINNED = {
         'Bitter, resinous, and it keeps your arms swinging through the next stand of trees.'),
     ('common', 'travelSpeed', 'travel'): ('road_tonic', 'Road Tonic',
         'Drunk at the gate, not on the road. Your legs stop asking questions.'),
-    ('uncommon', 'tripReduction', 'quarrying'): ('quarry_salts', 'Quarry Salts',
-        'Tastes like the inside of a mine. You work faster to be done sooner.'),
     ('uncommon', 'processingSpeed', 'processing'): ('guild_cordial', 'Guild Cordial',
         'What the line foremen drink. The queue does not move faster; you do.'),
     ('rare', 'yield', 'mining'): ('prospectors_flask', "Prospector's Flask",
@@ -136,26 +129,23 @@ FLAVOUR_YIELD = {
     'quarrying': 'The face splits where you meant it to, and gives up the whole block.',
     'harvesting': 'You crop at the root and lose nothing to the stubble.',
 }
-FLAVOUR_SPEED = {
-    'woodcutting': 'Fewer swings, the same tree, and you are on the road sooner.',
-    'mining': 'The pick finds the fault first go and the shift ends early.',
-    'hunting': 'You cut the tracking short because you already know where it went.',
-    'quarrying': 'No wasted blows on a face you have already read.',
-    'harvesting': 'The blade does not snag and the row is done before you notice.',
-}
 
 
 def consumables():
-    """Fourteen per rank: yield and mine time on each of the five lines, plus the
-    road, the bench and the fight. Seventy in all, every one action-locked."""
+    """Nine per rank: yield on each of the five lines, plus the road, the bench
+    and the fight. Forty-five in all, every one action-locked.
+
+    It was fourteen: there was a mine-time draft per line as well. §7.3 makes a
+    tool's attack the whole rate of a mine, so `tripReduction` was a percentage
+    on a number the tool already sets -- the same shape §7.3 took off the
+    gathering trees, and there was no reason it should have survived on a shelf.
+    Yield is the only percentage a mine has left."""
     out = []
 
     for rarity, value, station, tradeable, mats in RANKS:
         effects = []
         for b in BIOMES:
             effects.append(('yield', LINE[b], YIELD_WORD[LINE[b]], FLAVOUR_YIELD[LINE[b]]))
-        for b in BIOMES:
-            effects.append(('tripReduction', LINE[b], SPEED_WORD[LINE[b]], FLAVOUR_SPEED[LINE[b]]))
         # 'Wayfarer', not 'Road': Road Tonic is pinned at common, and the
         # legacy names do not use their own rank's vessel, so a generated
         # "Road Tonic" at uncommon would collide with it.

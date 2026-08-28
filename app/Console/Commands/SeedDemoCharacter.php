@@ -91,7 +91,7 @@ class SeedDemoCharacter extends Command
     private const CONSUMABLES = [
         'forest_draft' => 4,
         'road_tonic' => 2,
-        'quarry_salts' => 3,
+        'stonecut_tonic' => 3,
     ];
 
     private const LEVEL = 8;

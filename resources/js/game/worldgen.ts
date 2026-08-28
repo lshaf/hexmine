@@ -21,7 +21,6 @@
 import { hash2, rand01, randInt } from './hash'
 import { BIOME_VARIANTS, type VariantDef } from './variants'
 import { MONSTERS_BY_RING } from './monsters'
-import { BIOME_MATERIAL, SKILL_BY_KEY } from './catalog'
 import { hexDistance } from '@/map/hexGeometry'
 import type {
   Biome,
@@ -60,8 +59,6 @@ export interface WorldConfig {
   /** §5.2 -- the dead-ground field: its lattice, and where each ring cuts it. */
   barrenCell: number
   barrenThreshold: Record<Ring, number>
-  herdLifetimeMs: number
-  herdChance: number
   /** §5.7 -- the pocket: how long rich ground stands, how often, and what it pays. */
   pocketLifetimeMs: number
   pocketChance: number
@@ -700,38 +697,21 @@ export function dungeonAt(col: number, row: number): { key: string; name: string
 // --------------------------------------------------------------------- tiles
 
 /**
- * §5.5 -- herd markers are temporary and time-bucketed, so they are derivable
- * rather than stored and every client agrees on where they are.
- */
-// §5.5 -- a herd stands on hunting ground and nowhere else. Herds wandering
-// onto every biome made the bow the one tool with no ground of its own: every
-// line has a biome it is worked on (§8.0), and hunting's is the plains.
-function herdUntil(col: number, row: number, biome: Biome, now: number): number | undefined {
-  if (BIOME_MATERIAL[biome] !== SKILL_BY_KEY.hunting.material) return undefined
-
-  const c = cfg()
-
-  const bucket = Math.floor(now / c.herdLifetimeMs)
-  const h = hash2(col * 31 + bucket, row * 17 + bucket, c.seed ^ 0xbeef)
-  if (rand01(h) > c.herdChance) return undefined
-
-  return (bucket + 1) * c.herdLifetimeMs
-}
-
-/**
  * §5.7 -- is this ground briefly worth more than usual, and until when.
  *
- * The mirror of WorldGen::pocketUntil(). The herd's own trick, and deliberately
- * not the herd's argument: a herd is hunting's and belongs on hunting's ground,
- * while a pocket is the hex being good today and pays into whatever that hex
- * already trains. Keeping it to one biome would hand one of the five a bonus
- * the other four never see (§8 rule 4).
+ * The mirror of WorldGen::pocketUntil(). Same trick a pack runs on: a time
+ * bucket hashed with the hex, so a pocket nobody has walked onto costs no
+ * storage and every client agrees where it is.
+ *
+ * No biome test. A pocket is the hex being good today and pays into whatever
+ * that hex already trains, so keeping it to one biome would hand one of the
+ * five a bonus the other four never see (§8 rule 4).
  */
 function pocketUntil(col: number, row: number, now: number): number | undefined {
   const c = cfg()
 
   const bucket = Math.floor(now / c.pocketLifetimeMs)
-  // A different salt and mix from the herd's, or the two would land on the same
+  // A different salt and mix from the pack's, or the two would land on the same
   // hexes on the same schedule for ever.
   const h = hash2(col * 13 + bucket, row * 41 + bucket, c.seed ^ 0x0ddf)
   if (rand01(h) > c.pocketChance) return undefined
@@ -742,7 +722,7 @@ function pocketUntil(col: number, row: number, now: number): number | undefined 
 /**
  * §9.5.1 -- is a pack standing here, and which one.
  *
- * The mirror of WorldGen::packAt(). Same trick the herd uses, plus a per-hex
+ * The mirror of WorldGen::packAt(). The same time bucket, plus a per-hex
  * OFFSET into the bucket: without it every pack in the world would appear and
  * vanish on the same two-hour heartbeat, which with a pin on the far end of one
  * (§9.5.3) is a rhythm players would set a watch by. `until` comes back in the
@@ -927,17 +907,8 @@ export function generateTile(
     settlement,
     dungeon,
     water,
-    // §5.5 -- a herd stands on open ground. Nothing grazes a lake, and nothing
-    // grazes a town: a settlement is worked ground (§6), and a deer in the
-    // market square is the same category error as a pack camped on a capital.
-    //
-    // Nothing grazes dead ground either, and that one is the plainest of the
-    // three: §5.2's barren is scoured to the pan, and a herd needs something to
-    // have been eating.
-    herdUntil:
-      water || settlement || dungeon || barren ? undefined : herdUntil(col, row, biome, now),
     // §5.7 -- and the ground itself may be having a good few hours. The test
-    // is the SEAM rather than the herd's list of exclusions: a pocket is a hex
+    // is the SEAM itself: a pocket is a hex
     // being worth more to work, so a hex with nothing to work cannot have one.
     pocketUntil:
       material === undefined || (mutation?.regrowsAt ?? 0) > now

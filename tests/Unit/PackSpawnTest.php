@@ -80,7 +80,7 @@ final class PackSpawnTest extends TestCase
     /**
      * §9.5.1 -- a pack on a capital would lock a whole region out of the only
      * five-line bench it has, which is grief rather than hazard. Water and
-     * dungeon mouths are excluded for the same reason a herd never grazes a
+     * dungeon mouths are excluded for the same reason nothing else stands on a
      * lake: the thing placed there wins.
      */
     public function test_nothing_camps_on_a_settlement_a_mouth_or_open_water(): void

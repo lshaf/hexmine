@@ -54,25 +54,6 @@ class MiningController extends GameController
         );
     }
 
-    /** §5.5 -- work a herd marker. AP and time, no raid charge. */
-    public function hunt(Request $request): JsonResponse
-    {
-        $character = $this->character($request);
-
-        $validated = $request->validate([
-            'col' => ['required', 'integer', 'min:'.(-Balance::mapRadius()), 'max:'.Balance::mapRadius()],
-            'row' => ['required', 'integer', 'min:'.(-Balance::mapRadius()), 'max:'.Balance::mapRadius()],
-        ]);
-
-        $job = $this->game->startHunt($character, (int) $validated['col'], (int) $validated['row']);
-
-        return $this->respond(
-            $character,
-            $this->game->jobPayload($job),
-            "Hunting the herd at {$validated['col']},{$validated['row']}.",
-        );
-    }
-
     /**
      * §4 -- collect a finished mine.
      *

@@ -285,7 +285,7 @@ const combat = computed(
 )
 
 const ceilings = computed(() =>
-  (['tripReduction', 'travelSpeed', 'processingSpeed'] as StatKey[]).map((key) => {
+  (['yield', 'travelSpeed', 'processingSpeed'] as StatKey[]).map((key) => {
     const value = Math.abs(game.bonuses?.[key] ?? 0)
 
     return {

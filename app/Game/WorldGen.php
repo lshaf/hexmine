@@ -707,51 +707,23 @@ final class WorldGen
     // ---------------------------------------------------------------- tiles
 
     /**
-     * §5.5 -- herd markers are temporary and time-bucketed, so they are
-     * derivable rather than stored and every client agrees where they are.
-     */
-    private static function herdUntil(int $col, int $row, string $biome, int $now): ?int
-    {
-        // §5.5 -- a herd stands on hunting ground and nowhere else. Herds
-        // wandering onto every biome made the bow the one tool with no
-        // ground of its own: every line has a biome it is worked on (§8.0),
-        // and hunting's is the plains.
-        if (Catalog::BIOME_MATERIAL[$biome] !== Catalog::skills()['hunting']['material']) {
-            return null;
-        }
-
-        $lifetime = Balance::scaled(Balance::HERD_LIFETIME_MS);
-        $bucket = intdiv($now, $lifetime);
-        $h = Hash::hash2($col * 31 + $bucket, $row * 17 + $bucket, Balance::mapSeed() ^ 0xBEEF);
-
-        if (Hash::rand01($h) > Balance::HERD_CHANCE) {
-            return null;
-        }
-
-        return ($bucket + 1) * $lifetime;
-    }
-
-    /**
      * §5.7 -- is this ground briefly worth more than usual, and until when.
      *
-     * The herd's own trick (§5.5): a time bucket hashed with the hex, so a
-     * pocket nobody has walked onto costs no storage and every client agrees on
-     * where it is.
+     * The same trick a pack runs on (§9.5.1): a time bucket hashed with the
+     * hex, so a pocket nobody has walked onto costs no storage and every client
+     * agrees on where it is.
      *
-     * No biome test, and that is the difference between the two. A herd is
-     * hunting's and belongs on hunting's ground, because a LINE that pays out
-     * everywhere is a line the map cannot put anywhere. A pocket is not a line:
-     * it is the hex being good today, and it pays into whatever that hex
-     * already trains -- so keeping it to one biome would be handing one of the
-     * five a bonus the other four never see, which is the thing §8 rule 4 says
-     * not to do.
+     * No biome test. A pocket is not a line: it is the hex being good today,
+     * and it pays into whatever that hex already trains -- so keeping it to one
+     * biome would be handing one of the five a bonus the other four never see,
+     * which is the thing §8 rule 4 says not to do.
      */
     private static function pocketUntil(int $col, int $row, int $now): ?int
     {
         $lifetime = Balance::scaled(Balance::POCKET_LIFETIME_MS);
         $bucket = intdiv($now, $lifetime);
 
-        // A different salt and a different mix from the herd's, or the two
+        // A different salt and a different mix from the pack's, or the two
         // would land on the same hexes on the same schedule for ever.
         $h = Hash::hash2($col * 13 + $bucket, $row * 41 + $bucket, Balance::mapSeed() ^ 0x0DDF);
 
@@ -765,11 +737,11 @@ final class WorldGen
     /**
      * §9.5.1 -- is a pack standing here, and which one.
      *
-     * The same trick the herd uses (§5.5): a time bucket hashed with the hex, so
-     * the whole thing is derivable and a pack nobody has met costs no storage.
+     * A time bucket hashed with the hex, so the whole thing is derivable and a
+     * pack nobody has met costs no storage.
      *
-     * The difference is the OFFSET. A herd's bucket starts at the same instant
-     * on every hex, which means the whole world's herds blink at once; with two
+     * The OFFSET is what a plain bucket lacks. One that started at the same
+     * instant on every hex would blink the whole world at once; with two
      * hours between rolls and a pin on the far end of one (§9.5.3), a synchronised
      * world would empty and refill on a heartbeat everybody could set a watch by.
      * A per-hex offset staggers them: every hex keeps its own two-hour rhythm and
@@ -964,21 +936,9 @@ final class WorldGen
             'settlement' => $settlement,
             'dungeon' => $dungeon ? ['key' => $dungeon['key'], 'name' => $dungeon['name']] : null,
             'water' => $water,
-            // §5.5 -- a herd stands on open ground. Nothing grazes a lake, and
-            // nothing grazes a town: a settlement is worked ground (§6), and a
-            // deer in the market square is the same category error as a pack
-            // camped on the only five-line bench in the region (§9.5.1).
-            //
-            // Nothing grazes dead ground either, and that one is the plainest
-            // of the three: §5.2's barren is scoured to the pan, and a herd
-            // needs something to have been eating.
-            'herdUntil' => $water === null && $settlement === null && $dungeon === null && ! $barren
-                ? self::herdUntil($col, $row, $biome, $now)
-                : null,
             // §5.7 -- and the ground itself may be having a good few hours.
-            // The test is the SEAM rather than the herd's list of exclusions:
-            // a pocket is a hex being worth more to work, so a hex there is
-            // nothing to work on cannot have one. Dead ground and a lake fall
+            // The test is the SEAM itself: a pocket is a hex worth more to
+            // work, so a hex with nothing to work on cannot have one. Dead ground and a lake fall
             // out of that for free, and so does a settlement, which §6 says is
             // worked ground with nothing left to take.
             'pocketUntil' => $material !== null && $regrowsAt <= $now

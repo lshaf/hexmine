@@ -361,35 +361,39 @@ them.
 - Placement favors **under-populated regions** by local density (hexes per active wallet
   in a radius). Fills outward naturally.
 
-### 5.5 Hunting grounds
-Not a tile type. **Temporary herd markers** spawn on open **Plains** hexes — open
-meaning neither water nor a settlement nor a dungeon mouth, for the reason §9.5.1
-keeps packs off a capital: a settlement is worked ground (§6), and a deer in the
-market square is the same category error as a monster camped on the only
-five-line bench in the region. They decay after ~4h. Yields Pelt, the plains animal parts (horn, sinew), the biome's critter and a little of
-whatever grows there. No party, no raid charge, just time — and the bow decides
-how much of it, because a herd is a pile of work read exactly as a hex is
-(§7.3). A crude bow is the 25-minute reference mine; a Beastfang Bow is five,
-and there is no bare-handed hunt to fall back on.
+### 5.5 Hunting is mining, and there is no herd
 
-**No Tier 4, and that is a §2 rule rather than a tuning value.** Essence used to be
-on this table, as "the only activity bridging the mining and raid material tracks".
-A herd on a four-hour clock that anyone with a crude bow can shoot is a faucet for
-the one tier the dungeons exist to gate, and §9.4's ladder is supposed to end at a
-boss rather than at a deer. Raid materials come from raids.
+**Hunting is not a separate verb, and there is no herd marker on the map.** The
+bow is the plains line's tool exactly as the axe is the forest line's (§8.0):
+you work a plains hex with a bow and it gives up pelt, at the bow's rate, off
+the same table every other line reads. That is the whole of hunting.
 
-**Rich ground is the other marker with this shape, and it is not this** (§5.7).
-A pocket runs on the same time-bucketed hash and answers a different question:
-a herd is *hunting's own work*, on hunting's own ground, while a pocket is any
-hex being briefly worth more to whichever line already works it. That is why one
-is biome-locked and the other cannot be.
+*(It was its own verb for a long time: temporary herd markers on open plains,
+their own four-hour clock, their own drop table, their own dock button, taking
+no tile slot. What removed it was §7.3 — once a herd became "a pile of work read
+exactly as a hex is", worked with a tool at that tool's rate, the two verbs were
+the same arithmetic on the same ground, and one of them was carrying a marker
+system, a preview, a job kind and a button to say so.)*
 
-**Plains and nowhere else, because that is hunting's ground.** Herds briefly wandered
-onto every biome, on the argument that a bow should be worth carrying on a walk you took
-for another reason. It made hunting the one line with no biome of its own — every other
-tool in §8.0 is worked on named ground, and a line that pays out everywhere is a line the
-map cannot put anywhere. The pull toward the plains is the same pull §4 puts on the other
-four.
+**What survives is everything the LINE was.** Hunting is still one of §7.2's
+five skills, still has its own slot and its own five-rung ladder of bows (§8.0),
+still levels a job with a thirty-node tree, and pelt is still what the plains
+give up and what leather is tanned from. Nothing about the ladder moved; the
+second target standing on it went away.
+
+**The critter moved with it.** §4's five critters — the alchemist's other half —
+came off a herd and nothing else, so folding the hunt back into the mine left
+them with no faucet at all. They are on the mining table now, and still off the
+gathering one: what lives on a kind of ground is taken with the line's tool and
+never picked up by hand, which is the difference between the two halves of that
+shelf.
+
+**Two things are simply gone**, and both were the herd's rather than the line's:
+the animal parts' second faucet (horn and sinew are plains *components*, so
+mining a plains hex already pays them), and the fourth verb on the dock. §9.4's
+difficulty ladder loses a rung and reads `mine → road pack → dungeon floors`,
+which is the honest version: what the pack teaches is a fight, and a herd never
+taught one.
 
 ### 5.6 Sight and travel — a fog, not a fence
 
@@ -485,14 +489,13 @@ never *what is happening* there, which is what makes arriving worth something.
 A **pocket** is a hex having a good few hours. It stands for about **four**, it
 pays **half again on the haul**, and it can appear on **any workable ground**.
 
-It is the herd's machinery (§5.5) and deliberately **not the herd's argument**.
-A herd is a time-bucketed hash on the hex, derivable so that one nobody has
-walked onto costs no storage, and a pocket is the same trick with its own salt.
-But a herd belongs to *hunting* and stands on hunting's own ground, because a
-**line** that pays out everywhere is a line the map cannot put anywhere. A
-pocket is not a line. It is the hex being good today, and it pays into whatever
-that hex already trains — so restricting it to one biome would hand one of the
-five a bonus the other four never see, which is exactly what §8 rule 4 forbids.
+It is a pack's machinery (§9.5.1): a time-bucketed hash on the hex, derivable
+so that a pocket nobody has walked onto costs no storage, with its own salt.
+
+**On any biome, and that is the load-bearing part.** A pocket is not a line — it
+is the hex being good today, and it pays into whatever that hex already trains —
+so restricting it to one biome would hand one of the five a bonus the other four
+never see, which is exactly what §8 rule 4 forbids.
 
 **It is yield, never the clock.** §7.3 keeps the two apart on purpose: yield is
 how big the haul is and attack is how fast it comes out. A pocket that also
@@ -510,15 +513,24 @@ stop where you are, never a reason to abandon the walk inward.
 the worth, so a pocket that needed a tool would be a bonus locked away from the
 whole of §12's opening arc, which is worked by hand.
 
-**A herd standing on one gets nothing from it.** The herd walked here and pays
-out of its own table; the ground being good has nothing to do with the animal on
-top of it. That is the same line §5.5 already draws when it says nothing comes
-off the hex for a hunt.
-
 **Nothing to work, no pocket.** The test is the seam rather than a list of
 exclusions — water, dead ground (§5.2), a settlement and a depleted hex all fall
 out of that one rule, and a mark on ground nobody can work would be an
 advertisement for a refusal.
+
+**And it is a little likelier to give up the grade above your tool** (§5.3's
+upward tail, doubled). Rich means two things: more of what you can take, and
+better odds on what you cannot. Applied to that tail alone, so it is felt
+exactly where *the better grade is a long shot* is the sentence on the card and
+does nothing on ground your tool already tops out — and it can never reach past
+what the hex holds, because the tail it multiplies stops at the tile's own
+grade.
+
+**The ground a mine STARTED on is the ground it pays from.** A pocket that
+closed while the clock ran does not reach back and take the haul with it. The
+size was fixed at engagement anyway — the same rule a fight runs on (§9.5.5) —
+so reading the live tile at collection would have left the size of a haul and
+the shape of it disagreeing about whether the hex was rich.
 
 **§2 — it is not a faucet, because it cannot be farmed or re-rolled.** A hex has
 two seats and then depletes for nine hours (§5.1); a pocket lives four. It pays
@@ -530,25 +542,23 @@ herbs say what grows on a kind of ground; these say what lives on it*).
 Glimmermoth, rockmite, dustleveret, ashnewt, fenlark — one per kind of country,
 settled on the hex. Animals find the good ground before you do, which is the
 whole of the reasoning: you read a hex by **what is standing on it**, the way
-you already read a herd or a pack, rather than by decoding a symbol somebody
-drew on it.
+you already read a pack, rather than by decoding a symbol somebody drew on it.
 
 *(An abstract mark was tried first — a gold hexagon in a dark socket, cut from
 the ground so it lay in the stone. It was reasoned from the mechanic, and it
 looked like a sticker: a dot on a tile is a thing to look up, and every other
 piece of news on this map is a creature you simply see.)*
 
-It stands with the herd and the pack because it is the same kind of news —
-something alive is on this hex — and off to the **left of centre**, because all
-three can share a hex and the visitors own the middle.
+It stands with the pack because it is the same kind of news — something alive is
+on this hex — and off to the **left of centre**, because both can share a hex
+and the visitor owns the middle.
 
 **It carries a sap halo, and a pack carries an ember one** (§13.2's halo rule
 below). Two things stand on a hex and mean opposite things: a pack is a state to
 deal with and this is one worth crossing the screen for, which is exactly what
 §13.3 already defines that pair of colours as. The reading is learned once and
-holds everywhere. On plains a grazing herd
-and a hare can stand together, which is exactly right: they are two different
-pieces of news.
+holds everywhere. A monster and a hare can stand on one hex, which is exactly
+right: they are two different pieces of news.
 
 Each is a **two-tone silhouette**, solid fills, no alpha (§13.2). One flat
 colour would be the thing §5.2 says about dead ground — invisible on the country
@@ -681,8 +691,8 @@ Level unlocks **capacity, not power**: access to higher-tier hexes and dungeon
 floors. A whale can out-scale logistics but never out-damage a grinder.
 
 **Every verb that finishes work pays character XP, and the road is the only
-exception.** A mine, a gather, a hunt, a processing run, a craft and a won fight
-all level the character; §7.5's walking deliberately does not, and the reason it
+exception.** A mine, a gather, a processing run, a craft and a won fight all
+level the character; §7.5's walking deliberately does not, and the reason it
 gives is the only one that ever justifies withholding it — idle time must not be
 a faucet (§2).
 
@@ -714,7 +724,8 @@ and walking is the one reward in the game that cannot be bought.
 ### 7.2 Gathering lines (5, one per material line)
 Woodcutting · Mining · Hunting · Quarrying · Harvesting
 
-Each reduces mine time / boosts yield **for its own material only**. XP comes from mining
+Each boosts yield **for its own material only** — and reduces mine time only
+through the tool's attack (§7.3), never as a percentage of its own. XP comes from mining
 that material *and* from presence during its processing — so no single grind path maxes a
 tree alone.
 
@@ -726,18 +737,18 @@ offers the same ladder. The skill point cap is the lever, and it is the only one
 
 ### 7.3 Working a hex — there is no timer, there is HP and a rate
 
-**Mining, gathering and hunting have no cooldown.** They never really did — what
+**Mining and gathering have no cooldown.** They never really did — what
 they had was a rolled duration with a discount stapled to it — and now they have
 nothing of the kind. A hex is a **pile of work with a number on it**; a tool has
 an **attack**; the clock is what falls out of dividing one by the other.
 
 ```
-rate      = (attack + skill_attack + skill_bite) * (1 + tripReduction)
+rate      = attack + skill_attack + skill_bite
 trip_time = clamp(hp / rate, 1min, 60min)
 ```
 
 - `hp`: **2,700–5,400**, rolled per tile, then **scaled by the tile's grade**
-  (§5.3) — base ground untouched, up to ×4⅔ on contested. A herd is 4,500 (§5.5)
+  (§5.3) — base ground untouched, up to ×4⅔ on contested
 - `attack`: **the whole base rate**, and it is the tool's — or, for gathering
   alone, `BARE_HAND_ATTACK` (**3**, the common rung's own — see below)
 - `skill_attack`: `floor(level / 10)` — five more points at maxed line skill
@@ -750,6 +761,20 @@ clamp with gear, options and potions (§8.1 rule 1) — so a prospector in a dec
 coat had already spent the ceiling and the ten nodes they had bought were worth
 nothing at all. That is the shape §7.4 forbids, reached through the clamp
 instead of through a missing call site.
+
+**`tripReduction` is gone from the game entirely, and nothing may bring it
+back.** The tree lost it first; gear, rolled options and potions kept it for a
+while longer, and the argument against it there was the same one word for word.
+A percentage on this rate is **the tool's own ladder said twice**, in a unit
+that shares §8.1's ceiling with every coat in the game — so a good tool and a
+good coat competed for the same fifteen points, and the tool always lost,
+because the coat was the thing wearing them. There is exactly one number that
+decides how fast a hex comes apart, and it is `attack`.
+
+What replaced it is the other half of §7.3's own distinction: **yield is how
+big the haul is**, and it is the only percentage a mine has left. The four work
+armors sell it now, and the mine-time drafts (five a rung, twenty-five in all)
+simply stopped existing — there is nothing left for them to shorten.
 
 A count cannot be clamped away by a coat, and being flat inverts who it is worth
 most to: five points is most of a Stone Axe and a fifth of a Mythril Pickaxe.
@@ -773,10 +798,10 @@ what every grade costs the rung it belongs to. That is the whole of what the num
 they are these numbers — there is a test pinning it. Seconds appear nowhere in
 the model.
 
-**The tool is the rate, not a bonus on top of one.** Mining and hunting never
-read the bare-handed number: §8.0 rule 1 refuses the verb outright without its
-tool and points at the gather button instead, so a mine is worked with the tool
-or with the hands and **never with both**. That is what makes a pickaxe's attack
+**The tool is the rate, not a bonus on top of one.** Mining never reads the
+bare-handed number: §8.0 rule 1 refuses the verb outright without its tool and
+points at the gather button instead, so a mine is worked with the tool or with
+the hands and **never with both**. That is what makes a pickaxe's attack
 mean something plain — six times a Stone Axe is six times the rate, not 1.6
 times it once a shared base is added underneath.
 
@@ -844,11 +869,10 @@ HP, and the identical *rate*, worked at the one rung that needs no purchase.
 That is exactly why it is a floor rather than a punishment. What it costs you is
 **worth**, not time: scrap sells for a gold and the seam does not.
 
-**A herd is a pile of work too** (§5.5). Hunting used to be a flat 25 minutes
-sitting deliberately *outside* this formula, because the old floor clamp would
-have rounded the difference away. It goes through the same arithmetic now, so a
-crude bow is the 25-minute reference and a Beastfang Bow does it in five.
-Hunting was the one line whose tool bought nothing but permission.
+**Hunting is this arithmetic too, and it is nothing else** (§5.5). It used to be
+a flat 25 minutes sitting deliberately *outside* this formula, on its own verb
+and its own marker; putting it through the same equation is what eventually
+removed the verb, because a bow working plains at the bow's rate is a mine.
 
 **The floor is a guard rather than a lever, and it sits at 1 minute.** It was
 fifteen and it *bound*, which made the top half of the ladder wasted ground —
@@ -1476,10 +1500,11 @@ The gap between the two is the whole rule. Without it a scoped roll would
 be strictly the worse outcome and the pool would read as a bad-luck table; with
 it, *+2% everywhere* against *+4% mining* is a real choice for a prospector who
 knows which line they actually work. It is the same argument §8.5 makes for
-scoping potions — seventy flat drafts would be a power ladder you can drink.
+scoping potions — forty-five flat drafts would be a power ladder you can drink.
 
-**Only the two mine stats scope**, `yield` and `tripReduction`: `travelSpeed`
-has no line to belong to, and processing is scoped by the recipe already.
+**Only the mine stat scopes**, `yield`: `travelSpeed` has no line to belong to,
+and processing is scoped by the recipe already. It used to be two, and the
+second was `tripReduction` — which no longer exists (§7.3).
 
 **Tools never carry a scope.** An axe is line-locked by its slot (§8 rule 1), so
 its yield is already woodcutting's yield — storing that twice would only be
@@ -1492,7 +1517,7 @@ difference between them:
 
 | Piece | May roll |
 |---|---|
-| **Gathering tool** | `yield`, `tripReduction`, and a solid `attack` that is §7.3's mining attack |
+| **Gathering tool** | `yield`, and a solid `attack` that is §7.3's mining attack |
 | **Weapon** | `power`, `defense`, and the solid pair. Nothing else |
 | **Worn** | every stat there is, scoped or not, plus the solid pair |
 
@@ -1656,8 +1681,7 @@ the game, §11.1.)*
   action that could take the last of it says so first — the fight preview
   (§9.5.5) and the hex preview alike. An idle game may take something expensive
   from a player; it may never take it by surprise.
-- **It reaches the mine, not only the fight.** Mining and hunting wear the
-  line's tool, and at zero that tool is gone the same way a weapon is. The
+- **It reaches the mine, not only the fight.** A mine wears the line's tool, and at zero that tool is gone the same way a weapon is. The
   warning is line-locked exactly as the wear is: the axe on your back is not at
   risk while you are down a mine.
 - Nothing minted can be destroyed, because minting takes it out of the game
@@ -1778,10 +1802,10 @@ now does the thing it is named after.
 
 Worn gear:
 ```
-Leather Armor     = 6 Leather + 2 Cloth                        → +6% mine time
+Leather Armor     = 6 Leather + 2 Cloth                        → +5% yield
 Reinforced Boots  = 4 Cut Stone + 3 Leather                    → +8% travel speed
 Work Gloves       = 3 Cloth + 2 Planks                         → +4% processing speed
-Ironwood Armor    = 3 Ironwood + 2 Silkweave + 1 Shard         → +12% mine time [NFT]
+Ironwood Armor    = 3 Ironwood + 2 Silkweave + 1 Shard         → +11% yield [NFT]
 Beastfang Boots   = 2 Beastfang + 1 Obsidian + 1 Relic         → +15% travel  [NFT]
 ```
 
@@ -2031,7 +2055,7 @@ the benches have five of their own, counted separately and refused separately.
   less than selling the reagents that went into it, or the consumable bench is a
   gold press: brew, sell, repeat, best run by whoever has the most wallets (§2).
   It holds even at the Alchemist's `brewExtra` cap — +35% flasks still reaches
-  only 0.675 of what the inputs fetched. There is a test sweeping all seventy.
+  only 0.675 of what the inputs fetched. There is a test sweeping all forty-five.
 
   **Only the bottom two rungs**, like every other sale (§3.2). That matters more
   here than for gear: every epic and legendary draft wants a Tier 3 rare, and
@@ -2053,15 +2077,20 @@ the benches have five of their own, counted separately and refused separately.
   §7.4.3), on top of the flat stack. It widens the cellar and never the effect:
   the clamp is on what an action's charges add up to, and that is untouched.
 - One charge per (stat, action) is still enforced by a unique index rather than
-  by code, and that index is also the cap on hoarding: a cellar of seventy
+  by code, and that index is also the cap on hoarding: a cellar of forty-five
   drafts is still four stats across eight actions once drunk. The ceiling on
   any one action is exactly what it was, because the clamp applies to that
   action's aggregate alone.
-- **Seventy of them, fourteen a rung**, across the five rungs a bench can
-  reach: yield and mine time on each of the five lines, plus the road, the
-  bench, and the fight — `power` and `defense` scoped to `battle` (§9.5.8).
-  Scoping is what makes that many potions safe; seventy flat stat boosts would
-  be a power ladder you can drink.
+- **Forty-five of them, nine a rung**, across the five rungs a bench can
+  reach: yield on each of the five lines, plus the road, the bench, and the
+  fight — `power` and `defense` scoped to `battle` (§9.5.8). Scoping is what
+  makes that many potions safe; forty-five flat stat boosts would be a power
+  ladder you can drink.
+
+  It was seventy, fourteen a rung, because there was a **mine-time** draft per
+  line as well. §7.3 killed the stat those ran on: a tool's attack is the whole
+  rate of a mine, so a percentage off the clock was the tool's ladder sold back
+  in a bottle.
 - **Recipes get shorter as they climb.** The number of *different* materials a
   potion wants never rises with rarity: a common draft is a muddle of four
   cheap things, a legendary philtre is two perfect ones. Every one wants at
@@ -2126,10 +2155,10 @@ the map points inward at; the road is what teaches you to climb it.
 - **Pity timer on Relic** after N clears, so RNG never pushes players toward raid-spam botting
 
 ### 9.4 Difficulty ladder
-`mine → hunt → road pack → dungeon floors 1–3 → deep floors → boss`
+`mine → road pack → dungeon floors 1–3 → deep floors → boss`
 Each step introduces exactly **one** new mechanic (a fight, then charges, then parties).
 
-The pack is what makes the step from hunting to a dungeon floor survivable: it
+The pack is what makes the step from a mine to a dungeon floor survivable: it
 is the only place a player learns what attack, defense and durability wear cost
 them, and it costs a walk rather than a crafted charge to find out.
 
@@ -2152,8 +2181,7 @@ layer, where it can tie into Shard types.
 
 #### 9.5.1 Packs — derived, cleared, and never farmed
 
-Same machinery as the herd (§5.5), so a pack that nobody has met costs no
-storage: a **time-bucketed hash** of `(col, row, bucket)`, with a **per-hex
+Derived rather than stored, so a pack that nobody has met costs no storage: a **time-bucketed hash** of `(col, row, bucket)`, with a **per-hex
 offset folded into the bucket** so the world does not blink all at once every
 two hours.
 
@@ -2294,8 +2322,7 @@ and saying them twice would make two answers out of one.
 A pack does **not** force a fight. It stops you, which is a different thing.
 
 - **Travel ends at that hex.** The rest of the road is not walked.
-- While a live pack shares your hex you may not **mine, gather, hunt or
-  travel**. There is nothing else out there to do, which is the point: the hex
+- While a live pack shares your hex you may not **mine, gather or travel**. There is nothing else out there to do, which is the point: the hex
   is theirs until it is not.
 - **Two exits, and only two.** Fight it — either outcome clears it — or wait out
   its clock.
@@ -2462,7 +2489,7 @@ durability in the center where a legendary wand pays 145. Survivability is not
 free; it is paid at the repair bench instead of on the odds.
 
 That is the intended shape of the walk inward: it is a kit decision rather than
-a level one, and giving up mine time and travel speed is not optional past the
+a level one, and giving up yield and travel speed is not optional past the
 mid ring — it is the only way through.
 
 **Every worn piece carries the pair, at every rung including the top two.** The

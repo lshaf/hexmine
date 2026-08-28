@@ -13,7 +13,7 @@ namespace App\Game;
  * which is the point -- a mine is a small event with an outcome rather than a
  * withdrawal of a known quantity.
  *
- * THREE ACTIVITIES, and the tool is what separates them:
+ * TWO ACTIVITIES, and the tool is what separates them:
  *
  *   gathering  no tool, always available. Rubbish, herbs, and a windfall of
  *              the biome's common material about one time in twenty -- the
@@ -21,9 +21,9 @@ namespace App\Game;
  *              argument survives intact: bare hands still mostly bring back
  *              scrap, so the first tool is still obviously worth buying.
  *   mining     the line's tool. The ground's own material, at the grade the
- *              tool can reach.
- *   hunting    a bow, and a live herd (§5.5). Pelt, horn, sinew, and the
- *              biome's critter.
+ *              tool can reach -- and on the plains that tool is a bow and that
+ *              material is pelt -- which is all hunting ever was once §7.3 put
+ *              it through the same arithmetic as a dig (§5.5).
  *
  * THE TOOL SETS THE GRADE, THE GROUND SETS THE CEILING. A common axe on a
  * Hardwood Stand brings back Wood nearly every time and Hardwood occasionally:
@@ -40,8 +40,6 @@ final class Drops
     public const GATHERING = 'gathering';
 
     public const MINING = 'mining';
-
-    public const HUNTING = 'hunting';
 
     /**
      * How many distinct materials one haul may split into.
@@ -75,18 +73,16 @@ final class Drops
      * @param  array<string,mixed>  $tile
      * @return array<string,float>
      */
-    public static function table(string $activity, array $tile, int $toolGrade): array
+    public static function table(string $activity, array $tile, int $toolGrade, bool $rich = false): array
     {
         $biome = $tile['biome'];
         $variants = Variants::BIOME_VARIANTS[$biome];
         $tileGrade = self::gradeOf($tile, $variants);
         $reach = min($toolGrade, $tileGrade);
 
-        return match ($activity) {
-            self::HUNTING => self::hunting($biome, $tileGrade, $reach),
-            self::MINING => self::mining($biome, $variants, $tileGrade, $reach),
-            default => self::gathering($biome),
-        };
+        return $activity === self::MINING
+            ? self::mining($biome, $variants, $tileGrade, $reach, $rich)
+            : self::gathering($biome);
     }
 
     /**
@@ -101,7 +97,7 @@ final class Drops
      * @param  array<string,mixed>  $tile
      * @return array<string,float>
      */
-    public static function tableFor(string $activity, array $tile, string $primary): array
+    public static function tableFor(string $activity, array $tile, string $primary, bool $rich = false): array
     {
         $biome = $tile['biome'];
         $variants = Variants::BIOME_VARIANTS[$biome];
@@ -111,18 +107,15 @@ final class Drops
             return self::gathering($biome);
         }
 
-        $ladder = $activity === self::HUNTING ? Variants::BIOME_VARIANTS['plains'] : $variants;
         $reach = 0;
-        foreach ($ladder as $index => $variant) {
+        foreach ($variants as $index => $variant) {
             if ($variant['material'] === $primary) {
                 $reach = $index;
                 break;
             }
         }
 
-        return $activity === self::HUNTING
-            ? self::hunting($biome, $tileGrade, $reach)
-            : self::mining($biome, $variants, $tileGrade, $reach);
+        return self::mining($biome, $variants, $tileGrade, $reach, $rich);
     }
 
     /**
@@ -131,10 +124,6 @@ final class Drops
      */
     public static function activityFor(string $kind, string $primary): string
     {
-        if ($kind === 'hunting') {
-            return self::HUNTING;
-        }
-
         return Catalog::isScrap($primary) ? self::GATHERING : self::MINING;
     }
 
@@ -193,13 +182,21 @@ final class Drops
      *
      * @return array<string,float>
      */
-    private static function mining(string $biome, array $variants, int $tileGrade, int $reach): array
-    {
+    private static function mining(
+        string $biome,
+        array $variants,
+        int $tileGrade,
+        int $reach,
+        bool $rich = false,
+    ): array {
         $table = [$variants[$reach]['material'] => 60.0];
 
-        // Every rung you are short of the ground halves the odds again.
+        // Every rung you are short of the ground halves the odds again -- and
+        // §5.7's rich ground widens the whole tail, because "rich" means better
+        // odds on what you are not equipped for as well as more of what you are.
+        $above = 8.0 * ($rich ? Balance::POCKET_REACH : 1.0);
         for ($grade = $reach + 1; $grade <= $tileGrade; $grade++) {
-            $table[$variants[$grade]['material']] = 8.0 / (2 ** ($grade - $reach - 1));
+            $table[$variants[$grade]['material']] = $above / (2 ** ($grade - $reach - 1));
         }
 
         // §5.3 -- and the same tail going DOWN, because a seam is not uniform.
@@ -224,59 +221,13 @@ final class Drops
             $table[$component] = 6.0;
         }
 
+        // §4 -- and what LIVES on that ground. It used to come off a herd and
+        // nothing else, so folding hunting back into mining (§5.5) left the
+        // five critters with no faucet at all -- and the consumable bench wants
+        // every one of them.
+        $table[Critters::BY_BIOME[$biome]] = 4.0;
+
         $table[self::junkOf($biome)] = 9.0;
-
-        return $table;
-    }
-
-    /**
-     * §5.5 -- a bow, and something to point it at.
-     *
-     * The pelt grade follows the ground the herd is standing on, capped by the
-     * bow, exactly as mining follows the seam. Herbs and the biome's own
-     * material still turn up, because an animal is found somewhere: hunt a
-     * forest and you come back with a little wood whether you meant to or not.
-     *
-     * NO TIER 4 HERE. Essence is raid loot and nothing else: a herd on a
-     * four-hour clock that anyone can shoot would be a faucet for the one
-     * material tier the dungeons are supposed to gate, and §9.4's ladder ends
-     * at a boss rather than at a deer.
-     *
-     * @return array<string,float>
-     */
-    private static function hunting(string $biome, int $tileGrade, int $reach): array
-    {
-        $plains = Variants::BIOME_VARIANTS['plains'];
-
-        $table = [
-            $plains[$reach]['material'] => 45.0,
-            // Horn and sinew are the plains components, and they are the two
-            // things in the catalog that plainly come off an animal.
-            'horn' => 13.0,
-            'sinew' => 13.0,
-            Critters::BY_BIOME[$biome] => 12.0,
-            'bone_splinter' => 8.0,
-        ];
-
-        for ($grade = $reach + 1; $grade <= $tileGrade; $grade++) {
-            $table[$plains[$grade]['material']] = 6.0 / (2 ** ($grade - $reach - 1));
-        }
-
-        // §5.3 -- and down, exactly as a seam does. A herd on beastfang ground
-        // is not made entirely of beastfang animals.
-        for ($grade = $reach - 1; $grade >= 0; $grade--) {
-            $table[$plains[$grade]['material']] = self::LOWER_GRADE_WEIGHT / (2 ** ($reach - $grade - 1));
-        }
-
-        foreach (self::herbsOf($biome) as $herb) {
-            $table[$herb] = 2.5;
-        }
-
-        // Whatever the ground itself is, in the small amounts a hunter notices
-        // -- and never at the cost of the primary. On the plains the ground IS
-        // the primary (§5.5), so a plain assignment here would quietly demote
-        // pelt from 45 to 5 and hand the table to horn.
-        $table[Variants::BIOME_VARIANTS[$biome][0]['material']] ??= 5.0;
 
         return $table;
     }
@@ -552,9 +503,9 @@ final class Drops
      *
      * @return list<string>
      */
-    public static function kinds(string $activity, array $tile, int $toolGrade): array
+    public static function kinds(string $activity, array $tile, int $toolGrade, bool $rich = false): array
     {
-        $table = self::table($activity, $tile, $toolGrade);
+        $table = self::table($activity, $tile, $toolGrade, $rich);
         arsort($table);
 
         return array_keys($table);

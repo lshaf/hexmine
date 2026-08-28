@@ -1084,15 +1084,17 @@ final class Formulas
     public static function mineTime(
         int $hp,
         int $skillLevel,
-        float $equipTripReduction,
         int $toolAttack = 0,
         int $skillBite = 0,
     ): array {
         $skillAttack = self::skillAttack($skillLevel);
         $bite = max(0, min($skillBite, Balance::SKILL_BITE_CAP));
-        $attack = max(0, $toolAttack) + $skillAttack + $bite;
 
-        $rate = $attack * (1 + max(0.0, $equipTripReduction));
+        // §7.3 -- the whole rate, and nothing multiplies it. A percentage here
+        // would be the tool's own ladder said a second time, in a unit that
+        // shares §8.1's ceiling with every coat in the game.
+        $rate = max(0, $toolAttack) + $skillAttack + $bite;
+        $attack = $rate;
 
         $raw = $attack > 0 ? (int) round($hp / $rate) : 0;
         $total = $attack > 0

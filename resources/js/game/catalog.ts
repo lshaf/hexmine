@@ -394,7 +394,6 @@ export const STAT_LABEL: Record<StatKey, string> = {
   // The stat is stored as a reduction and said with a minus, so the words are
   // the plain thing it moves: "-3% mine time" rather than "+3% off the clock".
   // Every screen goes through statLine(), which owns that sign.
-  tripReduction: 'mine time',
   travelSpeed: 'travel speed',
   processingSpeed: 'processing speed',
   power: 'power',
@@ -409,7 +408,6 @@ export const STAT_LABEL: Record<StatKey, string> = {
  */
 export const LINE_STAT_LABEL: Partial<Record<StatKey, string>> = {
   yield: 'yield',
-  tripReduction: 'time',
 }
 
 /**
@@ -456,17 +454,16 @@ export interface OptionRoll {
   kind: 'percent' | 'flat'
 }
 
-const OPTION_STATS_TOOL: OptionStat[] = ['yield', 'tripReduction']
+const OPTION_STATS_TOOL: OptionStat[] = ['yield']
 const OPTION_STATS_WEAPON: OptionStat[] = ['power', 'defense']
 const OPTION_STATS_WORN: OptionStat[] = [
   'yield',
-  'tripReduction',
   'travelSpeed',
   'processingSpeed',
   'power',
   'defense',
 ]
-const OPTION_SCOPED_STATS: OptionStat[] = ['yield', 'tripReduction']
+const OPTION_SCOPED_STATS: OptionStat[] = ['yield']
 const OPTION_FLAT_TOOL: OptionStat[] = ['attack']
 const OPTION_FLAT_WORN: OptionStat[] = ['attack', 'defense']
 
@@ -704,7 +701,7 @@ export const ITEMS: ItemDef[] = [
   },
   {
     key: 'travel_cloak', name: 'Travel Cloak', slot: 'armor', rarity: 'common', tradeable: false,
-    stat: 'tripReduction', value: 0.02, attack: 0, defense: 2, palette: 'fiber',
+    stat: 'yield', value: 0.02, attack: 0, defense: 2, palette: 'fiber',
     goldPrice: 26, maxDurability: 60, station: 'village',
     description: 'Keeps the weather off, and a little off the clock on every hex.',
   },
@@ -785,7 +782,7 @@ export const ITEMS: ItemDef[] = [
   {
     key: 'leather_armor', name: 'Leather Armor', slot: 'armor', rarity: 'uncommon',
     tradeable: false,
-    stat: 'tripReduction', value: 0.05, attack: 0, defense: 3, palette: 'pelt', station: 'city',
+    stat: 'yield', value: 0.05, attack: 0, defense: 3, palette: 'pelt', station: 'city',
     maxDurability: 130,
     inputs: { thick_pelt: 8, boiled_leather: 4, cloth: 2, sinew: 3 },
     description: 'Light enough to walk in all day.',
@@ -842,7 +839,7 @@ export const ITEMS: ItemDef[] = [
   },
   {
     key: 'banded_mail', name: 'Banded Mail', slot: 'armor', rarity: 'rare', tradeable: false,
-    stat: 'tripReduction', value: 0.08, attack: 1, defense: 5, palette: 'iron', station: 'capital',
+    stat: 'yield', value: 0.08, attack: 1, defense: 5, palette: 'iron', station: 'capital',
     maxDurability: 160,
     inputs: { dire_pelt: 8, lacquered_hide: 4, steel_ingots: 3, sinew: 4, reinforced_frame: 1 },
     description: 'Iron bands over tanned hide. Heavy, and worth every pound of it.',
@@ -901,7 +898,7 @@ export const ITEMS: ItemDef[] = [
 
   {
     key: 'ironwood_armor', name: 'Ironwood Armor', slot: 'armor', rarity: 'epic', tradeable: true,
-    stat: 'tripReduction', value: 0.11, attack: 1, defense: 7, palette: 'wood', station: 'capital',
+    stat: 'yield', value: 0.11, attack: 1, defense: 7, palette: 'wood', station: 'capital',
     maxDurability: 210,
     inputs: { ironwood: 3, heartoak: 8, bentwood: 4, pine_pitch: 4, reinforced_frame: 2, shard_verdant: 1 },
     description: 'Grown, not forged. Marketplace-tradeable.',

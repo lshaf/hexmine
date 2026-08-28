@@ -291,7 +291,6 @@ export type Rarity =
 /** What an item modifies. All are capped per slot, §8.1. */
 export type StatKey =
   | 'yield'
-  | 'tripReduction'
   | 'travelSpeed'
   | 'processingSpeed'
   /** §7.4 -- the two battle stats. Dormant until raid combat exists, and
@@ -508,21 +507,21 @@ export interface Recipe {
 
 // ---------------------------------------------------------------- jobs
 
-export type JobKind = 'mining' | 'hunting' | 'processing' | 'craft' | 'battle'
+export type JobKind = 'mining' | 'processing' | 'craft' | 'battle'
 export type JobStatus = 'active' | 'ready'
 
 /**
- * A mine out on a hex, §5. Mining and hunting are the same job to everything
- * that reads one -- both pin the character to a hex until it is claimed or
- * dropped -- and they differ only in what the haul is drawn from (§4).
+ * A mine out on a hex, §5. A dig and a bare-handed gather are the same job to
+ * everything that reads one -- both pin the character to a hex until it is
+ * claimed or dropped -- and they differ only in what the haul is drawn from
+ * (§4).
  */
 export interface FieldJob {
   id: string
-  kind: 'mining' | 'hunting'
+  kind: 'mining'
   status: JobStatus
   col: number
   row: number
-  /** §5.5 -- a herd is not one of the hex's two seats, so a hunt takes none. */
   slot: 0 | 1 | null
   material: MaterialKey
   quantity: number
@@ -739,10 +738,10 @@ export interface Tile {
   slotsUsed: number
   /**
    * §5.1 -- how many people are at work on this hex, whatever they are doing:
-   * mining, gathering, hunting or fighting.
+   * mining, gathering or fighting.
    *
    * Never fewer than `slotsUsed` and often more, because only mining takes one
-   * of the two seats. A hex with two hunters on it is busy and still open.
+   * of the two seats. A hex with a fight on it is busy and still open.
    */
   workers: number
   /** §5.1 -- hauls already taken off this hex, by anybody. Shared. */
@@ -752,21 +751,19 @@ export interface Tile {
   settlement?: Settlement
   /** Dungeon entrance, §9.1. Exactly five exist, in the capital ring. */
   dungeon?: { key: string; name: string }
-  /** §5.3 -- standing water. Never mined, never gathered, never grazed. */
+  /** §5.3 -- standing water. Never mined, and never gathered. */
   water?: WaterKind
-  /** Temporary herd marker, §5.5. */
-  herdUntil?: number
   /**
    * §5.7 -- a pocket: this ground is briefly worth more to work than usual.
    *
-   * Derived like the herd, so a pocket nobody has walked onto costs no storage.
-   * Unlike the herd it belongs to no line -- it pays into whatever the hex
-   * already trains, which is why it can appear on any workable ground.
+   * Derived like a pack, so a pocket nobody has walked onto costs no storage.
+   * It belongs to no line -- it pays into whatever the hex already trains,
+   * which is why it can appear on any workable ground.
    */
   pocketUntil?: number
   /**
    * §9.5.1 -- the pack standing here this bucket, if any. Derived like the
-   * herd, so an unmet pack costs no storage; whether somebody has already
+   * pocket, so an unmet pack costs no storage; whether somebody has already
    * fought it is the one thing the seed cannot say, and that arrives with the
    * live-state payload instead.
    */

@@ -147,7 +147,7 @@ final class WorldParityTest extends TestCase
     }
 
     /** §5.3 -- water is never workable, and never has anything to work. */
-    public function test_water_carries_no_material_and_no_herd(): void
+    public function test_water_carries_no_material(): void
     {
         $radius = Balance::mapRadius();
         $now = 0;
@@ -170,7 +170,6 @@ final class WorldParityTest extends TestCase
                 $seen++;
                 $this->assertNotNull($tile['water'], "water at {$col},{$row} vanished from the tile");
                 $this->assertNull($tile['material'], "water at {$col},{$row} carries a material");
-                $this->assertNull($tile['herdUntil'], "a herd is grazing the water at {$col},{$row}");
             }
         }
 

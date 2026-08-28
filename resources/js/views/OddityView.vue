@@ -267,11 +267,11 @@ const PRIZES = [
  * in kind rather than in quality. §8.0 rule 4 survives because no variant is
  * better than its siblings; it is a sidegrade with a different signature.
  *
- * The stat pool is the post-swap tool pool: cooldown, tripReduction, oddity.
+ * The stat pool is the post-swap tool pool: cooldown, yield, oddity.
  * Worn patterns also reach travelSpeed and processingSpeed.
  */
 const MATERIAL_PERKS = [
-  { mat: 'Pitch', line: 'Woodcutting', perk: '+2% tripReduction', why: 'A sealed haft does not slacken; the swing stays true for longer.' },
+  { mat: 'Pitch', line: 'Woodcutting', perk: '+2% yield', why: 'A sealed haft does not slacken; the swing takes the whole cut.' },
   { mat: 'Coke', line: 'Mining', perk: '+2% cooldown', why: 'Harder steel takes a faster turnaround without dulling.' },
   { mat: 'Cord', line: 'Hunting', perk: '+2% oddity', why: 'A bound grip reads the cut, and finds what is in it.' },
   { mat: 'Flux', line: 'Quarrying', perk: '+3% durability', why: 'Not a StatKey and deliberately so — the one perk that buys wear, not power.' },

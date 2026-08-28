@@ -31,7 +31,7 @@ const made = computed(() =>
 const def = computed(() =>
   props.job.kind === 'processing'
     ? MATERIALS[props.job.output]
-    : props.job.kind === 'mining' || props.job.kind === 'hunting'
+    : props.job.kind === 'mining'
       ? MATERIALS[props.job.material]
       : undefined,
 )

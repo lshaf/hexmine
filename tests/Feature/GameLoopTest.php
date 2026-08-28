@@ -400,34 +400,6 @@ final class GameLoopTest extends TestCase
         $this->character->jobLevels()->where('job_key', $job)->update(['level' => $level]);
     }
 
-    /** Put materials in the bag without mining for them. */
-    /**
-     * Find a hex with a live herd on it and stand the character there.
-     *
-     * Herds are time-bucketed and 6% likely on plains/grassland (§5.5), so this
-     * scans rather than assuming. Returns [col, row].
-     *
-     * @return array{0:int,1:int}
-     */
-    private function standOnAHerd(): array
-    {
-        $now = $this->game->now();
-
-        for ($col = -Balance::mapRadius(); $col <= Balance::mapRadius(); $col++) {
-            for ($row = -Balance::mapRadius(); $row <= Balance::mapRadius(); $row++) {
-                $tile = $this->game->buildTile($col, $row, $now);
-                if (($tile['herdUntil'] ?? null) !== null && $tile['herdUntil'] > $now) {
-                    $this->character->update(['col' => $col, 'row' => $row]);
-                    $this->character->refresh();
-
-                    return [$col, $row];
-                }
-            }
-        }
-
-        $this->fail('no herd anywhere on the map');
-    }
-
     /** Stand on a forest hex that actually has a seam to work. */
     private function standOnMineableGround(): array
     {
@@ -490,7 +462,7 @@ final class GameLoopTest extends TestCase
         $this->assertSame(1, Player::where('wallet', $wallet)->count());
     }
 
-    /** §8.5 -- every potion names the action it buffs. Seventy, fourteen a rung. */
+    /** §8.5 -- every potion names the action it buffs. Forty-five, nine a rung. */
     public function test_every_consumable_is_locked_to_one_action(): void
     {
         $byRank = [];
@@ -518,7 +490,7 @@ final class GameLoopTest extends TestCase
 
         foreach (['common', 'uncommon', 'rare', 'epic', 'legendary'] as $rarity) {
             $this->assertGreaterThanOrEqual(
-                10,
+                9,
                 count($byRank[$rarity] ?? []),
                 "{$rarity} has fewer than ten potions",
             );
@@ -584,7 +556,7 @@ final class GameLoopTest extends TestCase
             $checked++;
         }
 
-        $this->assertGreaterThanOrEqual(60, $checked, 'the potion shelf is missing');
+        $this->assertGreaterThanOrEqual(45, $checked, 'the potion shelf is missing');
     }
 
     /** §4.0 -- junk sells for a copper, feeds nothing, and reaches no tier. */
@@ -714,7 +686,7 @@ final class GameLoopTest extends TestCase
         $tile = $this->tileOfGrade('forest', 1);
 
         foreach ([1, 3, 7, 12, 40] as $units) {
-            foreach ([Drops::GATHERING, Drops::MINING, Drops::HUNTING] as $activity) {
+            foreach ([Drops::GATHERING, Drops::MINING] as $activity) {
                 $table = Drops::table($activity, $tile, 1);
 
                 for ($seed = 0; $seed < 12; $seed++) {
@@ -857,9 +829,10 @@ final class GameLoopTest extends TestCase
     /**
      * §4 -- the bench stocks finally have a faucet, and it is the right one.
      *
-     * Herbs and craft components were in the catalog and in recipes with
-     * nothing on the map dropping them. Mining a biome now yields its two herbs
-     * and its two components; hunting yields its critter. Nothing else does.
+     * Herbs, craft components and critters were in the catalog and in recipes
+     * with nothing on the map dropping them. Mining a biome yields all five;
+     * bare hands reach the herbs and nothing else, which is the difference
+     * between the two halves of the alchemist's shelf.
      */
     public function test_every_bench_stock_drops_off_its_own_activity(): void
     {
@@ -867,7 +840,6 @@ final class GameLoopTest extends TestCase
             $tile = $this->tileOfGrade($biome, 0);
 
             $mined = Drops::table(Drops::MINING, $tile, 0);
-            $hunted = Drops::table(Drops::HUNTING, $tile, 0);
             $gathered = Drops::table(Drops::GATHERING, $tile, 0);
 
             foreach (Components::CRAFT as $key => $def) {
@@ -883,12 +855,12 @@ final class GameLoopTest extends TestCase
                 }
             }
 
-            // A critter is hunted and never gathered: that is the difference
-            // between the two halves of the alchemist's shelf.
+            // §5.5 -- a critter takes the line's tool and is never picked up
+            // by hand. It used to come off a herd and nothing else, so folding
+            // hunting back into mining left it with no faucet at all.
             $critter = Critters::BY_BIOME[$biome];
-            $this->assertArrayHasKey($critter, $hunted, "{$critter} has no faucet");
+            $this->assertArrayHasKey($critter, $mined, "{$critter} has no faucet");
             $this->assertArrayNotHasKey($critter, $gathered, "{$critter} can be picked up by hand");
-            $this->assertArrayNotHasKey($critter, $mined, "{$critter} is dug out of the ground");
         }
     }
 
@@ -1467,93 +1439,10 @@ final class GameLoopTest extends TestCase
     }
 
     /**
-     * §5.5 / §7.3 -- a herd is a pile of work, and the bow is what gets through
-     * it.
-     *
-     * It was a flat twenty-five minutes for as long as §7.3's clamp would have
-     * rounded any difference away. The floor is a guard now, so the hunting
-     * line has the same ladder every other line has: the crude bow is the
-     * reference mine and everything above it is felt on the clock.
-     */
-    public function test_a_better_bow_works_a_herd_faster(): void
-    {
-        [$col, $row] = $this->standOnAHerd();
-
-        CharacterItem::create([
-            'character_id' => $this->character->id,
-            'item_key' => 'crude_bow',
-            'durability' => 200,
-            'equipped' => true,
-            'options' => [],
-        ]);
-
-        $crude = $this->game->previewHunt($this->character->fresh(), $col, $row);
-        $this->assertTrue($crude['canHunt'], $crude['reason'] ?? '');
-
-        // A crude bow on a herd is twenty-five minutes, which is what a hunt
-        // has always cost -- the same yardstick a hex's HP was set by.
-        $this->assertSame(25 * 60, $crude['seconds']);
-        $this->assertSame(Balance::HERD_HP, $crude['hp']);
-        $this->assertTrue($crude['able']);
-
-        CharacterItem::where('character_id', $this->character->id)->delete();
-        CharacterItem::create([
-            'character_id' => $this->character->id,
-            'item_key' => 'recurve_bow',
-            'durability' => 200,
-            'equipped' => true,
-            'options' => [],
-        ]);
-
-        $recurve = $this->game->previewHunt($this->character->fresh(), $col, $row);
-        $this->assertGreaterThan($crude['toolAttack'], $recurve['toolAttack']);
-        $this->assertLessThan($crude['seconds'], $recurve['seconds']);
-        $this->assertFalse($recurve['clamped']);
-    }
-
-    /**
-     * §5.5 -- a herd pays pelt for a bow, and no Tier 4 for anybody.
-     *
-     * Essence used to be a line in this table. It is raid loot: a herd on a
-     * four-hour clock that anyone with a crude bow can shoot would be a faucet
-     * for the one tier the dungeons exist to gate, and §9.4's ladder is
-     * supposed to end at a boss rather than at a deer.
-     */
-    public function test_a_herd_pays_pelt_and_never_pays_tier_four(): void
-    {
-        [$col, $row] = $this->standOnAHerd();
-        $this->equipBow();
-
-        $preview = $this->game->previewHunt($this->character->fresh(), $col, $row);
-        $this->assertTrue($preview['canHunt'], $preview['reason'] ?? '');
-        $this->assertSame('pelt', $preview['material']);
-        $this->assertFalse($preview['scrap']);
-
-        // §4 -- the card names what this ground can give up, pelt leading it.
-        $this->assertSame('pelt', $preview['drops'][0]);
-
-        $pelt = 0;
-        for ($i = 0; $i < 40; $i++) {
-            $job = $this->game->startHunt($this->character->fresh(), $col, $row);
-            $job->update(['ends_at' => $this->game->now() - 1]);
-
-            $result = $this->game->collectJob($this->character->fresh(), $job->id);
-            $pelt += $result['gained']['pelt'] ?? 0;
-
-            // §4 -- the haul splits, but never past the strap budget.
-            $this->assertLessThanOrEqual(Drops::MAX_KINDS, count($result['gained']));
-        }
-
-        // Pelt is the heaviest line in the table, so over forty hunts it
-        // dominates.
-        $this->assertGreaterThan(0, $pelt, 'forty hunts produced no pelt at all');
-    }
-
-    /**
      * Tier 4 is raid loot, and there is no back door onto the map.
      *
-     * Not one of the three activities may pay it, on any ground, at any grade:
-     * a bow and a wandering marker must never stand in for a dungeon floor.
+     * Neither activity may pay it, on any ground, at any grade: no tool and no
+     * patch of ground may ever stand in for a dungeon floor.
      */
     public function test_no_activity_on_the_map_pays_a_raid_material(): void
     {
@@ -1569,11 +1458,7 @@ final class GameLoopTest extends TestCase
             foreach ([0, 1, 2, 3] as $grade) {
                 $tile = $this->tileOfGrade($biome, $grade);
 
-                foreach ([
-                    Drops::MINING,
-                    Drops::GATHERING,
-                    Drops::HUNTING,
-                ] as $activity) {
+                foreach ([Drops::MINING, Drops::GATHERING] as $activity) {
                     $table = Drops::table($activity, $tile, $grade);
 
                     foreach ($raid as $key) {
@@ -1585,140 +1470,6 @@ final class GameLoopTest extends TestCase
                     }
                 }
             }
-        }
-    }
-
-    /**
-     * A hunt is a mine, and the client has to be able to see one.
-     *
-     * The payload used to branch on 'mining' alone, so a hunting job came back
-     * shaped like a processing job -- no hex, no material, and matching neither
-     * of the client's two job selectors. The result was a character pinned to a
-     * finished hunt with no Claim anywhere on screen and every other action
-     * refused for a job that was, as far as the UI knew, not running.
-     */
-    public function test_a_hunting_job_is_reported_as_a_trip_on_a_hex(): void
-    {
-        [$col, $row] = $this->standOnAHerd();
-        $this->equipBow();
-
-        $job = $this->game->startHunt($this->character->fresh(), $col, $row);
-        $payload = $this->game->jobPayload($job->fresh());
-
-        $this->assertSame('hunting', $payload['kind']);
-        $this->assertSame($col, $payload['col']);
-        $this->assertSame($row, $payload['row']);
-        $this->assertSame('pelt', $payload['material']);
-        $this->assertArrayNotHasKey('recipeKey', $payload);
-
-        // §5.5 -- a herd is not one of the hex's two seats.
-        $this->assertNull($payload['slot']);
-    }
-
-    /**
-     * §5.5 / §8.0 -- a hunt is the one thing bare hands cannot do at all.
-     *
-     * Every other line has a bare-handed floor, because §4.0 says a hex is
-     * never blocked for want of a tool: you work it and you get scrap. A herd
-     * is not a hex. You do not take an animal down by hand, so the bow is the
-     * single tool in the game with a refusal behind it -- and that refusal is
-     * what keeps the one Tier 4 faucet outside a dungeon shut to the toolless.
-     */
-    public function test_a_hunt_is_refused_without_a_bow(): void
-    {
-        [$col, $row] = $this->standOnAHerd();
-
-        $preview = $this->game->previewHunt($this->character->fresh(), $col, $row);
-        $this->assertFalse($preview['canHunt']);
-        $this->assertStringContainsString('bow', strtolower((string) $preview['reason']));
-
-        try {
-            $this->game->startHunt($this->character->fresh(), $col, $row);
-            $this->fail('a bare-handed hunt was allowed');
-        } catch (GameException $e) {
-            $this->assertStringContainsString('bow', strtolower($e->getMessage()));
-        }
-
-        // And the hex itself is still workable by hand, §4.0 -- it is the hunt
-        // that is refused, never the ground.
-        $tile = $this->game->previewGather($this->character->fresh(), $col, $row);
-        $this->assertTrue($tile['canMine']);
-        $this->assertTrue($tile['scrap']);
-        $this->assertSame('gathering', $tile['activity']);
-    }
-
-    /** §5.5 -- a herd is not a seam: no slot taken, nothing depleted. */
-    public function test_hunting_takes_no_slot_and_depletes_nothing(): void
-    {
-        [$col, $row] = $this->standOnAHerd();
-        $this->equipBow();
-
-        $job = $this->game->startHunt($this->character->fresh(), $col, $row);
-
-        $this->assertNull($job->slot);
-        $this->assertSame(0, $this->game->buildTile($col, $row, $this->game->now())['slotsUsed'] ?? 0);
-
-        // Both mining seats are still free to other players while the hunt runs.
-        $others = [];
-        foreach (['0xa', '0xb'] as $wallet) {
-            $other = $this->game->createCharacter(Player::create(['wallet' => $wallet, 'session_id' => $wallet]));
-            $other->update(['col' => $col, 'row' => $row]);
-            $others[] = $this->game->startMining($other->fresh(), $col, $row, Drops::GATHERING);
-        }
-        $this->assertCount(2, $others);
-
-        // And collecting the hunt takes nothing off the seam: a herd is not a
-        // hex, and it leaves on its own clock (§5.5).
-        $job->update(['ends_at' => $this->game->now() - 1]);
-        $this->game->collectJob($this->character->fresh(), $job->id);
-        $this->assertSame(0, Tiles::state($col, $row)['taken']);
-    }
-
-    /** A person is in one place: a hunt blocks a dig, and a dig blocks a hunt. */
-    public function test_a_hunt_and_a_dig_exclude_each_other(): void
-    {
-        [$col, $row] = $this->standOnAHerd();
-        $this->equipBow();
-
-        $this->game->startHunt($this->character->fresh(), $col, $row);
-        $this->assertFalse($this->game->previewGather($this->character->fresh(), $col, $row)['canMine']);
-
-        try {
-            $this->game->startMining($this->character->fresh(), $col, $row, Drops::GATHERING);
-            $this->fail('dug a hex while already hunting it');
-        } catch (GameException $e) {
-            $this->assertSame('blocked', $e->errorCode);
-        }
-    }
-
-    /** §5.5 -- herds wander. A hex without one cannot be hunted. */
-    public function test_a_hex_with_no_herd_cannot_be_hunted(): void
-    {
-        // Which hexes carry a herd depends on the clock (§5.5 buckets on now),
-        // so stand on one that has none rather than assuming spawn is empty.
-        $now = $this->game->now();
-        $bare = null;
-        for ($d = 1; $d < 40 && $bare === null; $d++) {
-            $col = (int) $this->character->col + $d;
-            $row = (int) $this->character->row;
-            if (($this->game->buildTile($col, $row, $now)['herdUntil'] ?? null) === null) {
-                $bare = [$col, $row];
-            }
-        }
-        $this->assertNotNull($bare, 'no herd-free hex within forty columns');
-
-        [$col, $row] = $bare;
-        $this->character->update(['col' => $col, 'row' => $row]);
-
-        $preview = $this->game->previewHunt($this->character->fresh(), $col, $row);
-        $this->assertFalse($preview['canHunt']);
-        $this->assertStringContainsString('No herd', $preview['reason']);
-
-        try {
-            $this->game->startHunt($this->character->fresh(), $col, $row);
-            $this->fail('hunted a hex with no herd on it');
-        } catch (GameException $e) {
-            $this->assertSame('blocked', $e->errorCode);
         }
     }
 
@@ -1795,21 +1546,6 @@ final class GameLoopTest extends TestCase
     }
 
     /**
-     * §5.7 -- a pocket is the GROUND, and a herd is not standing in it.
-     *
-     * The herd walked here and pays out of its own table (§5.5); the ground
-     * being good today has nothing to do with the animal on top of it.
-     */
-    public function test_rich_ground_does_not_reach_a_herd(): void
-    {
-        [$col, $row] = $this->standOnAHerd();
-
-        $hunt = $this->game->previewHunt($this->character->fresh(), $col, $row);
-
-        $this->assertArrayNotHasKey('pocketUntil', $hunt, 'a hunt was costed against the ground');
-    }
-
-    /**
      * §5.7 -- nothing to work, no pocket. Water, dead ground and a settlement
      * all fall out of that one test rather than needing three of their own.
      */
@@ -1834,25 +1570,6 @@ final class GameLoopTest extends TestCase
         }
 
         $this->assertGreaterThan(100, $checked, 'swept no unworkable ground at all');
-    }
-
-    /** §5.6 -- a herd is live state, so it is bounded by the sight disc. */
-    public function test_a_herd_outside_sight_will_not_be_costed(): void
-    {
-        [$col, $row] = $this->standOnAHerd();
-
-        // Half a map away in both axes, so this is well outside any sight the
-        // Explorer tree can reach. Mirroring through the origin is the simplest
-        // way to be far from a herd wherever the scan above happened to find it.
-        $this->character->update([
-            'col' => -$col === $col ? Balance::mapRadius() : -$col,
-            'row' => -$row === $row ? Balance::mapRadius() : -$row,
-        ]);
-
-        $preview = $this->game->previewHunt($this->character->fresh(), $col, $row);
-        $this->assertTrue($preview['unseen']);
-        $this->assertNull($preview['herdUntil']);
-        $this->assertFalse($preview['canHunt']);
     }
 
     private function give(array $materials): void
@@ -2310,40 +2027,6 @@ final class GameLoopTest extends TestCase
     }
 
     /**
-     * §8.2 -- a bow at zero durability is not a bow.
-     *
-     * Hunting is the one verb with no bare-handed floor beneath it (§5.5), so
-     * this is the only place in the game where broken gear closes an action
-     * outright rather than dropping it to the un-geared rate.
-     */
-    public function test_a_broken_bow_cannot_hunt(): void
-    {
-        [$col, $row] = $this->standOnAHerd();
-
-        CharacterItem::create([
-            'character_id' => $this->character->id,
-            'item_key' => 'crude_bow',
-            'durability' => 0,
-            'equipped' => true,
-            'options' => [],
-        ]);
-
-        $preview = $this->game->previewHunt($this->character->fresh(), $col, $row);
-        $this->assertFalse($preview['canHunt']);
-
-        try {
-            $this->game->startHunt($this->character->fresh(), $col, $row);
-            $this->fail('hunted with a snapped bow');
-        } catch (GameException $e) {
-            $this->assertStringContainsString('bow', strtolower($e->getMessage()));
-        }
-
-        // The herd is still standing there: it is the bow that failed, not the
-        // marker, so repairing it is enough.
-        $this->assertNotNull($preview['herdUntil']);
-    }
-
-    /**
      * The dock costs all three verbs in one snapshot.
      *
      * Every cell on it has to be able to say what it would give before it is
@@ -2356,7 +2039,6 @@ final class GameLoopTest extends TestCase
 
         $this->assertSame('mining', $underfoot['activity']);
         $this->assertSame('gathering', $underfoot['gather']['activity']);
-        $this->assertArrayHasKey('canHunt', $underfoot['hunt']);
 
         // Bare belt: the tool's verb is shut and the other one is open.
         $this->assertFalse($underfoot['canMine']);
@@ -2455,16 +2137,13 @@ final class GameLoopTest extends TestCase
         // hex: nowhere near the guard, so the ladder has somewhere left to go.
         $best = Formulas::toolAttack(Catalog::item('mythril_pickaxe'));
         $mine = Formulas::mineTime(
-            Balance::TILE_HP_MAX,
-            Balance::SKILL_MAX_LEVEL,
-            Balance::STAT_CEILING,
-            $best,
+            Balance::TILE_HP_MAX, Balance::SKILL_MAX_LEVEL, $best,
         );
         $this->assertGreaterThan(Balance::MINING_FLOOR_SECONDS, $mine['total']);
         $this->assertFalse($mine['clamped'], 'the top of the tool ladder is wasted');
 
         // Even absurd inputs cannot breach it.
-        $absurd = Formulas::mineTime(Balance::TILE_HP_MAX, 9999, 99.0, 9999);
+        $absurd = Formulas::mineTime(Balance::TILE_HP_MAX, 9999, 9999);
         $this->assertSame(Balance::MINING_FLOOR_SECONDS, $absurd['total']);
         $this->assertTrue($absurd['clamped']);
     }
@@ -2519,8 +2198,8 @@ final class GameLoopTest extends TestCase
         $hex = Balance::TILE_HP_MIN;
         $level = 20;
 
-        $plain = Formulas::mineTime($hex, $level, 0.0, Balance::MINING_COMMON_ATTACK);
-        $tree = Formulas::mineTime($hex, $level, 0.0, Balance::MINING_COMMON_ATTACK, Balance::SKILL_BITE_CAP);
+        $plain = Formulas::mineTime($hex, $level, Balance::MINING_COMMON_ATTACK);
+        $tree = Formulas::mineTime($hex, $level, Balance::MINING_COMMON_ATTACK, Balance::SKILL_BITE_CAP);
 
         $this->assertSame(
             $plain['rate'] + Balance::SKILL_BITE_CAP,
@@ -2532,13 +2211,14 @@ final class GameLoopTest extends TestCase
         // The cap is enforced where the rate is built, not only where the
         // nodes are added up. A rate is a bad place to find out a cap was
         // missed somewhere upstream.
-        $overrun = Formulas::mineTime($hex, $level, 0.0, Balance::MINING_COMMON_ATTACK, 99);
+        $overrun = Formulas::mineTime($hex, $level, Balance::MINING_COMMON_ATTACK, 99);
         $this->assertSame($tree['rate'], $overrun['rate'], 'the mine rate does not enforce SKILL_BITE_CAP');
 
-        // A count, so a maxed coat cannot clamp it away -- which is the whole
-        // reason it stopped being tripReduction.
-        $capped = Formulas::mineTime($hex, $level, Balance::STAT_CEILING, Balance::MINING_COMMON_ATTACK);
-        $both = Formulas::mineTime($hex, $level, Balance::STAT_CEILING, Balance::MINING_COMMON_ATTACK, Balance::SKILL_BITE_CAP);
+        // A count, so a maxed coat could never clamp it away -- which is why
+        // the tree stopped selling a percentage, and eventually why nothing in
+        // the game sells one on a mine's clock at all.
+        $capped = Formulas::mineTime($hex, $level, Balance::MINING_COMMON_ATTACK);
+        $both = Formulas::mineTime($hex, $level, Balance::MINING_COMMON_ATTACK, Balance::SKILL_BITE_CAP);
         $this->assertGreaterThan($capped['rate'], $both['rate']);
     }
 
@@ -2572,7 +2252,7 @@ final class GameLoopTest extends TestCase
         // At every level of the line, because the skill term is shared: a level
         // that helped the hands and not the tool would break the tie sideways.
         foreach ([1, 10, 25, Balance::SKILL_MAX_LEVEL] as $level) {
-            $hands = Formulas::mineTime($hex, $level, 0.0, Balance::BARE_HAND_ATTACK)['total'];
+            $hands = Formulas::mineTime($hex, $level, Balance::BARE_HAND_ATTACK)['total'];
 
             // The five rungs a village sells, one per line. Same bite as hands.
             foreach (['stone_axe', 'chipped_pick', 'crude_bow'] as $key) {
@@ -2580,7 +2260,7 @@ final class GameLoopTest extends TestCase
 
                 $this->assertSame(
                     $hands,
-                    Formulas::mineTime($hex, $level, 0.0, $attack)['total'],
+                    Formulas::mineTime($hex, $level, $attack)['total'],
                     "{$key} no longer ties bare hands at line level {$level}",
                 );
             }
@@ -2592,7 +2272,7 @@ final class GameLoopTest extends TestCase
 
                 $this->assertLessThan(
                     $hands,
-                    Formulas::mineTime($hex, $level, 0.0, $attack)['total'],
+                    Formulas::mineTime($hex, $level, $attack)['total'],
                     "{$key} is no faster than bare hands at line level {$level}",
                 );
             }
@@ -2613,29 +2293,14 @@ final class GameLoopTest extends TestCase
         $fresh = 1;
 
         $easy = Formulas::mineTime(
-            Balance::TILE_HP_MIN,
-            $fresh,
-            0.0,
-            Balance::MINING_COMMON_ATTACK,
+            Balance::TILE_HP_MIN, $fresh, Balance::MINING_COMMON_ATTACK,
         );
         $hard = Formulas::mineTime(
-            Balance::TILE_HP_MAX,
-            $fresh,
-            0.0,
-            Balance::MINING_COMMON_ATTACK,
+            Balance::TILE_HP_MAX, $fresh, Balance::MINING_COMMON_ATTACK,
         );
 
         $this->assertSame(15 * 60, $easy['total']);
         $this->assertSame(30 * 60, $hard['total']);
-
-        // A herd is read off the same yardstick, at twenty-five.
-        $herd = Formulas::mineTime(
-            Balance::HERD_HP,
-            $fresh,
-            0.0,
-            Balance::MINING_COMMON_ATTACK,
-        );
-        $this->assertSame(25 * 60, $herd['total']);
     }
 
     /**
@@ -2658,7 +2323,6 @@ final class GameLoopTest extends TestCase
             $base = Formulas::mineTime(
                 WorldGen::tileHp($hash, 'common'),
                 $fresh,
-                0.0,
                 Balance::MINING_COMMON_ATTACK,
             )['total'];
 
@@ -2669,7 +2333,6 @@ final class GameLoopTest extends TestCase
                 $own = Formulas::mineTime(
                     WorldGen::tileHp($hash, $grade),
                     $fresh,
-                    0.0,
                     $attack,
                 )['total'];
 
@@ -2773,7 +2436,7 @@ final class GameLoopTest extends TestCase
         $this->assertSame(0, Formulas::skillAttack(9));
         $this->assertSame(1, Formulas::skillAttack(10));
 
-        $mine = Formulas::mineTime(Balance::TILE_HP_MIN, 1, 0.0, 3);
+        $mine = Formulas::mineTime(Balance::TILE_HP_MIN, 1, 3);
         $this->assertSame(0, $mine['skillAttack']);
         $this->assertSame(3.0, $mine['rate']);
     }
@@ -2787,7 +2450,7 @@ final class GameLoopTest extends TestCase
      */
     public function test_no_attack_at_all_is_a_refusal_rather_than_a_long_trip(): void
     {
-        $none = Formulas::mineTime(Balance::TILE_HP_MIN, 1, 0.0, 0);
+        $none = Formulas::mineTime(Balance::TILE_HP_MIN, 1, 0);
 
         $this->assertFalse($none['able']);
         $this->assertSame(0, $none['total']);
@@ -2795,7 +2458,7 @@ final class GameLoopTest extends TestCase
         $this->assertFalse($none['clamped']);
 
         // One point of anything is enough to make it a mine again.
-        $some = Formulas::mineTime(Balance::TILE_HP_MIN, 1, 0.0, 1);
+        $some = Formulas::mineTime(Balance::TILE_HP_MIN, 1, 1);
         $this->assertTrue($some['able']);
         $this->assertGreaterThan(0, $some['total']);
 
@@ -2803,7 +2466,7 @@ final class GameLoopTest extends TestCase
         // which is why the arithmetic alone is not the whole answer. §8.0 rule
         // 1 refuses the VERB without its tool, so previewTile overrides this
         // for a bare-handed dig no matter how well the line is known.
-        $learned = Formulas::mineTime(Balance::TILE_HP_MIN, 10, 0.0, 0);
+        $learned = Formulas::mineTime(Balance::TILE_HP_MIN, 10, 0);
         $this->assertTrue($learned['able']);
     }
 
@@ -2860,7 +2523,7 @@ final class GameLoopTest extends TestCase
             $attack = Formulas::toolAttack($def);
             $this->assertGreaterThan(0, $attack, "{$key} has no bite");
 
-            $mine = Formulas::mineTime($hex, 1, 0.0, $attack);
+            $mine = Formulas::mineTime($hex, 1, $attack);
             $this->assertLessThan($last, $mine['total'], "{$key} was no faster than the rung below");
             $this->assertFalse($mine['clamped'], "{$key} is wasted on this hex");
             $last = $mine['total'];
@@ -2878,11 +2541,11 @@ final class GameLoopTest extends TestCase
     {
         $one = Formulas::aggregateStat(
             [['key' => 'leather_armor', 'durability' => 10, 'equipped' => true]],
-            'tripReduction',
+            'yield',
         );
         $three = Formulas::aggregateStat(
             array_fill(0, 3, ['key' => 'leather_armor', 'durability' => 10, 'equipped' => true]),
-            'tripReduction',
+            'yield',
         );
 
         $this->assertGreaterThan(0.0, $one);
@@ -2926,12 +2589,12 @@ final class GameLoopTest extends TestCase
         $worn = [['key' => 'leather_armor', 'durability' => 10, 'equipped' => true]];
         $this->assertGreaterThan(
             0,
-            Formulas::aggregateStat($worn, 'tripReduction', 'harvesting'),
+            Formulas::aggregateStat($worn, 'yield', 'harvesting'),
             'armor stopped working outside a line',
         );
         $this->assertGreaterThan(
             0,
-            Formulas::aggregateStat($worn, 'tripReduction'),
+            Formulas::aggregateStat($worn, 'yield'),
             'armor stopped working with no line in mind',
         );
     }
@@ -3065,12 +2728,16 @@ final class GameLoopTest extends TestCase
      *
      * Armor works all five lines at once, which is exactly why a line it names
      * is narrower than a flat one. "No line is being worked" is one of the
-     * elsewheres it pays nothing on, so a mining roll never shortens a journey.
+     * elsewheres it pays nothing on, so a mining roll never follows you onto
+     * the road.
+     *
+     * Read off a piece whose own stat is something else, so the only thing in
+     * the aggregate is the rolled line being tested.
      */
     public function test_a_scoped_option_pays_on_its_line_and_nowhere_else(): void
     {
         $kit = [[
-            'key' => 'leather_armor',
+            'key' => 'reinforced_boots',
             'durability' => 10,
             'equipped' => true,
             'options' => [['stat' => 'yield', 'value' => 0.04, 'scope' => 'mining']],
@@ -3151,13 +2818,13 @@ final class GameLoopTest extends TestCase
             'key' => 'iron_pickaxe',
             'durability' => 10,
             'equipped' => true,
-            'options' => [['stat' => 'tripReduction', 'value' => 0.02]],
+            'options' => [['stat' => 'yield', 'value' => 0.02]],
         ]];
 
         // The pickaxe is a yield tool, yet it now shaves mine time on its line.
-        $this->assertSame(0.02, Formulas::aggregateStat($kit, 'tripReduction', 'mining'));
+        $this->assertSame(0.02, Formulas::aggregateStat($kit, 'yield', 'mining'));
         // ...and nowhere else, because options inherit the line-lock.
-        $this->assertSame(0.0, Formulas::aggregateStat($kit, 'tripReduction', 'woodcutting'));
+        $this->assertSame(0.0, Formulas::aggregateStat($kit, 'yield', 'woodcutting'));
     }
 
     /**
@@ -3308,8 +2975,8 @@ final class GameLoopTest extends TestCase
 
         // A faster hex, and the same fight.
         $this->assertLessThan(
-            Formulas::mineTime(3600, 0, 0.0, $bare)['total'],
-            Formulas::mineTime(3600, 0, 0.0, $bare + 5)['total'],
+            Formulas::mineTime(3600, 0, $bare)['total'],
+            Formulas::mineTime(3600, 0, $bare + 5)['total'],
         );
 
         $pair = Formulas::combatPair(
@@ -3587,7 +3254,7 @@ final class GameLoopTest extends TestCase
      */
     public function test_a_rolled_line_belongs_to_the_piece_it_is_on(): void
     {
-        $work = ['yield', 'tripReduction', 'travelSpeed', 'processingSpeed'];
+        $work = ['yield', 'travelSpeed', 'processingSpeed'];
         $checked = ['tool' => 0, 'weapon' => 0, 'worn' => 0];
 
         foreach (Catalog::items() as $key => $def) {
@@ -3603,8 +3270,8 @@ final class GameLoopTest extends TestCase
                 $checked['tool']++;
                 // A tool is line-locked by its slot, so the road and the bench
                 // are not its business and neither is a scope.
-                $this->assertSame(['yield', 'tripReduction', 'attack'], $stats, "{$key}");
-                $this->assertSame([null, null, null], array_column($pool, 'scope'), "{$key}");
+                $this->assertSame(['yield', 'attack'], $stats, "{$key}");
+                $this->assertSame([null, null], array_column($pool, 'scope'), "{$key}");
 
                 continue;
             }
@@ -4198,45 +3865,6 @@ final class GameLoopTest extends TestCase
 
         // Small enough that the whole window is a rounding error on the wire.
         $this->assertLessThan(200, strlen(json_encode($busy)));
-    }
-
-    /**
-     * §5.1 / §5.5 -- busy and shut are two different facts about a hex.
-     *
-     * The map fills a notch for anybody at work on the ground, whatever the
-     * verb, because a hex somebody is standing on is not an empty one. Only
-     * mining takes one of the two seats, so only mining can shut the hex --
-     * and the two counts have to be able to disagree, or one of them is wrong.
-     *
-     * A hunt is the case that proves it: two hunters on a hex make it plainly
-     * busy and leave both seats free.
-     */
-    public function test_a_hunt_is_a_body_at_work_and_never_one_of_the_two_seats(): void
-    {
-        [$col, $row] = $this->standOnAHerd();
-
-        $this->equipBow();
-
-        $hunter = $this->game->createCharacter(Player::create(['wallet' => '0xhunter']));
-        $hunter->update(['col' => $col, 'row' => $row]);
-        CharacterItem::create([
-            'character_id' => $hunter->id,
-            'item_key' => 'crude_bow',
-            'durability' => 200,
-            'equipped' => true,
-            'options' => [],
-        ]);
-
-        $this->game->startHunt($hunter->fresh(), $col, $row);
-        $this->game->startHunt($this->character->fresh(), $col, $row);
-
-        $seen = $this->game->mapMutations($this->character->fresh())['occupied'];
-
-        // Two bodies, no seats: busy, and open to anybody who came to dig.
-        $this->assertSame([[$col, $row, 2, 0]], $seen);
-
-        // And the ground agrees -- a hex two hunts deep still takes a miner.
-        $this->assertSame(0, $this->game->buildTile($col, $row, $this->game->now())['slotsUsed']);
     }
 
     /**

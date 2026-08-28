@@ -20,6 +20,7 @@ import { formatDuration, formatSpan } from '@/game/formulas'
 import { MINING } from '@/game/balance'
 import { groundLabel } from '@/game/ground'
 import { hexDistance } from '@/map/hexGeometry'
+import { worldParams } from '@/game/worldgen'
 import { materialIcon } from '@/icons/procedural'
 import { deadGlyph, dungeonProp, pocketSpecimen, unscoutedGlyph, waterGlyph } from '@/map/props'
 import HexAction from '@/shell/HexAction.vue'
@@ -62,7 +63,7 @@ const pocketUntil = computed(() => preview.value?.pocketUntil ?? null)
  * a silhouette against nothing has no edge to read against.
  */
 const pocketMark = computed(() =>
-  tile.value && pocketUntil.value ? pocketSpecimen(tile.value.biome, 52) : '',
+  tile.value && pocketUntil.value ? pocketSpecimen(tile.value.biome, 30) : '',
 )
 
 
@@ -159,30 +160,23 @@ const shown = (keys: readonly MaterialKey[] | undefined) =>
   (keys ?? []).slice(0, DROPS_SHOWN).map((k) => MATERIALS[k])
 
 /**
- * One list per verb, because this hex may answer to two of them.
+ * One list per verb, because this hex answers to two of them.
  *
- * §5.5 -- a herd is not a mode of mining, it is a different thing to do on the
- * same ground, and it pays out of a different table: pelt, horn, sinew and the
- * biome's critter. Reading a hex therefore means reading every offer on it, and
- * folding them into one list would say the seam drops pelt.
- *
- * The hunting list is here only when there is a herd to point a bow at, and the
- * server empties it when there is no bow -- so its presence IS the answer to
- * "can I hunt here", and nothing has to say so twice.
+ * §4.0 -- a dig and a bare-handed gather work the same ground at different
+ * rates and off different tables, so reading a hex means reading both. Folding
+ * them into one list would say the seam drops scrap.
  */
 const drops = computed(() => shown(preview.value?.drops))
 const gatherDrops = computed(() => shown(preview.value?.gather?.drops))
-const huntDrops = computed(() => shown(preview.value?.hunt?.drops))
 
 /**
  * One entry per verb the dock offers here, in the order the dock offers them.
  *
- * Named with the dock's own words -- Mine, Gather, Hunt -- because these rows
- * are the price list for those three buttons and the correspondence should be
- * exact. They used to read "Woodcutting reward", which repeated a noun on every
- * row, said "reward" three times over a set of pips that are visibly rewards,
- * and wrapped to two lines on a phone. Which line the seam trains is the lede's
- * job and it is already doing it.
+ * Named with the dock's own words -- Mine, Gather -- because these rows are the
+ * price list for those buttons and the correspondence should be exact. They
+ * used to read "Woodcutting reward", which repeated a noun on every row, said
+ * "reward" twice over a set of pips that are visibly rewards, and wrapped to two
+ * lines on a phone. Which line the seam trains is the lede's job.
  */
 const tables = computed(() => {
   const p = preview.value
@@ -191,9 +185,19 @@ const tables = computed(() => {
   return [
     { key: 'mine', label: 'Mine', rows: drops.value, cost: p },
     { key: 'gather', label: 'Gather', rows: gatherDrops.value, cost: p.gather },
-    { key: 'hunt', label: 'Hunt', rows: huntDrops.value, cost: p.hunt },
   ].filter((t) => t.rows.length)
 })
+
+/**
+ * §5.7 -- what rich ground multiplies the haul by.
+ *
+ * A RATE rather than a sentence, and in the readout slot the verbs above put
+ * their clocks in: "half again on every haul" is prose about a number, and the
+ * number is the thing being compared. The clock moves down to the pip row,
+ * because on this card it is the one fact that expires rather than the one that
+ * is being read for.
+ */
+const pocketRate = computed(() => `×${worldParams().pocketYield}`)
 
 /**
  * §7.3 -- which verb has its arithmetic showing, or none.
@@ -386,7 +390,7 @@ watch(open, (isOpen) => {
               <span class="readout">{{ tile.slotsUsed }}/2</span>
             </span>
             <!-- §5.1 -- the map fills a notch for anybody at work on the hex and
-                 §5.5 says only mining takes a seat, so a hunt or a fight leaves
+                 only mining takes a seat, so a fight on the hex leaves
                  the two counts disagreeing. Printed only when they do: without
                  it a hex drawn busy would read "0/2" here and one of the two
                  would look wrong. -->
@@ -439,23 +443,11 @@ watch(open, (isOpen) => {
             {{ mat.name }} · trains {{ SKILL_BY_KEY[mine.skill ?? skillForMaterial(mat.key)].name }}
           </p>
 
-          <!-- §5.7 -- why the hauls below are bigger than this ground usually
-               pays. It carries the map's own mark so the symbol on the hex and
-               the sentence about it are one thing, and it is the only line on
-               the card with a clock in it: a pocket is the one fact here that
-               expires. -->
-          <div v-if="pocketUntil" class="pocket">
-            <SvgIcon class="mark" :svg="pocketMark" />
-            <span class="tiny grow">Rich ground — half again on every haul</span>
-            <span class="tiny readout">{{ formatDuration(pocketUntil - game.now) }} left</span>
-          </div>
-
-          <!-- §4 / §7.3 -- one price line per verb, because this hex answers to
-               up to three of them and each has its own clock now: a dig takes
-               the seam at the pick's rate, bare hands take what is lying about
-               at no rate at all, and a hunt takes the animal at the bow's.
-               Folding them together would say the seam drops essence and that
-               all three cost the same hour.
+          <!-- §4 / §7.3 -- one price line per verb, because this hex answers
+               to both and each has its own clock: a dig takes the seam at the
+               tool's rate, bare hands take what is lying about at the rate of
+               having none. Folding them together would say the seam drops
+               scrap and that the two cost the same hour.
 
                The kinds stay on the face of it -- what a hex can give up is a
                fact about the place and the card owes it at a glance. What is
@@ -519,11 +511,8 @@ watch(open, (isOpen) => {
                 </span>
               </div>
               <p v-if="!t.cost.able" class="note unable">
-                {{
-                  t.key === 'hunt'
-                    ? 'No bow. A herd is not something you take by hand.'
-                    : 'Nothing to work it with. Equip a tool for this line, or gather it by hand.'
-                }}
+                Nothing to work it with. Equip a tool for this line, or gather
+                it by hand.
               </p>
               <p v-if="t.cost.clamped" class="note clamp">
                 Held at the {{ floorMinutes }}-minute guard. Nothing works this
@@ -533,6 +522,26 @@ watch(open, (isOpen) => {
                 Game clock says {{ formatSpan(gameTime(t.cost.seconds)) }} —
                 the development clock is ×{{ game.timeScale }}.
               </p>
+            </div>
+          </div>
+
+          <!-- §5.7 -- under the price lists, because it is about them: rich
+               ground multiplies whatever the two rows above pay. The RATE sits
+               where a verb puts its clock, since that is the figure being
+               compared, and the clock drops to the pip row -- it is the one
+               fact on this card that expires rather than the one it is read
+               for. No drop list of its own: a pocket changes how much comes
+               back, never what does. -->
+          <div v-if="pocketUntil" class="inset verb rich">
+            <div class="price">
+              <span class="label muted">Rich</span>
+              <span class="leader" aria-hidden="true" />
+              <span class="readout clock rate">{{ pocketRate }}</span>
+            </div>
+            <div class="pips">
+              <span class="pip">
+                <SvgIcon :svg="pocketMark" />on every haul, {{ formatDuration(pocketUntil - game.now) }} left
+              </span>
             </div>
           </div>
         </div>
@@ -816,30 +825,20 @@ watch(open, (isOpen) => {
   color: var(--vellum-dim);
 }
 
-/*
- * §5.7 -- gold, the palette's one colour for worth (§13.3), and the only row on
- * the card that runs out. A hairline rather than a fill: the hauls below are
- * the news and this is the reason for them, so it sits beside the price list
- * rather than shouting over it.
- */
-.pocket {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 6px;
-  padding: 5px 9px;
-  border: 1px solid rgba(216, 179, 74, 0.45);
+/* §5.7 -- the rate reads as the figure it is, in the palette's one colour for
+   worth (§13.3). Gold on the number alone: the row is a note about the hauls
+   above it, not a third haul. */
+.verb.rich .rate {
   color: var(--gold);
 }
 
-.pocket .mark {
-  flex: 0 0 auto;
-  line-height: 0;
+.verb.rich .pip :deep(svg) {
+  display: block;
 }
 
-/* Gold, the same reading the dock and the map already give a herd: an
-   opportunity standing here rather than ground that will keep. */
-.verb.hunt .label {
+/* §5.7 -- gold, the palette's one colour for worth (§13.3), and the only row
+   here that runs out. */
+.verb.rich .label {
   color: var(--gold);
 }
 

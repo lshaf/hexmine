@@ -420,7 +420,7 @@ export const useGame = defineStore('game', () => {
     () =>
       jobs.value.find(
         (j): j is FieldJob | BattleJob =>
-          j.kind === 'mining' || j.kind === 'hunting' || j.kind === 'battle',
+          j.kind === 'mining' || j.kind === 'battle',
       ) ?? null,
   )
 
@@ -734,14 +734,6 @@ export const useGame = defineStore('game', () => {
     }
   }
 
-  /**
-   * §5.5 -- a hunt takes no tile slot, so the occupancy map cannot have changed
-   * and refreshMutations() would be a wasted request. Only the hex re-reads.
-   */
-  async function startHunt(col: number, row: number): Promise<void> {
-    const job = await act(() => api.startHunt(col, row))
-    if (job) await select(col, row)
-  }
 
   /**
    * §4.0 -- the same hex, by hand.
@@ -1078,7 +1070,7 @@ export const useGame = defineStore('game', () => {
     loadGuilds, foundGuild, joinGuild, leaveGuild,
     updateGuild, removeGuildMember, setGuildRole, withdrawApplication, decideApplication,
     donateToGuild, upgradeGuildFacility,
-    startMining, startGathering, startHunt, collect, abandon, travelTo, cancelTravel, startProcessing, buy,
+    startMining, startGathering, collect, abandon, travelTo, cancelTravel, startProcessing, buy,
     sell, sellAllScrap, sellItem, sellPotion, craft, equip, unequip, repair, discard, discardMaterial, drink, openPanel, closePanel,
     battleSkills, loadTree, loadBattleSkills, buyNode,
     loadQuests, claimQuest, clearQuestReward,
