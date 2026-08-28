@@ -23,7 +23,7 @@
  * from the foot up — so the height and the colour of the tip say the same
  * thing twice, and a piece in trouble is short AND red.
  */
-import { computed } from 'vue'
+import { computed, useId } from 'vue'
 import SvgIcon from '@/components/SvgIcon.vue'
 import type { ItemDef, OwnedItem } from '@/game/types'
 
@@ -57,9 +57,17 @@ const VIEW_H = 100
 const CLEARANCE = 6
 const EDGE = `M${75 + CLEARANCE} 0 L${100 + CLEARANCE} ${VIEW_H / 2} L${75 + CLEARANCE} ${VIEW_H}`
 
-/** Unique per instance: two gradients sharing an id would share a fill. */
-let counter = 0
-const uid = `gauge${++counter}`
+/**
+ * Unique per instance, and it has to come from the framework.
+ *
+ * A module-looking `let counter = 0` at the top of `<script setup>` is not
+ * module scope -- that block IS the component's setup function, so the counter
+ * is reborn at 0 for every cell and all nine mint the same id. The gradient
+ * then resolves to whichever element claimed it first, and so does the clip:
+ * every gauge in the rack drew the FIRST one's durability, which is a bug that
+ * looks exactly like a gauge that is not wired to anything.
+ */
+const uid = useId()
 
 const ceiling = computed(() => props.item?.maxDurability || (props.def?.maxDurability ?? 1))
 
@@ -137,10 +145,15 @@ const litTop = computed(() => VIEW_H * (1 - fraction.value))
   height: 100%;
 }
 
+/* Filling the box, not sitting in it. §13.1 gives every item icon its own hex
+   frame, so a smaller one drew a hexagon inside a hexagon -- two rings saying
+   one thing, with the rarity colour on the inner and quieter of the two. At
+   full size the frame IS the cell, which is what makes rarity readable across
+   a rack of nine. */
 .art :deep(svg) {
   display: block;
-  width: 68%;
-  height: 68%;
+  width: 100%;
+  height: 100%;
 }
 
 .cell.bare .art {
@@ -161,6 +174,9 @@ const litTop = computed(() => VIEW_H * (1 - fraction.value))
   height: 100%;
 }
 
+/* The fallbacks are line glyphs rather than framed icons -- a skill mark and a
+   dashed hexagon -- so they keep their margin. Filling the box with a stroke
+   drawing would push it under the clip. */
 .glyph :deep(svg) {
   display: block;
   width: 58%;
@@ -179,7 +195,7 @@ const litTop = computed(() => VIEW_H * (1 - fraction.value))
 
 .gauge path {
   fill: none;
-  stroke-width: 4;
+  stroke-width: 5;
   stroke-linejoin: miter;
   stroke-linecap: butt;
   /* The viewBox scales with the cell, and a geometric stroke would scale with
@@ -188,7 +204,7 @@ const litTop = computed(() => VIEW_H * (1 - fraction.value))
 }
 
 .track {
-  stroke: #2a352e;
+  stroke: #4d5c53;
 }
 
 /* The hexagon is clipped, so an outline would be cut away with the corners.

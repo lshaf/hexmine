@@ -1575,7 +1575,14 @@ the game, §11.1.)*
   middle, ember at the foot (§13.3), lit from the foot up. Pinning the colours
   to positions is what makes nine gauges comparable, and it means the height and
   the colour of the tip say the same thing twice — a piece in trouble is short
-  *and* red.
+  *and* red. **The unlit track carries half of that reading** and must have real
+  contrast against the panel: what separates a piece at 84% from one at 73% is
+  nine pixels of lit length, which nothing can see, or the same nine pixels said
+  as an absence above it, which anyone can.
+
+  **The icon fills its cell.** §13.1 gives every item its own hex frame, so a
+  smaller one drew a hexagon inside a hexagon — two rings saying one thing, with
+  the rarity colour on the inner and quieter of the two.
 
   **Tapping one opens what it is**: the name, the rung, the rolled lines
   (§8.0.1), the exact figure, what a mend takes, and Repair · Stow. That is
