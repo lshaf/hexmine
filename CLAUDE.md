@@ -1557,6 +1557,37 @@ the game, §11.1.)*
   own bench — it earns that because it is the only one of the four that does not
   give the piece back, and nothing drawn from a forge says *gone* as fast. A
   plate with room for words still says them beside the glyph.
+- **The prospector sheet is a condition read-out, not an inventory.** Nine
+  slots — the five lines and the four worn — drawn as nine hexagons on one
+  baseline, each with a gauge running down its **right face**. Names are gone:
+  §13.1 already puts the slot in the silhouette and the rung in the colour, so a
+  name spent a whole row saying what the icon had said, and the question the
+  screen is actually opened for — *which piece is about to break* — was answered
+  nowhere. Nine gauges side by side answer it before a word is read.
+
+  **The gauge is the hexagon's own edge, not a bar beside it.** §13 allows two
+  shapes and no third; a straight rail next to a hexagon is a third one, and it
+  sits in the gap reading as a divider between two cells rather than as a
+  reading off one. The chevron runs parallel to the right face at the same
+  slope the clip cuts.
+
+  **The scale is fixed and the fill is not**: sap at the top, gold in the
+  middle, ember at the foot (§13.3), lit from the foot up. Pinning the colours
+  to positions is what makes nine gauges comparable, and it means the height and
+  the colour of the tip say the same thing twice — a piece in trouble is short
+  *and* red.
+
+  **Tapping one opens what it is**: the name, the rung, the rolled lines
+  (§8.0.1), the exact figure, what a mend takes, and Repair · Stow. That is
+  §7.6's grammar indoors — a thing you tap opens what it is and the one or two
+  things that can be done with it.
+- **The stowed list is gone, and is not lost.** An unworn axe is filed **behind
+  the axe slot**, which is where somebody looking for it would look, with the
+  Equip button on the row it belongs to. A flat list of everything unworn was a
+  second place to keep gear, ordered by nothing, and it is the reason the sheet
+  could not fit a screen. A broken spare offers Repair where Equip would only
+  have refused — a plate whose job is to offer what can be done must never
+  offer the thing that does nothing.
 - **Tuning decision still open:** repair cost must be cheaper than crafting new, but not
   dramatically so, or the crafting-materials sink stalls at endgame.
 

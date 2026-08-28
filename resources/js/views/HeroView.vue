@@ -2,6 +2,20 @@
 /**
  * The prospector sheet, §7 and §8.
  *
+ * **It is a condition read-out, not an inventory.** Nine slots -- the five
+ * gathering lines and the four worn -- drawn as nine hexagons standing on one
+ * baseline, each with a rail beside it. What a player opens this screen to find
+ * out is which piece is about to break, and nine rails in a row answer that
+ * before a word is read. Names are gone: §13.1 already puts the slot in the
+ * silhouette and the rung in the colour, so a name spent a whole row saying
+ * what the icon had said. What a piece IS lives one tap deeper.
+ *
+ * **The stowed list is gone too, and is not lost.** An unworn axe is filed
+ * behind the axe slot, which is where somebody looking for it would look --
+ * so tapping a slot says what is in your hand AND what else you have for it,
+ * with the Equip button on the row it belongs to. A flat list of everything
+ * unworn was a second place to keep gear, ordered by nothing.
+ *
  * This screen is about **what is on the character**, and it is deliberately the
  * only thing it is about. Levels, job levels, points and trees are the Jobs
  * sheet's (§7.4), and a second copy of a skill level here would be a second
@@ -22,19 +36,22 @@ import { useGame } from '@/stores/game'
 import { logout } from '@/wallet/wax'
 import {
   ITEM_BY_KEY,
+  RARITY_LABEL,
+  SKILL_BY_KEY,
   SKILL_LIST,
   SLOT_LABEL,
   STAT_LABEL,
   slotForSkill,
 } from '@/game/catalog'
-import { formatPercent, formatStat } from '@/game/formulas'
+import { formatPercent, formatStat, optionStatLine } from '@/game/formulas'
 import { CHARACTER, EQUIPMENT } from '@/game/balance'
 import { itemIcon, skillIcon } from '@/icons/procedural'
-import GearRow from '@/components/GearRow.vue'
+import GearCell from '@/components/GearCell.vue'
 import RepairCost from '@/components/RepairCost.vue'
 import GearAction from '@/components/GearAction.vue'
+import StatChips from '@/components/StatChips.vue'
 import SvgIcon from '@/components/SvgIcon.vue'
-import type { EquipSlot, OwnedItem, StatKey } from '@/game/types'
+import type { EquipSlot, ItemDef, OwnedItem, SkillKey, StatKey } from '@/game/types'
 
 const game = useGame()
 
@@ -110,16 +127,9 @@ async function disconnect(): Promise<void> {
 }
 
 /**
- * §8 -- worn gear only. The five tool slots are not here: a tool belongs to its
- * line, and it is drawn on the line so that "what am I carrying for the forest"
- * and "what is the forest worth to me" are one answer instead of two.
+ * §8 -- the four worn slots, in the order a set is put on.
  */
-const WORN: Array<{ key: EquipSlot; label: string; hint: string }> = [
-  { key: 'armor', label: SLOT_LABEL.armor, hint: 'Empty' },
-  { key: 'boots', label: SLOT_LABEL.boots, hint: 'Empty' },
-  { key: 'gloves', label: SLOT_LABEL.gloves, hint: 'Empty' },
-  { key: 'weapon', label: SLOT_LABEL.weapon, hint: 'Raids — nothing to equip yet' },
-]
+const WORN: EquipSlot[] = ['armor', 'boots', 'gloves', 'weapon']
 
 const equipped = computed(() => {
   const map = {} as Record<EquipSlot, OwnedItem | undefined>
@@ -131,44 +141,124 @@ const equipped = computed(() => {
   return map
 })
 
-const stowed = computed(() => game.equipment.filter((e) => !e.equipped))
+/** A dashed hexagon: the shape of the hole rather than a picture of nothing. */
+const EMPTY_HEX =
+  '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" ' +
+  'stroke-width="1.1" stroke-dasharray="3 2.6" stroke-linejoin="round" aria-hidden="true">' +
+  '<path d="M23 12 17.5 21.5h-11L1 12l5.5-9.5h11Z" /></svg>'
+
+interface KitSlot {
+  key: string
+  slot: EquipSlot
+  /** The gathering line this slot works, or null for worn gear (§8 rule 1). */
+  line: SkillKey | null
+  /** Said on hover and to a reader. Nothing on the rack is said on screen. */
+  label: string
+  item: OwnedItem | null
+  def: ItemDef | null
+  icon: string | null
+  fallback: string
+}
+
+function cell(slot: EquipSlot, line: SkillKey | null, what: string): KitSlot {
+  const item = equipped.value[slot] ?? null
+  const def = item ? (ITEM_BY_KEY[item.key] ?? null) : null
+
+  return {
+    key: slot,
+    slot,
+    line,
+    label: def ? `${what} — ${def.name}` : `${what} — nothing equipped`,
+    item,
+    def,
+    // §13.1 -- the real thing, drawn from its own slot, rarity and material.
+    icon: def
+      ? itemIcon({ slot: def.slot, family: def.family, rarity: def.rarity, palette: def.palette, size: 30 })
+      : null,
+    fallback: line ? skillIcon(line, 24) : EMPTY_HEX,
+  }
+}
 
 /**
- * §8 -- one row per gathering line, in one place.
- *
- * `yield` is the server's aggregate for that line, already capped and already
- * carrying the tool, the tree and any draft. The tool's own printed value is
- * left off on purpose: two numbers for one thing is exactly what this page is
- * being cured of.
+ * §8 rule 1 -- a tool pays out on its own line and nowhere else, so the rack is
+ * two banks rather than one row of nine. The bare slots are the useful half:
+ * they are the lines you own no tool for.
  */
-const lines = computed(() =>
-  SKILL_LIST.map((skill) => {
-    const slot = slotForSkill(skill.key)
-    const tool = equipped.value[slot]
-    const def = tool ? ITEM_BY_KEY[tool.key]! : null
-
-    return {
-      key: skill.key,
-      name: skill.name,
-      label: SLOT_LABEL[slot],
-      tool,
-      toolName: def?.name ?? null,
-      rarity: def?.rarity ?? null,
-      // §13.1 -- the real thing, drawn from its own slot, rarity and material.
-      // The line glyph is what stands in when the hand is empty; drawing it
-      // over a piece of gear would throw away both channels the icon set
-      // carries, and rarity is most of what a player is looking for here.
-      icon: def ? itemIcon({ slot: def.slot, family: def.family, rarity: def.rarity, palette: def.palette, size: 30 }) : null,
-      durability: tool?.durability ?? 0,
-      // §7.4.3 -- the piece's ceiling, which a Smith's node can raise above
-      // the recipe's.
-      maxDurability: tool?.maxDurability || (def?.maxDurability ?? 1),
-      wear: tool ? (tool.durability / Math.max(1, tool.maxDurability || (def!.maxDurability ?? 1))) * 100 : 0,
-      broken: tool ? tool.durability <= 0 : false,
-      yield: game.toolYield?.[skill.key] ?? 0,
-    }
-  }),
+const toolBank = computed(() =>
+  SKILL_LIST.map((skill) => cell(slotForSkill(skill.key), skill.key, skill.name)),
 )
+
+const wornBank = computed(() => WORN.map((slot) => cell(slot, null, SLOT_LABEL[slot])))
+
+/** §8.1 rule 3 -- how much of the whole kit is still in one piece. */
+const kitCondition = computed(() => {
+  const all = [...toolBank.value, ...wornBank.value].filter((c) => c.item)
+  if (all.length === 0) return null
+
+  const worst = all.reduce((low, c) => {
+    const ceiling = c.item!.maxDurability || (c.def?.maxDurability ?? 1)
+    const fraction = c.item!.durability / Math.max(1, ceiling)
+
+    return Math.min(low, fraction)
+  }, 1)
+
+  return { held: all.length, worst: Math.round(worst * 100) }
+})
+
+// -------------------------------------------------------------- the slot plate
+
+/**
+ * §7.6's grammar, indoors: tapping a thing opens what it is and the one or two
+ * things that can be done with it. The rack has no room for a name and does not
+ * want one; this is where the name, the rolled lines and the exact figure live.
+ */
+const pickedKey = ref<string | null>(null)
+
+const picked = computed(
+  () => [...toolBank.value, ...wornBank.value].find((c) => c.key === pickedKey.value) ?? null,
+)
+
+function close(): void {
+  pickedKey.value = null
+}
+
+/**
+ * What else you own for this slot. This is where the old Stowed list went: an
+ * unworn axe belongs behind the axe, not in a flat pile of everything unworn.
+ */
+const candidates = computed(() => {
+  const slot = picked.value?.slot
+  if (!slot) return []
+
+  return game.equipment
+    .filter((item) => !item.equipped && ITEM_BY_KEY[item.key]?.slot === slot)
+    .map((item) => {
+      const def = ITEM_BY_KEY[item.key]!
+      const ceiling = item.maxDurability || (def.maxDurability ?? 1)
+
+      return {
+        item,
+        def,
+        ceiling,
+        icon: itemIcon({ slot: def.slot, family: def.family, rarity: def.rarity, palette: def.palette, size: 22 }),
+      }
+    })
+})
+
+/** The tapped piece's ceiling and how much of it is left, said exactly. */
+const pickedWear = computed(() => {
+  const item = picked.value?.item
+  if (!item) return null
+
+  const ceiling = item.maxDurability || (picked.value?.def?.maxDurability ?? 1)
+
+  return { left: item.durability, ceiling, percent: (item.durability / Math.max(1, ceiling)) * 100 }
+})
+
+async function act(run: Promise<unknown>): Promise<void> {
+  await run
+  close()
+}
 
 /**
  * §8.1 rule 1 -- the load-bearing number on this page.
@@ -229,10 +319,8 @@ const ceilings = computed(() =>
       </div>
 
       <p class="tiny muted note">
-        Gear, a skill tree and a draft all feed this one sum and stop at the
-        same roof. A second item of the same kind is worth
-        ×{{ EQUIPMENT.stackFalloff }} the first — buying three of a thing does
-        not make you three times better.
+        Gear, a tree and a draft feed one sum and stop at one roof. A second of
+        a kind is worth ×{{ EQUIPMENT.stackFalloff }}.
       </p>
     </section>
 
@@ -265,123 +353,58 @@ const ceilings = computed(() =>
       </div>
 
       <p class="tiny muted note">
-        Solid numbers, not percentages — a ±{{ formatPercent(CEILING) }} swing
-        cannot decide a fight, so these are the base it is decided on. The pool
-        is the durability of the weapon and the worn set, and it is your health:
-        what a fight takes off it comes off the gear.
+        Solid numbers, not percentages. The pool is your gear — a fight's
+        damage comes off it.
       </p>
     </section>
 
-    <!-- ---------------------------------------------------------- lines -->
-    <!-- §8 rule 1: a tool pays out on its own line and nowhere else. The zeroes
-         are the useful part — they are the lines you own no tool for. -->
-    <section class="section">
-      <div class="row-between" style="margin-bottom: 8px">
-        <h3 class="head">Lines</h3>
-        <span class="tiny muted">a tool works one line each</span>
+    <!-- ------------------------------------------------------------ kit -->
+    <!-- The signature: nine hexagons on one baseline, each with the rail that
+         says what is left of it. No names — §13.1 already puts the slot in the
+         silhouette and the rung in the colour, and a name would only spend the
+         width saying it again. Which piece is in trouble is the one question
+         this screen exists to answer at a glance. -->
+    <section class="inset">
+      <div class="row-between" style="margin-bottom: 7px">
+        <h3 class="head">Kit</h3>
+        <span v-if="kitCondition" class="tiny mono muted">
+          {{ kitCondition.held }} in hand · worst at {{ kitCondition.worst }}%
+        </span>
+        <span v-else class="tiny muted">Nothing equipped</span>
       </div>
 
-      <div v-for="line in lines" :key="line.key" class="inset line" :class="{ bare: !line.tool }">
-        <SvgIcon v-if="line.icon" :svg="line.icon" boxed :size="30" />
-        <span v-else class="icon-box glyph" v-html="skillIcon(line.key, 20)" />
-
-        <div class="grow">
-          <div class="row-between">
-            <strong class="tiny">{{ line.name }}</strong>
-            <strong class="tiny mono yield">{{ formatPercent(line.yield) }}</strong>
+      <div class="banks">
+        <div class="bank">
+          <span class="label bank-name">Lines</span>
+          <div class="rack">
+            <GearCell
+              v-for="c in toolBank"
+              :key="c.key"
+              :item="c.item"
+              :def="c.def"
+              :icon="c.icon"
+              :fallback="c.fallback"
+              :label="c.label"
+              @click="pickedKey = c.key"
+            />
           </div>
-
-          <template v-if="line.tool">
-            <div class="tiny" :class="`rarity-${line.rarity}`">{{ line.toolName }}</div>
-            <p v-if="line.broken" class="tiny broken">
-              Broken — this line is paying the bare-handed rate until it is repaired.
-            </p>
-            <div v-else class="row wear">
-              <div class="bar grow" :class="line.wear < 25 ? 'bar-ember' : ''">
-                <span :style="{ width: `${line.wear}%` }" />
-              </div>
-              <span class="tiny mono muted">{{ line.durability }}/{{ line.maxDurability }}</span>
-            </div>
-
-            <!-- §8.2 -- what the mend takes, before the button is pressed. It
-                 is the largest continuous sink in the game (§11.1), so it is
-                 the decision rather than a footnote to it. -->
-            <RepairCost v-if="line.tool" :item="line.tool" />
-          </template>
-
-          <!-- Empty reads as the slot it is waiting for, the same way the worn
-               list below does. What a bare line costs you is the hex card's
-               answer, and its button already gives it. -->
-          <div v-else class="tiny muted">{{ line.label }}</div>
         </div>
 
-        <div v-if="line.tool" class="row-actions">
-          <GearAction action="repair" label="Repair" :disabled="game.busy" @click="game.repair(line.tool.id)" />
-          <GearAction action="stow" label="Stow" :disabled="game.busy" @click="game.unequip(line.tool.id)" />
-        </div>
-      </div>
-    </section>
-
-    <!-- ----------------------------------------------------------- worn -->
-    <section class="section">
-      <div class="row-between" style="margin-bottom: 8px">
-        <h3 class="head">Worn</h3>
-        <span class="tiny muted">works everywhere</span>
-      </div>
-
-      <div v-for="slot in WORN" :key="slot.key" class="inset row-item">
-        <template v-if="equipped[slot.key]">
-          <GearRow :item="equipped[slot.key]!">
-            <template #cost><RepairCost :item="equipped[slot.key]!" /></template>
-            <GearAction action="repair" label="Repair" :disabled="game.busy" @click="game.repair(equipped[slot.key]!.id)" />
-            <GearAction action="stow" label="Stow" :disabled="game.busy" @click="game.unequip(equipped[slot.key]!.id)" />
-          </GearRow>
-        </template>
-
-        <template v-else>
-          <span class="icon-box empty-slot">
-            <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor"
-                 stroke-width="1.1" stroke-dasharray="3 2.6" stroke-linejoin="round" aria-hidden="true">
-              <path d="M23 12 17.5 21.5h-11L1 12l5.5-9.5h11Z" />
-            </svg>
-          </span>
-          <div class="grow">
-            <strong class="tiny muted">{{ slot.label }}</strong>
-            <div class="tiny muted">{{ slot.hint }}</div>
+        <div class="bank">
+          <span class="label bank-name">Worn</span>
+          <div class="rack">
+            <GearCell
+              v-for="c in wornBank"
+              :key="c.key"
+              :item="c.item"
+              :def="c.def"
+              :icon="c.icon"
+              :fallback="c.fallback"
+              :label="c.label"
+              @click="pickedKey = c.key"
+            />
           </div>
-        </template>
-      </div>
-    </section>
-
-    <!-- --------------------------------------------------------- stowed -->
-    <!-- §7.6 -- an unworn piece is carried, so this list is bag rows. Taking
-         something off is the one action that adds a row. -->
-    <section v-if="stowed.length" class="section">
-      <div class="row-between" style="margin-bottom: 8px">
-        <h3 class="head">Stowed</h3>
-        <span class="tiny muted">carried, not worn — one bag row each</span>
-      </div>
-
-      <div v-for="item in stowed" :key="item.id" class="inset row-item">
-        <GearRow :item="item">
-          <!-- §8.2 -- a stowed piece mends too. The server never refused one;
-               the button simply was not here, so a broken axe had to be worn
-               before it could be fixed. -->
-          <template #cost><RepairCost :item="item" /></template>
-          <GearAction
-            action="equip"
-            label="Equip"
-            :disabled="game.busy || item.durability <= 0"
-            @click="game.equip(item.id)"
-          />
-          <GearAction action="repair" label="Repair" :disabled="game.busy" @click="game.repair(item.id)" />
-          <GearAction
-            action="scrap"
-            label="Scrap for parts"
-            :disabled="game.busy"
-            @click="game.discard(item.id)"
-          />
-        </GearRow>
+        </div>
       </div>
     </section>
 
@@ -431,19 +454,6 @@ const ceilings = computed(() =>
           <span class="muted">Wallet</span>
           <span class="mono wallet">{{ game.character.wallet }}</span>
         </div>
-        <div class="row-between tiny">
-          <span class="muted">Position</span>
-          <span class="mono">{{ game.character.col }}, {{ game.character.row }}</span>
-        </div>
-        <div class="row-between tiny">
-          <span class="muted">Bound</span>
-          <span>Soulbound — one character per wallet, non-transferable</span>
-        </div>
-        <p class="tiny muted" style="margin: 0; line-height: 1.5">
-          Levels buy capacity: access to deeper tiles. Not the bag, and not the
-          road — those are the Explorer's, and the only way to earn them is to
-          walk. Levels never buy raw power.
-        </p>
       </div>
 
       <!-- The character is soulbound and stays where it is; what ends here is
@@ -454,17 +464,152 @@ const ceilings = computed(() =>
           {{ leaving ? 'Disconnecting…' : 'Disconnect wallet' }}
         </button>
         <span class="tiny muted">
-          Your character stays with the wallet. Signing back in means another
+          Soulbound. It stays with the wallet — signing back in costs another
           transfer.
         </span>
       </div>
     </section>
 
+    <!-- ----------------------------------------------------- slot plate -->
+    <!-- Teleported out of the panel for the same reason the bag's popup is:
+         the panel carries a backdrop-filter, which would otherwise become the
+         containing block for anything fixed inside it. -->
+    <Teleport to="body">
+      <div v-if="picked" class="pop-wrap" role="dialog" :aria-label="picked.label">
+        <div class="pop-scrim" @click="close" />
+        <div class="pop plate">
+          <div class="pop-inner">
+            <header class="pop-head">
+              <span class="icon-box art">
+                <SvgIcon v-if="picked.icon" :svg="picked.icon" :size="34" />
+                <span v-else class="glyph" v-html="picked.fallback" />
+              </span>
+              <div class="grow">
+                <strong :class="picked.def ? `rarity-${picked.def.rarity}` : 'muted'">
+                  {{ picked.def?.name ?? SLOT_LABEL[picked.slot] }}
+                </strong>
+                <p class="tiny muted sub">
+                  <template v-if="picked.def">
+                    {{ SLOT_LABEL[picked.slot] }} · {{ RARITY_LABEL[picked.def.rarity] }}
+                  </template>
+                  <template v-else>Nothing in this slot</template>
+                </p>
+              </div>
+              <button class="pop-close" type="button" aria-label="Close" @click="close">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                  <path d="M6 6l12 12M18 6L6 18" />
+                </svg>
+              </button>
+            </header>
+
+            <template v-if="picked.item && picked.def && pickedWear">
+              <!-- The thesis of the plate, because it is what the rack was
+                   pointing at: the same rail, big enough to carry the figure. -->
+              <div class="detail">
+                <div class="gauge">
+                  <span class="rail">
+                    <span class="lit" :style="{ height: `${pickedWear.percent}%` }" />
+                  </span>
+                  <span class="figure">
+                    <strong class="mono left">{{ pickedWear.left }}</strong>
+                    <span class="tiny muted">of {{ pickedWear.ceiling }}</span>
+                  </span>
+                </div>
+
+                <div class="grow facts">
+                  <StatChips :def="picked.def" :options="picked.item.options ?? []" />
+
+                  <!-- §8 rule 1 -- what this line is actually worth, and the
+                       only per-line figure on the sheet. It belongs with the
+                       tool that produces it rather than in a table of five. -->
+                  <p v-if="picked.line" class="tiny line-yield">
+                    <span class="muted">On {{ SKILL_BY_KEY[picked.line].name.toLowerCase() }}</span>
+                    <strong class="mono" :class="{ none: !game.toolYield?.[picked.line] }">
+                      {{ formatPercent(game.toolYield?.[picked.line] ?? 0) }} yield
+                    </strong>
+                  </p>
+
+                  <!-- §8.0.1 -- the rolled lines, said as rolled. Nothing off a
+                       shelf ever has one, so the word is the whole distinction. -->
+                  <div v-if="picked.item.options?.length" class="rolled">
+                    <span class="tiny muted rolled-label">rolled</span>
+                    <span v-for="(o, i) in picked.item.options" :key="i" class="tiny mono roll">
+                      {{ optionStatLine(o, picked.def) }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <p v-if="picked.item.durability <= 0" class="tiny broken">
+                Broken — this slot is paying nothing until it is mended.
+              </p>
+
+              <RepairCost :item="picked.item" />
+
+              <div class="acts">
+                <GearAction
+                  action="repair"
+                  label="Repair"
+                  wide
+                  :disabled="game.busy"
+                  @click="act(game.repair(picked.item.id))"
+                />
+                <GearAction
+                  action="stow"
+                  label="Stow"
+                  wide
+                  :disabled="game.busy"
+                  @click="act(game.unequip(picked.item.id))"
+                />
+              </div>
+            </template>
+
+            <!-- Where the Stowed list went. What you own for this slot, filed
+                 behind the slot, with the button on the row it belongs to. -->
+            <div v-if="candidates.length" class="pack">
+              <span class="label pack-name">
+                {{ picked.item ? 'Also for this slot' : 'In the pack' }}
+              </span>
+              <div v-for="c in candidates" :key="c.item.id" class="spare">
+                <span class="icon-box small"><SvgIcon :svg="c.icon" :size="22" /></span>
+                <div class="grow">
+                  <strong class="tiny" :class="`rarity-${c.def.rarity}`">{{ c.def.name }}</strong>
+                  <span class="tiny mono muted">{{ c.item.durability }}/{{ c.ceiling }}</span>
+                </div>
+                <!-- §8.2 -- a broken spare cannot be put on, so the button
+                     that would refuse becomes the button that fixes it. One
+                     action per row, and it is never the one that does nothing. -->
+                <GearAction
+                  v-if="c.item.durability <= 0"
+                  action="repair"
+                  label="Repair"
+                  :disabled="game.busy"
+                  @click="act(game.repair(c.item.id))"
+                />
+                <GearAction
+                  v-else
+                  action="equip"
+                  label="Equip"
+                  :disabled="game.busy"
+                  @click="act(game.equip(c.item.id))"
+                />
+              </div>
+            </div>
+
+            <p v-else-if="!picked.item" class="tiny muted empty-note">
+              Nothing in the pack fits here. A bare line still works — it pays
+              the bare-handed rate and brings back scrap.
+            </p>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
     <!-- One pointer, no figures. Levels, points and trees are the Jobs sheet's
          and are not repeated here. -->
     <p class="tiny muted footnote">
-      How good you are at each of these — levels, points and the trees they open
-      — lives in the Jobs sheet.
+      Levels, points and the trees they open live in the Jobs sheet.
     </p>
   </div>
 </template>
@@ -476,7 +621,7 @@ const ceilings = computed(() =>
 }
 
 .section {
-  margin-top: 18px;
+  margin-top: 12px;
 }
 
 .head {
@@ -564,9 +709,18 @@ const ceilings = computed(() =>
 }
 
 .meters {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px 16px;
+}
+
+/* One column on a phone: three meters at a third of 340px cannot carry both a
+   label and a reading on one line, and a wrapped label is worse than a taller
+   block. */
+@media (max-width: 480px) {
+  .meters {
+    grid-template-columns: 1fr;
+  }
 }
 
 .meter {
@@ -587,60 +741,253 @@ const ceilings = computed(() =>
   color: var(--gold);
 }
 
-/* A line, its tool and what the pair is worth. A bare line is dimmed rather
-   than hidden -- the gap is the thing worth seeing. */
-.line {
+/* ------------------------------------------------------------------- kit */
+
+/*
+ * Two banks, not one row of nine. The split is real -- five slots belong to
+ * ground and four belong to your body (§8 rule 1) -- and it is also what lets
+ * the rack wrap onto a phone without the rails going ragged.
+ */
+.banks {
   display: flex;
-  align-items: center;
-  gap: 11px;
-  min-height: 58px;
+  flex-wrap: wrap;
+  gap: 10px 22px;
 }
 
-.line + .line {
-  margin-top: 6px;
+.bank {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
-.line.bare {
-  opacity: 0.62;
+.bank-name {
+  color: #7d8b81;
 }
 
-.glyph {
-  width: 38px;
-  height: 38px;
-  color: var(--copper);
+/* The baseline. Every cell is the same height and every gauge starts at the
+   same y, which is what makes nine of them a chart rather than nine badges.
+   Wrapping is the safety net, not the plan: five on one line is the reading,
+   and a bank broken over two lines has lost most of what it was for. */
+.rack {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 13px;
+  --cell: 56px;
 }
 
-.yield {
-  font-size: 13px;
-  color: var(--gold);
-}
-
-.line.bare .yield {
-  color: var(--vellum-dim);
-}
-
-.wear {
-  gap: 7px;
-  margin-top: 5px;
+@media (max-width: 560px) {
+  .rack {
+    --cell: 42px;
+    gap: 8px 7px;
+  }
 }
 
 .broken {
-  margin: 4px 0 0;
+  margin: 8px 0 0;
   color: var(--ember);
 }
 
-.empty-slot {
-  width: 42px;
-  height: 42px;
-  color: var(--vellum-dim);
-  background: rgba(0, 0, 0, 0.22);
+/* -------------------------------------------------------------- slot plate */
+
+.pop-wrap {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 18px;
 }
 
-.row-actions {
+.pop-scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(8, 11, 10, 0.55);
+}
+
+.pop {
+  position: relative;
+  width: min(340px, 100%);
+}
+
+.pop-inner {
+  padding: 13px 14px 14px;
+}
+
+.pop-head {
   display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.pop-head .art {
+  width: 44px;
+  height: 44px;
+}
+
+.pop-head strong {
+  font-size: 14px;
+}
+
+.glyph {
+  display: grid;
+  place-items: center;
+  color: var(--copper);
+}
+
+.sub {
+  margin: 2px 0 0;
+}
+
+.pop-close {
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--vellum-dim);
+  cursor: pointer;
+}
+
+.pop-close:hover {
+  color: var(--vellum);
+}
+
+/* The rack pointed at condition, so condition is what the plate opens with --
+   the same rail, tall enough to carry the figure beside it. */
+.detail {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.gauge {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
   flex: 0 0 auto;
-  justify-content: flex-end;
-  gap: 5px;
+}
+
+/* The same scale the rack draws, straightened. The chevron on a cell follows
+   the hexagon it belongs to; there is no hexagon here for it to follow, so it
+   is a bar -- but it is the SAME bar, fixed sap at the top through gold to
+   ember at the foot, with the bottom of it lit. Two grammars for one reading
+   would make the plate a second opinion about the cell you tapped. */
+.gauge .rail {
+  position: relative;
+  width: 6px;
+  height: 58px;
+  background: #2a352e;
+}
+
+.gauge .lit {
+  position: absolute;
+  inset: auto 0 0 0;
+  background-image: linear-gradient(to top, var(--ember), var(--gold), var(--sap));
+  background-size: 100% 58px;
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+}
+
+.figure {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.left {
+  font-family: var(--font-display);
+  font-size: 21px;
+  line-height: 1;
+}
+
+.facts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  justify-content: center;
+  min-width: 0;
+}
+
+.line-yield {
+  display: flex;
+  gap: 6px;
+  margin: 0;
+}
+
+.line-yield strong {
+  color: var(--gold);
+}
+
+/* §7.3 -- a tool has no percentage at all, so an unbuilt line honestly reads
+   +0%. Gold on a zero would make nothing look like something. */
+.line-yield strong.none {
+  color: var(--vellum-dim);
+}
+
+.rolled {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.rolled-label {
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-size: 8.5px;
+}
+
+.roll {
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  background: #1c2519;
+  color: #b7d6a4;
+}
+
+.acts {
+  display: flex;
+  gap: 7px;
+  margin-top: 12px;
+}
+
+/* Where the stowed list went: behind the slot it belongs to. */
+.pack {
+  margin-top: 13px;
+  padding-top: 11px;
+  border-top: 1px solid var(--line);
+}
+
+.pack-name {
+  display: block;
+  margin-bottom: 7px;
+  color: #7d8b81;
+}
+
+.spare {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.spare + .spare {
+  margin-top: 6px;
+}
+
+.spare .grow {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  min-width: 0;
+}
+
+.icon-box.small {
+  width: 30px;
+  height: 30px;
+}
+
+.empty-note {
+  margin: 12px 0 0;
+  line-height: 1.5;
 }
 
 .wallet {
@@ -649,7 +996,7 @@ const ceilings = computed(() =>
 }
 
 .footnote {
-  margin: 16px 0 0;
+  margin: 9px 0 0;
   line-height: 1.5;
 }
 </style>
