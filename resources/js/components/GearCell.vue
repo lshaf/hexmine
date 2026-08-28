@@ -2,26 +2,21 @@
 /**
  * One slot of the kit: a hexagon, and a gauge that runs down its right face.
  *
- * The prospector sheet used to be nine tall rows, each spending most of its
- * width on a name the icon had already said (§13.1 puts the slot in the
- * silhouette and the rung in the colour). What a player opens this screen to
- * find out is **what is about to break**, and a name answers that about as well
- * as a filename answers what a photo is of. So the name is gone and the gauge
- * is the row. What each piece IS lives one tap deeper.
+ * What a player opens the prospector sheet to find out is **what is about to
+ * break**, and a name answers that about as well as a filename answers what a
+ * photo is of — §13.1 already puts the slot in the silhouette and the rung in
+ * the colour. So the name is gone and the gauge is the row. What each piece IS
+ * lives one tap deeper.
  *
- * **The gauge is not a bar beside the hexagon, it is the hexagon's own edge.**
- * §13 allows two shapes and no third: a hexagon and a chamfer. A straight rail
- * next to a hexagon is a third one — it sits in the gap and reads as a divider
- * between two cells rather than as a reading off one. The chevron runs parallel
- * to the right face at the same 1:2 slope the clip cuts, so it belongs to its
- * own cell and to no other.
+ * **Everything here is measured off the drawn hexagon, never off a box.** That
+ * distinction is the whole of what went wrong before. §13.1's icon draws a
+ * REGULAR hexagon inscribed in a square viewBox: 0.93 of the width across the
+ * points, 0.866 of that again down the flats. A box is none of those numbers,
+ * so laying a clip on the box, centring the art in the box and hanging the
+ * gauge off the box gave three shapes that agreed with each other nowhere.
  *
- * §13.3 -- the scale is sap at the top, gold in the middle, ember at the foot,
- * and it is FIXED: the palette already has a word for healthy, for getting on,
- * and for a state to deal with, and pinning them to positions is what makes
- * nine gauges comparable. What varies is how much of the scale is lit, filling
- * from the foot up — so the height and the colour of the tip say the same
- * thing twice, and a piece in trouble is short AND red.
+ * `--cell` is therefore the hexagon's own WIDTH — the thing you can see and
+ * point at — and the art, the cell and the gauge are all derived from it.
  */
 import { computed, useId } from 'vue'
 import SvgIcon from '@/components/SvgIcon.vue'
@@ -34,46 +29,36 @@ const props = defineProps<{
   fallback: string
   /** Said on hover and to a reader. Nothing on the rack is said on screen. */
   label: string
-  /** The icon of what is in the slot, already sized. */
+  /** The icon of what is in the slot. */
   icon: string | null
 }>()
 
 /*
- * The gauge is drawn in the CELL's own coordinates, not in a box of its own.
+ * The gauge, in hexagon units: 100 across the points, 86.6 down the flats.
  *
- * §13's clip cuts the hexagon at 25% / 50%, so its right face runs (75,0) →
- * (100,50) → (75,100) in a 100-unit square. The gauge is that same path pushed
- * out by a constant, which is the only way two shapes can be parallel: a
- * chevron placed BESIDE the hexagon's bounding box touches it at the middle
- * and drifts a quarter of the width away at the top and the bottom, because
- * the box is square and the shape inside it is not.
+ * The right face runs (75,0) → (100,43.3) → (75,86.6), so the gauge is that
+ * path pushed out by a constant — the only way two shapes stay parallel. It
+ * starts at the hexagon's top-right corner and ends at its bottom-right one,
+ * which is what makes it read as belonging to this cell and no other.
  *
- * The box is 125 wide against 86.6 tall because that is what a REGULAR hexagon
- * measures: circumradius R gives a width of 2R and a height of R√3, so height
- * is 0.866 of width and never equal to it. `.icon-box` cuts its clip from
- * whatever box it is given, so a square one yields a hexagon stretched 15% tall
- * -- which is fine where nothing else is drawn against it, and wrong here,
- * because the icon inside draws its own regular frame (§13.1) and the two then
- * disagree about what shape a hexagon is.
- *
- * The element is 1.25 cells wide against 0.866 tall, matching the viewBox, so
- * the scale stays uniform and the stroke stays honest.
+ * The viewBox is 112 wide so the pushed-out apex has room; the element is
+ * 1.12 cells wide against 0.866 tall, so the scale stays uniform both ways.
  */
-const VIEW_W = 125
+const VIEW_W = 112
 const VIEW_H = 86.6
-/** How far off the face the gauge stands, in the same units. */
 const CLEARANCE = 6
 const EDGE = `M${75 + CLEARANCE} 0 L${100 + CLEARANCE} ${VIEW_H / 2} L${75 + CLEARANCE} ${VIEW_H}`
+/** The hexagon itself, in the same units — the ground every slot stands on. */
+const GROUND = `25,0 75,0 100,${VIEW_H / 2} 75,${VIEW_H} 25,${VIEW_H} 0,${VIEW_H / 2}`
 
 /**
  * Unique per instance, and it has to come from the framework.
  *
  * A module-looking `let counter = 0` at the top of `<script setup>` is not
- * module scope -- that block IS the component's setup function, so the counter
- * is reborn at 0 for every cell and all nine mint the same id. The gradient
- * then resolves to whichever element claimed it first, and so does the clip:
- * every gauge in the rack drew the FIRST one's durability, which is a bug that
- * looks exactly like a gauge that is not wired to anything.
+ * module scope — that block IS the setup function, so the counter is reborn at
+ * 0 for every cell and all nine mint the same id. Every gauge in the rack then
+ * draws the FIRST one's durability, which looks exactly like a gauge wired to
+ * nothing.
  */
 const uid = useId()
 
@@ -91,21 +76,14 @@ const litTop = computed(() => VIEW_H * (1 - fraction.value))
 <template>
   <button
     class="cell"
-    :class="{ bare: !item, gone: item && item.durability <= 0 }"
+    :class="{ bare: !icon, gone: item && item.durability <= 0 }"
     type="button"
     :title="label"
     :aria-label="label"
   >
-    <!-- §13.1 -- a filled cell wears NO outer clip. The icon already draws a
-         hexagon, and its artwork deliberately spills a little past that frame;
-         a second hexagon over the top shaves the spill and leaves a blade cut
-         off flat. An empty cell has no icon to be the shape, so it keeps the
-         dark clipped box and the glyph sits well inside it. -->
-    <span class="art" :class="{ 'icon-box': !icon }">
-      <SvgIcon v-if="icon" :svg="icon" :size="38" />
-      <span v-else class="glyph" v-html="fallback" />
-    </span>
-
+    <!-- Drawn BEFORE the art, because it carries the ground the art stands on.
+         The chevron never crosses the hexagon, so nothing here can cover the
+         icon. -->
     <svg class="gauge" :viewBox="`0 0 ${VIEW_W} ${VIEW_H}`" aria-hidden="true">
       <defs>
         <linearGradient :id="`${uid}-ramp`" x1="0" y1="1" x2="0" y2="0">
@@ -118,20 +96,41 @@ const litTop = computed(() => VIEW_H * (1 - fraction.value))
         </clipPath>
       </defs>
 
-      <!-- The unlit track has to be visible. Unlit and invisible are different
-           facts: without it the lit part floats, and nine gauges read as nine
-           ragged marks instead of nine readings off one scale. -->
+      <!-- The same ground under every slot, full or empty. It used to be a CSS
+           clip on the art and only a BARE cell had one, which put the heaviest
+           mark in the rack on the slots holding nothing — an empty hand reading
+           louder than a full one. Drawn here it is exact hexagon geometry, it
+           sits behind the icon rather than cutting it, and there is one
+           definition of the shape instead of two. -->
+      <polygon :points="GROUND" class="ground" />
+
+      <!-- The unlit track carries half the reading. What separates a piece at
+           84% from one at 73% is a few pixels of lit length, which nothing can
+           see, or the same few pixels said as an absence above it, which
+           anyone can. It needs real contrast against the panel for that. -->
       <path :d="EDGE" class="track" />
-      <path v-if="item" :d="EDGE" :stroke="`url(#${uid}-ramp)`" :clip-path="`url(#${uid}-lit)`" class="lit" />
+      <path v-if="item" :d="EDGE" :stroke="`url(#${uid}-ramp)`" :clip-path="`url(#${uid}-lit)`" />
     </svg>
+
+    <span class="art">
+      <SvgIcon v-if="icon" :svg="icon" />
+      <span v-else class="glyph" v-html="fallback" />
+    </span>
   </button>
 </template>
 
 <style scoped>
+/*
+ * Three derived numbers, all off the hexagon's width:
+ *   height  = 0.866 × width   the flats of a regular hexagon
+ *   cell    = 1.12  × width   the hexagon plus the room the gauge stands in
+ *   art     = 1.075 × width   the square viewBox whose inscribed hexagon is
+ *                             exactly `width` across (1 / 0.93)
+ */
 .cell {
   position: relative;
-  width: calc(var(--cell, 60px) * 1.25);
-  height: calc(var(--cell, 60px) * 0.866);
+  width: calc(var(--cell, 58px) * 1.12);
+  height: calc(var(--cell, 58px) * 0.866);
   flex: 0 0 auto;
   padding: 0;
   border: 0;
@@ -139,73 +138,64 @@ const litTop = computed(() => VIEW_H * (1 - fraction.value))
   cursor: pointer;
 }
 
-/* The cell scales from one variable so the rack can shrink to a phone without
-   nine hexagons breaking onto three lines. The art follows it in CSS rather
-   than through the size prop, which is a number and cannot answer a media
-   query. */
+/* The hexagon itself: the left part of the cell, and the thing every other
+   number here is measured against. */
 .art {
   position: absolute;
-  inset: 0 auto 0 0;
-  width: var(--cell, 60px);
-  display: grid;
-  place-items: center;
+  left: 0;
+  top: 0;
+  width: var(--cell, 58px);
+  height: calc(var(--cell, 58px) * 0.866);
 }
 
-/* The wrapper has to be given the box before the art can be a share of it: an
-   auto-sized grid track and a percentage child collapse each other to nothing. */
+/*
+ * Centred by transform rather than by alignment. `place-items: center` does not
+ * centre an item LARGER than its track — it start-aligns it — so the art sat in
+ * the cell's top-left corner and hung over the gauge and the row beneath. A
+ * translate cannot have that opinion.
+ */
 .art :deep(.svg-icon) {
-  display: grid;
-  place-items: center;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: block;
+  width: calc(var(--cell, 58px) * 1.075);
+  height: calc(var(--cell, 58px) * 1.075);
+}
+
+.art :deep(.svg-icon svg) {
+  display: block;
   width: 100%;
   height: 100%;
 }
 
-/* Filling the cell, not sitting in it. §13.1 gives every item icon its own hex
-   frame, so a smaller one drew a hexagon inside a hexagon -- two rings saying
-   one thing, with the rarity colour on the inner and quieter of the two. At
-   full size the frame IS the cell, which is what makes rarity readable across
-   a rack of nine.
-
-   1.075 because the icon's viewBox is SQUARE and the regular hexagon it draws
-   is inscribed at 93% of that width. Scaling by 1/0.93 puts the drawn frame
-   exactly on the cell's own hexagon -- and its height lands at 0.866 of the
-   width on its own, which is the same geometry the gauge is cut from. */
-.art :deep(svg) {
-  display: block;
-  width: calc(var(--cell, 60px) * 1.075);
-  height: calc(var(--cell, 60px) * 1.075);
-}
-
+/* A bare slot's glyph is smaller than its box, so alignment centres it fine.
+   The ICON is not — see the transform above. */
 .cell.bare .art {
+  display: grid;
+  place-items: center;
   color: #5a685f;
 }
 
-/* §8.2 -- a piece at zero is paying nothing until it is mended, and the icon
-   says so by going quiet. The gauge is already at the floor; dimming the art is
-   what stops a dead tool reading as a live one at a glance. */
+.glyph {
+  display: block;
+  line-height: 0;
+}
+
+.glyph :deep(svg) {
+  display: block;
+  width: calc(var(--cell, 58px) * 0.46);
+  height: calc(var(--cell, 58px) * 0.46);
+}
+
+/* §8.2 — a piece at zero is paying nothing until it is mended, and the icon
+   says so by going quiet. The gauge is already at the floor; dimming the art
+   is what stops a dead tool reading as a live one at a glance. */
 .cell.gone .art {
   opacity: 0.45;
 }
 
-.glyph {
-  display: grid;
-  place-items: center;
-  width: 100%;
-  height: 100%;
-}
-
-/* The fallbacks are line glyphs rather than framed icons -- a skill mark and a
-   dashed hexagon -- so they keep their margin. Sized off the cell rather than
-   as a percentage, because the box is no longer square and 58% of two different
-   edges is two different sizes. */
-.glyph :deep(svg) {
-  display: block;
-  width: calc(var(--cell, 60px) * 0.5);
-  height: calc(var(--cell, 60px) * 0.5);
-}
-
-/* Laid over the whole cell rather than placed after it, because the path is
-   written in the hexagon's own coordinates. */
 .gauge {
   position: absolute;
   inset: 0;
@@ -214,13 +204,17 @@ const litTop = computed(() => VIEW_H * (1 - fraction.value))
   pointer-events: none;
 }
 
+.ground {
+  fill: rgba(0, 0, 0, 0.32);
+}
+
 .gauge path {
   fill: none;
   stroke-width: 5;
   stroke-linejoin: miter;
   stroke-linecap: butt;
   /* The viewBox scales with the cell, and a geometric stroke would scale with
-     it -- so a phone would get a thinner gauge than a desktop for no reason. */
+     it — so a phone would get a thinner gauge than a desktop for no reason. */
   vector-effect: non-scaling-stroke;
 }
 
@@ -228,15 +222,13 @@ const litTop = computed(() => VIEW_H * (1 - fraction.value))
   stroke: #4d5c53;
 }
 
-/* A tint behind the art would paint a SQUARE now that a filled cell carries no
-   clip, and an outline on the cell would box in the gauge as well. Brightening
-   the drawing itself is the one lift that follows whatever shape is there. */
+/* A tint behind the art would paint a square on a cell that carries no clip,
+   and an outline on the cell would box in the gauge as well. Brightening the
+   drawing is the one lift that follows whatever shape is actually there. */
 .cell:hover .art {
   filter: brightness(1.3);
 }
 
-/* Focus needs to be seen rather than felt, so it gets a real ring -- on the
-   button, which is the thing being focused, and never on the art. */
 .cell:focus-visible {
   outline: 2px solid var(--copper);
   outline-offset: 2px;

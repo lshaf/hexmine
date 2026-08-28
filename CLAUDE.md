@@ -1586,14 +1586,20 @@ the game, §11.1.)*
   quieter of the two. Only a bare slot keeps the dark clipped box, because it
   has no icon to be the shape.
 
-  **The hexagon here is regular, and that is not what `.icon-box` gives you.**
-  The clip is cut from whatever box it is handed, so a square one yields a
-  hexagon stretched 15% tall — circumradius R means a width of 2R against a
-  height of R√3, and those are never equal. That passes unnoticed anywhere the
-  hexagon stands alone, and fails the moment something regular is drawn against
-  it: the frame inside and the clip outside disagreed about what shape a
-  hexagon is. The cell is `W × 0.866W`, and the gauge is cut from the same
-  geometry.
+  **Every measurement in a cell is taken off the drawn hexagon, never off a
+  box.** That is the rule the whole thing kept breaking. §13.1's icon draws a
+  *regular* hexagon inscribed in a square viewBox — 0.93 of the width across
+  the points, 0.866 of that again down the flats — and a box is none of those
+  numbers. Laying a clip on the box, centring the art in the box and hanging
+  the gauge off the box gave three shapes that agreed nowhere. The hexagon's
+  **width** is the one dimension everything else derives from.
+
+  **One ground, drawn once, under every slot.** The dark hexagon is a polygon
+  in the gauge's own SVG rather than a CSS clip on the art — exact geometry,
+  behind the icon instead of cutting it, and one definition of the shape rather
+  than two. It used to be a clip that only a *bare* cell wore, which put the
+  heaviest mark in the rack on the slots holding nothing: an empty hand reading
+  louder than a full one.
 
   **Tapping one opens what it is**: the name, the rung, the rolled lines
   (§8.0.1), the exact figure, what a mend takes, and Repair · Stow. That is

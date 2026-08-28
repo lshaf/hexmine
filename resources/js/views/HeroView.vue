@@ -778,12 +778,14 @@ const ceilings = computed(() =>
   display: flex;
   flex-wrap: wrap;
   gap: 10px 13px;
-  --cell: 60px;
+  /* The hexagon's WIDTH, which is what every other measurement in the cell is
+     derived from -- see GearCell. */
+  --cell: 58px;
 }
 
 @media (max-width: 560px) {
   .rack {
-    --cell: 42px;
+    --cell: 44px;
     gap: 8px 7px;
   }
 }
