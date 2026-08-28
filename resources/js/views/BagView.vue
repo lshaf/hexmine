@@ -30,22 +30,16 @@ import {
   SCOPE_ACTION,
   SCOPE_LABEL,
   SLOT_LABEL,
-  STAT_LABEL,
-  skillForSlot,
 } from '@/game/catalog'
-import {
-  PAIR_STATS,
-  aggregateAfterSwap,
-  aggregateStat,
-  flatOption,
-  statLine,
-} from '@/game/formulas'
+import { statLine, swapCeilingNote, swapChanges } from '@/game/formulas'
+import type { SwapChange } from '@/game/formulas'
 import GearAction from '@/components/GearAction.vue'
 import RepairCost from '@/components/RepairCost.vue'
 import StatChips from '@/components/StatChips.vue'
+import SwapMoves from '@/components/SwapMoves.vue'
 import { itemIcon, materialIcon } from '@/icons/procedural'
 import SvgIcon from '@/components/SvgIcon.vue'
-import type { ItemDef, ItemOption, MaterialKey, OwnedItem, StatKey } from '@/game/types'
+import type { ItemDef, MaterialKey, OwnedItem } from '@/game/types'
 
 const game = useGame()
 
@@ -286,102 +280,20 @@ const worn = computed<OwnedItem | null>(() => {
 
 const wornDef = computed(() => (worn.value ? ITEM_BY_KEY[worn.value.key] : undefined))
 
-/** §8 rule 1 -- a tool's numbers are read on its own line and nowhere else. */
-const swapLine = computed(() => (def.value?.slot ? skillForSlot(def.value.slot) : null))
-
-/** The solid pair (§9.5.4), rolled lines included -- what statChips prints. */
-const solid = (item: OwnedItem, itemDef: ItemDef, stat: 'attack' | 'defense'): number =>
-  (itemDef[stat] ?? 0) + flatOption(item.options ?? [], stat)
-
-/** One piece's own percentage contribution to a stat, before any kit maths. */
-const ownPercent = (item: OwnedItem, itemDef: ItemDef, stat: StatKey): number =>
-  (itemDef.stat === stat ? itemDef.value ?? 0 : 0) +
-  (item.options ?? [])
-    .filter((o: ItemOption) => o.kind !== 'flat' && o.stat === stat)
-    .reduce((sum, o) => sum + o.value, 0)
-
-/** Every percentage either piece touches. The pair is solid and is said above. */
-const percentStats = computed<StatKey[]>(() => {
-  const gear = pickedGear.value
-  const into = def.value
-  const off = wornDef.value
-  if (!gear || !into || !worn.value || !off) return []
-
-  const stats = new Set<StatKey>()
-  const collect = (item: OwnedItem, itemDef: ItemDef) => {
-    if (itemDef.stat && !PAIR_STATS.has(itemDef.stat)) stats.add(itemDef.stat)
-    for (const option of item.options ?? []) {
-      if (option.kind !== 'flat' && !PAIR_STATS.has(option.stat)) stats.add(option.stat)
-    }
-  }
-
-  collect(gear.item, into)
-  collect(worn.value, off)
-
-  return [...stats]
-})
-
 /**
- * What the swap moves, said once per fact.
+ * What the swap moves, and the one case where an upgrade buys nothing.
  *
- * The pair subtracts, because §9.5.4's numbers are solid. A percentage does
- * not: it is projected through the whole kit both ways (§8.1's falloff and
- * ceiling), so what is printed is what the swap is actually worth rather than
- * the difference between two labels.
+ * Both come off `@/game/formulas`, because the prospector sheet asks the same
+ * question of the spares filed behind a slot (§8.2). Two copies of a swap
+ * comparison is two answers waiting to disagree.
  */
-const changes = computed<Array<{ text: string; better: boolean }>>(() => {
-  const gear = pickedGear.value
-  const into = def.value
-  const off = wornDef.value
-  if (!gear || !into || !worn.value || !off) return []
+const changes = computed<SwapChange[]>(() =>
+  pickedGear.value ? swapChanges(game.equipment, pickedGear.value.item, worn.value) : [],
+)
 
-  const out: Array<{ text: string; better: boolean }> = []
-
-  for (const [stat, word] of [['attack', 'atk'], ['defense', 'def']] as const) {
-    const delta = solid(gear.item, into, stat) - solid(worn.value, off, stat)
-    if (delta !== 0) {
-      out.push({ text: `${delta > 0 ? '+' : ''}${delta} ${word}`, better: delta > 0 })
-    }
-  }
-
-  for (const stat of percentStats.value) {
-    const before = aggregateStat(game.equipment, stat, swapLine.value)
-    const after = aggregateAfterSwap(game.equipment, gear.item, worn.value, stat, swapLine.value)
-    if (Math.abs(after - before) < 1e-9) continue
-
-    out.push({ text: statLine(stat, after - before, swapLine.value), better: after > before })
-  }
-
-  return out
-})
-
-/**
- * §8.1 rule 1 -- the swap that buys nothing.
- *
- * A better number on the label and no movement in the total means the kit is
- * already at the ceiling for that stat. Worth saying before the tap: it is the
- * one case where the obvious upgrade is not one.
- */
-const ceilingNote = computed<string>(() => {
-  const gear = pickedGear.value
-  const into = def.value
-  const off = wornDef.value
-  if (!gear || !into || !worn.value || !off) return ''
-
-  for (const stat of percentStats.value) {
-    const before = aggregateStat(game.equipment, stat, swapLine.value)
-    const after = aggregateAfterSwap(game.equipment, gear.item, worn.value, stat, swapLine.value)
-    if (Math.abs(after - before) > 1e-9) continue
-    if (ownPercent(gear.item, into, stat) <= ownPercent(worn.value, off, stat)) continue
-
-    // The labels are stored mid-sentence ("mine time"), and this one opens one.
-    const words = STAT_LABEL[stat]
-
-    return `${words[0]!.toUpperCase()}${words.slice(1)} is capped on your kit — the surplus is wasted.`
-  }
-
-  return ''
-})
+const ceilingNote = computed<string>(() =>
+  pickedGear.value ? swapCeilingNote(game.equipment, pickedGear.value.item, worn.value) : '',
+)
 
 async function drink(key: string): Promise<void> {
   await game.drink(key)
@@ -645,23 +557,9 @@ async function mend(item: OwnedItem): Promise<void> {
                   <StatChips :def="def" :options="picked.item.options ?? []" />
                 </div>
 
-                <!--
-                  §13.3 -- sap for what the swap wins, ember for what it costs.
-                  A stat is neither of those and StatChips is right to draw it
-                  plain; a CHANGE is exactly a thing to weigh, which is the one
-                  reading this plate exists for.
-                -->
                 <div class="moves">
                   <span class="eyebrow">Net change</span>
-                  <span v-if="changes.length" class="chips">
-                    <span
-                      v-for="(change, i) in changes"
-                      :key="i"
-                      class="chip tiny move"
-                      :class="change.better ? 'up' : 'down'"
-                    >{{ change.text }}</span>
-                  </span>
-                  <span v-else class="tiny muted">Identical stats — only condition differs.</span>
+                  <SwapMoves :changes="changes" />
                 </div>
 
                 <p v-if="ceilingNote" class="tiny ceiling">{{ ceilingNote }}</p>
@@ -1041,29 +939,6 @@ async function mend(item: OwnedItem): Promise<void> {
   padding: 8px 11px;
   border-top: 1px solid var(--line);
   background: rgba(0, 0, 0, 0.22);
-}
-
-.moves .chips {
-  display: inline-flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-
-.move {
-  font-variant-numeric: tabular-nums;
-}
-
-/* §13.3 -- sap is what is worth crossing the screen for, ember is what has to
-   be dealt with. A trade is made of both, and this is the one row in the app
-   where a stat is a verdict rather than a fact. */
-.move.up {
-  color: #b7d6a4;
-  background: #1c2519;
-}
-
-.move.down {
-  color: #e0a09b;
-  background: #2a1a19;
 }
 
 /* §8.1 rule 1 -- the qualification, not an alarm. Copper is what the dock

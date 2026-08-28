@@ -1626,6 +1626,20 @@ the game, §11.1.)*
   could not fit a screen. A broken spare offers Repair where Equip would only
   have refused — a plate whose job is to offer what can be done must never
   offer the thing that does nothing.
+
+  **And the row says what the SWAP moves, not what the spare is worth.** A
+  spare is never a question on its own — §8 puts one item in a slot, so the
+  piece on the belt is the other half of every answer — and two rows of
+  absolute numbers is that question handed back as arithmetic. The pair
+  subtracts, because §9.5.4's numbers are solid; a percentage is **projected
+  through the whole kit both ways** instead, so §8.1's falloff and ceiling are
+  in the figure. That is the difference between *+8% travel speed* on a label
+  and *+5%* in the reading, and only the second one is true.
+
+  It is the same arithmetic and the same drawing the bag uses when a piece is
+  tapped there, because it is the same question asked from two rooms. Sap for
+  what the swap wins and ember for what it costs (§13.3) — a stat is neither
+  and is drawn plain, but a *change* is exactly a thing to weigh.
 - **Tuning decision still open:** repair cost must be cheaper than crafting new, but not
   dramatically so, or the crafting-materials sink stalls at endgame.
 

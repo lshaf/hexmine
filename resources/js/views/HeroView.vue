@@ -43,13 +43,14 @@ import {
   STAT_LABEL,
   slotForSkill,
 } from '@/game/catalog'
-import { formatPercent, formatStat, optionStatLine } from '@/game/formulas'
+import { formatPercent, formatStat, optionStatLine, swapChanges } from '@/game/formulas'
 import { CHARACTER, EQUIPMENT } from '@/game/balance'
 import { itemIcon, skillIcon } from '@/icons/procedural'
 import GearCell from '@/components/GearCell.vue'
 import RepairCost from '@/components/RepairCost.vue'
 import GearAction from '@/components/GearAction.vue'
 import StatChips from '@/components/StatChips.vue'
+import SwapMoves from '@/components/SwapMoves.vue'
 import SvgIcon from '@/components/SvgIcon.vue'
 import type { EquipSlot, ItemDef, OwnedItem, SkillKey, StatKey } from '@/game/types'
 
@@ -241,6 +242,11 @@ const candidates = computed(() => {
         def,
         ceiling,
         icon: itemIcon({ slot: def.slot, family: def.family, rarity: def.rarity, palette: def.palette, size: 22 }),
+        // §8 -- one item per slot, so a spare is never a question on its own:
+        // it is a question about the one on the belt. The same call the bag
+        // makes, so both screens answer it with one arithmetic (§8.1's falloff
+        // and ceiling included, which subtracting two labels cannot see).
+        changes: swapChanges(game.equipment, item, picked.value?.item ?? null),
       }
     })
 })
@@ -576,8 +582,17 @@ const ceilings = computed(() =>
               <div v-for="c in candidates" :key="c.item.id" class="spare">
                 <span class="hexicon spare-icon"><SvgIcon :svg="c.icon" /></span>
                 <div class="grow">
-                  <strong class="tiny" :class="`rarity-${c.def.rarity}`">{{ c.def.name }}</strong>
-                  <span class="tiny mono muted">{{ c.item.durability }}/{{ c.ceiling }}</span>
+                  <div class="named">
+                    <strong class="tiny" :class="`rarity-${c.def.rarity}`">{{ c.def.name }}</strong>
+                    <span class="tiny mono muted">{{ c.item.durability }}/{{ c.ceiling }}</span>
+                  </div>
+                  <!-- The whole reason this row is here: not what the spare is
+                       worth, but what swapping to it buys. The durability above
+                       is the rest of the trade. -->
+                  <SwapMoves
+                    :changes="c.changes"
+                    :same="picked.item ? 'Same stats as the one on the belt.' : 'No stats to speak of.'"
+                  />
                 </div>
                 <!-- §8.2 -- a broken spare cannot be put on, so the button
                      that would refuse becomes the button that fixes it. One
@@ -1033,15 +1048,24 @@ const ceilings = computed(() =>
   gap: 9px;
 }
 
-.spare + .spare {
-  margin-top: 6px;
+/* The name and what is left of it are one line; what the swap moves is the
+   next. Two facts about the same trade, in the order they are asked. */
+.spare .grow {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
 }
 
-.spare .grow {
+.named {
   display: flex;
   align-items: baseline;
   gap: 7px;
   min-width: 0;
+}
+
+.spare + .spare {
+  margin-top: 6px;
 }
 
 .empty-note {

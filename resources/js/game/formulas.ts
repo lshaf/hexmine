@@ -565,3 +565,133 @@ export function flatOption(options: ItemOption[], stat: string): number {
     .filter((o) => o.kind === 'flat' && o.stat === stat)
     .reduce((sum, o) => sum + o.value, 0)
 }
+
+// ------------------------------------------------------------------ the swap
+
+/** One fact about a swap, and whether it moves the way the player wants. */
+export interface SwapChange {
+  text: string
+  better: boolean
+}
+
+/** The solid pair (§9.5.4), rolled lines included -- what `statChips` prints. */
+function solid(item: OwnedItem, def: ItemDef, stat: 'attack' | 'defense'): number {
+  return (def[stat] ?? 0) + flatOption(item.options ?? [], stat)
+}
+
+/** One piece's own percentage contribution to a stat, before any kit maths. */
+function ownPercent(item: OwnedItem, def: ItemDef, stat: StatKey): number {
+  return (
+    (def.stat === stat ? def.value ?? 0 : 0) +
+    (item.options ?? [])
+      .filter((o) => o.kind !== 'flat' && o.stat === stat)
+      .reduce((sum, o) => sum + o.value, 0)
+  )
+}
+
+/** Every percentage either piece touches. The pair is solid and is said apart. */
+function percentStats(pieces: Array<{ item: OwnedItem; def: ItemDef }>): StatKey[] {
+  const stats = new Set<StatKey>()
+
+  for (const { item, def } of pieces) {
+    if (def.stat && !PAIR_STATS.has(def.stat)) stats.add(def.stat)
+    for (const option of item.options ?? []) {
+      if (option.kind !== 'flat' && !PAIR_STATS.has(option.stat)) stats.add(option.stat)
+    }
+  }
+
+  return [...stats]
+}
+
+/** Both sides of one swap, or null where either piece is not in the catalog. */
+function swapPieces(
+  incoming: OwnedItem,
+  outgoing: OwnedItem | null,
+): { into: ItemDef; off: ItemDef | null; line: SkillKey | null } | null {
+  const into = ITEM_BY_KEY[incoming.key]
+  if (!into) return null
+
+  const off = outgoing ? ITEM_BY_KEY[outgoing.key] ?? null : null
+  if (outgoing && !off) return null
+
+  return { into, off, line: into.slot ? skillForSlot(into.slot) : null }
+}
+
+/**
+ * What the swap moves, said once per fact.
+ *
+ * §8 puts one item in a slot, so a piece in the pack is never a question on its
+ * own: it is a question about the one already on the belt. Two rows of absolute
+ * numbers is that question handed back to the player as arithmetic.
+ *
+ * The pair subtracts, because §9.5.4's numbers are solid. A percentage does
+ * not: it is projected through the whole kit both ways (§8.1's falloff and
+ * ceiling), so what is printed is what the swap is actually worth rather than
+ * the difference between two labels.
+ *
+ * Against an empty slot the difference IS the piece, so the same call carries
+ * the bare case without a second shape.
+ */
+export function swapChanges(
+  items: OwnedItem[],
+  incoming: OwnedItem,
+  outgoing: OwnedItem | null,
+): SwapChange[] {
+  const pieces = swapPieces(incoming, outgoing)
+  if (!pieces) return []
+
+  const { into, off, line } = pieces
+  const out: SwapChange[] = []
+
+  for (const [stat, word] of [['attack', 'atk'], ['defense', 'def']] as const) {
+    const delta =
+      solid(incoming, into, stat) - (outgoing && off ? solid(outgoing, off, stat) : 0)
+
+    if (delta !== 0) out.push({ text: `${delta > 0 ? '+' : ''}${delta} ${word}`, better: delta > 0 })
+  }
+
+  const both = [{ item: incoming, def: into }]
+  if (outgoing && off) both.push({ item: outgoing, def: off })
+
+  for (const stat of percentStats(both)) {
+    const before = aggregateStat(items, stat, line)
+    const after = aggregateAfterSwap(items, incoming, outgoing, stat, line)
+    if (Math.abs(after - before) < 1e-9) continue
+
+    out.push({ text: statLine(stat, after - before, line), better: after > before })
+  }
+
+  return out
+}
+
+/**
+ * §8.1 rule 1 -- the swap that buys nothing.
+ *
+ * A better number on the label and no movement in the total means the kit is
+ * already at the ceiling for that stat. Worth saying before the tap: it is the
+ * one case where the obvious upgrade is not one.
+ */
+export function swapCeilingNote(
+  items: OwnedItem[],
+  incoming: OwnedItem,
+  outgoing: OwnedItem | null,
+): string {
+  const pieces = swapPieces(incoming, outgoing)
+  if (!pieces || !outgoing || !pieces.off) return ''
+
+  const { into, off, line } = pieces
+
+  for (const stat of percentStats([{ item: incoming, def: into }, { item: outgoing, def: off }])) {
+    const before = aggregateStat(items, stat, line)
+    const after = aggregateAfterSwap(items, incoming, outgoing, stat, line)
+    if (Math.abs(after - before) > 1e-9) continue
+    if (ownPercent(incoming, into, stat) <= ownPercent(outgoing, off, stat)) continue
+
+    // The labels are stored mid-sentence ("mine time"), and this one opens one.
+    const words = STAT_LABEL[stat]
+
+    return `${words[0]!.toUpperCase()}${words.slice(1)} is capped on your kit — the surplus is wasted.`
+  }
+
+  return ''
+}
