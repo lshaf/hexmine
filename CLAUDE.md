@@ -1925,6 +1925,17 @@ question asked a step apart: that half plans a walk and this half plans a
 gather. It is also the one screen reachable from every hex, which is the only
 place a shopping list is worth having.
 
+**Two tabs rather than two stacked sections.** They were stacked, which put the
+slate below however many jobs happened to be out — so the half you read while
+standing in a field was the half you had to scroll a bench ledger to reach. Two,
+and no third: there is no state a bench job is in that the row cannot say
+itself.
+
+**Every material on it is drawn as well as named.** A shopping list read in a
+field is scanned rather than read, and the glyph is what a player recognises in
+the bag they are comparing it against — spelling the names alone made it the one
+list in the game you had to parse.
+
 **What you are short of is worked out where it is drawn, never stored.** The
 bag moves with every haul, so a written-down answer would be stale before it
 was read. The line reads sap when the bag already covers it and names the

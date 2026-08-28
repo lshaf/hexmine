@@ -11,7 +11,7 @@
  * the top -- the clock is the thing you cannot change and the walk is the thing
  * you can.
  */
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useGame } from '@/stores/game'
 import { ITEM_BY_KEY, MATERIALS, RARITY_LABEL, RECIPE_BY_KEY, stationForRarity } from '@/game/catalog'
 import { formatDuration, placeLabel } from '@/game/formulas'
@@ -26,6 +26,22 @@ import type { CraftJob, MaterialKey, ProcessingJob } from '@/game/types'
 type BenchJob = CraftJob | ProcessingJob
 
 const game = useGame()
+
+/**
+ * §8.4 -- two tabs, because this page holds two questions rather than one list.
+ *
+ * WORK is what is already in a building and has to be walked back to; SLATE is
+ * what you have not started yet, and it plans a gather rather than a route.
+ * They were stacked, which meant the slate was below however many jobs happened
+ * to be out -- so the half of the page you read while standing in a field was
+ * the half you had to scroll past a bench ledger to reach.
+ *
+ * Two, and no third. There is no state a bench job is in that this page cannot
+ * say on the row itself.
+ */
+type Tab = 'work' | 'slate'
+
+const tab = ref<Tab>('work')
 
 const here = (job: BenchJob) =>
   job.col === game.character?.col && job.row === game.character?.row
@@ -127,6 +143,32 @@ const slateReady = computed(() => slate.value.filter((l) => l.ready).length)
 
 <template>
   <div class="page">
+    <div class="tabs" role="tablist">
+      <button
+        type="button"
+        role="tab"
+        class="tab"
+        :class="{ on: tab === 'work' }"
+        :aria-selected="tab === 'work'"
+        @click="tab = 'work'"
+      >
+        On a bench
+        <span class="tally" :class="{ ready: done.length > 0 }">{{ game.benchJobs.length }}</span>
+      </button>
+      <button
+        type="button"
+        role="tab"
+        class="tab"
+        :class="{ on: tab === 'slate' }"
+        :aria-selected="tab === 'slate'"
+        @click="tab = 'slate'"
+      >
+        Slate
+        <span class="tally" :class="{ ready: slateReady > 0 }">{{ slate.length }}/{{ SLATE_CAP }}</span>
+      </button>
+    </div>
+
+    <template v-if="tab === 'work'">
     <p v-if="!game.benchJobs.length" class="nothing tiny muted">
       Nothing is on a bench. A craft or a processing run waits at the settlement you
       started it in, until you come back for it.
@@ -203,43 +245,52 @@ const slateReady = computed(() => slate.value.filter((l) => l.ready).length)
       </section>
     </template>
 
+    </template>
+
     <!-- ---------------------------------------------------------- the slate -->
-    <!-- §8.4 -- outside the `v-else`, because what you mean to make is worth
-         reading whether or not anything is cooking. It is the half of this page
-         that plans a gather rather than a walk. -->
-    <section v-if="slate.length" class="section">
-      <div class="row" style="gap: 8px; margin-bottom: 3px">
-        <h3 class="head">On the slate</h3>
-        <span class="tally" :class="{ ready: slateReady > 0 }">
-          {{ slateReady > 0 ? `${slateReady} affordable` : `${slate.length}/${SLATE_CAP}` }}
-        </span>
-      </div>
-      <p class="tiny muted note">
-        What you mean to make, and what is still missing for it. Nothing is
-        reserved — this is a note to yourself, not a claim on the bag.
+    <template v-else>
+      <p v-if="!slate.length" class="nothing tiny muted">
+        The slate is empty. Mark a recipe at a bench or a processing line and it
+        is remembered here — with what you are still short of for it, wherever
+        you happen to be standing.
       </p>
 
-      <div v-for="line in slate" :key="line.key" class="line inset" :class="{ ready: line.ready }">
-        <SvgIcon :svg="line.icon" boxed :size="26" />
-        <div class="grow">
-          <div class="row-between">
-            <strong class="tiny">{{ line.name }}</strong>
-            <span class="tiny muted makes">{{ line.makes }}</span>
+      <template v-else>
+        <p class="tiny muted note">
+          What you mean to make, and what is still missing for it. Nothing is
+          reserved — this is a note to yourself, not a claim on the bag.
+          <template v-if="slateReady">
+            <strong class="done">{{ slateReady }} you can afford now.</strong>
+          </template>
+        </p>
+
+        <div v-for="line in slate" :key="line.key" class="line inset" :class="{ ready: line.ready }">
+          <SvgIcon :svg="line.icon" boxed :size="26" />
+          <div class="grow">
+            <div class="row-between">
+              <strong class="tiny">{{ line.name }}</strong>
+              <span class="tiny muted makes">{{ line.makes }}</span>
+            </div>
+            <!-- Every material is drawn as well as named. A shopping list you
+                 read in a field is scanned rather than read, and the glyph is
+                 what a player recognises in the bag they are comparing it to. -->
+            <div class="inputs">
+              <span
+                v-for="input in line.inputs"
+                :key="input.key"
+                class="input tiny"
+                :class="{ short: input.have < input.need }"
+              >
+                <SvgIcon :svg="materialIcon(MATERIALS[input.key], 15)" />
+                <span class="mono">{{ input.have }}/{{ input.need }}</span>
+                <span class="iname">{{ MATERIALS[input.key].name }}</span>
+              </span>
+            </div>
           </div>
-          <div class="inputs">
-            <span
-              v-for="input in line.inputs"
-              :key="input.key"
-              class="input tiny mono"
-              :class="{ short: input.have < input.need }"
-            >
-              {{ MATERIALS[input.key].name }} {{ input.have }}/{{ input.need }}
-            </span>
-          </div>
+          <SlateMark :recipe="line.key" />
         </div>
-        <SlateMark :recipe="line.key" />
-      </div>
-    </section>
+      </template>
+    </template>
   </div>
 </template>
 
@@ -288,6 +339,34 @@ const slateReady = computed(() => slate.value.filter((l) => l.ready).length)
   padding: 0 2px;
 }
 
+/* --------------------------------------------------------------------- tabs */
+
+.tabs {
+  display: flex;
+  gap: 6px;
+}
+
+.tab {
+  flex: 1 1 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 8px 10px;
+  font-size: 12px;
+  color: var(--vellum-dim);
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid transparent;
+  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+  cursor: pointer;
+}
+
+.tab.on {
+  color: var(--vellum);
+  border-color: var(--line);
+  background: var(--ink-panel);
+}
+
 /* -------------------------------------------------------------- the slate */
 
 .line {
@@ -306,8 +385,25 @@ const slateReady = computed(() => slate.value.filter((l) => l.ready).length)
 .inputs {
   display: flex;
   flex-wrap: wrap;
-  gap: 3px 8px;
-  margin-top: 3px;
+  gap: 4px 10px;
+  margin-top: 4px;
+}
+
+.input {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  line-height: 1;
+}
+
+.iname {
+  color: var(--vellum-dim);
+}
+
+/* Ember on the count AND the name of what is missing, because the pair is one
+   fact: the shortfall is what a player is scanning this list for. */
+.input.short .iname {
+  color: inherit;
 }
 
 /* Ember on the shortfall alone, because that is the state to deal with. */
@@ -315,7 +411,7 @@ const slateReady = computed(() => slate.value.filter((l) => l.ready).length)
   color: var(--ember);
 }
 
-.input:not(.short) {
+.input:not(.short) .mono {
   color: var(--vellum-dim);
 }
 </style>
