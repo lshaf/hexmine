@@ -732,6 +732,37 @@ final class WorldGen
     }
 
     /**
+     * §5.7 -- is this ground briefly worth more than usual, and until when.
+     *
+     * The herd's own trick (§5.5): a time bucket hashed with the hex, so a
+     * pocket nobody has walked onto costs no storage and every client agrees on
+     * where it is.
+     *
+     * No biome test, and that is the difference between the two. A herd is
+     * hunting's and belongs on hunting's ground, because a LINE that pays out
+     * everywhere is a line the map cannot put anywhere. A pocket is not a line:
+     * it is the hex being good today, and it pays into whatever that hex
+     * already trains -- so keeping it to one biome would be handing one of the
+     * five a bonus the other four never see, which is the thing §8 rule 4 says
+     * not to do.
+     */
+    private static function pocketUntil(int $col, int $row, int $now): ?int
+    {
+        $lifetime = Balance::scaled(Balance::POCKET_LIFETIME_MS);
+        $bucket = intdiv($now, $lifetime);
+
+        // A different salt and a different mix from the herd's, or the two
+        // would land on the same hexes on the same schedule for ever.
+        $h = Hash::hash2($col * 13 + $bucket, $row * 41 + $bucket, Balance::mapSeed() ^ 0x0DDF);
+
+        if (Hash::rand01($h) > Balance::POCKET_CHANCE) {
+            return null;
+        }
+
+        return ($bucket + 1) * $lifetime;
+    }
+
+    /**
      * §9.5.1 -- is a pack standing here, and which one.
      *
      * The same trick the herd uses (§5.5): a time bucket hashed with the hex, so
@@ -943,6 +974,15 @@ final class WorldGen
             // needs something to have been eating.
             'herdUntil' => $water === null && $settlement === null && $dungeon === null && ! $barren
                 ? self::herdUntil($col, $row, $biome, $now)
+                : null,
+            // §5.7 -- and the ground itself may be having a good few hours.
+            // The test is the SEAM rather than the herd's list of exclusions:
+            // a pocket is a hex being worth more to work, so a hex there is
+            // nothing to work on cannot have one. Dead ground and a lake fall
+            // out of that for free, and so does a settlement, which §6 says is
+            // worked ground with nothing left to take.
+            'pocketUntil' => $material !== null && $regrowsAt <= $now
+                ? self::pocketUntil($col, $row, $now)
                 : null,
             // §9.5.1 -- nothing camps on open water, and nothing camps on a
             // settlement or a dungeon mouth either: a pack parked on a capital

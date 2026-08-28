@@ -355,6 +355,47 @@ final class Balance
 
     public const HERD_CHANCE = 0.06;
 
+    // ------------------------------------------------------- rich ground §5.7
+
+    /**
+     * §5.7 -- a pocket: ground that is briefly worth more than it usually is.
+     *
+     * The herd's machinery on any workable hex, and deliberately NOT the herd's
+     * argument. A herd is hunting's own thing and stands on hunting's own
+     * ground (§5.5), because a line that pays out everywhere is a line the map
+     * cannot put anywhere. A pocket is not a line at all -- it is the hex being
+     * good today -- so it belongs to whichever line that hex already trains,
+     * and every one of the five gets the same chance at one.
+     */
+    public const POCKET_LIFETIME_MS = 4 * self::HOUR;
+
+    /**
+     * About one hex in twenty-five.
+     *
+     * Sight is one hex (§5.6), so a pocket is met by walking onto it and never
+     * by scanning for it: on a twenty-five hex journey you pass about one. Much
+     * rarer and nobody would ever see the mechanic; much commoner and a rich
+     * hex stops being a reason to stop.
+     */
+    public const POCKET_CHANCE = 0.04;
+
+    /**
+     * Half again on the haul, and it is a GROUND multiplier like the ring's.
+     *
+     * §7.3 keeps yield and mine time as two different questions: a pocket is
+     * how big the haul is, never how fast it comes out. Half again is felt
+     * without being a reason to abandon a plan -- the ring premium is already
+     * ×1.35 in the mid ring and ×1.9 inside, so this is comfortably under the
+     * gradient the map is built on.
+     *
+     * §2 -- and it is not a faucet, because it cannot be re-rolled or farmed.
+     * A hex has two seats and depletes for nine hours after them (§5.1), and a
+     * pocket lives four: it pays at most two hauls, to whoever is standing
+     * there, and there is no second roll to wait for. Supply is capped by hexes
+     * and hours, exactly as §9.5.1 caps packs.
+     */
+    public const POCKET_YIELD = 1.5;
+
     /**
      * §8.4 -- how long a bench holds onto a thing, by what it is making.
      *

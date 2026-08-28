@@ -19,7 +19,7 @@ import { MATERIALS, RING_LABEL, SKILL_BY_KEY, skillForMaterial } from '@/game/ca
 import { formatDuration, formatSpan } from '@/game/formulas'
 import { MINING } from '@/game/balance'
 import { groundLabel } from '@/game/ground'
-import { hexDistance } from '@/map/hexGeometry'
+import { groundMark, hexDistance } from '@/map/hexGeometry'
 import { materialIcon } from '@/icons/procedural'
 import { deadGlyph, dungeonProp, unscoutedGlyph, waterGlyph } from '@/map/props'
 import HexAction from '@/shell/HexAction.vue'
@@ -42,6 +42,25 @@ const distance = computed(() => {
 const open = ref(false)
 
 const depleted = computed(() => Boolean(tile.value && tile.value.regrowsAt > game.now))
+
+/**
+ * §5.7 -- rich ground, and when it closes.
+ *
+ * Read off the PREVIEW rather than the tile, because it is here to explain a
+ * haul the preview already reports: the server decided both in one pass, and
+ * two sources for one fact is two chances to disagree about whether the bonus
+ * applied.
+ */
+const pocketUntil = computed(() => preview.value?.pocketUntil ?? null)
+
+/**
+ * The map's own mark, at card scale.
+ *
+ * The same two shapes cut from the same geometry, so the thing on the hex and
+ * the row explaining it are recognisably one symbol rather than a picture and a
+ * sentence about it. Learning it once is the point.
+ */
+const POCKET_MARK = { socket: groundMark(20), core: groundMark(8.5) }
 
 
 /**
@@ -417,6 +436,20 @@ watch(open, (isOpen) => {
             {{ mat.name }} · trains {{ SKILL_BY_KEY[mine.skill ?? skillForMaterial(mat.key)].name }}
           </p>
 
+          <!-- §5.7 -- why the hauls below are bigger than this ground usually
+               pays. It carries the map's own mark so the symbol on the hex and
+               the sentence about it are one thing, and it is the only line on
+               the card with a clock in it: a pocket is the one fact here that
+               expires. -->
+          <div v-if="pocketUntil" class="pocket">
+            <svg class="mark" viewBox="-12 -8 24 16" aria-hidden="true">
+              <path :d="POCKET_MARK.socket" fill="#1a231f" />
+              <path :d="POCKET_MARK.core" fill="#d8b34a" />
+            </svg>
+            <span class="tiny grow">Rich ground — half again on every haul</span>
+            <span class="tiny readout">{{ formatDuration(pocketUntil - game.now) }} left</span>
+          </div>
+
           <!-- §4 / §7.3 -- one price line per verb, because this hex answers to
                up to three of them and each has its own clock now: a dig takes
                the seam at the pick's rate, bare hands take what is lying about
@@ -781,6 +814,28 @@ watch(open, (isOpen) => {
   gap: 4px;
   font-size: 11px;
   color: var(--vellum-dim);
+}
+
+/*
+ * §5.7 -- gold, the palette's one colour for worth (§13.3), and the only row on
+ * the card that runs out. A hairline rather than a fill: the hauls below are
+ * the news and this is the reason for them, so it sits beside the price list
+ * rather than shouting over it.
+ */
+.pocket {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  padding: 5px 9px;
+  border: 1px solid rgba(216, 179, 74, 0.45);
+  color: var(--gold);
+}
+
+.pocket .mark {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 15px;
 }
 
 /* Gold, the same reading the dock and the map already give a herd: an

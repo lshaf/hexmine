@@ -66,7 +66,7 @@ final class WorldParityTest extends TestCase
         $this->assertNotEmpty($lines);
 
         foreach ($lines as $line) {
-            [$coord, $biome, $variant, $ring, $material, $dead, $baseSeconds, $baseYield, $extractions, $settlement, $dungeon, $water, $pack, $propSeed]
+            [$coord, $biome, $variant, $ring, $material, $dead, $baseSeconds, $baseYield, $extractions, $settlement, $dungeon, $water, $pack, $pocket, $propSeed]
                 = explode('|', $line);
 
             [$col, $row] = array_map('intval', explode(',', $coord));
@@ -87,6 +87,9 @@ final class WorldParityTest extends TestCase
                 $tile['dungeon'] ? $tile['dungeon']['key'] : '-',
                 $tile['water'] ?? '-',
                 $tile['pack'] ? $tile['pack']['key'].':'.$tile['pack']['bucket'] : '-',
+                // §5.7 -- rich ground, pinned like the pack: a drift takes half
+                // again on the haul away from a hex somebody is standing on.
+                $tile['pocketUntil'] ?? '-',
                 $tile['propSeed'],
             ]);
 
@@ -94,7 +97,7 @@ final class WorldParityTest extends TestCase
 
             // Silence unused-variable noise while keeping the destructure
             // readable as documentation of the fixture format.
-            unset($biome, $variant, $ring, $material, $dead, $baseSeconds, $baseYield, $extractions, $settlement, $dungeon, $water, $pack, $propSeed);
+            unset($biome, $variant, $ring, $material, $dead, $baseSeconds, $baseYield, $extractions, $settlement, $dungeon, $water, $pack, $pocket, $propSeed);
         }
     }
 

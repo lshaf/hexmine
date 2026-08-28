@@ -1599,6 +1599,12 @@ class GameService
             'barrenThreshold' => Balance::BARREN_THRESHOLD,
             'herdLifetimeMs' => Balance::scaled(Balance::HERD_LIFETIME_MS),
             'herdChance' => Balance::HERD_CHANCE,
+            // §5.7 -- the pocket, sent for the same reason: the field is
+            // mirrored and the numbers are not, so retuning how rich the ground
+            // gets cannot silently desync the map the client draws.
+            'pocketLifetimeMs' => Balance::scaled(Balance::POCKET_LIFETIME_MS),
+            'pocketChance' => Balance::POCKET_CHANCE,
+            'pocketYield' => Balance::POCKET_YIELD,
             // §9.5.1 -- sent rather than compiled in, like every other
             // generation constant: the algorithm is mirrored, the numbers are
             // not, so tuning the rings cannot silently desync the two.
@@ -2909,6 +2915,7 @@ class GameService
                 'note' => null,
                 'unseen' => true,
                 'warnings' => [],
+                'pocketUntil' => null,
                 // §9.5.3 -- unknown rather than false, strictly, but the pin is
                 // about the ground under your feet and this hex is not it. The
                 // key is here because every caller reads it, and a preview
@@ -2947,6 +2954,7 @@ class GameService
             // §9.5.3 -- something is standing on the hex you are on.
             'pinned' => false,
             'warnings' => [],
+            'pocketUntil' => null,
         ];
 
         if ($pin !== null) {
@@ -3022,6 +3030,13 @@ class GameService
         $material = $gathering
             ? Catalog::BIOME_SCRAP[$tile['biome']]
             : $variants[$reach]['material'];
+
+        // §5.7 -- rich ground, and it counts for the bare-handed verb too. §4.0
+        // says scrap is the same haul size at a fraction of the worth, so a
+        // pocket that skipped gathering would be a bonus you need a tool to
+        // collect -- and the whole of §12's opening arc is worked by hand.
+        $pocketUntil = ($tile['pocketUntil'] ?? null) > $now ? $tile['pocketUntil'] : null;
+        $pocket = $pocketUntil !== null ? Balance::POCKET_YIELD : 1.0;
 
         // The slot keys are the nouns -- axe, pickaxe, bow, hammer, sickle.
         $tool = Catalog::slotForSkill($skillKey);
@@ -3104,12 +3119,19 @@ class GameService
             // which would otherwise print a clock beside a dead button for
             // anybody past level ten of the line.
             'able' => $mine['able'] && ! ($bare && ! $gathering),
+            // §5.7 -- a pocket multiplies the GROUND, beside the ring premium
+            // and never inside the gear aggregate: it is a fact about the hex
+            // for the next few hours, not something the player is wearing, so
+            // §8.1's ceiling has no business clamping it.
             'yield' => Formulas::mineYield(
                 $tile['baseYield'],
                 $skillLevel,
                 $bonuses['yield'],
-                WorldGen::ringYield($tile['ring']),
+                WorldGen::ringYield($tile['ring']) * $pocket,
             ),
+            // §5.7 -- and the card has to SAY so. A haul half again the usual
+            // size with nothing explaining it is worse than no bonus at all.
+            'pocketUntil' => $pocketUntil,
             'material' => $material,
             'bare' => $bare,
             // §4 -- what this ground can give up, most likely first. The ODDS

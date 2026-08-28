@@ -1671,6 +1671,120 @@ final class GameLoopTest extends TestCase
         }
     }
 
+    // ------------------------------------------------------- rich ground §5.7
+
+    /** Stand on a hex whose ground is having a good few hours. */
+    private function standOnAPocket(): array
+    {
+        $now = $this->game->now();
+
+        for ($col = -Balance::mapRadius(); $col <= Balance::mapRadius(); $col++) {
+            for ($row = -Balance::mapRadius(); $row <= Balance::mapRadius(); $row++) {
+                $tile = $this->game->buildTile($col, $row, $now);
+                if (($tile['pocketUntil'] ?? null) !== null && $tile['pocketUntil'] > $now) {
+                    $this->character->update(['col' => $col, 'row' => $row]);
+                    $this->character->refresh();
+
+                    return [$col, $row];
+                }
+            }
+        }
+
+        $this->fail('no rich ground anywhere on the map');
+    }
+
+    /**
+     * §5.7 -- a pocket pays half again on the haul, and NOTHING on the clock.
+     *
+     * §7.3 keeps the two apart on purpose: yield is how big the haul is and
+     * attack is how fast it comes out. A pocket that also shortened the mine
+     * would be a second answer to a question the tool already answers.
+     */
+    public function test_rich_ground_pays_more_and_takes_no_less_time(): void
+    {
+        [$col, $row] = $this->standOnAPocket();
+        $character = $this->character->fresh();
+
+        $rich = $this->game->previewTile($character, $col, $row);
+        $this->assertNotNull($rich['pocketUntil']);
+
+        // The same hex costed as though the pocket had closed. Everything else
+        // about the tile is a pure function of (col, row, seed), so this is the
+        // one variable moving.
+        $plain = Formulas::mineYield(
+            $this->game->buildTile($col, $row, $this->game->now())['baseYield'],
+            (int) ($character->skills()->where(
+                'skill_key',
+                Catalog::skillForMaterial($rich['material']),
+            )->value('level') ?? 1),
+            0.0,
+            WorldGen::ringYield(WorldGen::ringOf($col, $row)),
+        );
+
+        $this->assertGreaterThan($plain, $rich['yield'], 'rich ground paid no more');
+        $this->assertSame(
+            $rich['seconds'],
+            $this->game->previewTile($character, $col, $row)['seconds'],
+        );
+    }
+
+    /**
+     * §4.0 -- and it counts bare-handed, because scrap is the same haul size at
+     * a fraction of the worth. A bonus you need a tool to collect would miss
+     * the whole of §12's opening arc, which is worked by hand.
+     */
+    public function test_rich_ground_counts_for_bare_hands_too(): void
+    {
+        [$col, $row] = $this->standOnAPocket();
+
+        $gather = $this->game->previewGather($this->character->fresh(), $col, $row);
+
+        $this->assertNotNull($gather['pocketUntil']);
+        $this->assertTrue($gather['yield'] > 0);
+    }
+
+    /**
+     * §5.7 -- a pocket is the GROUND, and a herd is not standing in it.
+     *
+     * The herd walked here and pays out of its own table (§5.5); the ground
+     * being good today has nothing to do with the animal on top of it.
+     */
+    public function test_rich_ground_does_not_reach_a_herd(): void
+    {
+        [$col, $row] = $this->standOnAHerd();
+
+        $hunt = $this->game->previewHunt($this->character->fresh(), $col, $row);
+
+        $this->assertArrayNotHasKey('pocketUntil', $hunt, 'a hunt was costed against the ground');
+    }
+
+    /**
+     * §5.7 -- nothing to work, no pocket. Water, dead ground and a settlement
+     * all fall out of that one test rather than needing three of their own.
+     */
+    public function test_rich_ground_never_lands_where_there_is_nothing_to_work(): void
+    {
+        $now = $this->game->now();
+        $checked = 0;
+
+        for ($col = -Balance::mapRadius(); $col <= Balance::mapRadius(); $col += 3) {
+            for ($row = -Balance::mapRadius(); $row <= Balance::mapRadius(); $row += 3) {
+                $tile = WorldGen::generateTile($col, $row, $now);
+                if ($tile['material'] !== null) {
+                    continue;
+                }
+
+                $checked++;
+                $this->assertNull(
+                    $tile['pocketUntil'],
+                    "rich ground on a hex with no seam at {$col},{$row}",
+                );
+            }
+        }
+
+        $this->assertGreaterThan(100, $checked, 'swept no unworkable ground at all');
+    }
+
     /** §5.6 -- a herd is live state, so it is bounded by the sight disc. */
     public function test_a_herd_outside_sight_will_not_be_costed(): void
     {

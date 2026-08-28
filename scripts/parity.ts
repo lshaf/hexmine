@@ -62,6 +62,7 @@ for (const line of lines) {
     dungeon,
     water,
     pack,
+    pocket,
     propSeed,
   ] = line.split('|')
   const [col, row] = coord!.split(',').map(Number)
@@ -87,6 +88,9 @@ for (const line of lines) {
     // §9.5.1 -- the pack, and with it the per-hex bucket offset both sides fold
     // into the roll. A drift here moves packs under characters standing on one.
     tile.pack ? `${tile.pack.key}:${tile.pack.bucket}` : '-',
+    // §5.7 -- rich ground, pinned for the same reason as the pack: a drift
+    // takes half again on the haul away from a hex somebody is standing on.
+    tile.pocketUntil === undefined ? '-' : String(tile.pocketUntil),
     String(tile.propSeed),
   ].join('|')
 
@@ -103,6 +107,7 @@ for (const line of lines) {
     dungeon,
     water,
     pack,
+    pocket,
     propSeed,
   ].join('|')
 

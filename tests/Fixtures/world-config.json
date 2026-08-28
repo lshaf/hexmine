@@ -33,6 +33,9 @@
     },
     "herdLifetimeMs": 1440000,
     "herdChance": 0.06,
+    "pocketLifetimeMs": 1440000,
+    "pocketChance": 0.04,
+    "pocketYield": 1.5,
     "packLifetimeMs": 720000,
     "packChance": {
         "outer": 0.04,

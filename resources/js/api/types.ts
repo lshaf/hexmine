@@ -376,6 +376,14 @@ export interface WorkPreview {
   /** Which of the three verbs this costing is for. */
   activity: 'gathering' | 'mining' | 'hunting'
   /**
+   * §5.7 -- when the pocket on this hex closes, or null if there is none.
+   *
+   * Here as well as on the tile because it is the reason `yield` is bigger than
+   * usual, and a haul half again the normal size with nothing explaining it is
+   * worse than no bonus at all.
+   */
+  pocketUntil: number | null
+  /**
    * §9.5.3 -- something is standing on the hex under your feet.
    *
    * Set on every costing in sight, not only this hex's: the pin is about the

@@ -62,6 +62,10 @@ export interface WorldConfig {
   barrenThreshold: Record<Ring, number>
   herdLifetimeMs: number
   herdChance: number
+  /** §5.7 -- the pocket: how long rich ground stands, how often, and what it pays. */
+  pocketLifetimeMs: number
+  pocketChance: number
+  pocketYield: number
   /** §9.5.1 -- how long a pack stands, and the odds by ring. */
   packLifetimeMs: number
   packChance: Record<Ring, number>
@@ -715,6 +719,27 @@ function herdUntil(col: number, row: number, biome: Biome, now: number): number 
 }
 
 /**
+ * §5.7 -- is this ground briefly worth more than usual, and until when.
+ *
+ * The mirror of WorldGen::pocketUntil(). The herd's own trick, and deliberately
+ * not the herd's argument: a herd is hunting's and belongs on hunting's ground,
+ * while a pocket is the hex being good today and pays into whatever that hex
+ * already trains. Keeping it to one biome would hand one of the five a bonus
+ * the other four never see (§8 rule 4).
+ */
+function pocketUntil(col: number, row: number, now: number): number | undefined {
+  const c = cfg()
+
+  const bucket = Math.floor(now / c.pocketLifetimeMs)
+  // A different salt and mix from the herd's, or the two would land on the same
+  // hexes on the same schedule for ever.
+  const h = hash2(col * 13 + bucket, row * 41 + bucket, c.seed ^ 0x0ddf)
+  if (rand01(h) > c.pocketChance) return undefined
+
+  return (bucket + 1) * c.pocketLifetimeMs
+}
+
+/**
  * §9.5.1 -- is a pack standing here, and which one.
  *
  * The mirror of WorldGen::packAt(). Same trick the herd uses, plus a per-hex
@@ -911,6 +936,13 @@ export function generateTile(
     // have been eating.
     herdUntil:
       water || settlement || dungeon || barren ? undefined : herdUntil(col, row, biome, now),
+    // §5.7 -- and the ground itself may be having a good few hours. The test
+    // is the SEAM rather than the herd's list of exclusions: a pocket is a hex
+    // being worth more to work, so a hex with nothing to work cannot have one.
+    pocketUntil:
+      material === undefined || (mutation?.regrowsAt ?? 0) > now
+        ? undefined
+        : pocketUntil(col, row, now),
     // §9.5.1 -- nothing camps on water, a settlement or a dungeon mouth. The
     // second is the load-bearing one: a pack on a capital would lock a region
     // out of the only five-line bench it has.

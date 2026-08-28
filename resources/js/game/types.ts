@@ -742,6 +742,14 @@ export interface Tile {
   /** Temporary herd marker, §5.5. */
   herdUntil?: number
   /**
+   * §5.7 -- a pocket: this ground is briefly worth more to work than usual.
+   *
+   * Derived like the herd, so a pocket nobody has walked onto costs no storage.
+   * Unlike the herd it belongs to no line -- it pays into whatever the hex
+   * already trains, which is why it can appear on any workable ground.
+   */
+  pocketUntil?: number
+  /**
    * §9.5.1 -- the pack standing here this bucket, if any. Derived like the
    * herd, so an unmet pack costs no storage; whether somebody has already
    * fought it is the one thing the seed cannot say, and that arrives with the

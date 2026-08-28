@@ -361,6 +361,12 @@ A herd on a four-hour clock that anyone with a crude bow can shoot is a faucet f
 the one tier the dungeons exist to gate, and §9.4's ladder is supposed to end at a
 boss rather than at a deer. Raid materials come from raids.
 
+**Rich ground is the other marker with this shape, and it is not this** (§5.7).
+A pocket runs on the same time-bucketed hash and answers a different question:
+a herd is *hunting's own work*, on hunting's own ground, while a pocket is any
+hex being briefly worth more to whichever line already works it. That is why one
+is biome-locked and the other cannot be.
+
 **Plains and nowhere else, because that is hunting's ground.** Herds briefly wandered
 onto every biome, on the argument that a bow should be worth carrying on a walk you took
 for another reason. It made hunting the one line with no biome of its own — every other
@@ -456,6 +462,76 @@ Three consequences, all deliberate:
 The glyphs are what keep a fog navigable: you can always see *that* there is a
 capital over there, which is what makes deciding to walk to it possible, and
 never *what is happening* there, which is what makes arriving worth something.
+
+### 5.7 Pockets — ground that is briefly worth more
+
+A **pocket** is a hex having a good few hours. It stands for about **four**, it
+pays **half again on the haul**, and it can appear on **any workable ground**.
+
+It is the herd's machinery (§5.5) and deliberately **not the herd's argument**.
+A herd is a time-bucketed hash on the hex, derivable so that one nobody has
+walked onto costs no storage, and a pocket is the same trick with its own salt.
+But a herd belongs to *hunting* and stands on hunting's own ground, because a
+**line** that pays out everywhere is a line the map cannot put anywhere. A
+pocket is not a line. It is the hex being good today, and it pays into whatever
+that hex already trains — so restricting it to one biome would hand one of the
+five a bonus the other four never see, which is exactly what §8 rule 4 forbids.
+
+**It is yield, never the clock.** §7.3 keeps the two apart on purpose: yield is
+how big the haul is and attack is how fast it comes out. A pocket that also
+shortened the mine would be a second answer to a question the tool already
+answers, and the §8.0 ladder is what owns that one.
+
+**It multiplies the GROUND, beside the ring premium** (§5.2), and never joins
+the gear aggregate. It is a fact about the hex for the afternoon rather than
+something a player is wearing, so §8.1's ceiling has no business clamping it —
+the same reason the ring's ×1.35 and ×1.9 are not clamped either. Half again is
+comfortably under that gradient, which is the point: rich ground is a reason to
+stop where you are, never a reason to abandon the walk inward.
+
+**It counts bare-handed** (§4.0). Scrap is the same haul size at a fraction of
+the worth, so a pocket that needed a tool would be a bonus locked away from the
+whole of §12's opening arc, which is worked by hand.
+
+**A herd standing on one gets nothing from it.** The herd walked here and pays
+out of its own table; the ground being good has nothing to do with the animal on
+top of it. That is the same line §5.5 already draws when it says nothing comes
+off the hex for a hunt.
+
+**Nothing to work, no pocket.** The test is the seam rather than a list of
+exclusions — water, dead ground (§5.2), a settlement and a depleted hex all fall
+out of that one rule, and a mark on ground nobody can work would be an
+advertisement for a refusal.
+
+**§2 — it is not a faucet, because it cannot be farmed or re-rolled.** A hex has
+two seats and then depletes for nine hours (§5.1); a pocket lives four. It pays
+at most two hauls, to whoever is standing there, and there is no second roll to
+wait for. Supply is capped by hexes and hours, exactly as §9.5.1 caps packs.
+
+**On the map it is the one mark that is a HOLE**, and that is the whole of the
+drawing. Everything else transient is a *visitor* — a herd is an animal side-on,
+a pack is a dark mass with two lit eyes, a corpse is that mass gone still. A
+pocket is not standing on the hex, it **is** the hex, so it is cut from the
+ground with `groundMark`, which inherits the tile's own squash (§13.2) and lies
+in the stone rather than floating over it.
+
+Two nested marks rather than one, because a single gold lozenge is already
+taken: that is §4's contested-ring tell, and moving it sideways would be one
+shape saying two things. A **gold core in a dark socket** reads as ground opened
+with something in it, and the two are legible as relatives — because they are.
+Both say this ground pays better; one for good, one for the afternoon. The core
+is exactly the rare tell's size on purpose: same core, different setting.
+
+It sits on the **left shoulder**, which is the one part of the face nothing else
+uses — the rare tell is top-centre, the work marks bottom-centre, and the
+creatures own the middle — and it is drawn with the late marks rather than the
+props, so a stand of conifers cannot hide the one thing saying *work this hex
+now*.
+
+**The card carries the same mark and the sentence**, because a haul half again
+the usual size with nothing explaining it is worse than no bonus at all. It is
+the only row on a tile card with a clock in it, since a pocket is the one fact
+there that expires.
 
 ---
 
