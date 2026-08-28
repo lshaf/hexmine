@@ -19,9 +19,9 @@ import { MATERIALS, RING_LABEL, SKILL_BY_KEY, skillForMaterial } from '@/game/ca
 import { formatDuration, formatSpan } from '@/game/formulas'
 import { MINING } from '@/game/balance'
 import { groundLabel } from '@/game/ground'
-import { groundMark, hexDistance } from '@/map/hexGeometry'
+import { hexDistance } from '@/map/hexGeometry'
 import { materialIcon } from '@/icons/procedural'
-import { deadGlyph, dungeonProp, unscoutedGlyph, waterGlyph } from '@/map/props'
+import { deadGlyph, dungeonProp, pocketSpecimen, unscoutedGlyph, waterGlyph } from '@/map/props'
 import HexAction from '@/shell/HexAction.vue'
 import SvgIcon from './SvgIcon.vue'
 import LineMarks from './LineMarks.vue'
@@ -54,13 +54,16 @@ const depleted = computed(() => Boolean(tile.value && tile.value.regrowsAt > gam
 const pocketUntil = computed(() => preview.value?.pocketUntil ?? null)
 
 /**
- * The map's own mark, at card scale.
+ * §5.7 -- the same animal the map draws on the hex, at card scale.
  *
- * The same two shapes cut from the same geometry, so the thing on the hex and
- * the row explaining it are recognisably one symbol rather than a picture and a
- * sentence about it. Learning it once is the point.
+ * The tell IS the creature, so the row explaining it has to be the creature
+ * too: a symbol here and an animal out there would be two things to learn for
+ * one fact. It is drawn on its own ground for the reason every specimen is --
+ * a silhouette against nothing has no edge to read against.
  */
-const POCKET_MARK = { socket: groundMark(20), core: groundMark(8.5) }
+const pocketMark = computed(() =>
+  tile.value && pocketUntil.value ? pocketSpecimen(tile.value.biome, 52) : '',
+)
 
 
 /**
@@ -442,10 +445,7 @@ watch(open, (isOpen) => {
                the card with a clock in it: a pocket is the one fact here that
                expires. -->
           <div v-if="pocketUntil" class="pocket">
-            <svg class="mark" viewBox="-12 -8 24 16" aria-hidden="true">
-              <path :d="POCKET_MARK.socket" fill="#1a231f" />
-              <path :d="POCKET_MARK.core" fill="#d8b34a" />
-            </svg>
+            <SvgIcon class="mark" :svg="pocketMark" />
             <span class="tiny grow">Rich ground — half again on every haul</span>
             <span class="tiny readout">{{ formatDuration(pocketUntil - game.now) }} left</span>
           </div>
@@ -834,8 +834,7 @@ watch(open, (isOpen) => {
 
 .pocket .mark {
   flex: 0 0 auto;
-  width: 22px;
-  height: 15px;
+  line-height: 0;
 }
 
 /* Gold, the same reading the dock and the map already give a herd: an

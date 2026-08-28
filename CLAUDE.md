@@ -508,30 +508,41 @@ two seats and then depletes for nine hours (§5.1); a pocket lives four. It pays
 at most two hauls, to whoever is standing there, and there is no second roll to
 wait for. Supply is capped by hexes and hours, exactly as §9.5.1 caps packs.
 
-**On the map it is the one mark that is a HOLE**, and that is the whole of the
-drawing. Everything else transient is a *visitor* — a herd is an animal side-on,
-a pack is a dark mass with two lit eyes, a corpse is that mass gone still. A
-pocket is not standing on the hex, it **is** the hex, so it is cut from the
-ground with `groundMark`, which inherits the tile's own squash (§13.2) and lies
-in the stone rather than floating over it.
+**The tell is an ANIMAL, and specifically the biome's own critter** (§4: *the
+herbs say what grows on a kind of ground; these say what lives on it*).
+Glimmermoth, rockmite, dustleveret, ashnewt, fenlark — one per kind of country,
+settled on the hex. Animals find the good ground before you do, which is the
+whole of the reasoning: you read a hex by **what is standing on it**, the way
+you already read a herd or a pack, rather than by decoding a symbol somebody
+drew on it.
 
-Two nested marks rather than one, because a single gold lozenge is already
-taken: that is §4's contested-ring tell, and moving it sideways would be one
-shape saying two things. A **gold core in a dark socket** reads as ground opened
-with something in it, and the two are legible as relatives — because they are.
-Both say this ground pays better; one for good, one for the afternoon. The core
-is exactly the rare tell's size on purpose: same core, different setting.
+*(An abstract mark was tried first — a gold hexagon in a dark socket, cut from
+the ground so it lay in the stone. It was reasoned from the mechanic, and it
+looked like a sticker: a dot on a tile is a thing to look up, and every other
+piece of news on this map is a creature you simply see.)*
 
-It sits on the **left shoulder**, which is the one part of the face nothing else
-uses — the rare tell is top-centre, the work marks bottom-centre, and the
-creatures own the middle — and it is drawn with the late marks rather than the
-props, so a stand of conifers cannot hide the one thing saying *work this hex
-now*.
+It stands with the herd and the pack because it is the same kind of news —
+something alive is on this hex — and off to the **left of centre**, because all
+three can share a hex and the visitors own the middle. On plains a grazing herd
+and a hare can stand together, which is exactly right: they are two different
+pieces of news.
 
-**The card carries the same mark and the sentence**, because a haul half again
-the usual size with nothing explaining it is worse than no bonus at all. It is
-the only row on a tile card with a clock in it, since a pocket is the one fact
-there that expires.
+Each is a **two-tone silhouette**, solid fills, no alpha (§13.2). One flat
+colour would be the thing §5.2 says about dead ground — invisible on the country
+it belongs to. The rockmite is banded across the shell rather than lit on one
+side, because a bright shape on a dark body is the **pack's** whole tell (two
+eyes looking at you) and a beetle must not borrow it.
+
+**The card carries the same animal**, drawn on its own ground at card scale,
+because the tell *is* the creature — a symbol on the card and an animal on the
+hex would be two things to learn for one fact. It is the only row on a tile card
+with a clock in it, since a pocket is the one fact there that expires.
+
+**And the almanac carries all five**, in the Ground half beside the biome
+variants and the water. That is the screen that exists to answer *where does
+that come from* (§13), and rich ground is otherwise the one fact about a hex a
+player would have to infer from a haul coming back bigger. Five entries make it
+a field guide: this is what to look for, on this kind of country.
 
 ---
 

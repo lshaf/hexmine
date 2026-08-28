@@ -48,6 +48,7 @@ import type { SourceLine } from '@/game/sources'
 import { formatPercent, resaleValue } from '@/game/formulas'
 import { EQUIPMENT, ECONOMY, PROCESSING, BAG } from '@/game/balance'
 import { ACTION_PATHS } from '@/icons/actions'
+import { CRITTER_BY_BIOME } from '@/game/critters'
 import { BIOME_LABEL } from '@/theme/palette'
 import {
   BIOME_VARIANTS,
@@ -56,7 +57,7 @@ import {
   type VariantDef,
 } from '@/game/variants'
 import { itemIcon, materialIcon } from '@/icons/procedural'
-import { variantSpecimen, waterSpecimen } from '@/map/props'
+import { pocketSpecimen, variantSpecimen, waterSpecimen } from '@/map/props'
 import { waterLabel } from '@/game/water'
 import SvgIcon from '@/components/SvgIcon.vue'
 import StatChips from '@/components/StatChips.vue'
@@ -428,10 +429,45 @@ const waterEntries = computed<WaterEntry[]>(() =>
     .filter((e) => matches(e.hay)),
 )
 
+/**
+ * §5.7 -- rich ground, one entry per biome.
+ *
+ * The almanac is the one screen that answers "where does that come from", and
+ * this is the only fact about a hex a player is otherwise expected to work out
+ * by noticing that a haul came back bigger. The tell is an ANIMAL rather than a
+ * symbol, so what belongs here is a field guide: five creatures, one per kind
+ * of country, drawn exactly as the map draws them.
+ */
+const POCKET_BLURB =
+  'Animals find the good ground before you do. Where one has settled, the hex '
+  + 'pays half again on every haul — mined or gathered — for a few hours, and '
+  + 'then it is ordinary ground again.'
+
+const pocketEntries = computed(() =>
+  (Object.keys(BIOME_VARIANTS) as Biome[])
+    .map((biome) => {
+      const critter = MATERIALS[CRITTER_BY_BIOME[biome] as MaterialKey]
+
+      return {
+        key: `pocket.${biome}`,
+        biome,
+        critter,
+        hay: [
+          critter.name,
+          BIOME_LABEL[biome],
+          'rich ground pocket haul yield bonus',
+          POCKET_BLURB,
+        ].join(' '),
+      }
+    })
+    .filter((e) => matches(e.hay)),
+)
+
 const tileCount = computed(
   () =>
     tileGroups.value.reduce<number>((n, g) => n + g.entries.length, 0) +
-    waterEntries.value.length,
+    waterEntries.value.length +
+    pocketEntries.value.length,
 )
 
 // ------------------------------------------------------------------ equipment
@@ -926,6 +962,46 @@ function nature(item: ItemDef): string {
         </section>
       </template>
 
+      <!-- §5.7 -- rich ground. It sits with the tiles because it IS a fact
+           about a hex, and above the water for the same reason the seams are:
+           this is ground you can work, and better than usual. -->
+      <template v-if="half === 'tiles' && pocketEntries.length">
+        <section>
+          <div class="sect">
+            <h3>Rich ground</h3>
+            <span class="tally">{{ pocketEntries.length }}</span>
+          </div>
+
+          <p class="tiny muted lede">{{ POCKET_BLURB }}</p>
+
+          <div class="entries">
+            <article v-for="p in pocketEntries" :key="p.key" class="entry">
+              <div class="head">
+                <span class="specimen" v-html="pocketSpecimen(p.biome, 76)" />
+                <div class="grow">
+                  <span class="label eyebrow">{{ BIOME_LABEL[p.biome] }}</span>
+                  <strong class="name">{{ p.critter.name }}</strong>
+                </div>
+              </div>
+
+              <p class="tiny muted desc">{{ p.critter.description }}</p>
+
+              <dl class="rails">
+                <div class="rail" :style="{ '--road': SOURCE_COLOR.mine }">
+                  <dt class="label">Worth</dt>
+                  <dd>Half again on every haul off this hex</dd>
+                </div>
+
+                <div class="rail out">
+                  <dt class="label">Lasts</dt>
+                  <dd>About four hours, then the ground is ordinary again</dd>
+                </div>
+              </dl>
+            </article>
+          </div>
+        </section>
+      </template>
+
       <template v-if="half === 'tiles' && waterEntries.length">
         <section>
           <div class="sect">
@@ -1133,6 +1209,15 @@ function nature(item: ItemDef): string {
   min-height: 0;
   overflow-y: auto;
   padding: 16px;
+}
+
+/* §5.7 -- one sentence for the whole group, because the five entries below say
+   the same thing about five kinds of country and repeating it five times would
+   be a field guide that explains itself over and over. */
+.lede {
+  margin: -2px 0 10px;
+  max-width: 62ch;
+  line-height: 1.55;
 }
 
 section + section {

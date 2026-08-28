@@ -345,6 +345,100 @@ function herd(x: number, y: number): string {
   )
 }
 
+/*
+ * §5.7 -- rich ground, and the animals that found it first.
+ *
+ * A pocket is marked by the BIOME'S OWN CRITTER (§4: "the herbs say what grows
+ * on a kind of ground; these say what lives on it"), gathered on the hex.
+ * Animals know where the good ground is, which is the whole of the tell: you
+ * learn to read a hex by what is standing on it rather than by decoding a
+ * symbol somebody drew on it.
+ *
+ * It reads against the herd, which is the only other living marker: a herd is a
+ * BIG pale-brown body side-on with a second beast behind it, and every one of
+ * these is small, single and shaped like nothing else on the map. On plains
+ * both can stand on one hex, which is exactly right -- a grazing herd and a
+ * hare are two different pieces of news.
+ *
+ * Solid fills and two tones each (§13.2), because a critter drawn in one colour
+ * on its own biome would be the thing §5.2 says about dead ground: invisible on
+ * the country it belongs to.
+ */
+function glimmermoth(x: number, y: number): string {
+  const wing = '#e4d7ac'
+  const body = '#4a4335'
+
+  return (
+    poly(`${x},${y - 4} ${x - 8},${y - 8} ${x - 6},${y}`, wing) +
+    poly(`${x},${y - 4} ${x + 8},${y - 8} ${x + 6},${y}`, shade(wing, -0.18)) +
+    rect(x - 1, y - 7, 2, 7, body) +
+    `<path d="M${x - 1} ${y - 7} L${x - 4} ${y - 11} M${x + 1} ${y - 7} L${x + 4} ${y - 11}" stroke="${body}" stroke-width="0.9" fill="none"/>`
+  )
+}
+
+function rockmite(x: number, y: number): string {
+  const shell = '#2f3a42'
+  const sheen = '#8fa6b4'
+
+  // Banded across the shell rather than a lit wedge: a bright shape on a dark
+  // body is the PACK's whole tell (§9.5.1 -- two eyes looking at you), and a
+  // beetle borrowing it would say the wrong thing at a glance.
+  return (
+    `<ellipse cx="${x}" cy="${y - 4}" rx="6" ry="4.2" fill="${shell}"/>` +
+    `<path d="M${x - 2} ${y - 7.6} v 7.2 M${x + 1.6} ${y - 7.4} v 6.8" stroke="${sheen}" stroke-width="1.1" fill="none"/>` +
+    `<path d="M${x - 5} ${y - 7} L${x - 9} ${y - 10} M${x - 5} ${y - 5} L${x - 9} ${y - 3}" stroke="${shell}" stroke-width="1" fill="none"/>`
+  )
+}
+
+function dustleveret(x: number, y: number): string {
+  const back = '#7a5c3c'
+  const belly = '#d8c7a6'
+
+  return (
+    `<ellipse cx="${x}" cy="${y - 4}" rx="6" ry="3.6" fill="${back}"/>` +
+    `<ellipse cx="${x - 4}" cy="${y - 2.4}" rx="3.4" ry="1.8" fill="${belly}"/>` +
+    `<ellipse cx="${x + 5}" cy="${y - 7}" rx="2.6" ry="2.2" fill="${back}"/>` +
+    // The ears, which are the whole of what tells a hare from a herd.
+    `<path d="M${x + 5} ${y - 9} L${x + 3.5} ${y - 15} M${x + 6.5} ${y - 9} L${x + 7} ${y - 15}" stroke="${back}" stroke-width="1.6" stroke-linecap="round" fill="none"/>`
+  )
+}
+
+function ashnewt(x: number, y: number): string {
+  const skin = '#cfc7b4'
+  const spots = '#5d4a42'
+
+  return (
+    `<ellipse cx="${x}" cy="${y - 4}" rx="6" ry="3" fill="${skin}"/>` +
+    `<ellipse cx="${x - 6}" cy="${y - 4}" rx="2.4" ry="2.2" fill="${skin}"/>` +
+    `<path d="M${x + 5} ${y - 4} q 5 -1 6 -5" stroke="${skin}" stroke-width="1.8" fill="none" stroke-linecap="round"/>` +
+    `<path d="M${x - 2} ${y - 2} l -2 3 M${x + 2} ${y - 2} l 2 3" stroke="${skin}" stroke-width="1.4" fill="none" stroke-linecap="round"/>` +
+    rect(x - 1.5, y - 6, 1.6, 1.6, spots) +
+    rect(x + 2, y - 5.6, 1.6, 1.6, spots)
+  )
+}
+
+function fenlark(x: number, y: number): string {
+  const back = '#4c4436'
+  const breast = '#ddd0ad'
+
+  return (
+    `<ellipse cx="${x}" cy="${y - 5.5}" rx="5.8" ry="4.2" fill="${back}"/>` +
+    `<ellipse cx="${x - 2.6}" cy="${y - 4.4}" rx="3.4" ry="2.8" fill="${breast}"/>` +
+    `<ellipse cx="${x - 5.6}" cy="${y - 9}" rx="2.9" ry="2.6" fill="${back}"/>` +
+    poly(`${x - 7.8},${y - 9} ${x - 11.5},${y - 8.2} ${x - 7.8},${y - 7.4}`, '#c98f3f') +
+    poly(`${x + 4.6},${y - 7} ${x + 11},${y - 9.5} ${x + 4.6},${y - 4}`, shade(back, 0.18)) +
+    `<path d="M${x - 1} ${y - 1.8} v 2.4 M${x + 2.2} ${y - 1.8} v 2.4" stroke="${back}" stroke-width="1.1" fill="none"/>`
+  )
+}
+
+const POCKET_CRITTER: Record<Biome, (x: number, y: number) => string> = {
+  forest: glimmermoth,
+  mountain: rockmite,
+  plains: dustleveret,
+  badlands: ashnewt,
+  grassland: fenlark,
+}
+
 // ------------------------------------------------------------- settlements
 
 /*
@@ -1152,6 +1246,42 @@ export function waterSpecimen(biome: Biome, kind: WaterKind, size = 66): string 
 
 export function herdProp(tile: Tile): string {
   return tile.herdUntil ? herd(0, 6) : ''
+}
+
+/**
+ * §5.7 -- the critter that found the rich ground, if there is any.
+ *
+ * Off to the left of centre, because the herd and the pack own the middle of a
+ * hex and all three can stand on one: a pocket is a fact about the ground and
+ * they are visitors on top of it.
+ */
+export function pocketProp(tile: Tile): string {
+  return tile.pocketUntil ? POCKET_CRITTER[tile.biome](-13, 9) : ''
+}
+
+/**
+ * §5.7 -- one critter, off the map, for the almanac.
+ *
+ * Its own ground behind it for the reason variantSpecimen() gives: a silhouette
+ * drawn against nothing has no edge to read against, and the whole point of
+ * these five is that each one reads on the country it lives on.
+ */
+export function pocketSpecimen(biome: Biome, size = 54): string {
+  const top = variantColor(biome as VariantKey)
+  const w = 62
+  // The top face runs y -17..17 and the slab another 11 below it, so the box
+  // has to reach 28 or the ground the critter is standing on is cut off at the
+  // ankles. Shallow above, because none of the five stands more than 15px tall.
+  const boxH = 52
+  const h = Math.round((size * boxH) / w)
+
+  return (
+    `<svg viewBox="-31 -22 ${w} ${boxH}" width="${size}" height="${h}" aria-hidden="true">` +
+    `<path d="${HEX_SIDE_PATH}" fill="${shade(top, -0.4)}"/>` +
+    `<path d="${HEX_TOP_PATH}" fill="${top}" stroke="${shade(top, -0.2)}" stroke-width="0.5"/>` +
+    POCKET_CRITTER[biome](0, 8) +
+    '</svg>'
+  )
 }
 
 /**

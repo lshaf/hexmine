@@ -25,7 +25,7 @@ import {
   screenToTile,
   tileToScreen,
 } from './hexGeometry'
-import { corpseProp, dungeonGlyph, herdProp, packProp, settlementGlyph, tileProps } from './props'
+import { corpseProp, dungeonGlyph, herdProp, packProp, pocketProp, settlementGlyph, tileProps } from './props'
 import { EMBER, GOLD, INK, VELLUM, VELLUM_DIM, depletedColor, shade, variantColor, waterColor } from '@/theme/palette'
 import { MINING } from '@/game/balance'
 import type { Job, Tile, TravelState } from '@/game/types'
@@ -195,8 +195,8 @@ interface RenderTile {
   edge: string
   props: string
   herd: string
-  /** §5.7 -- rich ground, drawn only inside sight like every other live fact. */
-  pocket: boolean
+  /** §5.7 -- the critter that found the rich ground, drawn inside sight only. */
+  pocket: string
   /** §9.5.1 -- the pack standing here, drawn only inside sight. */
   pack: string
   /** §9.5.7 -- the corpse standing here, drawn regardless of sight. */
@@ -358,7 +358,8 @@ const renderTiles = computed<RenderTile[]>(() =>
       // §5.7 -- a pocket is live state and obeys the fog like the rest of it.
       // A hex being briefly worth more is exactly the kind of thing §5.6 keeps
       // outside the ring: you find rich ground by walking onto it.
-      pocket: inSight && !depleted && (tile.pocketUntil ?? 0) > props.now,
+      pocket:
+        inSight && !depleted && (tile.pocketUntil ?? 0) > props.now ? pocketProp(tile) : '',
       // §9.5.1 -- a pack is live state, so it is drawn inside sight and nowhere
       // else. Beyond the ring the map says what the ground is and who lives on
       // it, never what is happening there (§13.2).
@@ -464,32 +465,6 @@ const SLOT_GAP = 5.5
 /** §4 -- the contested-ring tell, cut from the same stone as the marks. */
 const RARE_MARK = groundMark(6)
 
-/*
- * §5.7 -- rich ground, and the one mark on the map that is a HOLE.
- *
- * Everything else transient is a visitor: a herd is an animal side-on, a pack
- * is a dark mass with two lit eyes, a corpse is that mass gone still. A pocket
- * is not standing on the hex, it IS the hex -- so it is cut from the ground
- * with `groundMark`, which inherits the tile's own squash and lies in the stone
- * rather than floating over it.
- *
- * Two nested marks, not one. A single gold lozenge is already taken: that is
- * the contested-ring tell above, and moving it sideways would be one shape
- * saying two things. A gold core in a dark socket reads as ground opened with
- * something in it -- which is what a pocket is -- and the two are legible as
- * relatives, because they are: both say this ground pays better, one for good
- * and one for the afternoon.
- *
- * On the LEFT SHOULDER, mid-height, which is the one part of the face nothing
- * else uses: the rare tell sits top-centre, the work marks bottom-centre, and
- * the creatures own the middle.
- */
-const POCKET_SOCKET = groundMark(13)
-/* Exactly the rare tell's size, deliberately: same core, different setting. */
-const POCKET_CORE = groundMark(6)
-const POCKET_AT = 'translate(-15,2)'
-/** Dark enough to be a hole in every biome, including the pale grassland. */
-const POCKET_SOCKET_FILL = shade(INK, 0.15)
 </script>
 
 <template>
@@ -528,19 +503,15 @@ const POCKET_SOCKET_FILL = shade(INK, 0.15)
         <!-- Terrain and settlement props stand above the tile, in sight only. -->
         <g v-if="t.props" v-html="t.props" />
         <g v-if="t.herd" v-html="t.herd" />
+        <!-- §5.7 -- the critter that found the rich ground. It stands with the
+             herd and the pack because it is the same kind of news: something
+             alive is on this hex, and it is worth looking at. -->
+        <g v-if="t.pocket" v-html="t.pocket" />
         <g v-if="t.pack" v-html="t.pack" />
         <g v-if="t.corpse" v-html="t.corpse" />
 
         <!-- Beyond sight: is anybody there. Nothing else is knowable. -->
         <g v-if="t.glyph" v-html="t.glyph" />
-
-        <!-- §5.7 -- rich ground: a socket cut in the stone with gold in it.
-             Drawn with the late marks rather than the props, so a stand of
-             conifers cannot hide the one thing that says work this hex now. -->
-        <g v-if="t.pocket" :transform="POCKET_AT">
-          <path :d="POCKET_SOCKET" :fill="POCKET_SOCKET_FILL" />
-          <path :d="POCKET_CORE" :fill="GOLD" />
-        </g>
 
         <!-- Rare-material tell, §4: gold, only in the contested ring. -->
         <path
