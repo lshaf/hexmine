@@ -171,6 +171,19 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
               {{ battle.jobXp ? `+${battle.jobXp} xp` : '—' }}
             </span>
           </div>
+          <!-- §7.1 -- two different ladders, and a fight feeds both: the battle
+               job gates its own tree, the character gates where you may go. A
+               loss pays neither, which is the em-dash. -->
+          <div class="row-between">
+            <span class="muted">Character</span>
+            <span class="readout" :class="battle.characterXp ? 'good' : 'muted'">
+              {{ battle.characterXp ? `+${battle.characterXp} xp` : '—' }}
+            </span>
+          </div>
+          <div v-if="battle.levelsGained" class="row-between">
+            <span>Level up</span>
+            <span class="readout gold">+{{ battle.levelsGained }}</span>
+          </div>
         </div>
 
         <!-- §9.5.8 -- combat feeds combat: two families off the monster and

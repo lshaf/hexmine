@@ -680,6 +680,23 @@ things, not the character — this prevents power-account selling.
 Level unlocks **capacity, not power**: access to higher-tier hexes and dungeon
 floors. A whale can out-scale logistics but never out-damage a grinder.
 
+**Every verb that finishes work pays character XP, and the road is the only
+exception.** A mine, a gather, a hunt, a processing run, a craft and a won fight
+all level the character; §7.5's walking deliberately does not, and the reason it
+gives is the only one that ever justifies withholding it — idle time must not be
+a faucet (§2).
+
+A craft and a fight used to pay their job's XP and nothing else, alone among
+them. That was the order things were built in rather than a rule: a craft costs
+materials, a bench slot, a clock and the walk back for it, and a fight costs
+durability, so neither is idle by any reading. Both are sized deliberately
+*under* mining per minute — a mine is the grind §7.4.4's curve was fitted
+against, and a craft is the thing you were grinding *for*.
+
+**A craft still teaches no §7.2 skill**, and that is a rule rather than an
+oversight: the five skills are the gathering lines, and an anvil is not one of
+them.
+
 > **Action points are gone.** AP gated a mine on a pool that refilled on a
 > clock, which put a second timer underneath the one the mine already runs. A
 > limit on how much can be done in a day will come back, but it is not going to

@@ -3429,6 +3429,52 @@ final class GameLoopTest extends TestCase
         }
     }
 
+    /**
+     * §7.1 -- every verb that finishes work pays a character level.
+     *
+     * A craft used to pay its bench's job XP and nothing else, alone among the
+     * verbs. There was no rule behind that, only the order things were built
+     * in: §7.5's road is the ONE thing deliberately outside it, and the reason
+     * it gives is that idle time must not be a faucet (§2). A craft is not
+     * idle -- it costs materials, a bench slot, a clock and the walk back.
+     */
+    public function test_a_craft_levels_the_character_and_not_only_the_bench(): void
+    {
+        $this->standAtWoodcuttingVillage();
+        $this->give(['wood' => 12, 'planks' => 8, 'heartknot' => 8]);
+
+        $before = (int) $this->character->fresh()->xp;
+        $result = $this->craftNow('hewn_axe');
+
+        $this->assertGreaterThan(0, $result['jobXp'], 'the bench learned nothing');
+        $this->assertGreaterThan(0, $result['characterXp'], 'the character learned nothing');
+        $this->assertGreaterThan(
+            $before,
+            (int) $this->character->fresh()->xp,
+            'the character XP was reported but never granted',
+        );
+
+        // §7.2 -- and still no SKILL XP, because the five are the gathering
+        // lines and an anvil is not one of them.
+        $skills = $this->character->fresh()->skills()->sum('xp');
+        $this->assertSame(0, (int) $skills, 'a craft taught a gathering line');
+    }
+
+    /**
+     * §7.1 -- and a better piece teaches more, on the same rank ladder the
+     * bench's own XP uses. It is deliberately under mining per minute: a mine
+     * is the grind §7.4.4's curve was fitted against, and a craft is the thing
+     * you were grinding FOR.
+     */
+    public function test_a_better_craft_levels_the_character_further(): void
+    {
+        $common = Balance::CHARACTER_XP_PER_RARITY_RANK * (Balance::rarityRank('common') + 1);
+        $epic = Balance::CHARACTER_XP_PER_RARITY_RANK * (Balance::rarityRank('epic') + 1);
+
+        $this->assertGreaterThan($common, $epic);
+        $this->assertGreaterThan(0, $common);
+    }
+
     // ------------------------------------------------------------- the slate
 
     /**

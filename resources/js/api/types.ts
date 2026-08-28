@@ -588,6 +588,12 @@ export interface BattleResult {
   gold: number
   job: string | null
   jobXp: number
+  /**
+   * §7.1 -- a win levels the character too, like every verb that finishes
+   * work. Zero on a loss (§9.5.3): losing is an exit, not a strategy.
+   */
+  characterXp: number
+  levelsGained: number
   /** §9.5.6 -- the weapon, and the one worn piece that took the hit. */
   wear: BattleWear[]
   /** §8.2 -- named here because nothing may be destroyed quietly. */
@@ -683,9 +689,12 @@ export interface CollectResult {
   lostToOverflow: number
   xp: { skill: SkillKey; amount: number }
   /**
-   * §7.4 -- the bench trade this taught, if any. A craft teaches no §7.2 skill
-   * and no character XP, so this is the ONLY figure on a craft receipt; a
-   * processing run teaches both its line and its job.
+   * §7.4 -- the bench trade this taught, if any.
+   *
+   * A craft teaches no §7.2 skill, because the five skills are the gathering
+   * lines and an anvil is not one of them. It does level the CHARACTER: §7.1
+   * pays that for every verb that finishes work, and the road (§7.5) is the
+   * only thing deliberately outside it.
    */
   job: string | null
   jobXp: number

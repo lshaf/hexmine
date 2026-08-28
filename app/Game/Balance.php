@@ -736,6 +736,15 @@ final class Balance
     public const JOB_XP_PER_BATTLE_TIER = 25;
 
     /**
+     * §7.1 -- and what it teaches the character, on the same tier ladder.
+     *
+     * Same gap as the craft bench had, and the same answer: a fight is finished
+     * work with a real bill (§9.5.6), so it pays a character level like every
+     * other verb that finishes something. On a WIN only, for the reason above.
+     */
+    public const CHARACTER_XP_PER_BATTLE_TIER = 6;
+
+    /**
      * No single fight may take more than this share of an item's maximum.
      *
      * Not optional now that zero is fatal (§8.2): without it one hopeless fight
@@ -908,6 +917,24 @@ final class Balance
 
     /** §7.4 -- what one craft teaches, by what was made: common 10 ... epic 40. */
     public const JOB_XP_PER_RARITY_RANK = 10;
+
+    /**
+     * §7.1 -- and what it teaches the CHARACTER, on the same rank ladder.
+     *
+     * A craft used to pay its bench's job XP and nothing else, alone among the
+     * verbs: a mine, a gather, a hunt and a processing run all pay a character
+     * level as well. There was no rule behind that, only the order things were
+     * built in -- §7.5's road is the one thing that deliberately pays no
+     * character XP, and the reason it gives is that idle time must not be a
+     * faucet (§2). A craft is not idle: it costs materials, a bench slot, a
+     * clock and the walk back for it.
+     *
+     * Sized under mining per minute, on purpose. A mine is the grind §7.4.4's
+     * curve was fitted against; a craft is the thing you were grinding FOR, and
+     * a rung that levelled you faster than the ground it was made from would
+     * invert that.
+     */
+    public const CHARACTER_XP_PER_RARITY_RANK = 8;
 
     /**
      * §6 -- what one unit off a processing bench teaches its line's job.

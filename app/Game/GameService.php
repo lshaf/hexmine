@@ -2358,6 +2358,8 @@ class GameService
         // at all (§9.5.3): losing is an exit, not a strategy.
         $gold = 0;
         $xp = 0;
+        $characterXp = 0;
+        $levelsGained = 0;
         $spoils = [];
         $lost = 0;
         $looted = null;
@@ -2375,6 +2377,12 @@ class GameService
                 $xp = Balance::JOB_XP_PER_BATTLE_TIER * (int) $monster['tier'];
                 $this->grantJobXp($character, (string) $payload['job'], $xp);
             }
+
+            // §7.1 -- and the character, for the same reason a craft does: a
+            // fight is finished work with a real bill (§9.5.6). On a win only,
+            // because §9.5.3 makes losing an exit rather than a strategy.
+            $characterXp = Balance::CHARACTER_XP_PER_BATTLE_TIER * (int) $monster['tier'];
+            $levelsGained = $this->grantCharacterXp($character, $characterXp);
 
             // §9.5.8 -- what came off it. Unlike gold these need straps, so a
             // full bag loses the surplus rather than refusing: the fight was
@@ -2479,6 +2487,10 @@ class GameService
             'gold' => $gold,
             'job' => $payload['job'] ?? null,
             'jobXp' => $xp,
+            // §7.1 -- a win levels the character too, like every other verb
+            // that finishes work. Zero on a loss (§9.5.3).
+            'characterXp' => $characterXp,
+            'levelsGained' => $levelsGained,
             'wear' => $wear,
             'spoils' => $spoils,
             'spoilsLost' => $lost,
@@ -3582,14 +3594,15 @@ class GameService
                     'gained' => [],
                     'lostToOverflow' => 0,
                     'made' => $crafted['made'],
+                    // §7.2 -- and no skill XP, ever: the five skills are the
+                    // gathering lines, and an anvil is not one of them.
                     'xp' => ['skill' => null, 'amount' => 0],
-                    // §7.4 -- the bench's own trade. A craft teaches no §7.2
-                    // skill and no character XP, so without this the receipt
-                    // for an hour at the anvil was a row of zeroes.
+                    // §7.4/§7.1 -- the bench's own trade, and the character.
+                    // A craft used to pay only the first, alone among the verbs.
                     'job' => $crafted['job'],
                     'jobXp' => $crafted['jobXp'],
-                    'characterXp' => 0,
-                    'levelsGained' => 0,
+                    'characterXp' => $crafted['characterXp'],
+                    'levelsGained' => $crafted['levelsGained'],
                     'durabilityLost' => 0,
                     'destroyed' => [],
                 ];
@@ -5668,12 +5681,22 @@ class GameService
         // granted is carried back so the receipt can say so; it was being
         // awarded silently, which made the plate report a flat zero for work
         // that had just levelled a trade.
+        $rank = Balance::rarityRank($def['rarity']) + 1;
+
         $jobKey = $this->jobForItem($def);
         $jobXp = $jobKey === null ? 0 : $this->grantJobXp(
             $character,
             $jobKey,
-            Balance::JOB_XP_PER_RARITY_RANK * (Balance::rarityRank($def['rarity']) + 1),
+            Balance::JOB_XP_PER_RARITY_RANK * $rank,
         );
+
+        // §7.1 -- and the character, like every other verb that finishes work.
+        // A craft was the one that paid only its bench, which was the order
+        // things were built in rather than a rule: §7.5's road is the only
+        // thing that deliberately pays no character XP, and its reason is that
+        // idle time must not be a faucet (§2). A craft is not idle.
+        $characterXp = Balance::CHARACTER_XP_PER_RARITY_RANK * $rank;
+        $levelsGained = $this->grantCharacterXp($character, $characterXp);
 
         $effects = $this->jobEffects($character, $jobKey);
 
@@ -5713,6 +5736,8 @@ class GameService
                 ],
                 'job' => $jobKey,
                 'jobXp' => $jobXp,
+                'characterXp' => $characterXp,
+                'levelsGained' => $levelsGained,
             ];
         }
 
@@ -5753,6 +5778,8 @@ class GameService
             ],
             'job' => $jobKey,
             'jobXp' => $jobXp,
+            'characterXp' => $characterXp,
+            'levelsGained' => $levelsGained,
         ];
     }
 

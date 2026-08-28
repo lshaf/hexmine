@@ -304,10 +304,10 @@ onBeforeUnmount(() => {
             <span class="muted">{{ jobName }}</span>
             <span class="readout good">+{{ haul.jobXp }} xp</span>
           </div>
-          <!-- A craft earns no character XP at all (§7.4.1: job levels are the
-               proof you did the work, not a reward for it), and a row of zero
-               reads as something withheld rather than something absent. -->
-          <div v-if="haul.characterXp || !jobName" class="row-between">
+          <!-- §7.1 -- every verb that finishes work pays a character level,
+               a craft included. Hidden only when it really is zero, since a row
+               of nothing reads as something withheld rather than absent. -->
+          <div v-if="haul.characterXp" class="row-between">
             <span class="muted">Character</span>
             <span class="readout good">+{{ haul.characterXp }} xp</span>
           </div>
