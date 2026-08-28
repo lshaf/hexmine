@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\QuestController;
 use App\Http\Controllers\Api\SettlementController;
 use App\Http\Controllers\Api\ShopController;
 use App\Http\Controllers\Api\SkillTreeController;
+use App\Http\Controllers\Api\SlateController;
 use App\Http\Controllers\Api\StateController;
 use App\Http\Middleware\ResolveCharacter;
 use Illuminate\Support\Facades\Route;
@@ -116,6 +117,12 @@ Route::middleware(ResolveCharacter::class)->group(function () {
     Route::post('/shop/potion-sales', [ShopController::class, 'sellConsumable']);
 
     Route::post('/crafting', [CraftingController::class, 'store']);
+
+    // §8.4 -- the slate. Ten recipes a prospector means to make, and the
+    // shopping list that falls out of them. The list itself is in the state.
+    Route::post('/slate', [SlateController::class, 'store']);
+    Route::delete('/slate/{recipe}', [SlateController::class, 'destroy'])
+        ->where('recipe', '[a-z0-9_]+');
 
     // §7.4 -- the tree is static and player-independent, so it is its own GET.
     Route::get('/jobs-tree', [SkillTreeController::class, 'index']);

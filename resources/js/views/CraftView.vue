@@ -29,6 +29,7 @@ import { CRAFT, PROCESSING } from '@/game/balance'
 import { itemIcon, materialIcon } from '@/icons/procedural'
 import SvgIcon from '@/components/SvgIcon.vue'
 import StatChips from '@/components/StatChips.vue'
+import SlateMark from '@/components/SlateMark.vue'
 import QueueBar from '@/components/QueueBar.vue'
 import JobCard from '@/components/JobCard.vue'
 import type { BuffScope, EquipSlot, ItemDef, MaterialKey, Rarity } from '@/game/types'
@@ -468,15 +469,22 @@ const emptyNote = computed(() => {
           <span class="tiny" :class="ready(item) ? 'muted' : 'lack'">
             {{ shortfall(item) ?? `${benchTime(item)} on the bench` }}
           </span>
-          <button
-            class="btn btn-sm"
-            :class="{ 'btn-primary': ready(item) }"
-            type="button"
-            :disabled="game.busy || !ready(item)"
-            @click="game.craft(item.key)"
-          >
-            Craft
-          </button>
+          <div class="acts">
+            <!-- §8.4 -- the note to yourself, beside the thing that acts. It
+                 is the answer to a recipe you cannot afford yet: the shortfall
+                 above names what to go and get, and this is what remembers it
+                 four days' walk from here. -->
+            <SlateMark :recipe="item.key" />
+            <button
+              class="btn btn-sm"
+              :class="{ 'btn-primary': ready(item) }"
+              type="button"
+              :disabled="game.busy || !ready(item)"
+              @click="game.craft(item.key)"
+            >
+              Craft
+            </button>
+          </div>
         </div>
       </article>
     </section>
@@ -490,6 +498,14 @@ const emptyNote = computed(() => {
 </template>
 
 <style scoped>
+/* The mark and the button are one cluster on the right of the foot: what you
+   can do about this recipe now, and what you can do about it later. */
+.acts {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 /* The card carries its own Collect when it is ready and its own Abandon while
    it runs, so this only has to give it a place to sit. */
 .mine {

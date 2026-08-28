@@ -277,6 +277,14 @@ export class HttpDriver implements GameApi {
     return post<ActionResult<QuestReward>>(`/quests/${quest}/claim`, {})
   }
 
+  saveRecipe(recipe: string): Promise<ActionResult<{ slate: string[] }>> {
+    return post<ActionResult<{ slate: string[] }>>('/slate', { recipe })
+  }
+
+  dropRecipe(recipe: string): Promise<ActionResult<{ slate: string[] }>> {
+    return del<ActionResult<{ slate: string[] }>>(`/slate/${recipe}`)
+  }
+
   craftItem(itemKey: string): Promise<ActionResult<Job>> {
     return post<ActionResult<Job>>('/crafting', { item: itemKey })
   }

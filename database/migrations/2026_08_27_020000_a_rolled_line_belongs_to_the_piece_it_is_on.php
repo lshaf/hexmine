@@ -92,9 +92,14 @@ return new class extends Migration
             ));
 
             if ($choices === []) {
-                // Nothing left to point it at -- the piece already carries one
-                // of everything its kind can be. Dropping is the only honest
-                // answer, and it cannot happen with any pool in the catalog.
+                // Nothing left to point it at: the piece already carries one of
+                // everything its kind can be. That is not a shortcoming here --
+                // Formulas::rollOptions() dedups by (stat, scope) and breaks
+                // when the pool runs dry, so the state being rebuilt is one the
+                // roller could never have produced either. A focus is where it
+                // actually bites: its percentage pool is `power` alone (§9.5.4
+                // takes the guard away), so a wand carrying two stray work
+                // lines can only come out of this with one.
                 continue;
             }
 

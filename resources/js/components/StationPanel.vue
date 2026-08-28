@@ -15,6 +15,7 @@ import { materialIcon } from '@/icons/procedural'
 import SvgIcon from './SvgIcon.vue'
 import QueueBar from './QueueBar.vue'
 import JobCard from './JobCard.vue'
+import SlateMark from './SlateMark.vue'
 import type { Recipe, Settlement } from '@/game/types'
 
 const props = defineProps<{ settlement: Settlement }>()
@@ -212,6 +213,10 @@ watch(() => props.settlement.id, () => { batches.value = 1 })
             → {{ recipe.outputQty * batches }} {{ MATERIALS[recipe.output].name }}
           </div>
         </div>
+        <!-- §8.4 -- a line runs at a bench somewhere on the map, and this is
+             what remembers which one you meant. It is the one control here
+             that works when you are not standing on the settlement. -->
+        <SlateMark :recipe="recipe.key" />
         <button
           class="btn btn-sm"
           type="button"

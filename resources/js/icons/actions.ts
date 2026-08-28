@@ -103,6 +103,12 @@ export const ACTION_PATHS: Record<string, string> = {
      earns the exception by being the only one of the four that does not give
      the piece back, and nothing drawn from a forge says "gone" as fast. */
   scrap: 'M3.5 7h17 M9.5 7V4.8h5V7 M6 7l1.1 13.2h9.8L18 7 M10 10.8v5.8 M14 10.8v5.8',
+  /* §8.4 -- the slate, and it is drawn as one: a board with a corner cut off,
+     which is the game's own chamfer (§13) rather than a borrowed ribbon. The
+     mark is a chalk tick, so a line already written and one not yet differ by
+     the thing that was actually done to it. */
+  slate: 'M4.5 4h11l4 4v12h-15Z M15.5 4v4h4',
+  slateOn: 'M4.5 4h11l4 4v12h-15Z M15.5 4v4h4 M8 13.6l2.6 2.6L16 11',
 }
 
 /**

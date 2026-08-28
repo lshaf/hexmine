@@ -393,6 +393,21 @@ export const useGame = defineStore('game', () => {
   function clearQuestReward(): void {
     questReward.value = null
   }
+
+  /**
+   * §8.4 -- the slate: ten recipes a prospector means to make.
+   *
+   * The list rides in the state, because what a player is short of moves with
+   * every haul. Two verbs rather than a toggle, so two taps in flight cannot
+   * settle on whichever answer arrives last.
+   */
+  const slate = computed<string[]>(() => state.value?.slate ?? [])
+
+  const saved = (recipe: string) => slate.value.includes(recipe)
+
+  async function toggleSlate(recipe: string): Promise<void> {
+    await act(() => (saved(recipe) ? api.dropRecipe(recipe) : api.saveRecipe(recipe)))
+  }
   const jobs = computed<Job[]>(() => state.value?.jobs ?? [])
 
   /**
@@ -1048,6 +1063,7 @@ export const useGame = defineStore('game', () => {
     tree, skillPoints, jobLevels, ownedNodes,
     rename,
     questDefs, quests, questsReady, questReward,
+    slate, saved,
     activeJobs, fieldJob, workFull, benchJobs, benchReady, benchHere, underfoot, selectedTile,
     currentSettlement, shopStock, sight, travelPerHexMs, travelEta,
     travel, travelProgress, travelHexesWalked, travelRemainingMs,
@@ -1066,6 +1082,7 @@ export const useGame = defineStore('game', () => {
     sell, sellAllScrap, sellItem, sellPotion, craft, equip, unequip, repair, discard, discardMaterial, drink, openPanel, closePanel,
     battleSkills, loadTree, loadBattleSkills, buyNode,
     loadQuests, claimQuest, clearQuestReward,
+    toggleSlate,
     openStation, closeStation, loadBench,
   }
 })

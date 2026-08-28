@@ -87,6 +87,12 @@ class Character extends Model
         return $this->hasMany(CharacterQuest::class);
     }
 
+    /** §8.4 -- the slate: ten recipes this character means to make. */
+    public function bookmarks(): HasMany
+    {
+        return $this->hasMany(CharacterBookmark::class);
+    }
+
     public function jobs(): HasMany
     {
         return $this->hasMany(GameJob::class);

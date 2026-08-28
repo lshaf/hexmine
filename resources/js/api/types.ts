@@ -171,6 +171,14 @@ export interface PlayerState {
    * what comes after that is not yet the player's problem.
    */
   quests: QuestState[]
+  /**
+   * §8.4 -- the slate: recipe keys this prospector means to make, oldest first.
+   *
+   * Keys and nothing else. What each one costs is in the catalog the client
+   * already holds, and how close the bag is to it is arithmetic against an
+   * inventory that moves with every haul -- so it is done where it is drawn.
+   */
+  slate: string[]
 }
 
 /** §12.1 -- one quest's standing. The catalog behind it comes from GET /quests. */
@@ -899,6 +907,10 @@ export interface GameApi {
   getQuests(): Promise<Record<string, QuestDef>>
   /** §12.1 -- take the gold, once. Answers with no message: the receipt says it. */
   claimQuest(quest: string): Promise<ActionResult<QuestReward>>
+  /** §8.4 -- write a recipe on the slate. Refused when it is full. */
+  saveRecipe(recipe: string): Promise<ActionResult<{ slate: string[] }>>
+  /** §8.4 -- rub one off. Silent about a line that was not there. */
+  dropRecipe(recipe: string): Promise<ActionResult<{ slate: string[] }>>
 }
 
 export class ApiError extends Error {

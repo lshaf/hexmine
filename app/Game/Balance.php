@@ -782,6 +782,19 @@ final class Balance
      */
     public const OUTSTANDING_WORK_CAP = 10;
 
+    /**
+     * §8.4 -- how many recipes fit on the slate.
+     *
+     * The same ten as the cap above, and for the same reason rather than by
+     * coincidence: both count things a prospector is keeping in mind across a
+     * map they have to walk. Ten is a route a person plans.
+     *
+     * It is deliberately not a soft limit that drops the oldest line. A slate
+     * that quietly forgets is worse than one that says it is full -- §7.6 makes
+     * the same argument about a bag, where the refusal is the decision.
+     */
+    public const SLATE_CAP = 10;
+
     /** Speed multiplier by settlement tier -- lower is faster. */
     public const SPEED_VILLAGE = 1.0;
 

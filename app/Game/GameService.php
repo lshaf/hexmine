@@ -6,6 +6,7 @@ namespace App\Game;
 
 use App\Models\Carrier;
 use App\Models\Character;
+use App\Models\CharacterBookmark;
 use App\Models\CharacterBuff;
 use App\Models\CharacterConsumable;
 use App\Models\CharacterItem;
@@ -1288,6 +1289,89 @@ class GameService
         $requires = Quests::DEFS[$key]['requires'] ?? null;
 
         return $requires === null || in_array($requires, $claimed, true);
+    }
+
+    // ------------------------------------------------------------- the slate
+
+    /**
+     * §8.4 -- is this key something a bench actually makes?
+     *
+     * Two kinds and one column, because a recipe key and an item key never
+     * collide and the catalog already knows which is which (there is a test
+     * pinning that they stay disjoint). Storing a `kind` beside the key would
+     * be the same mistake §8.4 avoids by deriving a bench category from a slot.
+     *
+     * A shop-only item is refused: it has no recipe, so there is nothing to
+     * gather for it and the trader is the whole of its story.
+     */
+    public function slateKind(string $key): ?string
+    {
+        if (Catalog::recipe($key) !== null) {
+            return 'processing';
+        }
+
+        $def = Catalog::item($key);
+
+        return $def !== null && isset($def['inputs']) ? 'craft' : null;
+    }
+
+    /**
+     * The slate as the client reads it: keys, oldest first.
+     *
+     * Nothing else, because everything else about a recipe is in the catalog
+     * the client already has. What the player is short of is arithmetic against
+     * a bag that moves constantly, and it is done where it is drawn.
+     *
+     * @return array<int,string>
+     */
+    public function slate(Character $character): array
+    {
+        return $character->bookmarks()
+            ->orderBy('id')
+            ->pluck('recipe_key')
+            ->all();
+    }
+
+    /**
+     * §8.4 -- write one down.
+     *
+     * The cap refuses rather than dropping the oldest line: a list that quietly
+     * forgets is worse than one that says it is full, which is the same
+     * argument §7.6 makes about the bag.
+     */
+    public function saveToSlate(Character $character, string $key): array
+    {
+        if ($this->slateKind($key) === null) {
+            throw new GameException('Nothing is made from that.', 'not_found');
+        }
+
+        if ($character->bookmarks()->where('recipe_key', $key)->exists()) {
+            return $this->slate($character);
+        }
+
+        if ($character->bookmarks()->count() >= Balance::SLATE_CAP) {
+            throw new GameException(
+                'The slate is full at '.Balance::SLATE_CAP.'. Rub one out first.',
+                'slate_full',
+            );
+        }
+
+        try {
+            CharacterBookmark::create(['character_id' => $character->id, 'recipe_key' => $key]);
+        } catch (UniqueConstraintViolationException) {
+            // Two taps in flight. The index is the guarantee; this is the
+            // apology, and the second tap simply agrees with the first.
+        }
+
+        return $this->slate($character);
+    }
+
+    /** Rub one out. Silent on a line that was not there -- the state matches. */
+    public function dropFromSlate(Character $character, string $key): array
+    {
+        $character->bookmarks()->where('recipe_key', $key)->delete();
+
+        return $this->slate($character);
     }
 
     /**
@@ -6536,6 +6620,10 @@ class GameService
             // than on the quests endpoint because it moves with almost every
             // action, while the catalog behind it never moves at all.
             'quests' => $this->questPayload($character),
+            // §8.4 -- the slate: what this prospector means to make. Keys only;
+            // what each one costs and how close the bag is to it is arithmetic
+            // against an inventory that is already here.
+            'slate' => $this->slate($character),
             // §10 -- the guild this character belongs to, if any. On the state
             // rather than fetched, because membership decides what a bench will
             // make (§8.0's legendary rung) and the two must never disagree.

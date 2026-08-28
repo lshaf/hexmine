@@ -13,10 +13,15 @@
  */
 import { computed } from 'vue'
 import { useGame } from '@/stores/game'
+import { ITEM_BY_KEY, MATERIALS, RARITY_LABEL, RECIPE_BY_KEY, stationForRarity } from '@/game/catalog'
 import { formatDuration, placeLabel } from '@/game/formulas'
 import { hexDistance } from '@/map/hexGeometry'
+import { SLATE_CAP } from '@/game/balance'
+import { itemIcon, materialIcon } from '@/icons/procedural'
 import JobCard from '@/components/JobCard.vue'
-import type { CraftJob, ProcessingJob } from '@/game/types'
+import SlateMark from '@/components/SlateMark.vue'
+import SvgIcon from '@/components/SvgIcon.vue'
+import type { CraftJob, MaterialKey, ProcessingJob } from '@/game/types'
 
 type BenchJob = CraftJob | ProcessingJob
 
@@ -50,6 +55,74 @@ const walk = (job: BenchJob) => {
 
 /** §6 vs §8.4 -- two different buildings, and the row should say which. */
 const kind = (job: BenchJob) => (job.kind === 'craft' ? 'Bench' : 'Processing line')
+
+// -------------------------------------------------------------- the slate §8.4
+
+/**
+ * §8.4 -- what is on a bench, and what you MEANT to put on one.
+ *
+ * They belong on the same page because they are the same question asked a step
+ * apart: this panel plans a route, and a recipe you cannot afford yet plans a
+ * gather. It is also the one screen the slate has to be readable from, since
+ * being four days from a bench is exactly when a shopping list is worth having.
+ *
+ * The shortfall is worked out here rather than stored (§8.4), because the bag
+ * moves with every haul and a written-down answer would be stale by the time
+ * it was read.
+ */
+interface SlateLine {
+  key: string
+  name: string
+  icon: string
+  /** What it makes, said the way the bench that makes it would say it. */
+  makes: string
+  inputs: Array<{ key: MaterialKey; need: number; have: number }>
+  ready: boolean
+}
+
+const slate = computed<SlateLine[]>(() =>
+  game.slate.flatMap((key) => {
+    const recipe = RECIPE_BY_KEY[key]
+    const item = ITEM_BY_KEY[key]
+
+    const need: Record<string, number> = recipe
+      ? {
+          [recipe.input]: recipe.inputQty,
+          ...(recipe.secondInput ? { [recipe.secondInput]: recipe.secondInputQty ?? 1 } : {}),
+        }
+      : (item?.inputs ?? {})
+
+    const inputs = Object.entries(need).map(([m, qty]) => ({
+      key: m as MaterialKey,
+      need: qty as number,
+      have: game.held(m as MaterialKey),
+    }))
+
+    if (recipe) {
+      return [{
+        key,
+        name: recipe.name,
+        icon: materialIcon(MATERIALS[recipe.output], 26),
+        makes: `${recipe.outputQty} ${MATERIALS[recipe.output].name} · processing line`,
+        inputs,
+        ready: inputs.every((i) => i.have >= i.need),
+      }]
+    }
+
+    if (!item) return []
+
+    return [{
+      key,
+      name: item.name,
+      icon: itemIcon({ slot: item.slot, family: item.family, rarity: item.rarity, palette: item.palette, size: 26 }),
+      makes: `${RARITY_LABEL[item.rarity]} · ${stationForRarity(item.rarity) ?? 'guild'} bench`,
+      inputs,
+      ready: inputs.every((i) => i.have >= i.need),
+    }]
+  }),
+)
+
+const slateReady = computed(() => slate.value.filter((l) => l.ready).length)
 </script>
 
 <template>
@@ -129,6 +202,44 @@ const kind = (job: BenchJob) => (job.kind === 'craft' ? 'Bench' : 'Processing li
         </div>
       </section>
     </template>
+
+    <!-- ---------------------------------------------------------- the slate -->
+    <!-- §8.4 -- outside the `v-else`, because what you mean to make is worth
+         reading whether or not anything is cooking. It is the half of this page
+         that plans a gather rather than a walk. -->
+    <section v-if="slate.length" class="section">
+      <div class="row" style="gap: 8px; margin-bottom: 3px">
+        <h3 class="head">On the slate</h3>
+        <span class="tally" :class="{ ready: slateReady > 0 }">
+          {{ slateReady > 0 ? `${slateReady} affordable` : `${slate.length}/${SLATE_CAP}` }}
+        </span>
+      </div>
+      <p class="tiny muted note">
+        What you mean to make, and what is still missing for it. Nothing is
+        reserved — this is a note to yourself, not a claim on the bag.
+      </p>
+
+      <div v-for="line in slate" :key="line.key" class="line inset" :class="{ ready: line.ready }">
+        <SvgIcon :svg="line.icon" boxed :size="26" />
+        <div class="grow">
+          <div class="row-between">
+            <strong class="tiny">{{ line.name }}</strong>
+            <span class="tiny muted makes">{{ line.makes }}</span>
+          </div>
+          <div class="inputs">
+            <span
+              v-for="input in line.inputs"
+              :key="input.key"
+              class="input tiny mono"
+              :class="{ short: input.have < input.need }"
+            >
+              {{ MATERIALS[input.key].name }} {{ input.have }}/{{ input.need }}
+            </span>
+          </div>
+        </div>
+        <SlateMark :recipe="line.key" />
+      </div>
+    </section>
   </div>
 </template>
 
@@ -175,5 +286,36 @@ const kind = (job: BenchJob) => (job.kind === 'craft' ? 'Bench' : 'Processing li
 
 .foot {
   padding: 0 2px;
+}
+
+/* -------------------------------------------------------------- the slate */
+
+.line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+/* Everything the bag can already cover reads sap, the same as a finished job
+   above it (§13.3): this list is scanned for what is ready, not for what is not. */
+.line.ready strong {
+  color: var(--sap);
+}
+
+.inputs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 8px;
+  margin-top: 3px;
+}
+
+/* Ember on the shortfall alone, because that is the state to deal with. */
+.input.short {
+  color: var(--ember);
+}
+
+.input:not(.short) {
+  color: var(--vellum-dim);
 }
 </style>

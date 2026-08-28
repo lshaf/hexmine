@@ -111,6 +111,15 @@ export const PROCESSING = {
 } as const
 
 /**
+ * §8.4 -- the slate: ten recipes a prospector means to make.
+ *
+ * Mirrors Balance::SLATE_CAP. Here so the mark can dim on the eleventh rather
+ * than letting the player tap into a refusal; the refusal is still the
+ * server's, because §16 owns rules.
+ */
+export const SLATE_CAP = 10
+
+/**
  * §8.4 -- how long a bench holds a thing, by rung. Mirrors
  * Balance::CRAFT_BASE_SECONDS.
  *

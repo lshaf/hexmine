@@ -1798,6 +1798,52 @@ A potion has neither a rolled line nor a durability (§7.4.3), so its plate is
 the flask, the rung and the count — and never a stat block reporting that it
 has no stats.
 
+#### The slate — ten things you mean to make
+
+A **bookmark on a recipe**, and the only control in the game that changes
+nothing about the world. Ten at most (`Balance::SLATE_CAP`), on any recipe a
+bench takes: an item the craft benches make (§8.4) or a run one of the five
+processing lines takes (§6).
+
+**What it is for is the walk.** A recipe you cannot afford yet names materials
+you have to go and get, and the bench that would tell you which ones is four
+days behind you. Everything else on the map is answered where you are standing;
+this is the one question whose answer has to travel with you.
+
+**Ten, and the eleventh is refused rather than pushing one off.** The same ten
+as §6.3's cap and for the same reason rather than by coincidence: both count
+things a prospector keeps in mind across a map they have to walk. A list that
+quietly forgets is worse than one that says it is full — §7.6 makes exactly
+that argument about a bag, where the refusal *is* the decision.
+
+**Nothing is reserved.** The slate holds no materials, blocks no bench and
+grants nothing. It is a note to yourself, which is why the mark sits *beside*
+Craft and Queue rather than looking like one of them, and why it is drawn in
+copper — §13.3 spends copper on work in progress, and an intention is exactly
+that. Sap would read as a payout and ember as a problem.
+
+**One column, and the kind is derived.** A recipe key and an item key never
+collide, and the catalog already knows which is which — so storing a `kind`
+beside the key would be the same mistake §8.4 avoids by deriving a bench
+category from the slot. There is a test pinning the two key spaces disjoint,
+because the whole scheme rests on it.
+
+**A shop-only piece cannot go on it.** It has no recipe, so there is nothing to
+gather for it and nothing for the list to say; the trader is the whole of its
+story.
+
+**It is read on the Benches ledger**, which is the page that already plans a
+route — what is on a bench, and what you meant to put on one. Two halves of one
+question asked a step apart: that half plans a walk and this half plans a
+gather. It is also the one screen reachable from every hex, which is the only
+place a shopping list is worth having.
+
+**What you are short of is worked out where it is drawn, never stored.** The
+bag moves with every haul, so a written-down answer would be stale before it
+was read. The line reads sap when the bag already covers it and names the
+shortfall in ember when it does not — the same two colours the rest of the
+ledger uses, pointed the same way.
+
 #### The claim happens at the bench
 
 **Anything left in a settlement is collected in that settlement**, a craft and a

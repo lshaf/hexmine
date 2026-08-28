@@ -3192,6 +3192,106 @@ final class GameLoopTest extends TestCase
         $this->assertGreaterThan(0, $percent, 'no percentage line ever rolled');
     }
 
+    // ------------------------------------------------------------- the slate
+
+    /**
+     * §8.4 -- one column holds both kinds, which only works while the two key
+     * spaces stay disjoint.
+     *
+     * If a recipe key ever collided with an item key, `slateKind()` would
+     * answer "processing" for something a player wrote down meaning the sword,
+     * and the shopping list would quietly cost the wrong materials. It is a
+     * property of the catalog rather than of the slate, so it is asserted here
+     * rather than defended in code.
+     */
+    public function test_a_recipe_key_is_never_also_an_item_key(): void
+    {
+        $collisions = array_intersect(
+            array_keys(Catalog::recipes()),
+            array_keys(Catalog::items()),
+        );
+
+        $this->assertSame([], array_values($collisions));
+    }
+
+    /** §8.4 -- both kinds go on the slate, and nothing else does. */
+    public function test_the_slate_takes_a_recipe_or_a_craftable_and_refuses_the_rest(): void
+    {
+        $this->assertSame('processing', $this->game->slateKind('planks'));
+        $this->assertSame('craft', $this->game->slateKind('hewn_axe'));
+
+        // A shop-only piece has no recipe, so there is nothing to gather for it.
+        $this->assertNull($this->game->slateKind('stone_axe'));
+        $this->assertNull($this->game->slateKind('wood'));
+        $this->assertNull($this->game->slateKind('nothing_at_all'));
+
+        $this->expectException(GameException::class);
+        $this->game->saveToSlate($this->character, 'stone_axe');
+    }
+
+    /**
+     * §8.4 -- ten, and the eleventh is refused rather than pushing one off.
+     *
+     * A list that quietly forgets is worse than one that says it is full, which
+     * is the same argument §7.6 makes about the bag.
+     */
+    public function test_the_slate_stops_at_ten_and_says_so(): void
+    {
+        $keys = array_slice(array_keys(array_filter(
+            Catalog::items(),
+            static fn (array $def) => isset($def['inputs']),
+        )), 0, Balance::SLATE_CAP + 1);
+
+        $this->assertCount(Balance::SLATE_CAP + 1, $keys, 'not enough craftables to fill a slate');
+
+        foreach (array_slice($keys, 0, Balance::SLATE_CAP) as $key) {
+            $this->game->saveToSlate($this->character, $key);
+        }
+
+        $this->assertCount(Balance::SLATE_CAP, $this->game->slate($this->character));
+
+        try {
+            $this->game->saveToSlate($this->character, $keys[Balance::SLATE_CAP]);
+            $this->fail('the eleventh line was written');
+        } catch (GameException $e) {
+            $this->assertSame('slate_full', $e->errorCode);
+        }
+
+        // And the eleventh did not displace anything.
+        $this->assertSame(
+            array_slice($keys, 0, Balance::SLATE_CAP),
+            $this->game->slate($this->character),
+        );
+    }
+
+    /**
+     * §8.4 -- writing the same line twice is one line, and rubbing out a line
+     * that was never there is not an error. Both are what a doubled tap does.
+     */
+    public function test_the_slate_is_idempotent_at_both_ends(): void
+    {
+        $this->game->saveToSlate($this->character, 'planks');
+        $this->game->saveToSlate($this->character, 'planks');
+
+        $this->assertSame(['planks'], $this->game->slate($this->character));
+
+        $this->game->dropFromSlate($this->character, 'planks');
+        $this->game->dropFromSlate($this->character, 'planks');
+
+        $this->assertSame([], $this->game->slate($this->character));
+    }
+
+    /** §8.4 -- and the state carries it, because that is where the client reads it. */
+    public function test_the_slate_rides_in_the_player_state(): void
+    {
+        $this->game->saveToSlate($this->character, 'ingots');
+        $this->game->saveToSlate($this->character, 'hewn_axe');
+
+        $state = $this->game->playerState($this->character->fresh());
+
+        $this->assertSame(['ingots', 'hewn_axe'], $state['slate']);
+    }
+
     /** §8.0.1 -- gold buys a plain item. An option is what a bench puts on one. */
     /**
      * §8.0.1 -- a rolled line is drawn from what the piece is FOR.
