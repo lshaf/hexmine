@@ -2654,6 +2654,7 @@ makes a whole new faucet safe under §2.
 | **Gold**, on a win | fills §3.2's monster drops, and needs no bag row — which matters when the fight was not your idea. A loss pays nothing at all (§9.5.3) |
 | **Monster materials** | 2 families × 5 grades: a plate/hide line for the smith and armorer, an ichor/organ line for the consumable bench. Tier 1, biome-free, dropped by nothing else |
 | **Leavings** | a **Tier 0** line of four, one per monster tier, dropped every time. §4's junk argument applied to combat: the rubbish carried out alongside |
+| **The ground's junk** | §4's own five, about two wins in five. The monster belongs to no ground, but the FIGHT happened somewhere |
 | **Looted gear** | the kit the monster was using, at **5–50% durability**, rarity capped at **rare** |
 | **Battle job XP** | on a win only (§9.5.3) |
 | **Never** | Tier 3, Tier 4, or anything mintable |
@@ -2672,6 +2673,15 @@ the one drop in the game that can be worth throwing away.
 One per *tier* rather than one per monster, and that is the bag again. Twelve
 trophies would be twelve rows, and a fight that costs you a strap is a fight
 that cost more than it paid.
+
+**And the hex itself turns up, about two wins in five.** A monster belongs to no
+ground — it walked here — but the *fight* did not happen in the abstract, and
+what gets trampled into the dirt is the ground's own. It is §4's existing junk,
+which is the tidy part: the same five a mine already turns up, so it costs no
+new kind of strap. Two tier-0 lines rather than one, and they answer two
+different questions — the trophy says **what** you fought and is always there,
+the junk says **where** and is a roll. Two guaranteed rows of rubbish on every
+win would be clutter dressed as variety.
 
 **Harder packs roll better options, not better rarity.** A tougher monster
 grants **extra option slots** (§8.0.1) on what it drops — the same mechanism the

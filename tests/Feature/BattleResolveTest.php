@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Game\Alchemy;
 use App\Game\Balance;
 use App\Game\BattleGear;
 use App\Game\Catalog;
@@ -1271,8 +1272,22 @@ final class BattleResolveTest extends TestCase
             }
 
             foreach (array_keys($result['spoils']) as $key) {
-                $this->assertArrayHasKey($key, Spoils::STOCK, "{$key} is not a spoil");
-                $seen[$key] = true;
+                // §4 -- a win also pays the ground's own junk, which is not a
+                // spoil and is not meant to be: it feeds no recipe and fetches
+                // a gold, so it can ride along without touching the containment
+                // this test is actually about.
+                if (isset(Alchemy::JUNK[$key])) {
+                    continue;
+                }
+
+                $this->assertArrayHasKey($key, Spoils::STOCK, "{$key} is neither a spoil nor junk");
+
+                // Only the two Tier 1 families count toward "both families":
+                // the tier-0 trophy is in STOCK and drops every single time, so
+                // counting it would satisfy this on the first win.
+                if ((Spoils::STOCK[$key]['tier'] ?? 0) === 1) {
+                    $seen[$key] = true;
+                }
             }
 
             $this->assertNotEmpty($result['spoils'], 'a win dropped no materials at all');

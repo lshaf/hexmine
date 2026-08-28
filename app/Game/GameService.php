@@ -2380,7 +2380,12 @@ class GameService
             // full bag loses the surplus rather than refusing: the fight was
             // often not your idea (§9.5.3), and a refusal at this point would
             // be a pin with no way out.
-            foreach (Drops::battleSpoils($monster, $seed) as $material => $quantity) {
+            // §4 -- the hex's own junk rides along, because the fight happened
+            // on ground rather than in the abstract. Passed rather than looked
+            // up in Drops: this method already holds the tile.
+            foreach (
+                Drops::battleSpoils($monster, $seed, WorldGen::biomeOf($col, $row)) as $material => $quantity
+            ) {
                 $granted = $this->addMaterial($character, $material, $quantity);
                 if ($granted > 0) {
                     $spoils[$material] = $granted;

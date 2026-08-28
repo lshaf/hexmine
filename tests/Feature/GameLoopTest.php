@@ -16,7 +16,9 @@ use App\Game\GameService;
 use App\Game\Hash;
 use App\Game\HexGeometry;
 use App\Game\Jobs;
+use App\Game\Monsters;
 use App\Game\Quests;
+use App\Game\Spoils;
 use App\Game\Tiles;
 use App\Game\Variants;
 use App\Game\WorldGen;
@@ -3304,6 +3306,78 @@ final class GameLoopTest extends TestCase
 
         $this->assertGreaterThan(0, $flat, 'no flat line ever rolled');
         $this->assertGreaterThan(0, $percent, 'no percentage line ever rolled');
+    }
+
+    /**
+     * §9.5.8/§4 -- a win pays two kinds of tier-0, and they answer two
+     * different questions.
+     *
+     * The trophy says WHAT you fought and is always there; the junk says WHERE
+     * you fought it and turns up about two times in five. Both are worth a gold
+     * and feed no recipe, which is the whole reason a combat faucet can be this
+     * generous without touching §9.5.8's containment.
+     */
+    public function test_a_win_pays_a_trophy_every_time_and_the_ground_sometimes(): void
+    {
+        $monster = Monsters::ROSTER['moss_hound'];
+        $trophy = Spoils::TROPHY_BY_TIER[$monster['tier']];
+        $junk = null;
+        foreach (Alchemy::JUNK as $key => $def) {
+            if ($def['biome'] === 'forest') {
+                $junk = $key;
+            }
+        }
+
+        $this->assertNotNull($junk);
+
+        $sawJunk = 0;
+        for ($seed = 1; $seed <= 200; $seed++) {
+            $bare = Drops::battleSpoils($monster, $seed);
+            $onGround = Drops::battleSpoils($monster, $seed, 'forest');
+
+            // The trophy is not a roll.
+            $this->assertArrayHasKey($trophy, $bare, "no trophy off seed {$seed}");
+            $this->assertGreaterThan(0, $bare[$trophy]);
+
+            // And the ground is the ONLY difference between the two calls.
+            $this->assertSame(
+                $bare,
+                array_diff_key($onGround, [$junk => true]),
+                "the biome changed something other than the junk, seed {$seed}",
+            );
+
+            if (isset($onGround[$junk])) {
+                $sawJunk++;
+            }
+        }
+
+        // Two in five, loosely: this pins that it is a chance rather than
+        // never or always, not the exact rate.
+        $this->assertGreaterThan(40, $sawJunk, 'the ground never turned up');
+        $this->assertLessThan(160, $sawJunk, 'the ground turned up every time');
+    }
+
+    /** §4 -- and every one of them is a gold apiece, feeding nothing. */
+    public function test_every_tier_zero_drop_off_a_fight_is_worth_scrap_money(): void
+    {
+        foreach (Spoils::TROPHY_BY_TIER as $key) {
+            $def = Catalog::material($key);
+
+            $this->assertNotNull($def, "{$key} is not in the catalog");
+            $this->assertSame(0, $def['tier']);
+            $this->assertSame(1, $def['npcPrice']);
+        }
+
+        // §4 -- and nothing anywhere takes one as an input.
+        foreach (Catalog::items() as $itemKey => $item) {
+            foreach (array_keys($item['inputs'] ?? []) as $input) {
+                $this->assertNotContains(
+                    $input,
+                    Spoils::TROPHY_BY_TIER,
+                    "{$itemKey} wants a trophy as an input",
+                );
+            }
+        }
     }
 
     // ------------------------------------------------------------- the slate

@@ -267,7 +267,7 @@ final class Drops
      *
      * @return array<string,int>
      */
-    public static function battleSpoils(array $monster, int $seed): array
+    public static function battleSpoils(array $monster, int $seed, ?string $biome = null): array
     {
         $grade = max(1, min(5, (int) $monster['tier']));
         $lines = Spoils::BY_GRADE[$grade];
@@ -305,6 +305,26 @@ final class Drops
             );
         }
 
+        // §4 -- and what the ground gave up while the two of you were on it.
+        //
+        // The monster belongs to no ground -- it walked here -- but the FIGHT
+        // happened somewhere, and what is trampled into the dirt is the hex's
+        // own. It is the same junk a mine turns up, so it costs no new strap
+        // kind, and it is junk: a gold, no recipe, nothing to inflate.
+        //
+        // A chance rather than every time, because the trophy above already
+        // guarantees a tier-0 row. Two of them on every win would be clutter
+        // dressed as variety.
+        if ($biome !== null
+            && Hash::rand01(Hash::hash2($seed, 31, Balance::mapSeed() ^ 0x5907)) < self::BATTLE_JUNK_CHANCE) {
+            $key = self::junkOf($biome);
+            $out[$key] = ($out[$key] ?? 0) + Hash::randInt(
+                Hash::hash2($seed, 37, Balance::mapSeed() ^ 0x5908),
+                self::TROPHY_MIN,
+                self::TROPHY_MAX,
+            );
+        }
+
         $above = Spoils::BY_GRADE[$grade + 1] ?? null;
         if ($above !== null
             && Hash::rand01(Hash::hash2($seed, 19, Balance::mapSeed() ^ 0x5904)) < self::RARE_SPOIL_CHANCE) {
@@ -330,6 +350,14 @@ final class Drops
     public const TROPHY_MIN = 1;
 
     public const TROPHY_MAX = 2;
+
+    /**
+     * §4 -- how often the ground itself turns up in the spoils.
+     *
+     * Two in five, which is often enough to be a thing players notice about
+     * where they fight and rare enough that a win is not two rows of rubbish.
+     */
+    public const BATTLE_JUNK_CHANCE = 0.4;
 
     /** §9.5.8 -- the plate line drops every win; the ichor line about half. */
     public const PLATE_MIN = 1;
