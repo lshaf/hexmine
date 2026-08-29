@@ -129,7 +129,7 @@ export function optionGain(
     if (toolLine !== null && toolLine !== line) continue
 
     for (const option of owned.options ?? []) {
-      if (option.stat === stat) values.push(option.value)
+      if (option.stat === stat) values.push(option.value ?? 0)
     }
   }
 
@@ -535,7 +535,7 @@ export function optionStatLine(option: ItemOption): string {
   // §8.0.1 -- a share of the work, and the only rolled line that is a
   // percentage at all. It is not a StatKey and meets no ceiling (§8.1).
   if (option.kind === 'gain') {
-    return `${formatPercent(option.value)} ${GAIN_LABEL[option.stat] ?? option.stat}`
+    return `${formatPercent(option.value ?? 0)} ${GAIN_LABEL[option.stat] ?? option.stat}`
   }
 
   return `+${option.value} ${FLAT_LABEL[option.stat] ?? option.stat}`
@@ -631,7 +631,7 @@ export function statChips(def: ItemDef, options: ItemOption[] = []): StatChip[] 
 
 /** §8.0.1 -- what an item's rolled lines add to one solid number. */
 export function flatOption(options: ItemOption[], stat: string): number {
-  return options.filter((o) => o.stat === stat).reduce((sum, o) => sum + o.value, 0)
+  return options.filter((o) => o.stat === stat).reduce((sum, o) => sum + (o.value ?? 0), 0)
 }
 
 // ------------------------------------------------------------------ the swap
@@ -664,7 +664,7 @@ const GAIN_PAIRS = [
 function rolled(item: OwnedItem, stat: string): number {
   return (item.options ?? [])
     .filter((o) => o.stat === stat)
-    .reduce((sum, o) => sum + o.value, 0)
+    .reduce((sum, o) => sum + (o.value ?? 0), 0)
 }
 
 /**

@@ -2786,9 +2786,11 @@ final class GameLoopTest extends TestCase
                 $tiers = Formulas::optionTiersFor($rarity);
 
                 foreach ($rolled as $option) {
-                    // §8.2 -- the rare one is rolled apart from the lines and
-                    // does not count against the ceiling.
+                    // §8.2 -- the rare one is rolled apart from the lines, does
+                    // not count against the ceiling, and carries no number.
                     if ($option['kind'] === 'indestructible') {
+                        $this->assertArrayNotHasKey('value', $option, $key);
+
                         continue;
                     }
 
@@ -2982,6 +2984,23 @@ final class GameLoopTest extends TestCase
         foreach (['flat', 'durability', 'cooldown', 'gain', 'indestructible'] as $kind) {
             $this->assertArrayHasKey($kind, $kinds, "no {$kind} line ever rolled");
         }
+
+        // §8.0.1 -- and the one line with no number carries none. Every other
+        // line answers "how much"; this one either happened or it did not, and
+        // a placeholder would be somewhere for a band to be invented later.
+        $rod = Catalog::item('knotted_rod');
+        $seen = false;
+        for ($seed = 1; $seed <= 400; $seed++) {
+            foreach (Formulas::rollOptions($rod, $seed) as $option) {
+                if ($option['kind'] !== 'indestructible') {
+                    continue;
+                }
+
+                $seen = true;
+                $this->assertArrayNotHasKey('value', $option, 'unbreakable carried a number');
+            }
+        }
+        $this->assertTrue($seen, 'nothing ever rolled unbreakable');
     }
 
     /**
@@ -3116,7 +3135,8 @@ final class GameLoopTest extends TestCase
      */
     public function test_an_unbreakable_piece_survives_running_out(): void
     {
-        $unbreakable = [['stat' => 'indestructible', 'value' => 1, 'kind' => 'indestructible']];
+        // §8.0.1 -- no value, because it has none: owning the line IS the effect.
+        $unbreakable = [['stat' => 'indestructible', 'kind' => 'indestructible']];
 
         $this->assertTrue(Formulas::isIndestructible($unbreakable));
         $this->assertFalse(Formulas::isIndestructible([]));

@@ -127,6 +127,7 @@ function optionTiersFor(rarity: Rarity): typeof OPTION_TIERS {
 interface RollBrief {
   ceiling: number
   lines: { label: string; value: string }[]
+  unbreakable: string
   plainShelf: boolean
 }
 
@@ -188,12 +189,14 @@ function rollBrief(def: ItemDef): RollBrief | null {
     ceiling: Math.min(EQUIPMENT.optionRolls[def.rarity] ?? 0, pool.length),
     lines: [
       ...pool.map((entry) => ({ label: LABEL[entry.stat] ?? entry.stat, value: band(entry) })),
-      // §8.2 -- rolled apart from the lines, but it belongs in the row with
-      // them: this is the list a player reads to find out what a bench can put
-      // on a thing, and the rarest answer is the one worth seeing. Its odds
-      // stand where the others' band does, because that is what it has instead.
-      { label: 'unbreakable', value: pct(EQUIPMENT.optionIndestructibleChance) },
+      // §8.0.1 -- it belongs in this row, because this is the list a player
+      // reads to find out what a bench can put on a thing and the rarest answer
+      // is the one worth seeing. It carries NO value: every other pip's number
+      // is what the line is worth, and this line is not worth an amount -- it
+      // either happened or it did not. Its odds are prose, above.
+      { label: 'unbreakable', value: '' },
     ],
+    unbreakable: pct(EQUIPMENT.optionIndestructibleChance),
     plainShelf: def.goldPrice !== undefined,
   }
 }
@@ -967,14 +970,15 @@ function nature(item: ItemDef): string {
                       <span class="where">
                         Up to {{ entry.rolls!.ceiling }}
                         {{ entry.rolls!.ceiling === 1 ? 'line' : 'lines' }}, at most one
-                        of each below. Unbreakable is rolled apart from them and takes
-                        no slot — at zero the piece is not lost, only useless until it
-                        is mended.
+                        of each below. Unbreakable has no number and takes no slot: it
+                        is rolled apart from the rest, {{ entry.rolls!.unbreakable }} of
+                        the time, and the piece simply never goes — at zero it is not
+                        lost, only useless until it is mended.
                       </span>
                       <div class="cost">
                         <span v-for="l in entry.rolls!.lines" :key="l.label" class="pip roll solid">
                           <span class="key">{{ l.label }}</span>
-                          <span class="mono">{{ l.value }}</span>
+                          <span v-if="l.value" class="mono">{{ l.value }}</span>
                         </span>
                       </div>
                       <p v-if="entry.rolls!.plainShelf" class="tiny muted note">

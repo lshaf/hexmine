@@ -178,7 +178,11 @@ final class Formulas
         // one and never dilutes a pool -- and gated on the rung rolling at all,
         // which keeps it off every shelf and every common.
         if (Hash::rand01(Hash::hash2($seed, 970, Balance::mapSeed())) < Balance::OPTION_INDESTRUCTIBLE_CHANCE) {
-            $out[] = ['stat' => Catalog::OPTION_INDESTRUCTIBLE, 'value' => 1, 'kind' => 'indestructible'];
+            // No value, because it has none: owning the line IS the effect, the
+            // way a `battleSkill` node is (§7.4.3). Every other line answers
+            // "how much"; this one answers nothing, and a placeholder number
+            // would be somewhere for a band to be invented later.
+            $out[] = ['stat' => Catalog::OPTION_INDESTRUCTIBLE, 'kind' => 'indestructible'];
         }
 
         return $out;

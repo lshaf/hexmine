@@ -1512,8 +1512,16 @@ twice and permanently, and a full mend still costs one recipe's worth of parts.
 `indestructible` is rolled **apart from the lines and after them**, at
 `OPTION_INDESTRUCTIBLE_CHANCE` (2%), so it never takes a slot from one and
 never dilutes a pool. It is gated on the rung rolling at all, which keeps it
-off every shelf and every common. It has no value: **owning it is the effect**,
-the way a `battleSkill` node is (§7.4.3).
+off every shelf and every common.
+
+**It carries no value at all, and the row does not even have the field.**
+Owning it is the effect, the way a `battleSkill` node is (§7.4.3). Every other
+line answers *how much*; this one either happened or it did not, so a
+placeholder number would be nothing but somewhere for a band to be invented
+later. On screen it is a name with no figure beside it, and the 2% is prose
+rather than a value in the column where the other lines print what they are
+worth — how *often* a thing happens and what it is *worth* are two questions,
+and one column cannot answer both.
 
 What it survives as is **a piece at zero** — not destroyed, and useless until it
 is mended. That is the one exception §8.2 has, and it has to stay rare: an

@@ -419,7 +419,11 @@ export type OptionKind = 'flat' | 'durability' | 'cooldown' | 'gain' | 'indestru
 
 export interface ItemOption {
   stat: 'attack' | 'defense' | 'durability' | 'cooldown' | 'haul' | 'travel' | 'indestructible'
-  value: number
+  /**
+   * How much, and absent on the one line that has no how much: `indestructible`
+   * is standalone, and owning it IS the effect (§8.0.1).
+   */
+  value?: number
   /**
    * Which unit the value is counted in. `flat`, `durability` and `cooldown` are
    * whole numbers that simply add; `gain` is a share of the work (§8.0.1's
