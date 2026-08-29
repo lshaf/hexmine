@@ -964,7 +964,7 @@ class GameService
             // it is only ever mining attack.
             $best = max(
                 $best,
-                Formulas::toolAttack($def) + Formulas::flatOption($item->options ?? [], 'attack'),
+                Formulas::toolAttack($def) + Formulas::optionCount($item->options ?? [], 'attack'),
             );
         }
 
@@ -1074,8 +1074,15 @@ class GameService
     {
         // §8.5 -- 'travel' by name, or a road potion would be filtered out of
         // the one thing it was drunk for.
+        //
+        // §8.0.1 -- the rolled `travel` line rides beside that rather than in
+        // it. It is boots-only and it is not a StatKey, so it does not meet
+        // STAT_CEILING and does not belong in the aggregate that does.
         return Balance::scaled(
-            Balance::travelMsPerHex($this->bonuses($character, 'travel')['travelSpeed']),
+            Balance::travelMsPerHex(
+                $this->bonuses($character, 'travel')['travelSpeed'],
+                Formulas::optionGain($this->itemRows($character), Catalog::OPTION_TRAVEL),
+            ),
         );
     }
 
@@ -1122,7 +1129,10 @@ class GameService
             $left = max(0, (int) $item->durability - $amount);
             $drained += min($amount, (int) $item->durability);
 
-            if ($left <= 0) {
+            // §8.2 -- at zero the piece is gone, unless it rolled the one line
+            // that says otherwise (§8.0.1). An unbreakable piece stops at zero
+            // instead: useless until it is mended, and still yours.
+            if ($left <= 0 && ! Formulas::isIndestructible($item->options)) {
                 $destroyed[] = $def['name'];
                 $item->delete();
 
@@ -1815,10 +1825,14 @@ class GameService
                 'job' => $job,
                 'family' => $family,
                 'level' => (int) ($this->jobLevels($character)[$job] ?? 0),
+                // §8.0.1 -- whole rounds off every one of this family's three,
+                // rolled onto the weapon itself. It rides here because it is a
+                // fact about the thing in your hand rather than about you.
+                'cooldown' => Formulas::optionCount($item['options'] ?? [], Catalog::OPTION_COOLDOWN),
             ];
         }
 
-        return ['job' => null, 'family' => null, 'level' => 0];
+        return ['job' => null, 'family' => null, 'level' => 0, 'cooldown' => 0];
     }
 
     /**
@@ -1855,16 +1869,26 @@ class GameService
      * class. The panel needs them to show what all three are worth, including
      * the two nobody has learned yet.
      *
-     * @return array{power:float,cooldown:int,stun:int}
+     * @return array{power:float,cooldown:int,stun:int,weaponCooldown:int}
      */
     public function battleTreeFor(Character $character, string $family): array
     {
         $tree = $this->battleTree($character, $family);
+        $carried = $this->battleJobLevel($character);
 
         return [
             'power' => $tree['skillPower'],
             'cooldown' => $tree['skillCooldown'],
             'stun' => $tree['skillStun'],
+            // §8.0.1 -- and the weapon's own rolled rounds, kept apart from the
+            // tree's because they answer to different limits: the tree's are
+            // capped by SKILL_BATTLE_COOLDOWN_CAP because a point may never buy
+            // more than about a rung of gear, and this IS the gear.
+            //
+            // Only when the family in your hand is the family being asked
+            // about: the bench at /battle simulates all three, and a rolled
+            // line on a sword has nothing to say about a wand.
+            'weaponCooldown' => $carried['family'] === $family ? (int) ($carried['cooldown'] ?? 0) : 0,
         ];
     }
 
@@ -2564,25 +2588,28 @@ class GameService
             return null;
         }
 
-        $max = Formulas::maxDurabilityFor($def);
+        // §8.0.1 -- harder packs roll better options, never better rarity. The
+        // roll comes first because a durability line moves the piece's own
+        // ceiling (§8.2), and the battered fraction below is a share of THAT.
+        $options = $this->rollFor(
+            $character,
+            $def,
+            intdiv((int) $monster['tier'], 2) + $extraOption,
+        );
+        $max = Formulas::maxDurabilityFor($def, $options);
         $durability = max(1, (int) round($max * Hash::randInt(
             Hash::hash2($seed, 41, Balance::mapSeed() ^ 0x5909),
             Balance::LOOT_DURABILITY_MIN_PERCENT,
             Balance::LOOT_DURABILITY_MAX_PERCENT,
         ) / 100));
 
-        // §8.0.1 -- harder packs roll better options, never better rarity.
         $item = CharacterItem::create([
             'character_id' => $character->id,
             'item_key' => $key,
             'durability' => $durability,
             'max_durability' => $max,
             'equipped' => false,
-            'options' => $this->rollFor(
-                $character,
-                $def,
-                intdiv((int) $monster['tier'], 2) + $extraOption,
-            ),
+            'options' => $options,
         ]);
 
         return [
@@ -2865,15 +2892,18 @@ class GameService
         $before = (int) $item->durability;
         $left = max(0, $before - $amount);
 
+        // §8.2/§8.0.1 -- an unbreakable piece runs out without being lost.
+        $kept = Formulas::isIndestructible($item->options);
+
         $row = [
             'name' => $def['name'] ?? $item->item_key,
             'slot' => $def['slot'] ?? null,
             'lost' => min($amount, $before),
             'left' => $left,
-            'destroyed' => $left <= 0,
+            'destroyed' => $left <= 0 && ! $kept,
         ];
 
-        if ($left <= 0) {
+        if ($left <= 0 && ! $kept) {
             $item->delete();
         } else {
             $item->durability = $left;
@@ -3141,6 +3171,10 @@ class GameService
                 $skillLevel,
                 $bonuses['yield'],
                 WorldGen::ringYield($tile['ring']) * $pocket,
+                // §8.0.1 -- the rolled `haul` line, which is not a StatKey and
+                // so is not in `$bonuses` and does not meet STAT_CEILING. A
+                // tool's is line-locked like everything else on a tool.
+                Formulas::optionGain($this->itemRows($character), Catalog::OPTION_HAUL, $skillKey),
             ),
             // §5.7 -- and the card has to SAY so. A haul half again the usual
             // size with nothing explaining it is worse than no bonus at all.
@@ -5559,7 +5593,16 @@ class GameService
         // catalog's, which made the node worth one craft: the bar read past
         // 100%, resale clamped the fraction back to 1, and the first mend set
         // durability to the catalog max and threw the extra away for good.
-        $max = Formulas::maxDurabilityFor($def, (float) $effects['craftDurability']);
+        //
+        // §8.0.1 -- a rolled durability line moves the same ceiling, which is
+        // why the lines are rolled BEFORE the max is worked out.
+        $options = $this->rollFor(
+            $character,
+            $def,
+            $this->extraRoll($character, $effects['craftOption'], 0x5C11),
+            (float) $effects['optionTier'],
+        );
+        $max = Formulas::maxDurabilityFor($def, $options, (float) $effects['craftDurability']);
         $durability = $max;
 
         $item = CharacterItem::create([
@@ -5568,12 +5611,7 @@ class GameService
             'durability' => $durability,
             'max_durability' => $max,
             'equipped' => false,
-            'options' => $this->rollFor(
-                $character,
-                $def,
-                $this->extraRoll($character, $effects['craftOption'], 0x5C11),
-                (float) $effects['optionTier'],
-            ),
+            'options' => $options,
         ]);
 
         return [

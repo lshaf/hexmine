@@ -377,7 +377,7 @@ final class BattleSkills
      * own cap on the way in -- an exchange is a bad place to discover a cap was
      * missed somewhere upstream.
      *
-     * @param  array{power?:float,cooldown?:int,stun?:int}  $tree
+     * @param  array{power?:float,cooldown?:int,stun?:int,weaponCooldown?:int}  $tree
      * @return list<array<string,mixed>>
      */
     /** §9.5.9 -- the tree node that teaches this skill. */
@@ -394,8 +394,15 @@ final class BattleSkills
     public static function armed(?string $family, array $tree = [], ?array $learned = null): array
     {
         $power = max(0.0, min((float) ($tree['power'] ?? 0.0), Balance::SKILL_BATTLE_POWER_CAP));
-        $shorter = max(0, min((int) ($tree['cooldown'] ?? 0), Balance::SKILL_BATTLE_COOLDOWN_CAP));
         $longer = max(0, min((int) ($tree['stun'] ?? 0), Balance::SKILL_BATTLE_STUN_CAP));
+
+        // §7.4.3 -- the TREE's rounds, capped because a skill point may never
+        // buy more than about a rung of gear. §8.0.1 -- and the WEAPON's rolled
+        // rounds, which are not capped here because they ARE the rung of gear;
+        // what bounds them is the floor below, and the one line per stat that
+        // stops a piece carrying two.
+        $shorter = max(0, min((int) ($tree['cooldown'] ?? 0), Balance::SKILL_BATTLE_COOLDOWN_CAP))
+            + max(0, (int) ($tree['weaponCooldown'] ?? 0));
 
         $out = [];
 

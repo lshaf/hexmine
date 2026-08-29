@@ -33,6 +33,7 @@ import type {
   CritterKey,
   GradeRawKey,
   GradeRefinedKey,
+  OptionKind,
   Recipe,
   Rarity,
   Ring,
@@ -434,26 +435,31 @@ export const skillForSlot = (slot: EquipSlot): SkillKey | null =>
 /**
  * §8.0.1 -- every line a roll on this piece may land on.
  *
- * **Every option is a solid number on the pair, and nothing else.** A
- * percentage was the wrong unit for luck: it climbs toward §8.1's ceiling,
- * which every line on every piece is already climbing toward, so a good roll
- * and a bad one read the same on the plate. §9.5.4 makes that argument about
- * the percentage twins already; this is it carried to its conclusion.
+ * **A line is a solid number or a share of the work, never a `StatKey`
+ * percentage.** A percentage climbs toward §8.1's ceiling, which every line on
+ * every piece is already climbing toward, so a good roll and a bad one read the
+ * same on the plate.
  *
- * Which of the two a piece is eligible for is §8's usual question -- what is
- * the piece FOR. A gathering tool rolls `attack`, and on a tool that is §7.3's
- * MINING attack; it never rolls a guard, because there is nothing on a hex for
- * one to mean. A weapon and worn gear roll both, except a focus (§9.5.4).
+ * Which lines a piece is eligible for is §8's usual question -- what is the
+ * piece FOR. The pair on everything that fights, and on a tool `attack` alone,
+ * because a tool's attack is §7.3's mining attack and there is nothing on a hex
+ * for a guard to keep off you. `durability` on everything, because everything
+ * wears out. `haul` on everything but the weapon (§8 rule 5 keeps work off the
+ * one slot that never works). `travel` on boots. `cooldown` on the weapon,
+ * because the family in that slot is what decides which three skills you carry.
+ *
+ * `indestructible` is not here: it is rolled apart from the lines at its own
+ * low chance, so it never takes a slot from one.
  *
  * Mirrors `Catalog::optionRollsFor()`. The client needs it because the almanac
  * is where a piece is read before it is owned, and what it *may* roll is part
  * of what it is.
  */
-export type OptionStat = 'attack' | 'defense'
+export type OptionStat = 'attack' | 'defense' | 'durability' | 'haul' | 'travel' | 'cooldown'
 
 export interface OptionRoll {
   stat: OptionStat
-  kind: 'flat'
+  kind: OptionKind
 }
 
 const OPTION_FLAT_TOOL: OptionStat[] = ['attack']
@@ -470,17 +476,27 @@ export function optionRollsFor(def: ItemDef): OptionRoll[] {
   // §8.5 -- no slot is a consumable, and a potion has no rolled line at all.
   if (!def.slot) return []
 
-  const lines = (stats: OptionStat[]): OptionRoll[] =>
-    stats.map((stat) => ({ stat, kind: 'flat' as const }))
+  const pool: OptionRoll[] = []
 
-  // A tool guards nothing, so it is the one pool with a single entry.
-  if (skillForSlot(def.slot) !== null) return lines(OPTION_FLAT_TOOL)
+  if (skillForSlot(def.slot) !== null) {
+    pool.push({ stat: OPTION_FLAT_TOOL[0]!, kind: 'flat' })
+  } else {
+    for (const stat of OPTION_FLAT_WORN) {
+      const noGuard =
+        stat === 'defense' &&
+        def.slot === 'weapon' &&
+        !!def.family &&
+        OPTION_FAMILY_NO_DEFENSE.includes(def.family)
+      if (!noGuard) pool.push({ stat, kind: 'flat' })
+    }
+  }
 
-  const pool = lines(OPTION_FLAT_WORN)
+  pool.push({ stat: 'durability', kind: 'durability' })
+  if (def.slot !== 'weapon') pool.push({ stat: 'haul', kind: 'gain' })
+  if (def.slot === 'boots') pool.push({ stat: 'travel', kind: 'gain' })
+  if (def.slot === 'weapon') pool.push({ stat: 'cooldown', kind: 'cooldown' })
 
-  return def.slot === 'weapon' && def.family && OPTION_FAMILY_NO_DEFENSE.includes(def.family)
-    ? pool.filter((entry) => entry.stat !== 'defense')
-    : pool
+  return pool
 }
 
 /** The slot a skill line draws its tool from. */

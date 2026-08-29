@@ -225,30 +225,52 @@ final class Catalog
     /**
      * §8.0.1 -- what a rolled line may land on.
      *
-     * **Every option is a solid number on the pair, and nothing else.** A
-     * percentage was the wrong unit for luck: it climbs toward §8.1's ceiling,
-     * which is one invisible number every line on every piece is already
-     * climbing toward, so a good roll and a bad one read the same on the plate
-     * and neither could be felt in play. §9.5.4 makes exactly that argument
-     * about the percentage twins -- "+3% power moves a common sword from 5
-     * attack to 5" -- and this is that argument carried to its conclusion.
+     * **A line is a solid number, never a `StatKey` percentage.** A percentage
+     * climbs toward §8.1's ceiling, which is one invisible number every line on
+     * every piece is already climbing toward, so a good roll and a bad one read
+     * the same on the plate. §9.5.4 makes that argument about the percentage
+     * twins already; the pool is that argument carried out.
      *
-     * So a line is `attack` or `defense`, solid, simply added. What is left to
-     * decide is which of the two a piece is eligible for, and §8 answers that
-     * the same way it answers everything else -- by what the piece is FOR:
+     * Which lines a piece is eligible for is §8's usual question -- what is the
+     * piece FOR:
      *
-     * - a **gathering tool** rolls `attack`, and on a tool that is §7.3's
-     *   MINING attack: it bites deeper into a hex and is worth nothing in a
-     *   fight, exactly as the tool's own attack is (§8 rule 5). It never rolls
-     *   `defense`, because there is nothing on a hex for a guard to mean.
-     * - a **weapon** rolls both -- except a focus, which guards nowhere in the
-     *   kit and may not roll one either (below).
-     * - **worn gear** rolls both. §9.5.4 makes armor "one set with two axes,
-     *   not a second wardrobe", and both axes are the pair.
+     * - **the pair**, `attack` and `defense`, on everything that fights. A tool
+     *   rolls attack alone, and on a tool that is §7.3's MINING attack: it
+     *   bites deeper into a hex and is worth nothing in a fight (§8 rule 5). It
+     *   never rolls a guard, because there is nothing on a hex for one to keep
+     *   off you.
+     * - **`durability`** on everything, because whatever a piece is for it is a
+     *   thing that wears out (§8.2).
+     * - **`haul`** on anything that goes down a mine, which is every piece
+     *   except the weapon: §8 rule 5 keeps work off the one slot that never
+     *   works, and that is the whole of the exception.
+     * - **`travel`** on boots and nowhere else. A coat does not walk faster.
+     * - **`cooldown`** on the weapon and nowhere else. The family in that slot
+     *   is what decides which three skills you carry (§9.5.9), so it is the
+     *   only piece with any business shortening them.
+     *
+     * `indestructible` is deliberately NOT here: it is rolled apart from the
+     * lines at its own low chance (Balance::OPTION_INDESTRUCTIBLE_CHANCE), so
+     * it never takes a slot from them and never dilutes a pool.
      */
     public const OPTION_FLAT_TOOL = ['attack'];
 
     public const OPTION_FLAT_WORN = ['attack', 'defense'];
+
+    /** The line every piece may roll, whatever it is for. */
+    public const OPTION_DURABILITY = 'durability';
+
+    /** Every piece that goes down a mine, which is every piece but the weapon. */
+    public const OPTION_HAUL = 'haul';
+
+    /** Boots, and nothing else. */
+    public const OPTION_TRAVEL = 'travel';
+
+    /** The weapon, and nothing else (§9.5.9). */
+    public const OPTION_COOLDOWN = 'cooldown';
+
+    /** Rolled apart from the lines, at its own chance (§8.2). */
+    public const OPTION_INDESTRUCTIBLE = 'indestructible';
 
     /**
      * §9.5.4 -- a focus keeps nothing off you, of either kind.
@@ -281,23 +303,38 @@ final class Catalog
             return [];
         }
 
-        $lines = fn (array $stats) => array_map(
-            static fn (string $stat) => ['stat' => $stat, 'kind' => 'flat'],
-            $stats,
-        );
+        $line = static fn (string $stat, string $kind = 'flat') => ['stat' => $stat, 'kind' => $kind];
+        $pool = [];
 
-        // A tool guards nothing, so it is the one pool with a single entry.
         if (self::skillForSlot($slot) !== null) {
-            return $lines(self::OPTION_FLAT_TOOL);
+            // A tool guards nothing: there is no blow on a hex to keep off you.
+            $pool[] = $line(self::OPTION_FLAT_TOOL[0]);
+        } else {
+            foreach (self::OPTION_FLAT_WORN as $stat) {
+                // §9.5.4 -- a focus keeps nothing off you, of either kind.
+                if ($stat === 'defense' && $slot === 'weapon'
+                    && in_array($def['family'] ?? null, self::OPTION_FAMILY_NO_DEFENSE, true)) {
+                    continue;
+                }
+
+                $pool[] = $line($stat);
+            }
         }
 
-        $pool = $lines(self::OPTION_FLAT_WORN);
+        $pool[] = $line(self::OPTION_DURABILITY, 'durability');
 
-        if ($slot === 'weapon' && in_array($def['family'] ?? null, self::OPTION_FAMILY_NO_DEFENSE, true)) {
-            $pool = array_values(array_filter(
-                $pool,
-                static fn (array $entry) => $entry['stat'] !== 'defense',
-            ));
+        // §8 rule 5 -- the weapon is the one slot that never works, so it is
+        // the one slot a work bonus may not land on.
+        if ($slot !== 'weapon') {
+            $pool[] = $line(self::OPTION_HAUL, 'gain');
+        }
+
+        if ($slot === 'boots') {
+            $pool[] = $line(self::OPTION_TRAVEL, 'gain');
+        }
+
+        if ($slot === 'weapon') {
+            $pool[] = $line(self::OPTION_COOLDOWN, 'cooldown');
         }
 
         return $pool;

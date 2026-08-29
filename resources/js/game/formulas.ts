@@ -103,6 +103,65 @@ export function aggregateAfterSwap(
   return aggregateStat(swapped, stat, line)
 }
 
+/**
+ * §8.0.1 -- a `haul` or `travel` line, summed across a whole kit.
+ *
+ * Mirrors `Formulas::optionGain()`. These are shares rather than counts, so
+ * unlike the solid lines they stack -- and §8.1 rule 2 is about stacking rather
+ * than about the ceiling, so it applies. They are NOT StatKeys and never meet
+ * STAT_CEILING; `optionGainCap` is where the whole kit stops.
+ */
+export function optionGain(
+  items: OwnedItem[],
+  stat: string,
+  line: SkillKey | null = null,
+): number {
+  const values: number[] = []
+
+  for (const owned of items) {
+    if (!owned.equipped || owned.durability <= 0) continue
+
+    const def = ITEM_BY_KEY[owned.key]
+    if (!def) continue
+
+    // §8 rule 1 -- a tool pays out on its own line and on no other.
+    const toolLine = def.slot ? skillForSlot(def.slot) : null
+    if (toolLine !== null && toolLine !== line) continue
+
+    for (const option of owned.options ?? []) {
+      if (option.stat === stat) values.push(option.value)
+    }
+  }
+
+  if (values.length === 0) return 0
+
+  values.sort((a, b) => b - a)
+
+  const total = values.reduce(
+    (sum, value, index) => sum + value * EQUIPMENT.stackFalloff ** index,
+    0,
+  )
+
+  return Math.min(total, EQUIPMENT.optionGainCap)
+}
+
+function optionGainAfterSwap(
+  items: OwnedItem[],
+  incoming: OwnedItem,
+  outgoing: OwnedItem | null,
+  stat: string,
+  line: SkillKey | null = null,
+): number {
+  const swapped = items.map((item) => {
+    if (item.id === incoming.id) return { ...item, equipped: true }
+    if (outgoing && item.id === outgoing.id) return { ...item, equipped: false }
+
+    return item
+  })
+
+  return optionGain(swapped, stat, line)
+}
+
 /** Salvage returned when an item is discarded, §8.2. */
 /**
  * §8.2 -- what a trader pays for a piece of shop gear.
@@ -457,7 +516,7 @@ export function statLine(
 }
 
 /**
- * §8.0.1 -- a rolled line, which is always a solid number on the pair.
+ * §8.0.1 -- a rolled line, said in the unit it is counted in.
  *
  * A tool's rolled `attack` is §7.3's mining attack and it is still said plainly
  * as attack: the piece's own chip says ATK, a tool has no other attack for it
@@ -465,6 +524,20 @@ export function statLine(
  * second word for the one number is what made it hard to read.
  */
 export function optionStatLine(option: ItemOption): string {
+  // §8.2 -- the one line with no number: owning it IS the effect.
+  if (option.kind === 'indestructible') return 'unbreakable'
+
+  // §9.5.9 -- rounds OFF a cooldown, so it reads with the sign it is felt with.
+  if (option.kind === 'cooldown') {
+    return `−${option.value} round${option.value === 1 ? '' : 's'} on every skill`
+  }
+
+  // §8.0.1 -- a share of the work, and the only rolled line that is a
+  // percentage at all. It is not a StatKey and meets no ceiling (§8.1).
+  if (option.kind === 'gain') {
+    return `${formatPercent(option.value)} ${GAIN_LABEL[option.stat] ?? option.stat}`
+  }
+
   return `+${option.value} ${FLAT_LABEL[option.stat] ?? option.stat}`
 }
 
@@ -491,6 +564,13 @@ export function optionStatLine(option: ItemOption): string {
 const FLAT_LABEL: Partial<Record<string, string>> = {
   attack: 'attack',
   defense: 'defense',
+  durability: 'durability',
+}
+
+/** §8.0.1 -- the two shares of the work, said as the work rather than as a stat. */
+const GAIN_LABEL: Partial<Record<string, string>> = {
+  haul: 'haul',
+  travel: 'travel speed',
 }
 
 export interface StatChip {
@@ -568,6 +648,26 @@ function solid(item: OwnedItem, def: ItemDef, stat: 'attack' | 'defense'): numbe
 }
 
 /**
+ * §8.0.1 -- the rolled share and the base stat that do the same job.
+ *
+ * A haul line and `yield` both decide how big a haul is; a travel line and
+ * `travelSpeed` both decide how fast the road goes. They multiply rather than
+ * add (the rolled one is outside §8.1's ceiling and the stat is inside it), so
+ * a swap has to report the product or it reports the same thing twice.
+ */
+const GAIN_PAIRS = [
+  ['haul', 'yield', 'haul'],
+  ['travel', 'travelSpeed', 'travel speed'],
+] as const
+
+/** §8.0.1 -- one rolled line's value on a piece, for the lines gear has no base of. */
+function rolled(item: OwnedItem, stat: string): number {
+  return (item.options ?? [])
+    .filter((o) => o.stat === stat)
+    .reduce((sum, o) => sum + o.value, 0)
+}
+
+/**
  * One piece's own percentage contribution to a stat, before any kit maths.
  *
  * Its base stat and nothing else: a rolled line is a solid number now (§8.0.1)
@@ -635,10 +735,55 @@ export function swapChanges(
     if (delta !== 0) out.push({ text: `${delta > 0 ? '+' : ''}${delta} ${word}`, better: delta > 0 })
   }
 
+  // §8.0.1 -- the solid rolled lines the pair does not cover. A swap that
+  // quietly costs a point of durability or a round off every skill is a swap
+  // the row has to say, and neither is in the percentage aggregate below.
+  for (const stat of ['durability', 'cooldown'] as const) {
+    const delta = rolled(incoming, stat) - (outgoing ? rolled(outgoing, stat) : 0)
+    if (delta === 0) continue
+
+    // A cooldown line is rounds taken OFF, so a bigger number is a shorter
+    // wait: "+1" would read as the wrong direction. Said in words instead.
+    const text =
+      stat === 'cooldown'
+        ? `${Math.abs(delta)} ${delta > 0 ? 'fewer' : 'more'} round${Math.abs(delta) === 1 ? '' : 's'} on every skill`
+        : `${delta > 0 ? '+' : '−'}${Math.abs(delta)} max durability`
+
+    out.push({ text, better: delta > 0 })
+  }
+
+  // §8.0.1 -- and the two shares of the work, each merged with the STAT that
+  // does the same job. `travelSpeed` and a rolled `travel` line are two
+  // multipliers on one clock; printed apart they were two rows saying "travel
+  // speed" with different numbers, which reads as a bug rather than as a
+  // distinction. The player is owed what the swap does to the road, so both
+  // terms go into one figure -- exactly, since both are known here.
+  for (const [gain, stat, word] of GAIN_PAIRS) {
+    const before = (1 + aggregateStat(items, stat, line)) * (1 + optionGain(items, gain, line))
+    const after =
+      (1 + aggregateAfterSwap(items, incoming, outgoing, stat, line)) *
+      (1 + optionGainAfterSwap(items, incoming, outgoing, gain, line))
+
+    if (Math.abs(after - before) < 1e-9) continue
+
+    out.push({ text: `${formatPercent(after / before - 1)} ${word}`, better: after > before })
+  }
+
+  // §8.2 -- and the one that has no number, which is the largest thing a swap
+  // can move: a piece that survives running out against one that does not.
+  const keeps = (item: OwnedItem | null) =>
+    (item?.options ?? []).some((o) => o.kind === 'indestructible')
+  if (keeps(incoming) !== keeps(outgoing)) {
+    out.push({ text: keeps(incoming) ? 'unbreakable' : 'breakable again', better: keeps(incoming) })
+  }
+
   const both = [{ item: incoming, def: into }]
   if (outgoing && off) both.push({ item: outgoing, def: off })
 
   for (const stat of percentStats(both)) {
+    // The two the loop above already merged and reported in full.
+    if (GAIN_PAIRS.some(([, paired]) => paired === stat)) continue
+
     const before = aggregateStat(items, stat, line)
     const after = aggregateAfterSwap(items, incoming, outgoing, stat, line)
     if (Math.abs(after - before) < 1e-9) continue

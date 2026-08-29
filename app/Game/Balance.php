@@ -1217,6 +1217,108 @@ final class Balance
         'legendary' => [4, 8],
     ];
 
+    /**
+     * §8.0.1 -- a DURABILITY line, as a share of the piece's own max.
+     *
+     * Rolled as a share and stored as POINTS, because points are the unit a
+     * player reads durability in: a bar says 130/130, so "+9 durability" lands
+     * instantly where "+7%" is arithmetic. The share is what keeps the line
+     * worth the same on a 40-point stone axe and a 240-point coat -- a flat
+     * band would be a fifth of the axe and noise on the coat.
+     *
+     * Bounded by §11.1 rather than by §8.1: the repair bill is the largest
+     * continuous sink in the game, and a line that thinned it much further
+     * would be switching that sink off by luck.
+     */
+    public const OPTION_DURABILITY_VALUE = [
+        'common' => [0.03, 0.05],
+        'uncommon' => [0.04, 0.07],
+        'rare' => [0.05, 0.09],
+        'epic' => [0.07, 0.12],
+        'legendary' => [0.09, 0.15],
+    ];
+
+    /**
+     * §8.0.1/§9.5.9 -- whole rounds off EVERY cooldown the weapon's family
+     * carries. Weapon only: the family in the slot is what decides which three
+     * skills you have at all, so it is the only piece with any business
+     * shortening them.
+     *
+     * One value per tier rather than a range, because whole rounds are a short
+     * ladder and a "1-1" band is a band pretending to be one. Sized against
+     * SKILL_BATTLE_COOLDOWN_CAP (+2 for a whole maxed tree), so a lucky
+     * legendary is worth about what the tree is and never more -- gear is the
+     * ladder (§8) and a tree is a different road up it, not a shorter one.
+     */
+    public const OPTION_COOLDOWN_VALUE = [
+        'common' => 1,
+        'uncommon' => 1,
+        'rare' => 1,
+        'epic' => 2,
+        'legendary' => 2,
+    ];
+
+    /**
+     * §8.0.1 -- what a HAUL or a TRAVEL line is worth, per tier.
+     *
+     * 10% to 30% in fives, which is one value per option tier and no roll
+     * inside it: the tier IS the step. That is what makes these two legible in
+     * a way a 1-6% band never was -- a player reads "+20% haul" and knows
+     * exactly which rung of luck they got.
+     *
+     * **These are NOT `StatKey` percentages and do not meet STAT_CEILING.**
+     * They are their own kinds, read where the work is done rather than summed
+     * into the gear aggregate, the same way §5.7's pocket multiplies the ground
+     * beside the ring premium instead of joining the kit. §8.1 rule 1 still
+     * governs every stat it names; what it does not govern is a number it has
+     * never counted.
+     *
+     * They do keep §8.1 rule 2, because that rule is about stacking rather than
+     * about the ceiling: a second haul line is worth less than the first, and
+     * OPTION_GAIN_CAP is where the whole kit stops.
+     */
+    public const OPTION_GAIN_VALUE = [
+        'common' => 0.10,
+        'uncommon' => 0.15,
+        'rare' => 0.20,
+        'epic' => 0.25,
+        'legendary' => 0.30,
+    ];
+
+    /**
+     * §8.0.1 -- gloves haul on a shorter ladder, 5% to 20% in the same fives.
+     *
+     * Hands are not what takes material out of a hex -- the tool is (§7.3), and
+     * the coat and the boots are what carry it home. A glove that hauled as
+     * well as a coat would be saying the bench piece is a mining piece.
+     *
+     * Four steps across five rungs, so the top two share: a legendary glove is
+     * a legendary glove for its other lines. Tuning, not a rule.
+     */
+    public const OPTION_GAIN_VALUE_GLOVES = [
+        'common' => 0.05,
+        'uncommon' => 0.10,
+        'rare' => 0.15,
+        'epic' => 0.20,
+        'legendary' => 0.20,
+    ];
+
+    /** The most a whole kit's haul or travel lines may come to together. */
+    public const OPTION_GAIN_CAP = 0.30;
+
+    /**
+     * §8.0.1/§8.2 -- the chance a crafted piece comes out unbreakable.
+     *
+     * At zero durability it is not destroyed: it sits there, useless until it
+     * is mended, which is the one exception §8.2 has. Low on purpose and rolled
+     * apart from the lines, so it never competes with them for a slot and never
+     * dilutes a pool -- a piece that survives forever is a story, not a bonus.
+     *
+     * Only on a rung that rolls at all, which keeps it off every shelf (gold
+     * buys a plain item) and off every common.
+     */
+    public const OPTION_INDESTRUCTIBLE_CHANCE = 0.02;
+
     // --------------------------------------------------------- consumables §8.5
 
     /**
@@ -1426,9 +1528,21 @@ final class Balance
      * distance, and the §8.1 ceiling caps the saving at 15% like every other
      * stat.
      */
-    public static function travelMsPerHex(float $travelSpeedBonus = 0.0): int
+    /**
+     * §8.3 -- `travelSpeed` DIVIDES the clock, so +8% boots really are 8%
+     * faster over any distance.
+     *
+     * §8.0.1's rolled `travel` line is a second divisor rather than part of the
+     * first: it is not a `StatKey` and never meets STAT_CEILING, so summing the
+     * two would quietly put it under a ceiling it is not subject to.
+     */
+    public static function travelMsPerHex(float $travelSpeedBonus = 0.0, float $rolledBonus = 0.0): int
     {
-        return (int) round(self::TRAVEL_MS_PER_HEX / (1 + max(0.0, $travelSpeedBonus)));
+        return (int) round(
+            self::TRAVEL_MS_PER_HEX
+                / (1 + max(0.0, $travelSpeedBonus))
+                / (1 + max(0.0, $rolledBonus))
+        );
     }
 
     public static function settlementSpeed(string $tier): float

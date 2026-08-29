@@ -888,10 +888,11 @@ the two were never the same question: **attack is how fast you work through a
 hex, yield is how big the haul is.** One number each, and a tool answers the
 first.
 
-Yield is not reachable on a tool at all any more: §8.0.1 rolls the solid pair
-and nothing else, so what a bench may put on an axe is **more attack** — the
-same number, found rather than bought. What a tool is *for* is speed, and a
-lucky one is faster.
+Yield is reachable on a tool again, through a rolled `haul` line (§8.0.1) — a
+share of what comes out of the hex, line-locked to the tool's own line, and
+outside §8.1's ceiling because it is not a `StatKey`. So a tool's two rolled
+lines are §7.3's own two questions: **more attack** is faster, **more haul** is
+bigger. What the tool is *for* is still the first one.
 
 **A tool's attack is mining attack and nothing else.** §8 rule 5 keeps the two
 ladders apart in both directions: a pickaxe is worth nothing in a fight, which
@@ -1419,11 +1420,11 @@ it arrives as one. Everything in a bag is in the game and can be destroyed.
 
 **+15% is the hard ceiling for the whole game.** Rarity climbs toward it; nothing
 — no future rarity, no buff, no tree — may pass it. Read `Balance::STAT_CEILING`,
-never the top rung. A rolled option is no longer even a candidate: §8.0.1 makes
-every line a solid number on the pair, which is outside this ceiling entirely.
+never the top rung. **A rolled option is not a candidate**: §8.0.1's five kinds
+are solid counts and two shares of the work, and not one of them is a `StatKey`.
 
-**The option column is a count of lines, not of percentages.** What a bench may
-put on a piece is `attack` or `defense`, solid (§8.0.1).
+**The option column is a count of lines.** What a bench may put on a piece is in
+§8.0.1's table, and it depends on what the piece is for.
 
 **A bench reaches exactly as far as its tier**, whatever materials you carry to
 it: village → common, city → uncommon, capital → rare and epic, guild hall →
@@ -1458,40 +1459,84 @@ something a shelf cannot have.)*
 | | |
 |---|---|
 | **How many** | nothing up to the rung's ceiling in §8.0's table — so an uncommon may roll one or none, and a legendary anywhere from none to three |
+| **Which line** | one of the handful its own piece is eligible for, one per stat |
 | **Which tier** | each line is drawn from any tier **at or below** the item's own rarity, so a legendary regularly carries a common-grade line |
-| **Which half** | `attack` or `defense`, out of whichever of the two the piece is eligible for |
 
-| Option tier | What a line is worth |
-|---|---|
-| common | +1–2 |
-| uncommon | +1–3 |
-| rare | +2–4 |
-| epic | +3–6 |
-| legendary | +4–8 |
+**The five kinds**
 
-**Every line is a solid number on the pair, and nothing else.** `attack` and
-`defense` are not percentages (§9.5.4), so a rolled line that lands on them
-simply **adds**: it never enters the percentage aggregate, never meets §8.1's
-ceiling, and never carries a scope.
-
-*A percentage was the wrong unit for luck.* It climbed toward §8.1's ceiling,
-which is one invisible number every line on every piece is already climbing
-toward — so a good roll and a bad one read the same on the plate, and neither
-could be felt in play. §9.5.4 already makes exactly that argument about the
-percentage twins — *+3% power moves a common sword from 5 attack to 5* — and
-this is that argument carried to its conclusion. A line is luck, and luck has
+**Not one of them is a `StatKey` percentage, and that is the rule the whole
+pool is built on.** A percentage climbed toward §8.1's ceiling, which is one
+invisible number every line on every piece is already climbing toward — so a
+good roll and a bad one read the same on the plate, and neither could be felt
+in play. §9.5.4 already makes that argument about the percentage twins (*+3%
+power moves a common sword from 5 attack to 5*). A line is luck, and luck has
 to be legible.
 
-*(Three whole mechanisms went with it, and all three are gone rather than
-dormant: the percentage band, the **scoped** line worth double for naming one
-gathering line, and the **durability** line that lived for exactly one change.
-A band nothing rolls is a promise nothing keeps, and there is a test on both
-sides asserting the machinery is not sitting there waiting.)*
+| Kind | What it is | Band by tier |
+|---|---|---|
+| **the pair** | solid `attack` or `defense` (§9.5.4), simply added | +1–2 · +1–3 · +2–4 · +3–6 · +4–8 |
+| **`durability`** | points on this copy's own ceiling (§8.2) | 3–5% · 4–7% · 5–9% · 7–12% · 9–15% **of its own max** |
+| **`cooldown`** | whole rounds off **every** skill the weapon's family carries (§9.5.9) | −1 · −1 · −1 · −2 · −2 |
+| **`haul`** | a share of what comes out of a hex | +10% · +15% · +20% · +25% · +30% — **on gloves** +5% · +10% · +15% · +20% · +20% |
+| **`travel`** | a share off the road clock | +10% · +15% · +20% · +25% · +30% |
 
-**On a gathering tool a rolled `attack` is MINING attack** (§7.3): it bites
-deeper into a hex and is worth nothing at all in a fight, exactly as the tool's
-own attack is. That is the direct answer to *what should a tool roll* — the one
-number that decides how fast a hex comes apart.
+**`haul` and `travel` are the only percentages left, and the tier IS the step.**
+Ten to thirty in fives, one value per tier and no roll inside it — so a player
+reads *+20% haul* and knows exactly which rung of luck they got, which a 1–6%
+band never told anybody. They are **not `StatKey`s**: they are read where the
+work is done rather than summed into the gear aggregate, the same way §5.7's
+pocket multiplies the ground beside the ring premium instead of joining the
+kit. §8.1 rule 1 governs every stat it names; it has never counted these.
+
+They do keep **§8.1 rule 2**, because that rule is about *stacking* rather than
+about the ceiling: a second haul line is worth less than the first, and
+`OPTION_GAIN_CAP` (30%) is where a whole kit stops. A tool's haul is
+line-locked like everything else on a tool (§8 rule 1) — a lucky axe fattens a
+felling trip and does nothing to a seam.
+
+**Gloves haul on a shorter ladder**, 5% to 20% in the same fives. Hands are not
+what takes material out of a hex — the tool is (§7.3), and the coat and the
+boots are what carry it home — so a glove that hauled as well as a coat would
+be saying the bench piece is a mining piece. Four steps across five rungs, so
+the top two share; that is tuning rather than a rule.
+
+**A `durability` line is rolled as a share and stored as points**, and both
+halves are deliberate. The share keeps it worth the same on a 40-point stone
+axe and a 240-point coat; the points are what a bar is read in, so *+9
+durability* lands where *+7%* is arithmetic. What it raises is the **ceiling**,
+the same thing a Smith's `craftDurability` node raises (§8.2) — so it pays out
+twice and permanently, and a full mend still costs one recipe's worth of parts.
+
+**And then, rarely, the piece simply does not break.**
+
+`indestructible` is rolled **apart from the lines and after them**, at
+`OPTION_INDESTRUCTIBLE_CHANCE` (2%), so it never takes a slot from one and
+never dilutes a pool. It is gated on the rung rolling at all, which keeps it
+off every shelf and every common. It has no value: **owning it is the effect**,
+the way a `battleSkill` node is (§7.4.3).
+
+What it survives as is **a piece at zero** — not destroyed, and useless until it
+is mended. That is the one exception §8.2 has, and it has to stay rare: an
+unbreakable piece is a story, and a common one would switch off §11.1's largest
+sink by luck.
+
+**Which lines a piece is eligible for**
+
+One rule, and it is §8's usual one: **what is the piece FOR.**
+
+| Piece | May roll |
+|---|---|
+| **Gathering tool** | `attack` · `durability` · `haul` |
+| **Weapon** | `attack` · `defense` · `durability` · `cooldown` |
+| **Armor · gloves** | `attack` · `defense` · `durability` · `haul` |
+| **Boots** | the same, plus `travel` |
+
+…and any of them may, rarely, come out unbreakable.
+
+**A tool rolls no guard.** There is nothing on a hex for one to keep off you.
+And **on a tool a rolled `attack` is MINING attack** (§7.3): it bites deeper
+into the hex and is worth nothing at all in a fight, exactly as the tool's own
+attack is.
 
 **It is still drawn `atk`, and never given a word of its own.** The tool's own
 chip says ATK and a tool has no other attack for it to be confused with — §8
@@ -1499,29 +1544,13 @@ rule 5 keeps combat off a tool entirely — so a second name for the one number 
 a thing to decode rather than a distinction being made. The distinction is a
 rule about what the number *means*, and rules live here.
 
-**A higher rarity does not roll a better line every time; it rolls from a deeper
-bag.** That is a different and more interesting thing: the ceiling climbs the
-ladder and the floor does not, so a good roll is *found* rather than issued, and
-an unlucky legendary really can come out under a lucky rare.
+**A weapon rolls no work bonus.** §8 rule 5 read the other way: it is the one
+slot in the game that never works, which is exactly how a sword once came off
+the bench carrying *+4% hunting yield*. And it is the **only** slot that
+shortens a cooldown, because the family in it is what decides which three
+skills you carry at all (§9.5.9).
 
-- Rolled **server-side** from a seed, like every other outcome.
-- **One line per stat.** *+2 attack* twice on one item reads as a bug where
-  *+2 attack, +3 defense* reads as a piece that came out well. It is also what
-  caps a roll at the size of its pool — a tool has one entry, so it carries at
-  most one line whatever its rung and whatever a Smith has bought.
-
-**Which half a piece may roll is the one thing left to decide, and §8 decides
-it the way it decides everything: by what the piece is FOR.**
-
-| Piece | May roll |
-|---|---|
-| **Gathering tool** | `attack` — and on a tool that is §7.3's mining attack |
-| **Weapon** | both, except a focus |
-| **Worn** | both |
-
-**A tool never rolls a guard.** There is nothing on a hex for one to keep off
-you, and §8 rule 5 keeps the two ladders apart in both directions — a pickaxe is
-worth nothing in a fight, and a fight stat is worth nothing down a mine.
+**Only boots walk.** A coat does not get down the road faster for being a coat.
 
 **A focus rolls no guard either.** §9.5.4 says a focus has none at all — *a
 focus that also held a little of it would be the balanced one twice, and the
@@ -1529,12 +1558,17 @@ glass cannon is the point.* A rolled line is luck rather than budget, but a wand
 that can come out of the bench guarding says the same wrong thing about what a
 wand is. It is the only per-*family* rule in the pool.
 
-*(The pool used to differ far more than this — a tool drew from the mine stats,
-a weapon from the pair and its percentage twins, worn gear from every stat there
-is. The weapon slot fell through to the worn pool for a while, which is how a
-sword came off the bench carrying +4% hunting yield: a work bonus on the one
-slot in the game that never works. All of that collapses once every line is the
-same kind of number.)*
+**A higher rarity does not roll a better line every time; it rolls from a deeper
+bag.** The ceiling climbs the ladder and the floor does not, so a good roll is
+*found* rather than issued, and an unlucky legendary really can come out under a
+lucky rare.
+
+- Rolled **server-side** from a seed, like every other outcome.
+- **One line per stat.** *+2 attack* twice on one item reads as a bug where
+  *+2 attack, +3 defense* reads as a piece that came out well. It is also a
+  second ceiling: a piece can never carry more lines than its pool has entries,
+  so the almanac quotes the smaller of the two or it would promise a line that
+  cannot come.
 
 **A consumable has no pool.** No slot, nothing to sit on, and §8.5 already
 gives a potion its one effect. What made this worth writing down is that the
@@ -1543,8 +1577,9 @@ the coat's.
 
 **And the almanac says all of it, before anybody owns one.** What a piece *may*
 roll is a fact about the recipe rather than about the copy in a bag, which makes
-it the one screen that can tell you — the band and the half or halves it can
-land on, on the same rail that says where the thing comes from.
+it the one screen that can tell you — every line it is eligible for, each with
+its own band in its own unit, and the odds on the one that has no band.
+
 
 ### 8.0 Slots — a gathering tool per line, and combat kept separate
 
@@ -1583,11 +1618,16 @@ Rules, all mandatory:
 ### 8.1 Anti-imbalance rules (all mandatory)
 1. **One global % ceiling per stat**, +15%, and rarity climbs toward it. Nothing may
    pass it: not a rarity, not a buff, not a tree, not a future tier. The ceiling
-   is the load-bearing rule — rarity is only how far up you have climbed. An
-   option roll is not on that list any more and cannot be: §8.0.1 makes every
-   rolled line a solid number, which is not a percentage and meets no ceiling.
+   is the load-bearing rule — rarity is only how far up you have climbed. A
+   rolled option is not on that list and cannot be: §8.0.1's lines are counts
+   and shares of the work, none of them a `StatKey`, and they are read where the
+   work is done rather than summed into this aggregate — the same standing
+   §5.7's pocket has.
 2. **Diminishing returns on stacking** — a 2nd yield item gives less than the 1st. Blocks
-   buying 3 identical bundles for linear scaling.
+   buying 3 identical bundles for linear scaling. This one **does** reach §8.0.1's
+   `haul` and `travel`, because it is about stacking rather than about the
+   ceiling: a second haul line is worth less than the first, and
+   `OPTION_GAIN_CAP` is where a whole kit stops.
 3. **Durability decays with use** (fighting drains fastest, then raiding, then mining),
    and at zero the thing is **gone** (§8.2). Equipment is never "buy once, dominate
    forever" — it is rented from the repair bill.
@@ -1601,6 +1641,14 @@ Rules, all mandatory:
 **At 0 durability the item is destroyed.** Not broken, not inactive — gone from
 the bag, named in the result that killed it.
 
+**There is exactly one exception, and it is luck.** §8.0.1's `indestructible`
+line, rolled at 2% on a crafted or looted piece, means the piece runs out
+without being lost: it sits at zero, useless until it is mended, and still
+yours. It has to stay rare — an unbreakable piece is a story, and a common one
+would switch off §11.1's largest sink by luck. It is also the only place a mend
+is offered on something already empty, which is why the rule below reads
+*above zero* everywhere else.
+
 *(It used to go inactive and wait for a repair. That made repair optional: an
 item at zero cost nothing to leave at zero, so the sink only ever collected from
 players who wanted their gear back. Destruction moves the whole bill forward —
@@ -1610,8 +1658,9 @@ the game, §11.1.)*
 - Repair costs refined + raid materials, scaled to rarity tier, and is only ever
   possible **above** zero. There is no resurrection.
 - **A piece carries its own ceiling, not its recipe's.** §7.4.3's
-  `craftDurability` raises the max of what a Smith makes, so two copies of one
-  recipe can differ. Everything that measures wear, prices a resale or offers a
+  `craftDurability` raises the max of what a Smith makes, and §8.0.1's rolled
+  `durability` line raises it again — so two copies of one recipe can differ,
+  and a looted piece can too. Everything that measures wear, prices a resale or offers a
   mend reads the ceiling off the *object*, and so does a corpse: a stolen row
   that came home at the catalog's max would be a different object from the one
   that was taken.
@@ -1801,6 +1850,11 @@ the game, §11.1.)*
 `travelSpeed` **divides the travel clock** — +8% boots really are 8% faster over
 any distance. It used to buy hexes of reach, and §5.6 removed reach, so the stat
 now does the thing it is named after.
+
+§8.0.1's rolled `travel` line divides it a **second** time rather than joining
+the first: the boots' own stat meets STAT_CEILING and the rolled line does not,
+so summing them would quietly put the line under a ceiling it is not subject
+to.
 
 Worn gear:
 ```

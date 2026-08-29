@@ -170,38 +170,189 @@ final class Formulas
             }
 
             $tier = $tiers[$index];
+            $out[] = self::optionLine($def, $pick, $tier, Hash::hash2($seed, 920 + $i, Balance::mapSeed()));
+        }
 
-            // §9.5.4 -- attack and defense are solid numbers, so the line is
-            // one too. It simply adds, wherever the solid number is read.
-            [$min, $max] = Balance::OPTION_FLAT_VALUE[$tier];
-
-            $out[] = [
-                'stat' => $pick['stat'],
-                'value' => Hash::randInt(
-                    Hash::hash2($seed, 920 + $i, Balance::mapSeed()),
-                    (int) $min,
-                    (int) $max,
-                ),
-                'kind' => 'flat',
-            ];
+        // §8.2 -- and then, rarely, the piece simply does not break. Rolled
+        // apart from the lines and after them, so it never takes a slot from
+        // one and never dilutes a pool -- and gated on the rung rolling at all,
+        // which keeps it off every shelf and every common.
+        if (Hash::rand01(Hash::hash2($seed, 970, Balance::mapSeed())) < Balance::OPTION_INDESTRUCTIBLE_CHANCE) {
+            $out[] = ['stat' => Catalog::OPTION_INDESTRUCTIBLE, 'value' => 1, 'kind' => 'indestructible'];
         }
 
         return $out;
     }
 
     /**
-     * §8.2 -- the ceiling a NEW piece is born with, which is not the catalog's.
+     * §8.0.1 -- one line, valued off its own table.
      *
-     * §7.4.3's `craftDurability` raises the max of what a Smith makes, and it
-     * raises the CEILING rather than the fill -- so a piece holds more for the
-     * whole of its life and a full mend still costs one recipe's worth of
-     * materials. Everything that creates an item comes through here.
+     * Four kinds and four tables, because the four are counted in four units: a
+     * solid point of the pair, a point of durability, a whole round, and a
+     * share of the work. What they have in common is that none of them is a
+     * percentage climbing toward §8.1's ceiling.
      *
      * @param  array<string,mixed>  $def
+     * @param  array{stat:string,kind:string}  $pick
+     * @return array{stat:string,value:int|float,kind:string}
      */
-    public static function maxDurabilityFor(array $def, float $craftBonus = 0.0): int
+    private static function optionLine(array $def, array $pick, string $tier, int $seed): array
     {
-        return max(1, (int) round((int) ($def['maxDurability'] ?? 1) * (1 + $craftBonus)));
+        $line = fn (int|float $value) => ['stat' => $pick['stat'], 'value' => $value, 'kind' => $pick['kind']];
+
+        if ($pick['kind'] === 'durability') {
+            // Rolled as a share of the piece's own max and stored as POINTS,
+            // because points are the unit durability is read in. The share is
+            // what keeps it worth the same on a 40-point axe and a 240-point
+            // coat; storing the result is what makes "+9 durability" legible.
+            [$min, $max] = Balance::OPTION_DURABILITY_VALUE[$tier];
+            $steps = max(1, (int) round(($max - $min) * 1000));
+            $share = $min + Hash::randInt($seed, 0, $steps) / 1000;
+
+            return $line(max(1, (int) round((int) ($def['maxDurability'] ?? 0) * $share)));
+        }
+
+        // One value per tier and no roll inside it: the tier IS the step, which
+        // is what makes these legible where a 1-6% band never was.
+        if ($pick['kind'] === 'cooldown') {
+            return $line(Balance::OPTION_COOLDOWN_VALUE[$tier]);
+        }
+
+        if ($pick['kind'] === 'gain') {
+            // §8.0.1 -- a glove hauls on a shorter ladder. Hands are not what
+            // takes material out of a hex; the tool is, and the coat and the
+            // boots are what carry it home.
+            $table = ($def['slot'] ?? null) === 'gloves' && $pick['stat'] === Catalog::OPTION_HAUL
+                ? Balance::OPTION_GAIN_VALUE_GLOVES
+                : Balance::OPTION_GAIN_VALUE;
+
+            return $line($table[$tier]);
+        }
+
+        // §9.5.4 -- attack and defense are solid numbers, so the line is one
+        // too. It simply adds, wherever the solid number is read.
+        [$min, $max] = Balance::OPTION_FLAT_VALUE[$tier];
+
+        return $line(Hash::randInt($seed, (int) $min, (int) $max));
+    }
+
+    /**
+     * §8.2 -- the ceiling a NEW piece is born with, which is not the catalog's.
+     *
+     * Two things raise it and they stack: §7.4.3's `craftDurability`, and
+     * §8.0.1's rolled durability line. Both raise the CEILING rather than the
+     * fill -- so a piece holds more for the whole of its life and a full mend
+     * still costs one recipe's worth of materials. Everything that creates an
+     * item comes through here, so a looted piece and a crafted one agree about
+     * what a rolled line is worth.
+     *
+     * @param  array<string,mixed>  $def
+     * @param  array<int,array<string,mixed>>  $options
+     */
+    public static function maxDurabilityFor(array $def, array $options = [], float $craftBonus = 0.0): int
+    {
+        $max = (int) round((int) ($def['maxDurability'] ?? 1) * (1 + $craftBonus));
+
+        return max(1, $max + self::optionCount($options, Catalog::OPTION_DURABILITY));
+    }
+
+    /**
+     * §8.0.1 -- what a piece's rolled lines add to one whole-number effect.
+     *
+     * The pair, durability and cooldown are all counted this way: they are
+     * solid numbers, so they simply add. Kept apart from the percentage
+     * aggregate for exactly that reason.
+     *
+     * @param  array<int,array<string,mixed>>  $options
+     */
+    public static function optionCount(array $options, string $stat): int
+    {
+        $total = 0;
+
+        foreach ($options as $option) {
+            if (($option['stat'] ?? null) === $stat) {
+                $total += (int) $option['value'];
+            }
+        }
+
+        return $total;
+    }
+
+    /**
+     * §8.0.1 -- a `haul` or `travel` line, summed across a whole kit.
+     *
+     * These are shares rather than counts, so unlike the solid lines they can
+     * stack -- and §8.1 rule 2 is about stacking rather than about the ceiling,
+     * so it applies: sorted strongest-first, the nth is worth falloff^(n-1).
+     * OPTION_GAIN_CAP is where the whole kit stops.
+     *
+     * NOT the §8.1 rule 1 aggregate. These are not `StatKey`s and never meet
+     * STAT_CEILING; they are read where the work is done, the same way §5.7's
+     * pocket multiplies the ground rather than joining the kit.
+     *
+     * @param  array<int,array{key:string,durability:int,equipped:bool,options?:array}>  $items
+     */
+    public static function optionGain(array $items, string $stat, ?string $line = null): float
+    {
+        $values = [];
+
+        foreach ($items as $item) {
+            if (! $item['equipped'] || $item['durability'] <= 0) {
+                continue;
+            }
+
+            $def = Catalog::item($item['key']);
+            if ($def === null) {
+                continue;
+            }
+
+            // §8 rule 1 -- a tool pays out on its own line and on no other, so
+            // a haul line on an axe is woodcutting's and nobody else's.
+            $toolLine = Catalog::skillForSlot($def['slot'] ?? '');
+            if ($toolLine !== null && $toolLine !== $line) {
+                continue;
+            }
+
+            foreach ($item['options'] ?? [] as $option) {
+                if (($option['stat'] ?? null) === $stat) {
+                    $values[] = (float) $option['value'];
+                }
+            }
+        }
+
+        if ($values === []) {
+            return 0.0;
+        }
+
+        rsort($values);
+
+        $total = 0.0;
+        foreach ($values as $index => $value) {
+            $total += $value * Balance::STACK_FALLOFF ** $index;
+        }
+
+        return min($total, Balance::OPTION_GAIN_CAP);
+    }
+
+    /**
+     * §8.2 -- whether this piece survives running out.
+     *
+     * The one exception to "at zero the item is gone", and it is rare on
+     * purpose (Balance::OPTION_INDESTRUCTIBLE_CHANCE). What it survives as is
+     * a piece at zero: useless until it is mended, which is the only place in
+     * the game a mend is offered on something already empty.
+     *
+     * @param  array<int,array<string,mixed>>  $options
+     */
+    public static function isIndestructible(?array $options): bool
+    {
+        foreach ($options ?? [] as $option) {
+            if (($option['stat'] ?? null) === Catalog::OPTION_INDESTRUCTIBLE) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -233,33 +384,6 @@ final class Formulas
     {
         // Every line is a solid one now (§8.0.1), so the stat IS the identity.
         return (string) $entry['stat'];
-    }
-
-    /**
-     * §8.0.1 -- what an item's rolled lines add to one solid number.
-     *
-     * Every line is one of these now: a percentage was the wrong unit for luck,
-     * because it climbs toward a ceiling nobody can see. A solid number just
-     * adds, which is the whole of what a rolled line does.
-     *
-     * @param  array<int,array<string,mixed>>  $options
-     */
-    public static function flatOption(array $options, string $stat): int
-    {
-        $total = 0;
-
-        foreach ($options as $option) {
-            if (($option['kind'] ?? 'percent') !== 'flat') {
-                continue;
-            }
-            if (($option['stat'] ?? null) !== $stat) {
-                continue;
-            }
-
-            $total += (int) $option['value'];
-        }
-
-        return $total;
     }
 
     // ------------------------------------------------------------ combat §9.5
@@ -309,9 +433,9 @@ final class Formulas
             }
 
             $gearAttack += (int) ($def['attack'] ?? 0)
-                + self::flatOption($item['options'] ?? [], 'attack');
+                + self::optionCount($item['options'] ?? [], 'attack');
             $gearDefense += (int) ($def['defense'] ?? 0)
-                + self::flatOption($item['options'] ?? [], 'defense');
+                + self::optionCount($item['options'] ?? [], 'defense');
         }
 
         $might = intdiv($jobLevel, Balance::BATTLE_JOB_DIVISOR);
@@ -1125,16 +1249,27 @@ final class Formulas
         return (int) ($def['attack'] ?? 0);
     }
 
-    /** Yield for one mine. Skill and gear add; ring adds the risk premium. */
+    /**
+     * Yield for one mine. Skill and gear add; ring adds the risk premium.
+     *
+     * `$haulBonus` is §8.0.1's rolled `haul` line and is deliberately its own
+     * term rather than part of `$equipYieldBonus`: that one is the §8.1
+     * aggregate with STAT_CEILING on it, and a rolled line is not a `StatKey`
+     * and never meets that ceiling. It multiplies the same way §5.7's pocket
+     * does -- beside the others, not inside them.
+     */
     public static function mineYield(
         int $baseYield,
         int $skillLevel,
         float $equipYieldBonus,
         float $ringMultiplier,
+        float $haulBonus = 0.0,
     ): int {
         $skillBonus = 1 + ($skillLevel / Balance::SKILL_MAX_LEVEL) * 0.5;
 
-        return max(1, (int) round($baseYield * $skillBonus * (1 + $equipYieldBonus) * $ringMultiplier));
+        return max(1, (int) round(
+            $baseYield * $skillBonus * (1 + $equipYieldBonus) * $ringMultiplier * (1 + $haulBonus)
+        ));
     }
 
     // -------------------------------------------------------- processing §6

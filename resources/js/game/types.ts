@@ -415,11 +415,18 @@ export interface ActiveBuff {
  * climbs toward §8.1's invisible ceiling, so a lucky roll and an unlucky one
  * read the same on the plate; a solid number simply adds, and is felt.
  */
+export type OptionKind = 'flat' | 'durability' | 'cooldown' | 'gain' | 'indestructible'
+
 export interface ItemOption {
-  stat: 'attack' | 'defense'
+  stat: 'attack' | 'defense' | 'durability' | 'cooldown' | 'haul' | 'travel' | 'indestructible'
   value: number
-  /** Always `flat`. Kept on the row because that is how every one is stored. */
-  kind?: 'flat'
+  /**
+   * Which unit the value is counted in. `flat`, `durability` and `cooldown` are
+   * whole numbers that simply add; `gain` is a share of the work (§8.0.1's
+   * `haul` and `travel`), and it is NOT a StatKey -- it never meets §8.1's
+   * ceiling. `indestructible` has no value at all: owning it is the effect.
+   */
+  kind?: OptionKind
 }
 
 /**

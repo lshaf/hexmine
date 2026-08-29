@@ -126,8 +126,7 @@ function optionTiersFor(rarity: Rarity): typeof OPTION_TIERS {
 
 interface RollBrief {
   ceiling: number
-  band: string
-  labels: string[]
+  lines: { label: string; value: string }[]
   plainShelf: boolean
 }
 
@@ -135,25 +134,66 @@ function rollBrief(def: ItemDef): RollBrief | null {
   if (!def.slot) return null
 
   const tiers = optionTiersFor(def.rarity)
-  const low = EQUIPMENT.optionFlatValue[tiers[0]!][0]
-  const high = EQUIPMENT.optionFlatValue[tiers[tiers.length - 1]!][1]
-
+  const first = tiers[0]!
+  const last = tiers[tiers.length - 1]!
+  const pct = (v: number) => `${Math.round(v * 100)}%`
   const pool = optionRollsFor(def)
 
+  // §8.0.1 -- four kinds and four units, so the band is quoted per line rather
+  // than once in the sentence: a point of the pair, a point of durability, a
+  // whole round and a share of the work are not the same number.
+  const band = (entry: (typeof pool)[number]): string => {
+    if (entry.kind === 'durability') {
+      const low = Math.max(1, Math.round((def.maxDurability ?? 0) * EQUIPMENT.optionDurabilityValue[first][0]))
+      const high = Math.max(1, Math.round((def.maxDurability ?? 0) * EQUIPMENT.optionDurabilityValue[last][1]))
+
+      return low === high ? `+${low}` : `+${low}–${high}`
+    }
+    if (entry.kind === 'cooldown') {
+      const low = EQUIPMENT.optionCooldownValue[first]
+      const high = EQUIPMENT.optionCooldownValue[last]
+
+      return low === high ? `−${low}` : `−${low}–${high}`
+    }
+    if (entry.kind === 'gain') {
+      // §8.0.1 -- gloves haul on a shorter ladder than everything else.
+      const table =
+        def.slot === 'gloves' && entry.stat === 'haul'
+          ? EQUIPMENT.optionGainValueGloves
+          : EQUIPMENT.optionGainValue
+      const low = table[first]
+      const high = table[last]
+
+      return low === high ? `+${pct(low)}` : `+${pct(low)}–${pct(high)}`
+    }
+
+    const low = EQUIPMENT.optionFlatValue[first][0]
+    const high = EQUIPMENT.optionFlatValue[last][1]
+
+    return `+${low}–${high}`
+  }
+
+  const LABEL: Record<string, string> = {
+    attack: 'atk',
+    defense: 'def',
+    durability: 'dur',
+    cooldown: 'cd',
+    haul: 'haul',
+    travel: 'travel',
+  }
+
   return {
-    // §8.0.1 -- one line per stat, so the POOL is a ceiling too and it is the
-    // lower one on a tool: an epic axe has a rung that allows two and one thing
-    // it may roll. Quoting the rung alone would promise a line that cannot come.
+    // §8.0.1 -- one line per stat, so the POOL is a ceiling too. Quoting the
+    // rung alone would promise a line the piece cannot carry.
     ceiling: Math.min(EQUIPMENT.optionRolls[def.rarity] ?? 0, pool.length),
-    band: `+${low}–${high}`,
-    // The band is the same for every half now, so it is said once in the
-    // sentence and the pips are the halves themselves.
-    //
-    // A tool's rolled attack IS §7.3's mining attack, and it is still drawn
-    // `atk`: that is what the piece's own chip says, and a tool has no other
-    // attack for it to be confused with (§8 rule 5 keeps combat off a tool
-    // entirely). A second word for the one number was the confusing thing.
-    labels: pool.map((entry) => (entry.stat === 'attack' ? 'atk' : 'def')),
+    lines: [
+      ...pool.map((entry) => ({ label: LABEL[entry.stat] ?? entry.stat, value: band(entry) })),
+      // §8.2 -- rolled apart from the lines, but it belongs in the row with
+      // them: this is the list a player reads to find out what a bench can put
+      // on a thing, and the rarest answer is the one worth seeing. Its odds
+      // stand where the others' band does, because that is what it has instead.
+      { label: 'unbreakable', value: pct(EQUIPMENT.optionIndestructibleChance) },
+    ],
     plainShelf: def.goldPrice !== undefined,
   }
 }
@@ -926,12 +966,15 @@ function nature(item: ItemDef): string {
                     <template v-if="entry.rolls!.ceiling">
                       <span class="where">
                         Up to {{ entry.rolls!.ceiling }}
-                        {{ entry.rolls!.ceiling === 1 ? 'line,' : 'lines, each' }} a
-                        solid {{ entry.rolls!.band }} that simply adds.
+                        {{ entry.rolls!.ceiling === 1 ? 'line' : 'lines' }}, at most one
+                        of each below. Unbreakable is rolled apart from them and takes
+                        no slot — at zero the piece is not lost, only useless until it
+                        is mended.
                       </span>
                       <div class="cost">
-                        <span v-for="l in entry.rolls!.labels" :key="l" class="pip roll solid">
-                          <span class="key">{{ l }}</span>
+                        <span v-for="l in entry.rolls!.lines" :key="l.label" class="pip roll solid">
+                          <span class="key">{{ l.label }}</span>
+                          <span class="mono">{{ l.value }}</span>
                         </span>
                       </div>
                       <p v-if="entry.rolls!.plainShelf" class="tiny muted note">

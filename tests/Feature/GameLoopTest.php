@@ -2725,7 +2725,7 @@ final class GameLoopTest extends TestCase
         // What it does instead is add, wherever the solid number is read.
         $this->assertSame(
             3 * Balance::OPTION_FLAT_VALUE['legendary'][1],
-            Formulas::flatOption($fat[0]['options'], 'attack'),
+            Formulas::optionCount($fat[0]['options'], 'attack'),
         );
     }
 
@@ -2743,7 +2743,7 @@ final class GameLoopTest extends TestCase
 
         // Boots carry no attack of their own, and now they carry three.
         $this->assertSame(0, (int) ($def['attack'] ?? 0));
-        $this->assertSame(3, Formulas::flatOption($options, 'attack'));
+        $this->assertSame(3, Formulas::optionCount($options, 'attack'));
 
         // And nothing about the boots' own percentage moved.
         $kit = [['key' => 'reinforced_boots', 'durability' => 10, 'equipped' => true, 'options' => $options]];
@@ -2757,10 +2757,9 @@ final class GameLoopTest extends TestCase
      * two of the same recipe are never the same object. Commons roll nothing
      * because their ceiling is nothing.
      *
-     * The other bound is the POOL, which matters now that every line is one of
-     * two: an epic tool has a ceiling of 2 and one thing it may roll, so it
-     * carries at most one line. Whichever is smaller wins, which is why this
-     * counts against both.
+     * The other bound is the POOL -- one line per stat, so a piece can never
+     * carry more lines than its pool has entries. Whichever is smaller wins,
+     * which is why this counts against both.
      */
     public function test_option_counts_never_pass_the_rarity_ceiling(): void
     {
@@ -2770,31 +2769,58 @@ final class GameLoopTest extends TestCase
 
             for ($seed = 1; $seed <= 200; $seed++) {
                 $rolled = Formulas::rollOptions($def, $seed);
-                $seen[count($rolled)] = true;
+                // §8.2 -- the unbreakable line is rolled APART from the lines,
+                // so it is not one of them and does not count against the rung.
+                $lineCount = count(array_filter(
+                    $rolled,
+                    static fn (array $o) => $o['kind'] !== 'indestructible',
+                ));
+                $seen[$lineCount] = true;
 
                 $this->assertLessThanOrEqual(
                     Balance::OPTION_ROLLS[$rarity],
-                    count($rolled),
+                    $lineCount,
                     "{$key} rolled past its ceiling",
                 );
 
                 $tiers = Formulas::optionTiersFor($rarity);
 
                 foreach ($rolled as $option) {
-                    // Every line is a solid number on the pair (§8.0.1), read
-                    // off one table.
-                    $this->assertSame('flat', $option['kind']);
-                    $this->assertIsInt($option['value']);
-                    $this->assertGreaterThanOrEqual(
-                        Balance::OPTION_FLAT_VALUE[$tiers[0]][0],
-                        $option['value'],
-                    );
-                    $this->assertLessThanOrEqual(
-                        Balance::OPTION_FLAT_VALUE[end($tiers)][1],
-                        $option['value'],
-                    );
+                    // §8.2 -- the rare one is rolled apart from the lines and
+                    // does not count against the ceiling.
+                    if ($option['kind'] === 'indestructible') {
+                        continue;
+                    }
+
                     $this->assertContains($option['stat'], Catalog::optionStatsFor($def));
                     $this->assertArrayNotHasKey('scope', $option, "{$key} scoped a line");
+
+                    // §8.0.1 -- four kinds and four tables. None of them is a
+                    // StatKey percentage and none meets STAT_CEILING.
+                    [$floor, $roof] = match ($option['kind']) {
+                        'gain' => [
+                            min(
+                                Balance::OPTION_GAIN_VALUE_GLOVES[$tiers[0]],
+                                Balance::OPTION_GAIN_VALUE[$tiers[0]],
+                            ),
+                            Balance::OPTION_GAIN_VALUE[end($tiers)],
+                        ],
+                        'cooldown' => [
+                            Balance::OPTION_COOLDOWN_VALUE[$tiers[0]],
+                            Balance::OPTION_COOLDOWN_VALUE[end($tiers)],
+                        ],
+                        'durability' => [
+                            1,
+                            (int) round($def['maxDurability'] * Balance::OPTION_DURABILITY_VALUE[end($tiers)][1]),
+                        ],
+                        default => [
+                            Balance::OPTION_FLAT_VALUE[$tiers[0]][0],
+                            Balance::OPTION_FLAT_VALUE[end($tiers)][1],
+                        ],
+                    };
+
+                    $this->assertGreaterThanOrEqual($floor, $option['value'], $key);
+                    $this->assertLessThanOrEqual($roof, $option['value'], $key);
                 }
 
                 // One line per stat: "+2 attack" twice on one item reads as a
@@ -2832,6 +2858,11 @@ final class GameLoopTest extends TestCase
 
         for ($seed = 1; $seed <= 400; $seed++) {
             foreach (Formulas::rollOptions($def, $seed) as $option) {
+                // Read off the pair, which is the one kind with a range inside
+                // each tier rather than a single value per tier.
+                if ($option['kind'] !== 'flat') {
+                    continue;
+                }
                 if ($option['value'] <= Balance::OPTION_FLAT_VALUE['common'][1]) {
                     $low++;
                 }
@@ -2919,58 +2950,199 @@ final class GameLoopTest extends TestCase
     }
 
     /**
-     * §8.0.1 -- a roll only ever produces a solid line on the pair.
+     * §8.0.1 -- a roll never produces a `StatKey` percentage.
      *
-     * A percentage was the wrong unit for luck: it climbs toward §8.1's
-     * ceiling, which every line on every piece is already climbing toward, so
-     * a good roll and a bad one read the same on the plate.
+     * Four kinds and four units -- a point of the pair, a point of durability,
+     * a whole round, a share of the work -- and not one of them climbs toward
+     * §8.1's ceiling. A percentage was the wrong unit for luck: a good roll and
+     * a bad one read the same on the plate.
      */
-    public function test_a_roll_only_ever_produces_a_solid_line(): void
+    public function test_a_roll_never_produces_a_percentage_stat(): void
     {
-        $def = Catalog::item('keepers_carapace');
-        $attack = 0;
-        $defense = 0;
+        $kinds = [];
 
-        for ($seed = 1; $seed <= 300; $seed++) {
-            foreach (Formulas::rollOptions($def, $seed) as $option) {
-                $this->assertSame('flat', $option['kind']);
-                $this->assertIsInt($option['value']);
-                $this->assertArrayNotHasKey('scope', $option);
-                $this->assertContains($option['stat'], ['attack', 'defense']);
-
-                $option['stat'] === 'attack' ? $attack++ : $defense++;
-            }
-        }
-
-        $this->assertGreaterThan(0, $attack, 'worn gear never rolled an attack line');
-        $this->assertGreaterThan(0, $defense, 'worn gear never rolled a guard');
-    }
-
-    /**
-     * §8.0.1 -- and a gathering tool rolls ONE of them.
-     *
-     * `attack` on a tool is §7.3's mining attack, which is what a rolled line
-     * on a tool is for. `defense` has nothing on a hex to mean, so the tool
-     * pool is the one with a single entry -- which also caps a tool at one
-     * rolled line whatever its rung.
-     */
-    public function test_a_tool_rolls_attack_and_only_attack(): void
-    {
-        foreach (['ironwood_axe', 'mythril_pickaxe', 'beastfang_bow'] as $key) {
+        foreach (['keepers_carapace', 'ironwood_axe', 'knotted_rod', 'marching_boots'] as $key) {
             $def = Catalog::item($key);
-            $this->assertNotNull($def, $key);
-            $this->assertSame(['attack'], Catalog::optionStatsFor($def), $key);
 
-            for ($seed = 1; $seed <= 120; $seed++) {
-                $rolled = Formulas::rollOptions($def, $seed, 3);
-
-                $this->assertLessThanOrEqual(1, count($rolled), "{$key} rolled two lines");
-
-                foreach ($rolled as $option) {
-                    $this->assertSame('attack', $option['stat'], $key);
+            for ($seed = 1; $seed <= 300; $seed++) {
+                foreach (Formulas::rollOptions($def, $seed) as $option) {
+                    $kinds[$option['kind']] = true;
+                    $this->assertArrayNotHasKey('scope', $option);
+                    $this->assertNotContains(
+                        $option['stat'],
+                        ['yield', 'travelSpeed', 'processingSpeed', 'power'],
+                        "{$key} rolled a StatKey",
+                    );
                 }
             }
         }
+
+        // And every kind actually comes out of the roller, including the rare
+        // one -- a chance nothing ever hits is a chance nobody can believe.
+        foreach (['flat', 'durability', 'cooldown', 'gain', 'indestructible'] as $kind) {
+            $this->assertArrayHasKey($kind, $kinds, "no {$kind} line ever rolled");
+        }
+    }
+
+    /**
+     * §8.0.1 -- what each piece is eligible for, on the four odd ones.
+     *
+     * A tool guards nothing, a weapon works nothing, boots are the only thing
+     * that walks, and a focus keeps nothing off you. Four rules, four pieces.
+     */
+    public function test_each_piece_rolls_what_it_is_for(): void
+    {
+        $pool = fn (string $key) => Catalog::optionStatsFor(Catalog::item($key));
+
+        $this->assertSame(['attack', 'durability', 'haul'], $pool('ironwood_axe'));
+        $this->assertSame(['attack', 'defense', 'durability', 'haul', 'travel'], $pool('marching_boots'));
+        $this->assertSame(['attack', 'defense', 'durability', 'haul'], $pool('ironwood_armor'));
+        $this->assertSame(['attack', 'durability', 'cooldown'], $pool('knotted_rod'));
+    }
+
+    /**
+     * §8.2/§8.0.1 -- a durability line raises the OBJECT'S ceiling.
+     *
+     * It has to reach the ceiling rather than the fill, or it is worth exactly
+     * one craft: the first mend would fill the piece to the catalog max and
+     * throw the extra away, which is the bug §8.2 already fixed once for
+     * `craftDurability`. It stacks with that node rather than standing in for
+     * it, and it never reaches a stat.
+     */
+    public function test_a_durability_line_raises_the_object_ceiling(): void
+    {
+        $def = Catalog::item('mythril_pickaxe');
+        $line = ['stat' => 'durability', 'value' => 12, 'kind' => 'durability'];
+
+        $this->assertSame((int) $def['maxDurability'], Formulas::maxDurabilityFor($def));
+        $this->assertSame((int) $def['maxDurability'] + 12, Formulas::maxDurabilityFor($def, [$line]));
+        $this->assertSame(
+            (int) round($def['maxDurability'] * 1.1) + 12,
+            Formulas::maxDurabilityFor($def, [$line], 0.1),
+        );
+
+        $kit = [['key' => 'mythril_pickaxe', 'durability' => 10, 'equipped' => true, 'options' => [$line]]];
+        $this->assertSame(0.0, Formulas::aggregateStat($kit, 'yield', 'mining'));
+    }
+
+    /**
+     * §8.0.1 -- a `haul` or `travel` line stacks under §8.1 rule 2 and stops at
+     * its OWN cap, never at STAT_CEILING.
+     *
+     * Rule 2 is about stacking rather than about the ceiling, so it applies: a
+     * second haul line is worth less than the first. Rule 1 names stats, and
+     * these are not stats -- they are read where the work is done, the same way
+     * §5.7's pocket multiplies the ground rather than joining the kit.
+     */
+    public function test_a_gain_line_stacks_with_falloff_and_stops_at_its_own_cap(): void
+    {
+        $piece = fn (string $key, float $value) => [
+            'key' => $key,
+            'durability' => 10,
+            'equipped' => true,
+            'options' => [['stat' => 'haul', 'value' => $value, 'kind' => 'gain']],
+        ];
+
+        $one = Formulas::optionGain([$piece('ironwood_armor', 0.2)], 'haul');
+        $this->assertSame(0.2, $one);
+
+        $two = Formulas::optionGain(
+            [$piece('ironwood_armor', 0.2), $piece('beastfang_boots', 0.2)],
+            'haul',
+        );
+        $this->assertGreaterThan($one, $two, 'a second line was worth nothing');
+        $this->assertLessThan($one * 2, $two, 'two lines scaled linearly');
+
+        // Everything at the top of the band, and it still stops where it says.
+        $fat = array_map(
+            static fn (string $k) => [
+                'key' => $k,
+                'durability' => 10,
+                'equipped' => true,
+                'options' => [['stat' => 'haul', 'value' => Balance::OPTION_GAIN_VALUE['legendary'], 'kind' => 'gain']],
+            ],
+            ['ironwood_armor', 'beastfang_boots', 'silkweave_gloves'],
+        );
+        $this->assertSame(Balance::OPTION_GAIN_CAP, Formulas::optionGain($fat, 'haul'));
+
+        // §8 rule 1 -- and a tool's haul is its own line's and nobody else's.
+        $axe = [$piece('ironwood_axe', 0.2)];
+        $this->assertSame(0.2, Formulas::optionGain($axe, 'haul', 'woodcutting'));
+        $this->assertSame(0.0, Formulas::optionGain($axe, 'haul', 'mining'));
+        $this->assertSame(0.0, Formulas::optionGain($axe, 'haul'));
+    }
+
+    /** §8.0.1 -- a haul line makes the haul bigger, beside the ring and the pocket. */
+    public function test_a_haul_line_makes_the_haul_bigger(): void
+    {
+        $plain = Formulas::mineYield(20, 1, 0.0, 1.0);
+        $rich = Formulas::mineYield(20, 1, 0.0, 1.0, Balance::OPTION_GAIN_CAP);
+
+        $this->assertGreaterThan($plain, $rich, 'a haul line did nothing');
+
+        // Beside the ring premium rather than inside the gear aggregate, the
+        // same way §5.7's pocket is -- so it multiplies what the ring already
+        // paid rather than being clamped with the kit.
+        $this->assertSame(
+            Formulas::mineYield(20, 1, 0.0, 1.9 * (1 + Balance::OPTION_GAIN_CAP)),
+            Formulas::mineYield(20, 1, 0.0, 1.9, Balance::OPTION_GAIN_CAP),
+        );
+    }
+
+    /** §8.0.1 -- a travel line divides the road clock, beside the boots' own stat. */
+    public function test_a_travel_line_shortens_the_road(): void
+    {
+        $plain = Balance::travelMsPerHex(0.0, 0.0);
+        $rolled = Balance::travelMsPerHex(0.0, 0.3);
+
+        $this->assertLessThan($plain, $rolled, 'a travel line did nothing');
+        $this->assertSame((int) round($plain / 1.3), $rolled);
+
+        // Two divisors, not one sum: the boots' own stat meets STAT_CEILING and
+        // the rolled line does not, so adding them would put it under a ceiling
+        // it is not subject to.
+        $this->assertSame(
+            (int) round(Balance::TRAVEL_MS_PER_HEX / 1.1 / 1.3),
+            Balance::travelMsPerHex(0.1, 0.3),
+        );
+    }
+
+    /**
+     * §8.2/§8.0.1 -- an unbreakable piece runs out without being lost.
+     *
+     * This is the one exception to "at zero the item is gone", and what it
+     * survives as is a piece at zero: useless until it is mended. It has to be
+     * rare, or §11.1's largest sink switches itself off.
+     */
+    public function test_an_unbreakable_piece_survives_running_out(): void
+    {
+        $unbreakable = [['stat' => 'indestructible', 'value' => 1, 'kind' => 'indestructible']];
+
+        $this->assertTrue(Formulas::isIndestructible($unbreakable));
+        $this->assertFalse(Formulas::isIndestructible([]));
+        $this->assertFalse(Formulas::isIndestructible(null));
+
+        $kept = CharacterItem::create([
+            'character_id' => $this->character->id,
+            'item_key' => 'stone_axe',
+            'durability' => 1,
+            'equipped' => true,
+            'options' => $unbreakable,
+        ]);
+        $lost = CharacterItem::create([
+            'character_id' => $this->character->id,
+            'item_key' => 'leather_armor',
+            'durability' => 1,
+            'equipped' => true,
+            'options' => [],
+        ]);
+
+        (new ReflectionMethod($this->game, 'drainDurability'))
+            ->invoke($this->game, $this->character->fresh(), 50, 'woodcutting');
+
+        $this->assertNotNull($kept->fresh(), 'an unbreakable axe was destroyed');
+        $this->assertSame(0, (int) $kept->fresh()->durability);
+        $this->assertNull($lost->fresh(), 'an ordinary coat survived zero');
     }
 
     /**
@@ -3195,12 +3367,12 @@ final class GameLoopTest extends TestCase
     /**
      * §8.0.1 -- a rolled line belongs to the piece it is on.
      *
-     * Every line is a solid number on the pair now, so what a pool decides is
-     * WHICH of the two a piece may roll -- and §8 answers that the way it
-     * answers everything else, by what the piece is for. A tool guards nothing
-     * (§8 rule 5 keeps the two ladders apart in both directions), and a focus
-     * guards nowhere in the kit (§9.5.4). The sweep is over the whole catalog
-     * because the last two holes here were missing branches, not wrong entries.
+     * §8 answers "which lines" the way it answers everything else -- by what
+     * the piece is FOR. A tool guards nothing (§8 rule 5 keeps the two ladders
+     * apart in both directions), a weapon works nothing (the same rule read the
+     * other way), boots are the only thing that walks, and a focus guards
+     * nowhere in the kit (§9.5.4). The sweep is over the whole catalog because
+     * every hole here so far has been a missing branch, not a wrong entry.
      */
     public function test_a_rolled_line_belongs_to_the_piece_it_is_on(): void
     {
@@ -3215,37 +3387,50 @@ final class GameLoopTest extends TestCase
             $pool = Catalog::optionRollsFor($def);
             $stats = array_column($pool, 'stat');
 
-            // Never anything but the solid pair, on any piece in the catalog.
-            $this->assertSame(
-                array_fill(0, count($pool), 'flat'),
-                array_column($pool, 'kind'),
-                "{$key} rolls something that is not a solid line",
-            );
+            // Never a StatKey percentage, on any piece in the catalog: that is
+            // the rule the whole pool exists to keep.
             $this->assertEmpty(
-                array_diff($stats, ['attack', 'defense']),
-                "{$key} rolls something that is not the pair",
+                array_intersect($stats, ['yield', 'travelSpeed', 'processingSpeed', 'power']),
+                "{$key} rolls a StatKey",
             );
             $this->assertSame($stats, array_unique($stats), "{$key} lists a stat twice");
 
+            // Everything wears out, so everything may roll a longer life.
+            $this->assertContains('durability', $stats, "{$key} cannot roll durability");
+
             if (Catalog::skillForSlot($slot) !== null) {
                 $checked['tool']++;
-                // A tool takes material out of a hex; there is nothing there
-                // for a guard to keep off you.
-                $this->assertSame(['attack'], $stats, "{$key}");
+                // A tool takes material out of a hex: there is nothing there
+                // for a guard to keep off you, and nothing to walk or fight.
+                $this->assertSame(['attack', 'durability', 'haul'], $stats, "{$key}");
 
                 continue;
             }
 
-            if ($slot === 'weapon' && ($def['family'] ?? null) === 'focus') {
+            if ($slot === 'weapon') {
                 $checked['weapon']++;
+                // §8 rule 5 -- the one slot that never works, so the one slot a
+                // work bonus may not land on. And the only one that shortens a
+                // cooldown, because the family in it picks the three skills.
+                $this->assertNotContains('haul', $stats, "{$key} rolls a work bonus");
+                $this->assertNotContains('travel', $stats, "{$key} walks");
+                $this->assertContains('cooldown', $stats, "{$key} cannot roll a cooldown");
+
                 // §9.5.4 -- a focus keeps nothing off you, of either kind.
-                $this->assertSame(['attack'], $stats, "{$key} is a focus that guards");
+                if (($def['family'] ?? null) === 'focus') {
+                    $this->assertNotContains('defense', $stats, "{$key} is a focus that guards");
+                }
 
                 continue;
             }
 
-            $slot === 'weapon' ? $checked['weapon']++ : $checked['worn']++;
-            $this->assertSame(['attack', 'defense'], $stats, "{$key}");
+            $checked['worn']++;
+            $this->assertContains('haul', $stats, "{$key} cannot roll a haul");
+            $this->assertNotContains('cooldown', $stats, "{$key} shortens a cooldown");
+            // Boots walk. A coat does not.
+            $slot === 'boots'
+                ? $this->assertContains('travel', $stats, "{$key} cannot roll travel")
+                : $this->assertNotContains('travel', $stats, "{$key} walks faster than boots");
         }
 
         $this->assertGreaterThan(0, $checked['tool']);
@@ -3286,6 +3471,23 @@ final class GameLoopTest extends TestCase
         foreach (Balance::OPTION_FLAT_VALUE as $tier => [$min, $max]) {
             $this->assertMatchesRegularExpression("/optionFlatValue: \{[^}]*{$tier}: \[{$min}, {$max}\],/s", $ts, "optionFlatValue.{$tier}");
         }
+        foreach (Balance::OPTION_DURABILITY_VALUE as $tier => [$min, $max]) {
+            $this->assertMatchesRegularExpression("/optionDurabilityValue: \{[^}]*{$tier}: \[{$min}, {$max}\],/s", $ts, "optionDurabilityValue.{$tier}");
+        }
+        foreach (Balance::OPTION_COOLDOWN_VALUE as $tier => $rounds) {
+            $this->assertMatchesRegularExpression("/optionCooldownValue: \{[^}]*{$tier}: {$rounds},/s", $ts, "optionCooldownValue.{$tier}");
+        }
+        foreach (Balance::OPTION_GAIN_VALUE as $tier => $share) {
+            $this->assertMatchesRegularExpression("/optionGainValue: \{[^}]*{$tier}: {$share},/s", $ts, "optionGainValue.{$tier}");
+        }
+        foreach (Balance::OPTION_GAIN_VALUE_GLOVES as $tier => $share) {
+            $this->assertMatchesRegularExpression("/optionGainValueGloves: \{[^}]*{$tier}: {$share},/s", $ts, "optionGainValueGloves.{$tier}");
+        }
+        $this->assertStringContainsString('optionGainCap: '.Balance::OPTION_GAIN_CAP, $ts);
+        $this->assertStringContainsString(
+            'optionIndestructibleChance: '.Balance::OPTION_INDESTRUCTIBLE_CHANCE,
+            $ts,
+        );
 
         // And the percentage machinery is gone from both sides rather than
         // dormant on one: a band nothing rolls is a promise nothing keeps.

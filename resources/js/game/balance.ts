@@ -277,9 +277,9 @@ export const EQUIPMENT = {
     legendary: 3,
     unique: 3,
   } as const,
-  /** §8.0.1 -- what a rolled line is worth, per tier. Every line is a solid
-   *  number on the pair: a percentage climbs toward a ceiling nobody can see,
-   *  and a line is luck, which has to be legible. */
+  /** §8.0.1 -- what a rolled pair line is worth, per tier. A solid number: a
+   *  percentage climbs toward a ceiling nobody can see, and a line is luck,
+   *  which has to be legible. */
   optionFlatValue: {
     common: [1, 2],
     uncommon: [1, 3],
@@ -287,6 +287,50 @@ export const EQUIPMENT = {
     epic: [3, 6],
     legendary: [4, 8],
   } as const,
+  /** §8.0.1 -- a durability line, as a share of the piece's own max. Rolled as
+   *  a share and stored as points, so it is worth the same on a 40-point axe
+   *  and a 240-point coat. */
+  optionDurabilityValue: {
+    common: [0.03, 0.05],
+    uncommon: [0.04, 0.07],
+    rare: [0.05, 0.09],
+    epic: [0.07, 0.12],
+    legendary: [0.09, 0.15],
+  } as const,
+  /** §8.0.1/§9.5.9 -- whole rounds off every cooldown the weapon's family
+   *  carries. Weapon only. */
+  optionCooldownValue: {
+    common: 1,
+    uncommon: 1,
+    rare: 1,
+    epic: 2,
+    legendary: 2,
+  } as const,
+  /** §8.0.1 -- what a `haul` or `travel` line is worth: 10% to 30% in fives,
+   *  one value per tier and no roll inside it, so the tier IS the step. NOT a
+   *  StatKey -- these never meet STAT_CEILING. */
+  optionGainValue: {
+    common: 0.1,
+    uncommon: 0.15,
+    rare: 0.2,
+    epic: 0.25,
+    legendary: 0.3,
+  } as const,
+  /** §8.0.1 -- gloves haul on a shorter ladder: hands are not what takes
+   *  material out of a hex, and a glove that hauled like a coat would make the
+   *  bench piece a mining piece. */
+  optionGainValueGloves: {
+    common: 0.05,
+    uncommon: 0.1,
+    rare: 0.15,
+    epic: 0.2,
+    legendary: 0.2,
+  } as const,
+  /** The most a whole kit's haul or travel lines come to together. */
+  optionGainCap: 0.3,
+  /** §8.0.1/§8.2 -- the chance a crafted piece comes out unbreakable: at zero
+   *  it is not destroyed, only useless until it is mended. */
+  optionIndestructibleChance: 0.02,
   /** Diminishing returns on stacking, §8.1 rule 2: the nth item of the same
    *  stat contributes value * falloff^(n-1). */
   stackFalloff: 0.5,
