@@ -339,21 +339,47 @@ const standingNote = (def: ItemDef) => {
 }
 
 /**
- * §11.1 -- throwing things away.
+ * §11.1 -- trashing a stack.
  *
- * Two taps, always: the first opens the amounts, the second does it. There is
- * no salvage and no undo, so a single mis-tap must never be able to empty a
- * stack. The trader pays for this stuff -- this is for when there is no trader
- * within three hexes and the only thing worth having is the strap.
+ * **Trash rather than scrap**, and the two words are not interchangeable: §8.2
+ * scraps a piece of gear and hands back a share of what went into it, and this
+ * hands back nothing at all. A verb that promised salvage on the one action
+ * that has none would be the more expensive lie.
+ *
+ * Two taps, always: the first opens the field, the second does it. There is no
+ * salvage and no undo, so a single mis-tap must never be able to empty a stack.
+ * The trader pays for this stuff -- this is for when there is no trader within
+ * three hexes and the only thing worth having is the strap.
+ *
+ * A FIELD rather than a row of amounts. The old three buttons -- 1, 10, all --
+ * were the three numbers somebody guessed a player would want, and every stack
+ * that was not those three had to be trashed in instalments. The field is
+ * pre-filled with the whole stack and selected, so the common case (the strap
+ * is what you actually want) is still one tap, and any other number is typed
+ * over the top of it.
  */
 const dropping = ref(false)
+const trashQty = ref(1)
+const trashField = ref<HTMLInputElement | null>(null)
 
-/** Amounts worth reaching for. Deduped, so a stack of 1 offers one button. */
-function amounts(qty: number): number[] {
-  return [1, 10, qty].filter((n, i, arr) => n > 0 && n <= qty && arr.indexOf(n) === i)
+/** What the field is currently worth, clamped to what is actually on the strap. */
+const trashing = computed(() => {
+  const held = picked.value && 'qty' in picked.value ? picked.value.qty : 1
+
+  return Math.max(1, Math.min(Math.floor(trashQty.value || 0), held))
+})
+
+const trashValid = computed(
+  () => Number.isFinite(trashQty.value) && trashQty.value === trashing.value,
+)
+
+async function startTrash(qty: number): Promise<void> {
+  trashQty.value = qty
+  dropping.value = true
+  await nextTick()
+  trashField.value?.focus()
+  trashField.value?.select()
 }
-
-const label = (n: number, qty: number) => (n === qty && qty > 1 ? `All ${qty}` : `${n}`)
 
 async function drop(key: MaterialKey, qty: number): Promise<void> {
   dropping.value = false
@@ -482,22 +508,36 @@ async function mend(item: OwnedItem): Promise<void> {
                 {{ material.npcPrice > 0 ? `${material.npcPrice}g each at a trader` : 'The trader will not take it' }}
                 <template v-if="material.walletCap"> · capped at {{ material.walletCap }} per wallet</template>
               </p>
-              <div v-if="dropping" class="acts">
+              <form v-if="dropping" class="acts trash" @submit.prevent="drop(picked.key, trashing)">
+                <span class="tiny muted grow">
+                  How many of {{ picked.qty }}? Nothing comes back for it.
+                </span>
+                <input
+                  ref="trashField"
+                  v-model.number="trashQty"
+                  class="count"
+                  type="number"
+                  min="1"
+                  :max="picked.qty"
+                  step="1"
+                  inputmode="numeric"
+                  aria-label="How many to trash"
+                />
+                <!-- The confirm says the number rather than "OK", so the last
+                     thing read before an irreversible tap is what it will do. -->
+                <button class="btn btn-sm btn-danger" type="submit" :disabled="game.busy || !trashValid">
+                  Trash {{ trashing }}
+                </button>
+                <button class="btn btn-sm" type="button" @click="dropping = false">Cancel</button>
+              </form>
+              <div v-else class="acts">
                 <button
-                  v-for="n in amounts(picked.qty)"
-                  :key="n"
                   class="btn btn-sm btn-danger"
                   type="button"
                   :disabled="game.busy"
-                  @click="drop(picked.key, n)"
+                  @click="startTrash(picked.qty)"
                 >
-                  Throw {{ label(n, picked.qty) }}
-                </button>
-                <button class="btn btn-sm" type="button" @click="dropping = false">Cancel</button>
-              </div>
-              <div v-else class="acts">
-                <button class="btn btn-sm btn-danger" type="button" :disabled="game.busy" @click="dropping = true">
-                  Throw away
+                  Trash
                 </button>
               </div>
             </template>
@@ -969,5 +1009,42 @@ async function mend(item: OwnedItem): Promise<void> {
 
 .acts .btn {
   white-space: nowrap;
+}
+
+/* §11.1 -- the trash row: what you are about to lose, how many, and the tap.
+   The question sits on its own line so the field and the two buttons never get
+   squeezed onto a phone; the row wraps around it. */
+.trash {
+  align-items: center;
+  margin-top: 8px;
+}
+
+.trash .grow {
+  flex: 1 0 100%;
+  margin-bottom: 2px;
+}
+
+.count {
+  width: 68px;
+  padding: 5px 7px;
+  border: 1px solid var(--line);
+  background: var(--ink);
+  color: var(--vellum);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.count:focus {
+  outline: none;
+  border-color: var(--ember);
+}
+
+/* The spinners are a second control for the one thing the field already does,
+   and they are too small to hit on a phone. */
+.count::-webkit-outer-spin-button,
+.count::-webkit-inner-spin-button {
+  margin: 0;
+  appearance: none;
 }
 </style>

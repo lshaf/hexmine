@@ -278,13 +278,16 @@ final class SkillEffectTest extends TestCase
         $plain = 0.0;
         $upgraded = 0.0;
 
+        // §8.0.1 -- summed over the lines that HAVE a value: `indestructible`
+        // is standalone and carries none, so it is not a tier being drawn.
+        $worth = static fn (array $lines): float => array_sum(array_map(
+            static fn (array $line) => (float) ($line['value'] ?? 0),
+            $lines,
+        ));
+
         for ($seed = 1; $seed <= 300; $seed++) {
-            foreach (Formulas::rollOptions($def, $seed, 0, 0.0) as $line) {
-                $plain += (float) $line['value'];
-            }
-            foreach (Formulas::rollOptions($def, $seed, 0, 1.0) as $line) {
-                $upgraded += (float) $line['value'];
-            }
+            $plain += $worth(Formulas::rollOptions($def, $seed, 0, 0.0));
+            $upgraded += $worth(Formulas::rollOptions($def, $seed, 0, 1.0));
         }
 
         $this->assertGreaterThan($plain, $upgraded, 'a deeper bag rolled no better');

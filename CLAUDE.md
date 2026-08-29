@@ -3319,8 +3319,26 @@ facility worth buying at all.
 ### 11.1 Continuous / passive (unavoidable, happens during normal play)
 - **Bag pressure** (§7.6) — the bag does not destroy anything itself; it forces
   the choice between the NPC's deliberately poor rate, a processing queue, and
-  throwing the surplus away. It replaced storage-overflow decay, which punished
+  **trashing** the surplus. It replaced storage-overflow decay, which punished
   the same state twice and did it while the player was not looking.
+
+  **Trash and scrap are two words for two different things.** §8.2 scraps a
+  piece of gear and hands back a share of what went into it; trashing a stack of
+  material hands back nothing at all, which is exactly why it is the last
+  resort. One word for both would promise salvage on the one action that has
+  none.
+
+  On screen it is **two taps and a number**: the first opens a field, the second
+  does it. There is no salvage and no undo, so one mis-tap must never be able to
+  empty a strap. The field arrives holding the **whole stack, selected** — the
+  common case is that the strap itself is what you want, so that is one tap, and
+  any other number is typed over the top of it. The confirm says the count
+  (*Trash 12*) rather than *OK*, because the last thing read before an
+  irreversible tap should be what it is about to do.
+
+  *(It was three buttons: 1, 10, and all. Those are the three numbers somebody
+  guessed a player would want, and every stack that was not one of them had to
+  be thrown away in instalments.)*
 - **Equipment destruction** (§8.2) — durability drains from mining, raiding and
   hardest of all from fighting (§9.5.6), and at zero the item is gone rather
   than idle. This is the largest continuous sink in the game, and it is the one
