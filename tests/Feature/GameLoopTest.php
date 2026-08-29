@@ -1294,7 +1294,7 @@ final class GameLoopTest extends TestCase
         // 37 tools and work-leaning worn gear, plus §9.5.4's 90 combat pieces:
         // six groups, five rungs, three material grades apiece, and every one
         // of them craftable.
-        $this->assertSame(127, $checked, 'the crafted list changed size');
+        $this->assertSame(133, $checked, 'the crafted list changed size');
     }
 
     /**
@@ -3989,20 +3989,59 @@ final class GameLoopTest extends TestCase
         }
     }
 
-    /** §3.2 -- gold stops at uncommon, at every settlement tier. */
-    public function test_no_shop_anywhere_stocks_above_uncommon(): void
+    /**
+     * §3.2/§8.0 -- a shelf stops at COMMON, at every settlement tier.
+     *
+     * Anything better than the cheapest thing in the game is made rather than
+     * bought, which is what puts the benches at the centre of §8's ladder
+     * instead of beside it. Checked on the price rather than at the till, so a
+     * catalog entry can never quietly open a shelf the rule closed.
+     */
+    public function test_no_shop_anywhere_stocks_above_common(): void
     {
+        $priced = 0;
+
         foreach (Catalog::items() as $key => $def) {
             if (! isset($def['goldPrice'])) {
                 continue;
             }
 
-            $this->assertLessThanOrEqual(
-                Balance::rarityRank(Balance::SHOP_RARITY_CAP),
-                Balance::rarityRank($def['rarity']),
-                "{$key} is sold for gold at {$def['rarity']}",
+            $priced++;
+            $this->assertSame(
+                'common',
+                $def['rarity'],
+                "{$key} carries a shelf price at {$def['rarity']}",
             );
             $this->assertFalse($def['tradeable'], "{$key} bridges gold to NFT value");
+        }
+
+        $this->assertGreaterThan(0, $priced, 'nothing is stocked at all');
+    }
+
+    /**
+     * §8.0 -- and every rung above it is reachable, so closing the shelf did
+     * not close the ladder.
+     *
+     * The six pieces a city used to stock -- the atk-6 rung of all five lines,
+     * and the uncommon boots -- kept their place and gained a recipe. A rung
+     * that exists and cannot be had is worse than no rung.
+     */
+    public function test_everything_above_common_can_still_be_made(): void
+    {
+        foreach (Catalog::items() as $key => $def) {
+            if (($def['slot'] ?? null) === null || $def['rarity'] === 'common') {
+                continue;
+            }
+            // §8.0 -- unique is never crafted; it drops (§9.5.8).
+            if ($def['rarity'] === 'unique') {
+                continue;
+            }
+
+            $this->assertArrayHasKey(
+                'inputs',
+                $def,
+                "{$key} is above common with no shelf and no recipe",
+            );
         }
     }
 
@@ -5321,7 +5360,8 @@ final class GameLoopTest extends TestCase
             $checked++;
         }
 
-        $this->assertGreaterThan(20, $checked, 'the shelf sweep found almost nothing to check');
+        // Twelve, which is every price there is: §3.2's shelf stops at common.
+        $this->assertGreaterThan(8, $checked, 'the shelf sweep found almost nothing to check');
     }
 
     /**
@@ -5395,7 +5435,9 @@ final class GameLoopTest extends TestCase
             $checked++;
         }
 
-        $this->assertGreaterThan(20, $checked, 'the price sweep found almost nothing to check');
+        // Twelve, because §3.2's shelf stops at common: those are all the prices
+        // there are for the two sides to disagree about.
+        $this->assertGreaterThan(8, $checked, 'the price sweep found almost nothing to check');
     }
 
     // ------------------------------------------------- selling gear back §8.2
@@ -5535,9 +5577,12 @@ final class GameLoopTest extends TestCase
      */
     public function test_the_trader_prices_a_craftable_piece_off_its_parts_not_its_shelf_tag(): void
     {
-        $stocked = Catalog::item('iron_broadsword');
+        // A common, because §3.2's shelf stops there now -- and common is where
+        // the two prices sit closest, so it is the sharpest place to test that
+        // the trader reads the parts rather than the tag.
+        $stocked = Catalog::item('notched_sword');
 
-        $this->assertGreaterThan(0, $stocked['goldPrice'] ?? 0, 'iron_broadsword is not stocked any more');
+        $this->assertGreaterThan(0, $stocked['goldPrice'] ?? 0, 'notched_sword is not stocked any more');
         $this->assertSame(Formulas::makeCost($stocked), Formulas::resaleBasis($stocked));
         $this->assertLessThan(
             $stocked['goldPrice'],

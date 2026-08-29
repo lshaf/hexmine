@@ -262,7 +262,11 @@ export const EQUIPMENT = {
     capital: 'epic',
     guild: 'legendary',
   } as const,
-  /** Gold buys the bottom two rungs and nothing else, §3.2. */
+  /** §3.2/§8.0 -- a shelf stops at common. Above it, the bench. */
+  shopStockCap: 'common',
+  /** §3.2 -- and the highest rung gold changes hands over at all, which is the
+   *  trader's counter rather than its shelf: a piece keeps its sale as an exit
+   *  (§8.2) even where nobody stocks one. */
   shopRarityCap: 'uncommon',
   /**
    * §8.0.1 -- how many rolled lines a rung may carry. A CEILING, never a quota:

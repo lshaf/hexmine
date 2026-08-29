@@ -305,11 +305,13 @@ def items():
                 label = group['names'][i][g]
                 durability = round(group['dur'][i] * DUR_SCALE[grade])
                 recipe = inputs_for(group, i, grade)
-                # Low is the rung's shop line as well, at the two rungs gold
-                # reaches (§3.2). Everything else is bench work.
+                # Low is the rung's shop line as well, at the ONE rung a shelf
+                # reaches (§3.2/§8.0). Everything else is bench work -- which is
+                # now everything above common, so a village stocks the cheapest
+                # sword and a city stocks the same one.
                 gold = (
                     shop_price(STATION[i], rung, durability, recipe)
-                    if (grade == 'low' and i < 2)
+                    if (grade == 'low' and i < 1)
                     else None
                 )
 

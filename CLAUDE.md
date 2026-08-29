@@ -50,7 +50,11 @@ The three currencies are strictly separated. No backdoor converts one into anoth
 - **In-game only**, NPC-facing, freely inflatable/deflatable by design (no on-chain consequence)
 - Faucets: selling excess resources to NPC (deliberately bad rate), monster gold drops, quests/dailies
 - Sinks: NPC repair, basic equipment, settlement upgrades, **guild capital bidding** (largest sink)
-- Buys **common and uncommon only** (§8.0) — never convertible to NFT
+- Buys **common only** (§8.0). Every rung above the cheapest thing in the game
+  is made rather than bought — never convertible to NFT either way
+- The trader still *buys back* up to uncommon, which is a different question:
+  a shelf is about where gear comes from, a counter is about a piece's exit
+  (§8.2)
 
 ### 3.3 NFT
 
@@ -1464,8 +1468,28 @@ are solid counts and two shares of the work, and not one of them is a `StatKey`.
 it: village → common, city → uncommon, capital → rare and epic, guild hall →
 legendary. That is most of what makes a capital worth the walk.
 
-Gold buys **common and uncommon only**, at any settlement tier. A capital's shop
-edge over a city is *options*, not rarity (§8.0.1).
+**A shelf stops at common, at every settlement tier.** Anything better than the
+cheapest thing in the game is made rather than bought, which is what puts the
+benches at the centre of this ladder instead of beside it: gold gets you
+started, and every rung after the first is somewhere you carried materials to.
+
+*(It reached uncommon, which made the second rung of every line purchasable and
+the crafted rung beside it optional. A shelf that sells the upgrade is a bench
+nobody has to visit. The six pieces a city used to stock — the atk-6 rung of all
+five lines, and the uncommon boots — kept their place on the ladder and gained a
+recipe, because a rung that exists and cannot be had is worse than no rung.)*
+
+A capital's shop is therefore no better stocked than a village's. What a capital
+is for is the bench (§8.0's station column), which is the whole point.
+
+**The trader still buys back up to uncommon**, and that is a different question
+rather than an inconsistency. The shelf is about where gear comes FROM; the
+counter is about a piece's EXIT, and §8.2 gives a piece three of them. The two
+sets were never the same anyway — the trader has always bought back a craft-only
+common it does not stock. `SHOP_STOCK_CAP` is the shelf; `SHOP_RARITY_CAP` is
+the counter, and the second is a §2 guard: every epic and legendary draft wants
+a Tier 3 rare (§8.5) and those are capped per wallet, so a gold price on one
+would turn a capped rare into uncapped coin.
 
 **Unique is soulbound, and that is not negotiable.** It is the strongest thing in
 the game and it drops from dungeons — §2 forbids a grind→NFT faucet, so a
@@ -1671,9 +1695,10 @@ Rules, all mandatory:
 3. **All five slots may be equipped at once.** This is an idle game; forcing a swap
    before every mine is friction, not a decision. The interesting decision is which
    lines you *invest* in — that is already capped by §7.2 skill points.
-4. **Every line gets the same ladder** — village basic, city basic, crafted starter,
-   crafted, NFT — and the same ceiling. Specialisation must come from the skill point
-   cap, never from one line having better tools on offer than another.
+4. **Every line gets the same ladder** — village basic (the one rung a shelf
+   reaches), crafted starter, crafted city, crafted, NFT — and the same ceiling.
+   Specialisation must come from the skill point cap, never from one line having
+   better tools on offer than another.
 5. **`Weapon` is combat only and never gathers.** Combat gear must not be able to
    stand in for a gathering tool, or fighting becomes a shortcut around the mining ladder.
    One slot holds **three families** — shield, sword and focus — and the family decides
@@ -1961,7 +1986,10 @@ different ladder), then the combat rung fell under its own materials. Derived in
 `gen_battlegear.py` and pinned by a test that recomputes every shelf price from
 `Balance`, so a changed recipe reprices the item and a drifted one fails.
 
-| Line | Village atk 3 | Starter atk 4 | City atk 6 | Crafted atk 8 | NFT atk 14 |
+**One rung is bought and every rung after it is made** (§3.2): the shelf stops
+at common, so only the first column here has a price on it.
+
+| Line | Bought atk 3 | Made atk 4 | Made atk 6 | Made atk 8 | Made atk 14 |
 |---|---|---|---|---|---|
 | Woodcutting | Stone Axe | Hewn Axe | Iron Hatchet | Ironbound Axe | Ironwood Axe |
 | Mining | Chipped Pick | Wood Pickaxe | Miner's Pick | Iron Pickaxe | Mythril Pickaxe |
@@ -1969,11 +1997,16 @@ different ladder), then the combat rung fell under its own materials. Derived in
 | Quarrying | Stone Mallet | Stone Maul | Iron Sledge | Banded Sledge | Obsidian Sledge |
 | Harvesting | Bent Sickle | Reed Sickle | Steel Sickle | Toothed Sickle | Silkweave Sickle |
 
-Rare is **10**, legendary **17**, unique **19**. The crafted uncommon finally
-sits above the shop uncommon rather than tying with it — the old percentages had
-both at +5%, which made the bench rung pointless.
+Rare is **10**, legendary **17**, unique **19**.
+
+**Two uncommon rungs, and the difference is the stock.** The atk-6 one is built
+from a line's *base* raw and refined; the atk-8 one from the grade above it
+(§5.3's Better ground). So the cheap one is a city errand and the dear one is a
+reason to go and find better ground — which is the same distinction §9.5.4's
+low/medium/high grades draw inside a rung, arrived at from the other direction.
 
 ```
+Iron Hatchet      = 4 Iron ore + 3 Ingots + 2 Planks + 2 Heartknot
 Hewn Axe          = 4 Planks
 Iron Pickaxe      = 5 Ingots + 3 Planks
 Sinew Longbow     = 4 Leather + 3 Cloth

@@ -5061,10 +5061,12 @@ class GameService
             if (! isset($def['goldPrice'])) {
                 continue;
             }
-            // §3.2 -- gold reaches the bottom two rungs and stops. This is the
-            // rule that keeps gold from ever bridging to NFT value, so it is
-            // checked here rather than left to the catalog getting it right.
-            if (Balance::rarityRank($def['rarity']) > Balance::rarityRank(Balance::SHOP_RARITY_CAP)) {
+            // §3.2/§8.0 -- a shelf stops at common. Anything better than the
+            // cheapest thing in the game is made rather than bought, which is
+            // what puts the benches at the centre of §8's ladder instead of
+            // beside it. Checked here rather than left to the catalog getting
+            // it right: this is the rule, and the catalog is data.
+            if (Balance::rarityRank($def['rarity']) > Balance::rarityRank(Balance::SHOP_STOCK_CAP)) {
                 continue;
             }
             if (Catalog::STATION_RANK[$def['station'] ?? 'village'] > $rank) {

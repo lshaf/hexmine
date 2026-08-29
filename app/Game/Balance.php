@@ -1169,7 +1169,37 @@ final class Balance
         'guild' => 'legendary',
     ];
 
-    /** Gold buys the bottom two rungs and nothing else, §3.2. */
+    /**
+     * §3.2/§8.0 -- the highest rung a SHELF ever holds.
+     *
+     * Common, and nothing above it: anything better than the cheapest thing in
+     * the game is made rather than bought. That is what puts the benches at the
+     * centre of §8's ladder instead of beside it -- gold gets you started, and
+     * every rung after the first is somewhere you carried materials to.
+     *
+     * It used to reach uncommon, which made the second rung of every line
+     * purchasable and the crafted rung beside it optional. A shelf that sells
+     * the upgrade is a bench nobody has to visit.
+     */
+    public const SHOP_STOCK_CAP = 'common';
+
+    /**
+     * §3.2 -- the highest rung gold changes hands over AT ALL, which is the
+     * trader's counter rather than its shelf.
+     *
+     * Two different questions, and they were one constant. The shelf is about
+     * where gear comes FROM, and above common the answer is a bench. The
+     * counter is about a piece's EXIT: §8.2 gives a piece three of them --
+     * repair keeps it, salvage returns a fraction of what went in, a sale
+     * returns gold scaled by what is left -- and taking one away from every
+     * uncommon buys the threat model nothing.
+     *
+     * The two sets were never the same anyway: the trader has always bought
+     * back a craft-only common it does not stock. What this cap is for is §2 --
+     * every epic and legendary draft wants a Tier 3 rare (§8.5) and those are
+     * capped per wallet, so a gold price on one would turn a capped rare into
+     * uncapped coin.
+     */
     public const SHOP_RARITY_CAP = 'uncommon';
 
     // -------------------------------------------------------------- options §8.0.1
