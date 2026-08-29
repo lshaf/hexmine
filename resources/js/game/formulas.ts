@@ -459,14 +459,13 @@ export function statLine(
 /**
  * §8.0.1 -- a rolled line, which is always a solid number on the pair.
  *
- * On a gathering tool a rolled `attack` is MINING attack (§7.3) -- it bites
- * deeper into a hex and is worth nothing in a fight -- so it says so.
+ * A tool's rolled `attack` is §7.3's mining attack and it is still said plainly
+ * as attack: the piece's own chip says ATK, a tool has no other attack for it
+ * to be confused with (§8 rule 5 keeps combat off a tool entirely), and a
+ * second word for the one number is what made it hard to read.
  */
-export function optionStatLine(option: ItemOption, def: ItemDef): string {
-  const line = def.slot ? skillForSlot(def.slot) : null
-  const what = line ? 'mining attack' : FLAT_LABEL[option.stat] ?? option.stat
-
-  return `+${option.value} ${what}`
+export function optionStatLine(option: ItemOption): string {
+  return `+${option.value} ${FLAT_LABEL[option.stat] ?? option.stat}`
 }
 
 /**

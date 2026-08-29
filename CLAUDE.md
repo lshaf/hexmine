@@ -1493,6 +1493,12 @@ deeper into a hex and is worth nothing at all in a fight, exactly as the tool's
 own attack is. That is the direct answer to *what should a tool roll* — the one
 number that decides how fast a hex comes apart.
 
+**It is still drawn `atk`, and never given a word of its own.** The tool's own
+chip says ATK and a tool has no other attack for it to be confused with — §8
+rule 5 keeps combat off a tool entirely — so a second name for the one number is
+a thing to decode rather than a distinction being made. The distinction is a
+rule about what the number *means*, and rules live here.
+
 **A higher rarity does not roll a better line every time; it rolls from a deeper
 bag.** That is a different and more interesting thing: the ceiling climbs the
 ladder and the floor does not, so a good roll is *found* rather than issued, and

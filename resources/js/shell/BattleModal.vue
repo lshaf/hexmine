@@ -223,7 +223,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
             :key="option.stat + option.value"
             class="tiny option"
           >
-            {{ lootDef ? optionStatLine(option, lootDef) : option.stat }}
+            {{ optionStatLine(option) }}
           </span>
         </div>
 

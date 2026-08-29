@@ -250,7 +250,7 @@ onBeforeUnmount(() => {
               class="roll mono tiny"
               :style="{ transitionDelay: `${220 + i * 70}ms` }"
             >
-              {{ optionStatLine(option, madeDef) }}
+              {{ optionStatLine(option) }}
             </span>
           </template>
           <span v-else class="tiny muted">It came out plain. The next one may not.</span>

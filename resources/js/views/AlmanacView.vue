@@ -139,7 +139,6 @@ function rollBrief(def: ItemDef): RollBrief | null {
   const high = EQUIPMENT.optionFlatValue[tiers[tiers.length - 1]!][1]
 
   const pool = optionRollsFor(def)
-  const line = skillForSlot(def.slot)
 
   return {
     // §8.0.1 -- one line per stat, so the POOL is a ceiling too and it is the
@@ -149,11 +148,12 @@ function rollBrief(def: ItemDef): RollBrief | null {
     band: `+${low}–${high}`,
     // The band is the same for every half now, so it is said once in the
     // sentence and the pips are the halves themselves.
-    labels: pool.map((entry) =>
-      // §7.3 -- a rolled `attack` on a gathering tool is MINING attack, which
-      // is a different ladder wearing the same word (§8 rule 5).
-      entry.stat === 'attack' && line ? 'bite' : entry.stat === 'attack' ? 'atk' : 'def',
-    ),
+    //
+    // A tool's rolled attack IS §7.3's mining attack, and it is still drawn
+    // `atk`: that is what the piece's own chip says, and a tool has no other
+    // attack for it to be confused with (§8 rule 5 keeps combat off a tool
+    // entirely). A second word for the one number was the confusing thing.
+    labels: pool.map((entry) => (entry.stat === 'attack' ? 'atk' : 'def')),
     plainShelf: def.goldPrice !== undefined,
   }
 }
