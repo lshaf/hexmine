@@ -3394,8 +3394,30 @@ wrapper the contract asks for.
 | Axis | Encoding |
 |---|---|
 | Equipment slot | One base silhouette (axe, pickaxe, bow, hammer, sickle, armor, boots, gloves, weapon) |
-| Rarity | Six colors: gray → green → blue → violet → gold → ember. Owns the hex frame and the glow; ornamentation starts at rare. |
+| Rarity | Six colors: gray → green → blue → violet → gold → ember. Owns the hex **plate** and the glow; ornamentation starts at rare. |
 | Material | Accent stays on the body, so "what it is made of" and "how good it is" never compete for the same color |
+
+**The hexagon is FILLED with the rarity color, not outlined in it.** It was a
+hairline round nothing, which made rarity the thinnest mark on a screen full of
+them: at 32px a gray ring and a green ring are the same ring until you look, and
+at the 15px a recipe's inputs are drawn at, they were no ring at all. Filled, the
+rung is the loudest thing about an icon and is read across a whole list without
+reading anything — which is what rarity is *for*. The stroke stays, the same
+color, so the plate keeps a crisp edge rather than an antialiased one; it is not
+a second mark.
+
+**Everything drawn ON the plate is cut in one ink** — §13.3's `line`. That is
+the rule the fill forces: an outline in a darkened copy of the body's own color
+was invisible the moment the plate arrived (a dark violet edge on a violet plate
+is a violet plate), and ornament in the rarity color would be the plate's own
+color on the plate, which is nothing at all. One ink is also what makes a shelf
+of specimens read as one set, and what turns the icon into a **stamped tile**
+rather than a shape sitting on a colored square.
+
+**A common piece keeps its material.** It used to take the rarity gray for its
+body as well, so the cheapest gear looked like what it was whatever it was made
+of. The plate says that now and says it louder, and gray-on-gray was the one
+pairing the ink could keep legible and could not keep interesting.
 
 ### 13.2 Map rendering (critical implementation notes)
 
