@@ -294,6 +294,10 @@ final class Formulas
      * STAT_CEILING; they are read where the work is done, the same way §5.7's
      * pocket multiplies the ground rather than joining the kit.
      *
+     * `$line` is the verb being costed: a gathering line's name for a mine, and
+     * null for a fight or a road. It decides which slots are in the sum -- see
+     * the loop.
+     *
      * @param  array<int,array{key:string,durability:int,equipped:bool,options?:array}>  $items
      */
     public static function optionGain(array $items, string $stat, ?string $line = null): float
@@ -310,10 +314,22 @@ final class Formulas
                 continue;
             }
 
-            // §8 rule 1 -- a tool pays out on its own line and on no other, so
-            // a haul line on an axe is woodcutting's and nobody else's.
-            $toolLine = Catalog::skillForSlot($def['slot'] ?? '');
+            // §8 rule 5, both directions -- and this is where "which haul"
+            // gets decided. A LINE is being worked, so the line's own tool
+            // counts and the other four do not, and the weapon counts for
+            // nothing at all: a sword is worth nothing down a mine. With no
+            // line ($line === null) the verb is a fight, and it is the other
+            // way round -- the weapon counts and no tool does.
+            //
+            // Worn gear is in both, which is §9.5.4's "one set with two axes"
+            // and not an oversight.
+            $slot = (string) ($def['slot'] ?? '');
+            $toolLine = Catalog::skillForSlot($slot);
+
             if ($toolLine !== null && $toolLine !== $line) {
+                continue;
+            }
+            if ($slot === 'weapon' && $line !== null) {
                 continue;
             }
 

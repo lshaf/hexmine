@@ -3016,7 +3016,7 @@ final class GameLoopTest extends TestCase
         $this->assertSame(['attack', 'durability', 'haul'], $pool('ironwood_axe'));
         $this->assertSame(['attack', 'defense', 'durability', 'haul', 'travel'], $pool('marching_boots'));
         $this->assertSame(['attack', 'defense', 'durability', 'haul'], $pool('ironwood_armor'));
-        $this->assertSame(['attack', 'durability', 'cooldown'], $pool('knotted_rod'));
+        $this->assertSame(['attack', 'durability', 'haul', 'cooldown'], $pool('knotted_rod'));
     }
 
     /**
@@ -3084,11 +3084,69 @@ final class GameLoopTest extends TestCase
         );
         $this->assertSame(Balance::OPTION_GAIN_CAP, Formulas::optionGain($fat, 'haul'));
 
-        // §8 rule 1 -- and a tool's haul is its own line's and nobody else's.
+        // §8 rule 5, both directions. A tool's haul is its own line's: it pays
+        // on a felling mine, on no other mine, and not in a fight. A weapon's
+        // is the fight's: it pays where no line is being worked and nowhere a
+        // line is. Worn gear is in both, which is §9.5.4's one set, two axes.
         $axe = [$piece('ironwood_axe', 0.2)];
         $this->assertSame(0.2, Formulas::optionGain($axe, 'haul', 'woodcutting'));
         $this->assertSame(0.0, Formulas::optionGain($axe, 'haul', 'mining'));
-        $this->assertSame(0.0, Formulas::optionGain($axe, 'haul'));
+        $this->assertSame(0.0, Formulas::optionGain($axe, 'haul'), 'an axe hauled in a fight');
+
+        $sword = [$piece('soldiers_sword', 0.2)];
+        $this->assertSame(0.2, Formulas::optionGain($sword, 'haul'));
+        $this->assertSame(0.0, Formulas::optionGain($sword, 'haul', 'woodcutting'), 'a sword hauled down a mine');
+
+        $coat = [$piece('ironwood_armor', 0.2)];
+        $this->assertSame(0.2, Formulas::optionGain($coat, 'haul'));
+        $this->assertSame(0.2, Formulas::optionGain($coat, 'haul', 'woodcutting'));
+    }
+
+    /**
+     * §9.5.8/§8.0.1 -- a weapon's haul line makes a pack pay more.
+     *
+     * It scales what came off the BODY and nothing else: not the gold (§3.2's
+     * faucet is its own thing and `goldFind` already owns it) and not the
+     * looted gear, because §2 stops loot at rare whatever anybody is wearing.
+     *
+     * The share is applied as a seeded chance on the fraction rather than by
+     * rounding, because spoil rows are one to three units: rounding a 30% bonus
+     * would pay nothing at all on the commonest row.
+     */
+    public function test_a_weapon_haul_line_makes_a_pack_pay_more(): void
+    {
+        $monster = array_values(Monsters::ROSTER)[3];
+
+        $total = function (float $haul) use ($monster): int {
+            $sum = 0;
+            for ($seed = 1; $seed <= 500; $seed++) {
+                $sum += array_sum(Drops::battleSpoils($monster, $seed, 'forest', $haul));
+            }
+
+            return $sum;
+        };
+
+        $plain = $total(0.0);
+        $rich = $total(Balance::OPTION_GAIN_CAP);
+
+        $this->assertGreaterThan(0, $plain);
+        $this->assertEqualsWithDelta(
+            $plain * (1 + Balance::OPTION_GAIN_CAP),
+            $rich,
+            $plain * 0.05,
+            'the fight haul did not land near the share it promises',
+        );
+
+        // And a single unit really does pay the fraction, rather than rounding
+        // away -- the whole reason it is a chance and not a multiply-and-round.
+        $ones = 0;
+        for ($seed = 1; $seed <= 200; $seed++) {
+            $ones += Drops::battleSpoils($monster, $seed, null, 0.0) === []
+                ? 0
+                : (int) (array_sum(Drops::battleSpoils($monster, $seed, null, 1.0))
+                    > array_sum(Drops::battleSpoils($monster, $seed, null, 0.0)));
+        }
+        $this->assertGreaterThan(0, $ones, 'doubling the haul never paid a unit');
     }
 
     /** §8.0.1 -- a haul line makes the haul bigger, beside the ring and the pocket. */
@@ -3429,10 +3487,11 @@ final class GameLoopTest extends TestCase
 
             if ($slot === 'weapon') {
                 $checked['weapon']++;
-                // §8 rule 5 -- the one slot that never works, so the one slot a
-                // work bonus may not land on. And the only one that shortens a
-                // cooldown, because the family in it picks the three skills.
-                $this->assertNotContains('haul', $stats, "{$key} rolls a work bonus");
+                // §9.5.8 -- a weapon hauls too; what it hauls is the FIGHT, and
+                // §8 rule 5 is what keeps that off a mine rather than what
+                // forbids it. It does not walk, and it is the only thing that
+                // shortens a cooldown, because the family in it picks the three.
+                $this->assertContains('haul', $stats, "{$key} cannot roll a haul");
                 $this->assertNotContains('travel', $stats, "{$key} walks");
                 $this->assertContains('cooldown', $stats, "{$key} cannot roll a cooldown");
 

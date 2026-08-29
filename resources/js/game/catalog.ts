@@ -444,9 +444,10 @@ export const skillForSlot = (slot: EquipSlot): SkillKey | null =>
  * piece FOR. The pair on everything that fights, and on a tool `attack` alone,
  * because a tool's attack is §7.3's mining attack and there is nothing on a hex
  * for a guard to keep off you. `durability` on everything, because everything
- * wears out. `haul` on everything but the weapon (§8 rule 5 keeps work off the
- * one slot that never works). `travel` on boots. `cooldown` on the weapon,
- * because the family in that slot is what decides which three skills you carry.
+ * wears out. `haul` on everything too, and the slot decides WHAT it hauls: a
+ * tool's is its line's (§7.3), a weapon's is the fight's (§9.5.8), and worn
+ * gear is in both. `travel` on boots. `cooldown` on the weapon, because the
+ * family in that slot is what decides which three skills you carry.
  *
  * `indestructible` is not here: it is rolled apart from the lines at its own
  * low chance, so it never takes a slot from one.
@@ -492,7 +493,7 @@ export function optionRollsFor(def: ItemDef): OptionRoll[] {
   }
 
   pool.push({ stat: 'durability', kind: 'durability' })
-  if (def.slot !== 'weapon') pool.push({ stat: 'haul', kind: 'gain' })
+  pool.push({ stat: 'haul', kind: 'gain' })
   if (def.slot === 'boots') pool.push({ stat: 'travel', kind: 'gain' })
   if (def.slot === 'weapon') pool.push({ stat: 'cooldown', kind: 'cooldown' })
 

@@ -178,8 +178,10 @@ function rollBrief(def: ItemDef): RollBrief | null {
     attack: 'atk',
     defense: 'def',
     durability: 'dur',
+    // §9.5.8 -- on a weapon the same line is the fight's haul, and "haul" on a
+    // sword would leave a reader asking haul of what.
+    haul: def.slot === 'weapon' ? 'drops' : 'haul',
     cooldown: 'cd',
-    haul: 'haul',
     travel: 'travel',
   }
 

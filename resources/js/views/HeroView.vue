@@ -543,7 +543,7 @@ const ceilings = computed(() =>
                   <div v-if="picked.item.options?.length" class="rolled">
                     <span class="tiny muted rolled-label">rolled</span>
                     <span v-for="(o, i) in picked.item.options" :key="i" class="tiny mono roll">
-                      {{ optionStatLine(o) }}
+                      {{ optionStatLine(o, picked.def) }}
                     </span>
                   </div>
                 </div>

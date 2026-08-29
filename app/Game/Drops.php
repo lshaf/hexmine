@@ -249,8 +249,12 @@ final class Drops
      *
      * @return array<string,int>
      */
-    public static function battleSpoils(array $monster, int $seed, ?string $biome = null): array
-    {
+    public static function battleSpoils(
+        array $monster,
+        int $seed,
+        ?string $biome = null,
+        float $haul = 0.0,
+    ): array {
         $grade = max(1, min(5, (int) $monster['tier']));
         $lines = Spoils::BY_GRADE[$grade];
         $out = [];
@@ -318,7 +322,35 @@ final class Drops
             $out[$key] = ($out[$key] ?? 0) + 1;
         }
 
+        // §8.0.1 -- a `haul` line on the weapon or the worn set, which is the
+        // fight's own haul the way a tool's is its line's. It scales what came
+        // off the body and nothing else: not the gold (§3.2's faucet is its
+        // own thing and `goldFind` already owns it), and not the looted gear,
+        // because §2 stops loot at rare whatever anybody is wearing.
+        if ($haul > 0) {
+            foreach ($out as $key => $quantity) {
+                $out[$key] = self::scaleSpoil($quantity, $haul, Hash::hash2($seed, crc32($key), Balance::mapSeed() ^ 0x5910));
+            }
+        }
+
         return $out;
+    }
+
+    /**
+     * §8.0.1 -- a share applied to a small count, without losing the share.
+     *
+     * Spoil rows are one to three units, so rounding a 30% bonus would pay
+     * nothing at all on the commonest row and a whole unit on the next -- a
+     * bonus that is invisible two thirds of the time is a bonus nobody
+     * believes. The fraction is a seeded chance instead, exactly as an extra
+     * craft roll is (§8.0.1), so 1 unit at +30% really is 1.3 units on average.
+     */
+    private static function scaleSpoil(int $quantity, float $haul, int $seed): int
+    {
+        $exact = $quantity * (1 + $haul);
+        $whole = (int) floor($exact);
+
+        return $whole + (Hash::rand01($seed) < $exact - $whole ? 1 : 0);
     }
 
     /**

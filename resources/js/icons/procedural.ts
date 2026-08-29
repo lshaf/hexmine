@@ -10,14 +10,13 @@
  *   slot     -> base silhouette
  *   tier     -> fill treatment (flat gray / solid / gradient + glow)
  *   material -> accent color
- *   rarity   -> hex frame, ornamentation grows per tier -- on a material as
- *               much as on a piece of gear
+ *   rarity   -> hex frame, BOLD, ornamentation grows per tier -- on a material
+ *               as much as on a piece of gear
  */
 import {
   CRITTER_ACCENT,
   HERB_ACCENT,
   ICHOR_ACCENT,
-  LINE,
   PLATE_ACCENT,
   MATERIAL_PALETTE,
   RARITY_TREATMENT,
@@ -164,45 +163,47 @@ const SILHOUETTE: Record<IconShape, (fill: string, edge: string) => string> = {
 // -------------------------------------------------------------- hex framing
 
 /**
- * Rarity plate, §13.1 -- a hex FILLED with the rarity color, not outlined in it.
+ * Rarity frame, §13.1 -- a BOLD hex outline whose ornamentation grows with tier.
  *
- * It was a hairline round nothing, which made rarity the thinnest mark on a
- * screen full of them: at 32px a gray ring and a green ring are the same ring
- * until you look. Filled, the rung is the loudest thing about an icon and is
- * read across a whole list without reading anything -- which is what §13.1 says
- * rarity is FOR, and a hairline was never going to carry it.
+ * The weight is the point. A hairline made rarity the thinnest mark on a screen
+ * full of them: at 32px a gray ring and a green ring were the same ring until
+ * you looked, and at the 15px a recipe's inputs are drawn at they were no ring
+ * at all. Bold, the rung is read across a whole list without reading anything --
+ * which is what §13.1 says rarity is FOR.
  *
- * The stroke stays and stays the same color, so the plate keeps a crisp edge
- * rather than an antialiased one. It is not a second mark.
+ * Outlined rather than filled. A solid plate carried the rung even harder and
+ * cost too much for it: it swallowed every mark drawn on it, so the ornament
+ * and the specimen's own cut edge both had to be re-inked in one flat color,
+ * and the icon stopped being a thing on a dark ground and became a colored
+ * sticker. The ring says the same thing and leaves the artwork alone.
  *
- * **Everything drawn ON the plate is cut in one ink** (§13.3's `line`), because
- * the plate is now the thing a mark has to survive: ornament in the rarity
- * color would be the plate's own color on the plate, which is nothing at all.
- * That one ink is what makes the icon read as a stamped tile rather than as a
- * shape sitting on a colored square.
+ * `r` is pulled in by half the stroke so the bold edge still lands inside the
+ * viewBox -- a stroke is centerd on its path, and at this weight the overhang
+ * is the difference between a hexagon and a clipped one.
  */
 function hexFrame(color: string, ornate: boolean): string {
-  const r = 18.6
-  const points = Array.from({ length: 6 }, (_, i) => {
-    const angle = (Math.PI / 3) * i
-    return `${(C + r * Math.cos(angle)).toFixed(2)},${(C + r * Math.sin(angle)).toFixed(2)}`
-  }).join(' ')
-
-  let out = `<polygon points="${points}" fill="${color}" stroke="${color}" stroke-width="1.4"/>`
-  if (ornate) {
-    const inner = Array.from({ length: 6 }, (_, i) => {
+  const w = 3
+  const r = 18.6 - w / 2
+  const ring = (radius: number, width: number) =>
+    `<polygon points="${Array.from({ length: 6 }, (_, i) => {
       const angle = (Math.PI / 3) * i
-      return `${(C + (r - 3) * Math.cos(angle)).toFixed(2)},${(C + (r - 3) * Math.sin(angle)).toFixed(2)}`
-    }).join(' ')
-    out += `<polygon points="${inner}" fill="none" stroke="${LINE}" stroke-width="0.7"/>`
+      return `${(C + radius * Math.cos(angle)).toFixed(2)},${(C + radius * Math.sin(angle)).toFixed(2)}`
+    }).join(' ')}" fill="none" stroke="${color}" stroke-width="${width}" stroke-linejoin="round"/>`
+
+  let out = ring(r, w)
+  if (ornate) {
+    // Weighted against the bold outer ring rather than against nothing: a
+    // hairline inside a 3px edge reads as a printing artifact.
+    out += ring(r - 3.4, 1.1)
     // Corner pips, the top-tier tell.
     for (let i = 0; i < 6; i++) {
       const angle = (Math.PI / 3) * i
       const x = C + r * Math.cos(angle)
       const y = C + r * Math.sin(angle)
-      out += `<circle cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="1.5" fill="${LINE}"/>`
+      out += `<circle cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="1.5" fill="${color}"/>`
     }
   }
+
   return out
 }
 
@@ -223,14 +224,11 @@ export interface IconOptions {
  *
  * Two colors are doing two different jobs and must not be confused: the
  * **material accent** says what the thing is made of, the **rarity color** says
- * how good it is. Rarity owns the plate and the glow, because that is what a
+ * how good it is. Rarity owns the frame and the glow, because that is what a
  * player scans a list for; the material keeps the body.
  *
- * `common` used to be the exception -- it took the rarity gray for its body as
- * well, so the cheapest gear looked like what it was whatever it was made of.
- * The plate says that now, and says it louder than a gray body ever did, so the
- * body is its material again: gray-on-gray was the one pairing the ink outline
- * could keep legible and could not keep interesting.
+ * `common` is the exception -- it takes the rarity gray for its body too, so the
+ * cheapest gear looks like what it is no matter what it is made of.
  */
 export function itemIcon({ slot, family, rarity, palette, size = 40 }: IconOptions): string {
   const treatment = RARITY_TREATMENT[rarity]
@@ -240,7 +238,9 @@ export function itemIcon({ slot, family, rarity, palette, size = 40 }: IconOptio
   let fill: string
   let defs = ''
 
-  if (!treatment.glow) {
+  if (rarity === 'common') {
+    fill = treatment.fill
+  } else if (!treatment.glow) {
     fill = accent
   } else {
     // Epic and up: gradient body plus a border glow, §13.1.
@@ -258,10 +258,7 @@ export function itemIcon({ slot, family, rarity, palette, size = 40 }: IconOptio
     fill = `url(#${id})`
   }
 
-  // §13.1 -- the one ink everything on the plate is cut in. It used to be a
-  // darkened copy of the body's own color, which was invisible the moment the
-  // plate arrived: a dark violet outline on a violet plate is a violet plate.
-  const edge = LINE
+  const edge = shade(rarity === 'common' ? treatment.fill : accent, -0.42)
   const frame = hexFrame(treatment.color, treatment.ornate)
   // A sword is the `weapon` slot's own shape, so only the other two families
   // displace it -- and a weapon with no family recorded still draws as one.
@@ -308,11 +305,7 @@ export function materialIcon(mat: Material, size = 32): string {
 
   const ink: Ink = {
     fill: accent,
-    // §13.1 -- cut in the panel's own ink rather than in a darkened copy of the
-    // accent, because the specimen now sits ON the rarity plate: a dark green
-    // outline on a green plate says nothing. One ink for every specimen is also
-    // what makes a shelf of them read as one set.
-    dark: LINE,
+    dark: shade(accent, -0.42),
     light: shade(accent, 0.26),
   }
 

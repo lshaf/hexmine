@@ -1477,7 +1477,7 @@ to be legible.
 | **the pair** | solid `attack` or `defense` (§9.5.4), simply added | +1–2 · +1–3 · +2–4 · +3–6 · +4–8 |
 | **`durability`** | points on this copy's own ceiling (§8.2) | 3–5% · 4–7% · 5–9% · 7–12% · 9–15% **of its own max** |
 | **`cooldown`** | whole rounds off **every** skill the weapon's family carries (§9.5.9) | −1 · −1 · −1 · −2 · −2 |
-| **`haul`** | a share of what comes out of a hex | +10% · +15% · +20% · +25% · +30% — **on gloves** +5% · +10% · +15% · +20% · +20% |
+| **`haul`** | a share of what the work pays — a hex, or a pack | +10% · +15% · +20% · +25% · +30% — **on gloves** +5% · +10% · +15% · +20% · +20% |
 | **`travel`** | a share off the road clock | +10% · +15% · +20% · +25% · +30% |
 
 **`haul` and `travel` are the only percentages left, and the tier IS the step.**
@@ -1535,7 +1535,7 @@ One rule, and it is §8's usual one: **what is the piece FOR.**
 | Piece | May roll |
 |---|---|
 | **Gathering tool** | `attack` · `durability` · `haul` |
-| **Weapon** | `attack` · `defense` · `durability` · `cooldown` |
+| **Weapon** | `attack` · `defense` · `durability` · `haul` · `cooldown` |
 | **Armor · gloves** | `attack` · `defense` · `durability` · `haul` |
 | **Boots** | the same, plus `travel` |
 
@@ -1552,11 +1552,34 @@ rule 5 keeps combat off a tool entirely — so a second name for the one number 
 a thing to decode rather than a distinction being made. The distinction is a
 rule about what the number *means*, and rules live here.
 
-**A weapon rolls no work bonus.** §8 rule 5 read the other way: it is the one
-slot in the game that never works, which is exactly how a sword once came off
-the bench carrying *+4% hunting yield*. And it is the **only** slot that
-shortens a cooldown, because the family in it is what decides which three
-skills you carry at all (§9.5.9).
+**Everything hauls, and the slot decides WHAT it hauls.** A tool's haul is its
+own line's (§7.3); a **weapon's haul is the fight's** — more comes off the pack
+(§9.5.8); worn gear is in both, which is §9.5.4's *one set with two axes*. §8
+rule 5 is what makes that safe rather than what forbids it: the rule was never
+"combat gear has no work", it is that combat gear may not stand in for a
+gathering tool. A sword is worth nothing down a mine and an axe is worth nothing
+in a fight — the same sentence pointed both ways, and both directions are
+enforced where the sum is taken.
+
+*(It was weapon-excluded on the first reading of that rule, which is how a sword
+ended up the one piece of equipment with nothing to gain from being lucky. The
+mistake worth remembering is that a fight IS work: it has a haul, and §9.5.8
+had been describing it for a while.)*
+
+**What a fight's haul scales is what came off the body**, and nothing else. Not
+the gold — §3.2's faucet is its own thing and `goldFind` already owns it — and
+not the looted gear, because §2 stops loot at rare whatever anybody is wearing.
+Spoil rows are one to three units, so the share is applied as a **seeded chance
+on the fraction** rather than by rounding: rounding a 30% bonus would pay
+nothing at all on the commonest row, and a bonus that is invisible two thirds of
+the time is a bonus nobody believes.
+
+**On screen it says which haul it is.** A weapon's line reads *+20% monster
+drops* rather than *+20% haul*, because "haul" on a sword leaves a player asking
+haul of what, in the one slot §8 rule 5 keeps out of every mine.
+
+**The weapon is still the only slot that shortens a cooldown**, because the
+family in it is what decides which three skills you carry at all (§9.5.9).
 
 **Only boots walk.** A coat does not get down the road faster for being a coat.
 
@@ -3394,30 +3417,29 @@ wrapper the contract asks for.
 | Axis | Encoding |
 |---|---|
 | Equipment slot | One base silhouette (axe, pickaxe, bow, hammer, sickle, armor, boots, gloves, weapon) |
-| Rarity | Six colors: gray → green → blue → violet → gold → ember. Owns the hex **plate** and the glow; ornamentation starts at rare. |
+| Rarity | Six colors: gray → green → blue → violet → gold → ember. Owns the hex frame and the glow; ornamentation starts at rare. |
 | Material | Accent stays on the body, so "what it is made of" and "how good it is" never compete for the same color |
 
-**The hexagon is FILLED with the rarity color, not outlined in it.** It was a
-hairline round nothing, which made rarity the thinnest mark on a screen full of
-them: at 32px a gray ring and a green ring are the same ring until you look, and
-at the 15px a recipe's inputs are drawn at, they were no ring at all. Filled, the
-rung is the loudest thing about an icon and is read across a whole list without
-reading anything — which is what rarity is *for*. The stroke stays, the same
-color, so the plate keeps a crisp edge rather than an antialiased one; it is not
-a second mark.
+**The frame is BOLD, and the weight is the point.** A hairline made rarity the
+thinnest mark on a screen full of them: at 32px a gray ring and a green ring
+were the same ring until you looked, and at the 15px a recipe's inputs are drawn
+at, they were no ring at all — which is backwards for the one thing a list is
+scanned for. At weight 3 the rung is read across a whole list without reading
+anything: the bag comb says which strap holds the epic, the gear rack says the
+rung of all nine at once, and an input row says which of five ingredients are
+the rare-grade ones. The radius comes in by half the stroke, because a stroke is
+centered on its path and at this weight the overhang is the difference between a
+hexagon and a clipped one.
 
-**Everything drawn ON the plate is cut in one ink** — §13.3's `line`. That is
-the rule the fill forces: an outline in a darkened copy of the body's own color
-was invisible the moment the plate arrived (a dark violet edge on a violet plate
-is a violet plate), and ornament in the rarity color would be the plate's own
-color on the plate, which is nothing at all. One ink is also what makes a shelf
-of specimens read as one set, and what turns the icon into a **stamped tile**
-rather than a shape sitting on a colored square.
+**Outlined, never filled.** A solid plate was tried and carried the rung even
+harder — and cost too much for it. It swallowed every mark drawn on it, so the
+ornament and the specimen's own cut edge both had to be re-inked in one flat
+color, and the icon stopped being a thing on a dark ground and became a colored
+sticker. The ring says the same thing and leaves the artwork alone.
 
-**A common piece keeps its material.** It used to take the rarity gray for its
-body as well, so the cheapest gear looked like what it was whatever it was made
-of. The plate says that now and says it louder, and gray-on-gray was the one
-pairing the ink could keep legible and could not keep interesting.
+*(The ink of a specimen is therefore its own: a darkened copy of the body's
+accent, which is what reads against `inkPanel`. That is only true because there
+is no plate — under one it was invisible, which is how the plate was found out.)*
 
 ### 13.2 Map rendering (critical implementation notes)
 

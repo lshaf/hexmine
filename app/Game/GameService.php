@@ -2406,8 +2406,13 @@ class GameService
             // §4 -- the hex's own junk rides along, because the fight happened
             // on ground rather than in the abstract. Passed rather than looked
             // up in Drops: this method already holds the tile.
+            // §8.0.1 -- and the weapon's own `haul` line, which is the fight's
+            // haul the way a tool's is its line's. No line is named, so the
+            // sum is the weapon and the worn set and no tool at all.
+            $spoilHaul = Formulas::optionGain($this->itemRows($character), Catalog::OPTION_HAUL);
+
             foreach (
-                Drops::battleSpoils($monster, $seed, WorldGen::biomeOf($col, $row)) as $material => $quantity
+                Drops::battleSpoils($monster, $seed, WorldGen::biomeOf($col, $row), $spoilHaul) as $material => $quantity
             ) {
                 $granted = $this->addMaterial($character, $material, $quantity);
                 if ($granted > 0) {

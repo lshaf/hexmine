@@ -124,9 +124,13 @@ export function optionGain(
     const def = ITEM_BY_KEY[owned.key]
     if (!def) continue
 
-    // §8 rule 1 -- a tool pays out on its own line and on no other.
+    // §8 rule 5, both directions, and this is where "which haul" is decided.
+    // A line is being worked: the line's own tool counts, the other four do
+    // not, and the weapon counts for nothing -- a sword is worth nothing down a
+    // mine. With no line the verb is a fight, and it is the other way round.
     const toolLine = def.slot ? skillForSlot(def.slot) : null
     if (toolLine !== null && toolLine !== line) continue
+    if (def.slot === 'weapon' && line !== null) continue
 
     for (const option of owned.options ?? []) {
       if (option.stat === stat) values.push(option.value ?? 0)
@@ -523,7 +527,7 @@ export function statLine(
  * to be confused with (§8 rule 5 keeps combat off a tool entirely), and a
  * second word for the one number is what made it hard to read.
  */
-export function optionStatLine(option: ItemOption): string {
+export function optionStatLine(option: ItemOption, def?: ItemDef): string {
   // §8.2 -- the one line with no number: owning it IS the effect.
   if (option.kind === 'indestructible') return 'unbreakable'
 
@@ -535,7 +539,14 @@ export function optionStatLine(option: ItemOption): string {
   // §8.0.1 -- a share of the work, and the only rolled line that is a
   // percentage at all. It is not a StatKey and meets no ceiling (§8.1).
   if (option.kind === 'gain') {
-    return `${formatPercent(option.value ?? 0)} ${GAIN_LABEL[option.stat] ?? option.stat}`
+    // §9.5.8 -- "haul" on a sword would leave a player asking haul of WHAT, in
+    // the one slot §8 rule 5 keeps out of every mine. It names the fight.
+    const words =
+      def?.slot === 'weapon'
+        ? WEAPON_GAIN_LABEL[option.stat] ?? GAIN_LABEL[option.stat] ?? option.stat
+        : GAIN_LABEL[option.stat] ?? option.stat
+
+    return `${formatPercent(option.value ?? 0)} ${words}`
   }
 
   return `+${option.value} ${FLAT_LABEL[option.stat] ?? option.stat}`
@@ -571,6 +582,11 @@ const FLAT_LABEL: Partial<Record<string, string>> = {
 const GAIN_LABEL: Partial<Record<string, string>> = {
   haul: 'haul',
   travel: 'travel speed',
+}
+
+/** §9.5.8 -- on a weapon the same line is the FIGHT's haul, so it says which. */
+const WEAPON_GAIN_LABEL: Partial<Record<string, string>> = {
+  haul: 'monster drops',
 }
 
 export interface StatChip {

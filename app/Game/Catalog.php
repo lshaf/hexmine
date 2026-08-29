@@ -241,9 +241,13 @@ final class Catalog
      *   off you.
      * - **`durability`** on everything, because whatever a piece is for it is a
      *   thing that wears out (§8.2).
-     * - **`haul`** on anything that goes down a mine, which is every piece
-     *   except the weapon: §8 rule 5 keeps work off the one slot that never
-     *   works, and that is the whole of the exception.
+     * - **`haul`** on everything, and §8 rule 5 decides what it means rather
+     *   than whether it is allowed. A tool's haul is ITS LINE's haul; a
+     *   weapon's haul is THE FIGHT's -- more comes off the pack (§9.5.8). The
+     *   rule was never "combat gear has no work", it is that combat gear may
+     *   not stand in for a gathering tool, and neither of these does: a sword
+     *   is worth nothing down a mine and an axe is worth nothing in a fight,
+     *   which is the same sentence pointed both ways.
      * - **`travel`** on boots and nowhere else. A coat does not walk faster.
      * - **`cooldown`** on the weapon and nowhere else. The family in that slot
      *   is what decides which three skills you carry (§9.5.9), so it is the
@@ -323,11 +327,10 @@ final class Catalog
 
         $pool[] = $line(self::OPTION_DURABILITY, 'durability');
 
-        // §8 rule 5 -- the weapon is the one slot that never works, so it is
-        // the one slot a work bonus may not land on.
-        if ($slot !== 'weapon') {
-            $pool[] = $line(self::OPTION_HAUL, 'gain');
-        }
+        // Everything hauls. What it hauls is decided by the slot: a tool's is
+        // its line's (§7.3), a weapon's is the fight's (§9.5.8), and worn gear
+        // is in both.
+        $pool[] = $line(self::OPTION_HAUL, 'gain');
 
         if ($slot === 'boots') {
             $pool[] = $line(self::OPTION_TRAVEL, 'gain');
