@@ -439,33 +439,33 @@ export const skillForSlot = (slot: EquipSlot): SkillKey | null =>
  * one line and nothing else (§8 rule 1). A weapon is combat only and never
  * gathers (§8 rule 5) -- it used to draw from the worn pool, which is how a
  * sword came off the bench carrying "+4% hunting yield". Worn gear genuinely
- * does both: §9.5.4 makes armor "one set with two axes, not a second
- * wardrobe", so it is the one pool that reaches every stat there is.
+ * does both, with two exceptions: `yield` never comes out of a worn piece
+ * unpointed (it belongs to the work, and unpointed it is five bonuses in one
+ * garment), and `processingSpeed` is in no rolled pool at all (it belongs to a
+ * building, not to a body). Every pool ends on `durability`, because every
+ * piece of equipment wears out.
  *
  * Mirrors `Catalog::optionRollsFor()`. The client needs it because the almanac
  * is where a piece is read before it is owned, and what it *may* roll is part
  * of what it is.
  */
-export type OptionStat = StatKey | 'attack'
+export type OptionStat = StatKey | 'attack' | 'durability'
 
 export interface OptionRoll {
   stat: OptionStat
   scope: SkillKey | null
-  kind: 'percent' | 'flat'
+  kind: 'percent' | 'flat' | 'durability'
 }
 
 const OPTION_STATS_TOOL: OptionStat[] = ['yield']
 const OPTION_STATS_WEAPON: OptionStat[] = ['power', 'defense']
-const OPTION_STATS_WORN: OptionStat[] = [
-  'yield',
-  'travelSpeed',
-  'processingSpeed',
-  'power',
-  'defense',
-]
+const OPTION_STATS_WORN: OptionStat[] = ['travelSpeed', 'power', 'defense']
 const OPTION_SCOPED_STATS: OptionStat[] = ['yield']
 const OPTION_FLAT_TOOL: OptionStat[] = ['attack']
 const OPTION_FLAT_WORN: OptionStat[] = ['attack', 'defense']
+
+/** The line every pool ends on: a piece of equipment is a thing that wears out. */
+const OPTION_WEAR: OptionRoll[] = [{ stat: 'durability', scope: null, kind: 'durability' }]
 
 /**
  * §9.5.4 -- a focus keeps nothing off you, of either kind. "A focus that also
@@ -482,7 +482,7 @@ export function optionRollsFor(def: ItemDef): OptionRoll[] {
     stats.map((stat) => ({ stat, scope: null, kind }))
 
   if (skillForSlot(def.slot) !== null) {
-    return [...lines(OPTION_STATS_TOOL, 'percent'), ...lines(OPTION_FLAT_TOOL, 'flat')]
+    return [...lines(OPTION_STATS_TOOL, 'percent'), ...lines(OPTION_FLAT_TOOL, 'flat'), ...OPTION_WEAR]
   }
 
   if (def.slot === 'weapon') {
@@ -491,9 +491,12 @@ export function optionRollsFor(def: ItemDef): OptionRoll[] {
       ...lines(OPTION_FLAT_WORN, 'flat'),
     ]
 
-    return def.family && OPTION_FAMILY_NO_DEFENSE.includes(def.family)
-      ? pool.filter((entry) => entry.stat !== 'defense')
-      : pool
+    return [
+      ...(def.family && OPTION_FAMILY_NO_DEFENSE.includes(def.family)
+        ? pool.filter((entry) => entry.stat !== 'defense')
+        : pool),
+      ...OPTION_WEAR,
+    ]
   }
 
   const pool = lines(OPTION_STATS_WORN, 'percent')
@@ -503,7 +506,7 @@ export function optionRollsFor(def: ItemDef): OptionRoll[] {
     }
   }
 
-  return [...pool, ...lines(OPTION_FLAT_WORN, 'flat')]
+  return [...pool, ...lines(OPTION_FLAT_WORN, 'flat'), ...OPTION_WEAR]
 }
 
 /** The slot a skill line draws its tool from. */

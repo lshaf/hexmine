@@ -237,12 +237,17 @@ class SeedDemoCharacter extends Command
         foreach (self::ITEMS as $index => $item) {
             $def = Catalog::item($item['key']);
 
+            $options = Formulas::rollOptions($def, 31 + $index);
+
             CharacterItem::create([
                 'character_id' => $character->id,
                 'item_key' => $item['key'],
                 'durability' => $item['durability'],
+                // §8.2 -- a rolled durability line moves the object's ceiling,
+                // so it has to be stored with it.
+                'max_durability' => Formulas::maxDurabilityFor($def, $options),
                 'equipped' => $item['equipped'],
-                'options' => Formulas::rollOptions($def, 31 + $index),
+                'options' => $options,
             ]);
         }
 

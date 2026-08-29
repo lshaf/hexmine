@@ -58,6 +58,10 @@ export function aggregateStat(
     // §8 -- a tool has no percentage at all; its base is a solid attack.
     if (def.stat === stat && def.value !== undefined) contributions.push({ def, value: def.value })
     for (const option of owned.options ?? []) {
+      // §8.0.1 -- only a PERCENTAGE line climbs toward the ceiling. `defense`
+      // is a StatKey AND half the solid pair (§9.5.4), so without this a rolled
+      // "+3 defense" was read here as +300% and pegged the aggregate at the cap.
+      if ((option.kind ?? 'percent') !== 'percent') continue
       if (option.stat !== stat) continue
       // §8.0.1 -- a scoped line pays in full on the line it names and nothing
       // anywhere else, and no line being worked is one of those elsewheres.
@@ -464,11 +468,17 @@ export function statLine(
 /**
  * §8.0.1 -- a rolled line, which may name a line of its own or take its item's.
  *
- * Two kinds, and they are printed differently because they ARE different: a
- * percentage climbs toward §8.1's ceiling, and a solid number just adds. On a
- * gathering tool a flat `attack` is mining attack (§7.3), so it says so.
+ * Three kinds, and they are printed differently because they ARE different: a
+ * percentage climbs toward §8.1's ceiling, a solid number just adds, and a
+ * durability line is points on the object's own ceiling (§8.2) rather than a
+ * stat at all. On a gathering tool a flat `attack` is mining attack (§7.3), so
+ * it says so.
  */
 export function optionStatLine(option: ItemOption, def: ItemDef): string {
+  // §8.2 -- points on this piece's own ceiling, said in the unit the bar is
+  // read in. Not a stat, so it never carries a line and never a percentage.
+  if (option.kind === 'durability') return `+${option.value} durability`
+
   if (option.kind === 'flat') {
     const line = def.slot ? skillForSlot(def.slot) : null
     const what = line ? 'mining attack' : FLAT_LABEL[option.stat] ?? option.stat
@@ -477,7 +487,7 @@ export function optionStatLine(option: ItemOption, def: ItemDef): string {
   }
 
   return statLine(
-    option.stat,
+    option.stat as StatKey,
     option.value,
     option.scope ?? (def.slot ? skillForSlot(def.slot) : null),
   )
@@ -589,7 +599,7 @@ function ownPercent(item: OwnedItem, def: ItemDef, stat: StatKey): number {
   return (
     (def.stat === stat ? def.value ?? 0 : 0) +
     (item.options ?? [])
-      .filter((o) => o.kind !== 'flat' && o.stat === stat)
+      .filter((o) => (o.kind ?? 'percent') === 'percent' && o.stat === stat)
       .reduce((sum, o) => sum + o.value, 0)
   )
 }
@@ -601,7 +611,9 @@ function percentStats(pieces: Array<{ item: OwnedItem; def: ItemDef }>): StatKey
   for (const { item, def } of pieces) {
     if (def.stat && !PAIR_STATS.has(def.stat)) stats.add(def.stat)
     for (const option of item.options ?? []) {
-      if (option.kind !== 'flat' && !PAIR_STATS.has(option.stat)) stats.add(option.stat)
+      if ((option.kind ?? 'percent') === 'percent' && !PAIR_STATS.has(option.stat as StatKey)) {
+        stats.add(option.stat as StatKey)
+      }
     }
   }
 

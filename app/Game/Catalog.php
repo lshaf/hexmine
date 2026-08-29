@@ -239,26 +239,40 @@ final class Catalog
      *   slot in the game that does no work at all, paying out on work.
      * - **worn gear** genuinely does both. §9.5.4 makes armor "one set with two
      *   axes, not a second wardrobe" -- a coat is on your back down a mine, on
-     *   the road, at a bench and in a fight -- so it is the one pool that
-     *   reaches every stat there is.
+     *   the road and in a fight -- so it reaches the road, the pair, and the
+     *   work, with two named exceptions below.
+     *
+     * **`yield` never comes out of a worn piece unpointed.** It is the one
+     * percentage a mine has left (§7.3) and it belongs to the WORK, so a flat
+     * "+2% yield" on a coat is five bonuses in one garment for a stat the thing
+     * in your hands is supposed to own. Scoped it reads as what it actually is
+     * -- a coat cut for the quarry -- and that is the honest answer to *is this
+     * specific or global*: on worn gear it is always specific. The tool keeps
+     * the unpointed one, because its slot already names the line.
+     *
+     * **`processingSpeed` is not in any rolled pool.** It is the one stat that
+     * belongs to a BUILDING rather than to a body: what moves a bench clock is
+     * the settlement's tier, standing there (§6.2), the line's own tree, and
+     * the gloves that are advertised for it. A coat or a boot rolling "+3%
+     * processing speed" says nothing about a coat or a boot.
      */
     public const OPTION_STATS_TOOL = ['yield'];
 
     public const OPTION_STATS_WEAPON = ['power', 'defense'];
 
-    public const OPTION_STATS_WORN = ['yield', 'travelSpeed', 'processingSpeed', 'power', 'defense'];
+    public const OPTION_STATS_WORN = ['travelSpeed', 'power', 'defense'];
 
     /**
-     * §8.0.1 -- the two stats a worn line may be pointed at ONE gathering line,
-     * so armor rolls "+4% mining yield" rather than another flat "+2% yield".
+     * §8.0.1 -- the stat a worn line is pointed at ONE gathering line, which on
+     * worn gear is the ONLY way it comes out at all (see above).
      *
      * A tool needs none of this: it is already line-locked by its slot (§8 rule
      * 1), so its yield is its line's yield and a scope would only be a second
      * place for the two to disagree. Worn gear works every line at once, which
      * is exactly why a narrower line is worth more there -- see
-     * Balance::OPTION_SCOPED_MIN. Scoping only reaches the two mine stats:
-     * `travelSpeed` has no line to belong to, and processing is scoped by the
-     * recipe already.
+     * Balance::OPTION_SCOPED_MULTIPLIER. Scoping reaches `yield` and nothing
+     * else: `travelSpeed` has no line to belong to, the pair has no line to
+     * belong to either, and processing is scoped by the recipe already.
      */
     public const OPTION_SCOPED_STATS = ['yield'];
 
@@ -278,6 +292,20 @@ final class Catalog
     public const OPTION_FLAT_TOOL = ['attack'];
 
     public const OPTION_FLAT_WORN = ['attack', 'defense'];
+
+    /**
+     * §8.0.1 -- the one line every piece of equipment may roll, whatever it is
+     * for, because every piece of equipment wears out (§8.2).
+     *
+     * A third kind rather than a percentage or a solid stat: it is rolled as a
+     * share of the piece's own max and stored as points (Balance::
+     * OPTION_DURABILITY_VALUE), it is not a StatKey, and it therefore never
+     * enters the §8.1 aggregate or meets STAT_CEILING. What it moves is the
+     * CEILING on the object, the same thing a Smith's `craftDurability` node
+     * moves (§8.2) -- so it pays out twice and permanently: the piece holds
+     * more, and a full mend still costs one recipe's worth of materials.
+     */
+    public const OPTION_DURABILITY = 'durability';
 
     /**
      * §9.5.4 -- a focus keeps nothing off you, of either kind.
@@ -315,10 +343,17 @@ final class Catalog
             $stats,
         );
 
+        // Every piece of equipment wears out, so every pool ends on the same
+        // line. It is appended rather than written into each list because it is
+        // not a fact about what the piece is FOR -- it is a fact about it being
+        // a piece.
+        $wear = [['stat' => self::OPTION_DURABILITY, 'scope' => null, 'kind' => 'durability']];
+
         if (self::skillForSlot($slot) !== null) {
             return array_merge(
                 $lines(self::OPTION_STATS_TOOL, 'percent'),
                 $lines(self::OPTION_FLAT_TOOL, 'flat'),
+                $wear,
             );
         }
 
@@ -335,7 +370,7 @@ final class Catalog
                 ));
             }
 
-            return $pool;
+            return array_merge($pool, $wear);
         }
 
         $pool = $lines(self::OPTION_STATS_WORN, 'percent');
@@ -345,7 +380,7 @@ final class Catalog
             }
         }
 
-        return array_merge($pool, $lines(self::OPTION_FLAT_WORN, 'flat'));
+        return array_merge($pool, $lines(self::OPTION_FLAT_WORN, 'flat'), $wear);
     }
 
     /**

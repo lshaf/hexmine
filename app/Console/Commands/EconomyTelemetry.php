@@ -13,7 +13,6 @@ use App\Models\CharacterItem;
 use App\Models\CharacterMaterial;
 use App\Models\GameJob;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\DB;
 
 /**
  * §16 -- what is actually in the world, counted.

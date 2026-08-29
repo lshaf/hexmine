@@ -1454,24 +1454,43 @@ something a shelf cannot have.)*
 | **Which tier** | each line is drawn from any tier **at or below** the item's own rarity, so a legendary regularly carries a common-grade line |
 | **What it is worth** | inside that tier's band |
 
-| Option tier | Percentage | Scoped | **Solid** |
-|---|---|---|---|
-| common | +1–2% | +2–4% | +1–2 |
-| uncommon | +1–3% | +2–6% | +1–3 |
-| rare | +2–4% | +4–8% | +2–4 |
-| epic | +3–5% | +6–10% | +3–6 |
-| legendary | +4–6% | +8–12% | +4–8 |
+| Option tier | Percentage | Scoped | **Solid** | **Durability** |
+|---|---|---|---|---|
+| common | +1–2% | +2–4% | +1–2 | +3–5% |
+| uncommon | +1–3% | +2–6% | +1–3 | +4–7% |
+| rare | +2–4% | +4–8% | +2–4 | +5–9% |
+| epic | +3–5% | +6–10% | +3–6 | +7–12% |
+| legendary | +4–6% | +8–12% | +4–8 | +9–15% |
 
-**A line may be a percentage or a solid number, and both are real options.**
-`attack` and `defense` are not percentages (§9.5.4) — a fight is an exchange and
-a ±15% swing cannot decide one — so a rolled line that lands on them is a solid
-number that simply **adds**. It never enters the percentage aggregate, never
-meets §8.1's ceiling, and never carries a scope: a flat pair has no gathering
-line to belong to.
+**Three kinds of line, and the `kind` on the row is what tells them apart.**
+Without it *+2 defense* and *+2% defense* would be the same row saying two
+different things, since the flat pair and two of the `StatKey`s share their
+names.
 
-The line carries a `kind` for exactly that reason. Without it *+2 defense* and
-*+2% defense* would be the same row saying two different things, since the flat
-pair and two of the `StatKey`s share their names.
+**A solid line simply adds.** `attack` and `defense` are not percentages
+(§9.5.4) — a fight is an exchange and a ±15% swing cannot decide one — so a
+rolled line that lands on them is a solid number. It never enters the percentage
+aggregate, never meets §8.1's ceiling, and never carries a scope: a flat pair
+has no gathering line to belong to.
+
+**A durability line moves the OBJECT, not a stat** (§8.2). Every pool ends on it
+and every pool ends on it for the same reason: whatever a piece is for, a piece
+of equipment is a thing that wears out. It is not a `StatKey`, so it never
+touches the aggregate or the ceiling either — what it raises is this copy's own
+max, the same thing a Smith's `craftDurability` node raises, so it pays out
+twice and permanently: the piece holds more, and a full mend still costs one
+recipe's worth of materials.
+
+It is **rolled as a share and stored as points**, and both halves are
+deliberate. The share is what keeps the line worth the same on a 40-point stone
+axe and a 240-point coat — a flat band would be a fifth of the axe and noise on
+the coat. The points are what a player actually reads: a bar says 130/130, so
+*+9 durability* lands where *+7%* is arithmetic.
+
+The band is wider than the percentage one because it is not climbing toward
+anything. What bounds it instead is §11.1 — the repair bill is the largest
+continuous sink in the game, and a line that thinned it much further would be
+switching that sink off by luck.
 
 **On a gathering tool a solid `attack` is MINING attack** (§7.3): it bites
 deeper into a hex and is worth nothing at all in a fight, exactly as the tool's
@@ -1489,22 +1508,30 @@ an unlucky legendary really can come out under a lucky rare.
   above may look generous and are not: `STAT_CEILING` is still +15%, and every
   line on every piece is climbing toward that one number.
 
-**A worn line may name one gathering line, and is worth more for it.** Armor,
-boots and gloves work all five lines at once, so a flat *+2% yield* on them is
-five bonuses in a coat. A roll may instead come out **scoped** — *+4% mining
-yield*, *+3% off woodcutting time* — worth **twice** as much on the line it names
-and **nothing on the other four**. Same ceiling, same clamp, same aggregate:
-what a narrower line buys is a steeper climb to +15%, never a higher one.
+**A worn `yield` line ALWAYS names one gathering line.** It is the only stat
+that scopes, and on worn gear it is the only way it comes out at all — *+4%
+mining yield*, worth **twice** what an unpointed line of that tier is worth and
+**nothing on the other four**. Same ceiling, same clamp, same aggregate: what a
+narrower line buys is a steeper climb to +15%, never a higher one.
 
-The gap between the two is the whole rule. Without it a scoped roll would
-be strictly the worse outcome and the pool would read as a bad-luck table; with
-it, *+2% everywhere* against *+4% mining* is a real choice for a prospector who
-knows which line they actually work. It is the same argument §8.5 makes for
-scoping potions — forty-five flat drafts would be a power ladder you can drink.
+*Is it specific or global?* — **specific, always**, and that is the answer to
+the question the old pool could not give. `yield` is the one percentage a mine
+has left (§7.3) and it belongs to the **work**, so an unpointed *+2% yield* on a
+coat was five bonuses in one garment for the stat the thing in your hands is
+supposed to own. Pointed, it reads as what it actually is: a coat cut for the
+quarry. **The tool keeps the unpointed one**, because its slot already names the
+line — an axe's yield is woodcutting's yield and storing that twice would only
+be somewhere for the two to disagree.
 
-**Only the mine stat scopes**, `yield`: `travelSpeed` has no line to belong to,
-and processing is scoped by the recipe already. It used to be two, and the
-second was `tripReduction` — which no longer exists (§7.3).
+`travelSpeed` has no line to belong to, and processing is scoped by the recipe
+already, so neither of them scopes. It used to be two, and the second was
+`tripReduction` — which no longer exists (§7.3).
+
+**`processingSpeed` is in no rolled pool at all.** It is the one stat that
+belongs to a **building** rather than to a body: what moves a bench clock is the
+settlement's tier, standing there (§6.2), the line's own tree, and the gloves
+that are advertised for it. A coat or a boot rolling *+3% processing speed* says
+nothing about a coat or a boot.
 
 **Tools never carry a scope.** An axe is line-locked by its slot (§8 rule 1), so
 its yield is already woodcutting's yield — storing that twice would only be
@@ -1519,7 +1546,10 @@ difference between them:
 |---|---|
 | **Gathering tool** | `yield`, and a solid `attack` that is §7.3's mining attack |
 | **Weapon** | `power`, `defense`, and the solid pair. Nothing else |
-| **Worn** | every stat there is, scoped or not, plus the solid pair |
+| **Worn** | the road, the pair, and `yield` **pointed at one line** |
+
+…and every one of the three ends on `durability`, which is the one line that is
+not about what the piece is for at all.
 
 The weapon slot used to fall through to the worn pool, and that is how a sword
 came off the bench carrying *+4% hunting yield* — a work bonus on the one slot
@@ -1527,10 +1557,12 @@ in the game that never works (§8 rule 5). The other half of the same mistake wa
 quieter and just as wrong: a battle cuirass whose whole stat is `defense` could
 never roll one.
 
-**Worn gear is the one pool that reaches everything**, and that is §9.5.4 rather
-than laziness: armor is *one set with two axes, not a second wardrobe*. A coat
-is on your back down a mine, on the road, at a bench and in a fight, so there is
-no stat it has no business being good at.
+**Worn gear is the widest pool, and it is no longer everything.** §9.5.4 makes
+armor *one set with two axes, not a second wardrobe* — a coat is on your back
+down a mine, on the road and in a fight, so it reaches the road, the pair and
+the work. What it lost were the two stats that were never a coat's: an unpointed
+`yield`, which belongs to the tool, and `processingSpeed`, which belongs to the
+building. Both are argued above.
 
 **A focus rolls no guard, of either kind.** §9.5.4 says a focus has none at all
 — *a focus that also held a little of it would be the balanced one twice, and
@@ -1610,9 +1642,12 @@ the game, §11.1.)*
 - Repair costs refined + raid materials, scaled to rarity tier, and is only ever
   possible **above** zero. There is no resurrection.
 - **A piece carries its own ceiling, not its recipe's.** §7.4.3's
-  `craftDurability` raises the max of what a Smith makes, so two copies of one
-  recipe can differ — and everything that measures wear, prices a resale or
-  offers a mend reads the ceiling off the *object*.
+  `craftDurability` raises the max of what a Smith makes, and §8.0.1's rolled
+  `durability` line raises it again — so two copies of one recipe can differ,
+  and a looted piece can too. Everything that measures wear, prices a resale or
+  offers a mend reads the ceiling off the *object*, and so does a corpse: a
+  stolen row that came home at the catalog's max would be a different object
+  from the one that was taken.
 
   It used to write the bonus into the current fill and leave the ceiling at the
   recipe's, which made the node worth exactly one craft: the bar read past 100%,

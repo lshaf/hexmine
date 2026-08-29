@@ -141,6 +141,8 @@ function rollBrief(def: ItemDef): RollBrief | null {
   const high = EQUIPMENT.optionValue[tiers[tiers.length - 1]!][1]
   const flatLow = EQUIPMENT.optionFlatValue[tiers[0]!][0]
   const flatHigh = EQUIPMENT.optionFlatValue[tiers[tiers.length - 1]!][1]
+  const wearLow = EQUIPMENT.optionDurabilityValue[tiers[0]!][0]
+  const wearHigh = EQUIPMENT.optionDurabilityValue[tiers[tiers.length - 1]!][1]
   const pct = (v: number) => Math.round(v * 1000) / 10
 
   const pool = optionRollsFor(def)
@@ -155,21 +157,44 @@ function rollBrief(def: ItemDef): RollBrief | null {
       : null,
     // One name per stat: the five scoped copies of `yield` are the same line
     // pointed somewhere, and listing them would be the same word six times.
+    //
+    // §8.0.1 -- but a stat that ONLY ever comes out pointed has to say so, or
+    // the pip promises a bonus on all five lines that the pool cannot roll.
     percent: [
       ...new Set(
         pool
           .filter((entry) => entry.kind === 'percent')
-          .map((entry) => STAT_LABEL[entry.stat as keyof typeof STAT_LABEL]),
+          .map((entry) => {
+            const name = STAT_LABEL[entry.stat as keyof typeof STAT_LABEL]
+            const always = pool.every((o) => o.stat !== entry.stat || o.scope !== null)
+
+            return always ? `${name} · one line` : name
+          }),
       ),
     ],
-    flat: pool
-      .filter((entry) => entry.kind === 'flat')
-      .map((entry) => ({
-        // §7.3 -- a flat `attack` on a gathering tool is MINING attack, which
-        // is a different ladder wearing the same word (§8 rule 5).
-        label: entry.stat === 'attack' && line ? 'bite' : entry.stat === 'attack' ? 'atk' : 'def',
-        value: `+${flatLow}–${flatHigh}`,
-      })),
+    flat: [
+      ...pool
+        .filter((entry) => entry.kind === 'flat')
+        .map((entry) => ({
+          // §7.3 -- a flat `attack` on a gathering tool is MINING attack, which
+          // is a different ladder wearing the same word (§8 rule 5).
+          label: entry.stat === 'attack' && line ? 'bite' : entry.stat === 'attack' ? 'atk' : 'def',
+          value: `+${flatLow}–${flatHigh}`,
+        })),
+      // §8.2 -- quoted in points rather than as a share, because that is how it
+      // is rolled onto the piece and how the bar reads it back.
+      ...(pool.some((entry) => entry.kind === 'durability')
+        ? [
+            {
+              label: 'dur',
+              value: `+${Math.max(1, Math.round((def.maxDurability ?? 0) * wearLow))}–${Math.max(
+                1,
+                Math.round((def.maxDurability ?? 0) * wearHigh),
+              )}`,
+            },
+          ]
+        : []),
+    ],
     plainShelf: def.goldPrice !== undefined,
   }
 }

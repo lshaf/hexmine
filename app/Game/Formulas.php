@@ -72,11 +72,12 @@ final class Formulas
                     continue;
                 }
 
-                // §8.0.1 -- a flat line is a solid number, not a percentage.
-                // It is added by whoever reads the solid number; this is the
-                // aggregate with the falloff and the ceiling on it, and putting
-                // "+3 attack" through that would be nonsense twice over.
-                if (($option['kind'] ?? 'percent') === 'flat') {
+                // §8.0.1 -- only a PERCENTAGE line climbs toward the ceiling.
+                // A flat one is a solid number added by whoever reads the solid
+                // number, and a durability one moves the object's own ceiling
+                // (§8.2); putting either through the falloff and the clamp
+                // would be nonsense twice over.
+                if (($option['kind'] ?? 'percent') !== 'percent') {
                     continue;
                 }
 
@@ -196,10 +197,30 @@ final class Formulas
 
             $tier = $tiers[$index];
 
-            $flat = ($pick['kind'] ?? 'percent') === 'flat';
+            $kind = $pick['kind'] ?? 'percent';
             $valueSeed = Hash::hash2($seed, 920 + $i, Balance::mapSeed());
 
-            if ($flat) {
+            if ($kind === 'durability') {
+                // §8.0.1 -- rolled as a share of the piece's own max and stored
+                // as POINTS, because points are the unit durability is read in.
+                // The share is what keeps the line worth the same on a 40-point
+                // axe and a 240-point coat; storing the result is what makes
+                // "+9 durability" legible on the plate.
+                [$min, $max] = Balance::OPTION_DURABILITY_VALUE[$tier];
+                $base = (int) ($def['maxDurability'] ?? 0);
+                $steps = max(1, (int) round(($max - $min) * 1000));
+                $share = $min + Hash::randInt($valueSeed, 0, $steps) / 1000;
+
+                $out[] = [
+                    'stat' => Catalog::OPTION_DURABILITY,
+                    'value' => max(1, (int) round($base * $share)),
+                    'kind' => 'durability',
+                ];
+
+                continue;
+            }
+
+            if ($kind === 'flat') {
                 // §9.5.4 -- attack and defense are solid numbers, so the line
                 // is one too. No scope: a flat pair has no gathering line to
                 // belong to, and on a tool the slot already names it.
@@ -236,6 +257,33 @@ final class Formulas
         }
 
         return $out;
+    }
+
+    /**
+     * §8.2 -- the ceiling a NEW piece is born with, which is not the catalog's.
+     *
+     * Two things raise it and they stack: a Smith's `craftDurability` node
+     * (§7.4.3), and a rolled durability line (§8.0.1). Both move the CEILING
+     * rather than the fill, so a piece holds more for the whole of its life and
+     * a full mend still costs one recipe's worth of materials.
+     *
+     * Everything that creates an item comes through here, so a looted piece and
+     * a crafted one agree about what a rolled line is worth.
+     *
+     * @param  array<string,mixed>  $def
+     * @param  array<int,array<string,mixed>>  $options
+     */
+    public static function maxDurabilityFor(array $def, array $options, float $craftBonus = 0.0): int
+    {
+        $max = (int) round((int) ($def['maxDurability'] ?? 1) * (1 + $craftBonus));
+
+        foreach ($options as $option) {
+            if (($option['kind'] ?? null) === 'durability') {
+                $max += (int) $option['value'];
+            }
+        }
+
+        return max(1, $max);
     }
 
     /**

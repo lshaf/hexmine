@@ -412,7 +412,12 @@ export interface ActiveBuff {
  * of the same recipe are never the same object.
  */
 export interface ItemOption {
-  stat: StatKey
+  /**
+   * A `StatKey` on a percentage line; `attack` or `defense` on a solid one
+   * (§9.5.4); `durability` on a wear line, which is not a stat at all -- it is
+   * points on the object's own ceiling (§8.2).
+   */
+  stat: StatKey | 'attack' | 'durability'
   value: number
   /**
    * §8.0.1 -- the one gathering line this roll pays on, and absent when it pays
@@ -430,8 +435,11 @@ export interface ItemOption {
    * the same row saying two different things. A flat line never carries a
    * scope: it has no gathering line to belong to, and on a tool the slot
    * already names one.
+   *
+   * `durability` is the third: points added to this piece's own max (§8.2), so
+   * it never enters the §8.1 aggregate and never meets STAT_CEILING.
    */
-  kind?: 'percent' | 'flat'
+  kind?: 'percent' | 'flat' | 'durability'
 }
 
 /**

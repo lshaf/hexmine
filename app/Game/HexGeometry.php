@@ -14,7 +14,9 @@ namespace App\Game;
 final class HexGeometry
 {
     private const COL_STEP = 43.5;   // HEX_W * 0.75
+
     private const ROW_STEP = 34.0;   // HEX_H
+
     private const ODD_COL_OFFSET = 17.0;
 
     /** Hex distance in offset coords, via a cube-coordinate round trip. */

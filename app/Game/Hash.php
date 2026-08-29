@@ -46,9 +46,9 @@ final class Hash
      */
     public static function hash2(int $x, int $y, int $seed): int
     {
-        $h = ($seed ^ self::imul($x, 0x27d4eb2d) ^ self::imul($y, 0x165667b1)) & self::MASK;
-        $h = self::imul($h ^ ($h >> 15), 0x2c1b3c6d);
-        $h = self::imul($h ^ ($h >> 12), 0x297a2d39);
+        $h = ($seed ^ self::imul($x, 0x27D4EB2D) ^ self::imul($y, 0x165667B1)) & self::MASK;
+        $h = self::imul($h ^ ($h >> 15), 0x2C1B3C6D);
+        $h = self::imul($h ^ ($h >> 12), 0x297A2D39);
 
         return ($h ^ ($h >> 15)) & self::MASK;
     }

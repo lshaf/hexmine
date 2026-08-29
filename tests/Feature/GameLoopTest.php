@@ -2765,6 +2765,20 @@ final class GameLoopTest extends TestCase
 
                 $tiers = Formulas::optionTiersFor($def['rarity']);
 
+                // §8.0.1 -- a durability line is neither: it is points on the
+                // object's own ceiling (§8.2), read off its own table.
+                if (($option['kind'] ?? 'percent') === 'durability') {
+                    $this->assertSame('durability', $option['stat']);
+                    $this->assertIsInt($option['value']);
+                    $this->assertGreaterThanOrEqual(1, $option['value']);
+                    $this->assertLessThanOrEqual(
+                        (int) round($def['maxDurability'] * Balance::OPTION_DURABILITY_VALUE[end($tiers)][1]),
+                        $option['value'],
+                    );
+
+                    continue;
+                }
+
                 // §8.0.1 -- a line is either a percentage or a solid number,
                 // and the two are read off different tables.
                 if (($option['kind'] ?? 'percent') === 'flat') {
@@ -2853,6 +2867,10 @@ final class GameLoopTest extends TestCase
                 $tiers = Formulas::optionTiersFor($rarity);
 
                 foreach ($rolled as $option) {
+                    if (($option['kind'] ?? 'percent') === 'durability') {
+                        continue;
+                    }
+
                     $table = ($option['kind'] ?? 'percent') === 'flat'
                         ? Balance::OPTION_FLAT_VALUE
                         : Balance::OPTION_VALUE;
@@ -2908,6 +2926,9 @@ final class GameLoopTest extends TestCase
 
         for ($seed = 1; $seed <= 400; $seed++) {
             foreach (Formulas::rollOptions($def, $seed) as $option) {
+                if (($option['kind'] ?? 'percent') !== 'percent') {
+                    continue;
+                }
                 if ($option['value'] <= Balance::OPTION_VALUE['common'][1]) {
                     $low++;
                 }
@@ -2995,17 +3016,26 @@ final class GameLoopTest extends TestCase
     }
 
     /**
-     * §8.0.1 -- both kinds actually come out of the roller, and a flat one
-     * never carries a scope.
+     * §8.0.1 -- all three kinds actually come out of the roller, and neither
+     * of the two that are not percentages ever carries a scope.
      */
-    public function test_a_roll_produces_both_flat_and_percentage_lines(): void
+    public function test_a_roll_produces_all_three_kinds_of_line(): void
     {
         $def = Catalog::item('keepers_carapace');
         $flat = 0;
         $percent = 0;
+        $wear = 0;
 
         for ($seed = 1; $seed <= 300; $seed++) {
             foreach (Formulas::rollOptions($def, $seed) as $option) {
+                if (($option['kind'] ?? 'percent') === 'durability') {
+                    $wear++;
+                    $this->assertIsInt($option['value']);
+                    $this->assertArrayNotHasKey('scope', $option);
+
+                    continue;
+                }
+
                 if (($option['kind'] ?? 'percent') === 'flat') {
                     $flat++;
                     $this->assertContains($option['stat'], ['attack', 'defense']);
@@ -3022,6 +3052,43 @@ final class GameLoopTest extends TestCase
 
         $this->assertGreaterThan(0, $flat, 'no flat line ever rolled');
         $this->assertGreaterThan(0, $percent, 'no percentage line ever rolled');
+        $this->assertGreaterThan(0, $wear, 'no durability line ever rolled');
+    }
+
+    /**
+     * §8.0.1/§8.2 -- a durability line moves the OBJECT'S ceiling, not a stat.
+     *
+     * Both halves matter. It has to reach the ceiling rather than the fill, or
+     * it is worth exactly one craft -- the first mend would fill the piece to
+     * the catalog max and throw the extra away, which is the bug §8.2 already
+     * fixed once for `craftDurability`. And it must stay out of the §8.1
+     * aggregate: it is points, not a percentage, and it is not a StatKey.
+     */
+    public function test_a_durability_line_raises_the_object_ceiling_and_no_stat(): void
+    {
+        $def = Catalog::item('mythril_pickaxe');
+        $line = ['stat' => 'durability', 'value' => 12, 'kind' => 'durability'];
+
+        $this->assertSame((int) $def['maxDurability'], Formulas::maxDurabilityFor($def, []));
+        $this->assertSame((int) $def['maxDurability'] + 12, Formulas::maxDurabilityFor($def, [$line]));
+
+        // It stacks with a Smith's node rather than standing in for it.
+        $this->assertSame(
+            (int) round($def['maxDurability'] * 1.1) + 12,
+            Formulas::maxDurabilityFor($def, [$line], 0.1),
+        );
+
+        // And nothing reads it as a bonus: `yield` is what a pickaxe's other
+        // lines move, and a durability line moves none of it.
+        $items = [[
+            'key' => 'mythril_pickaxe',
+            'durability' => 10,
+            'equipped' => true,
+            'options' => [$line],
+        ]];
+
+        $this->assertSame(0.0, Formulas::aggregateStat($items, 'yield', 'mining'));
+        $this->assertSame(0.0, Formulas::aggregateStat($items, 'defense', 'mining'));
     }
 
     /**
@@ -3266,12 +3333,16 @@ final class GameLoopTest extends TestCase
             $pool = Catalog::optionRollsFor($def);
             $stats = array_column($pool, 'stat');
 
+            // §8.2 -- every piece of equipment wears out, so every pool ends on
+            // the same line whatever the piece is FOR.
+            $this->assertContains('durability', $stats, "{$key} cannot roll durability");
+
             if (Catalog::skillForSlot($slot) !== null) {
                 $checked['tool']++;
                 // A tool is line-locked by its slot, so the road and the bench
                 // are not its business and neither is a scope.
-                $this->assertSame(['yield', 'attack'], $stats, "{$key}");
-                $this->assertSame([null, null], array_column($pool, 'scope'), "{$key}");
+                $this->assertSame(['yield', 'attack', 'durability'], $stats, "{$key}");
+                $this->assertSame([null, null, null], array_column($pool, 'scope'), "{$key}");
 
                 continue;
             }
@@ -3292,11 +3363,32 @@ final class GameLoopTest extends TestCase
             }
 
             $checked['worn']++;
-            // §9.5.4 -- worn gear is one set with two axes, so it is the one
-            // pool that reaches every stat there is.
-            foreach ([...$work, 'power', 'defense', 'attack'] as $stat) {
+            // §9.5.4 -- worn gear is one set with two axes, so it reaches the
+            // road, the pair and the work.
+            foreach (['travelSpeed', 'yield', 'power', 'defense', 'attack'] as $stat) {
                 $this->assertContains($stat, $stats, "{$key} cannot roll {$stat}");
             }
+
+            // §8.0.1 -- but `yield` never comes out of a worn piece UNPOINTED.
+            // It belongs to the work, and unpointed it is five bonuses in one
+            // garment for the stat the thing in your hands is supposed to own.
+            foreach ($pool as $entry) {
+                if ($entry['stat'] === 'yield') {
+                    $this->assertNotNull($entry['scope'], "{$key} rolls yield at nothing in particular");
+                }
+            }
+
+            $this->assertSame(
+                Catalog::SKILLS,
+                array_values(array_filter(
+                    array_column($pool, 'scope'),
+                    static fn (?string $scope) => $scope !== null,
+                )),
+                "{$key} does not point yield at all five lines",
+            );
+
+            // §8.0.1 -- and processing belongs to a BUILDING, not to a body.
+            $this->assertNotContains('processingSpeed', $stats, "{$key} rolls a bench bonus");
         }
 
         $this->assertGreaterThan(0, $checked['tool']);
@@ -3344,8 +3436,18 @@ final class GameLoopTest extends TestCase
         foreach (Balance::OPTION_FLAT_VALUE as $tier => [$min, $max]) {
             $this->assertMatchesRegularExpression("/optionFlatValue: \{[^}]*{$tier}: \[{$min}, {$max}\],/s", $ts, "optionFlatValue.{$tier}");
         }
+        foreach (Balance::OPTION_DURABILITY_VALUE as $tier => [$min, $max]) {
+            $this->assertMatchesRegularExpression("/optionDurabilityValue: \{[^}]*{$tier}: \[{$min}, {$max}\],/s", $ts, "optionDurabilityValue.{$tier}");
+        }
         $this->assertStringContainsString(
             'optionScopedMultiplier: '.(int) Balance::OPTION_SCOPED_MULTIPLIER,
+            $ts,
+        );
+
+        // §8.2 -- and the line every pool ends on, which is the one entry that
+        // is not a stat list and so cannot be checked by the sweep above.
+        $this->assertStringContainsString(
+            "{ stat: '".Catalog::OPTION_DURABILITY."', scope: null, kind: 'durability' }",
             $ts,
         );
     }

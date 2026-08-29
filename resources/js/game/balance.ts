@@ -297,6 +297,16 @@ export const EQUIPMENT = {
     epic: [3, 6],
     legendary: [4, 8],
   } as const,
+  /** §8.0.1 -- a durability line, as a share of the piece's own max. Rolled as
+   *  a share and stored as points, so it is worth the same on a 40-point axe
+   *  and a 240-point coat. Not a StatKey: it never meets STAT_CEILING. */
+  optionDurabilityValue: {
+    common: [0.03, 0.05],
+    uncommon: [0.04, 0.07],
+    rare: [0.05, 0.09],
+    epic: [0.07, 0.12],
+    legendary: [0.09, 0.15],
+  } as const,
   /** §8.0.1 -- what naming one gathering line is worth, since it is worth
    *  nothing on the other four. */
   optionScopedMultiplier: 2,
