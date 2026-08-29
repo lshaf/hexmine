@@ -686,6 +686,32 @@ between. Ten is a route a person plans; two hundred is a spreadsheet.
 **One character per wallet. Soulbound (non-transferable).** Gear and land are the tradeable
 things, not the character — this prevents power-account selling.
 
+**A prospector names themselves ONCE.** A name is drawn beside other players'
+on a shared map, and one that can change is one nobody can be recognised by —
+so the naming is spent the first time it is used and there is no second one,
+not even back to the name you already hold. The `name` column IS the record:
+null means the naming is still owed, anything else means it is gone, so there
+is nothing extra to store and nothing for a second copy of the answer to drift
+from.
+
+**It is taken in the top-left cluster, before the name, and it is a pencil.**
+That is where a player actually reads their name; the prospector sheet is a
+condition read-out of what is being worn (§8.2), and the one irreversible thing
+about a character had no business being filed under gear. A pencil in the margin
+of a word is what *you may still write this* looks like everywhere else in the
+world, and it is drawn in copper — §13.3 spends copper on work in progress, and
+an unclaimed name is exactly that. **It is gone the moment it is spent**: a
+control that can only ever be pressed once must not sit there afterwards saying
+so.
+
+**Letting go of the wallet is a hexagon of its own, top right.** It is drawn in
+the instrument cluster's treatment rather than the screens honeycomb's, and
+smaller than a cell, because it is furniture and not a screen — every hexagon in
+that flower opens a panel and closes again, and the one control that throws the
+session away must not read as an eighth of them. Quiet until it is reached for:
+ember is what §13.3 spends on a state to deal with, and a corner glowing red at
+somebody with nothing wrong is an alarm nobody can switch off.
+
 ### 7.1 Level
 Level unlocks **capacity, not power**: access to higher-tier hexes and dungeon
 floors. A whale can out-scale logistics but never out-damage a grinder.

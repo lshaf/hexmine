@@ -153,6 +153,19 @@ class GameService
      */
     public function renameCharacter(Character $character, string $name): Character
     {
+        // §7 -- ONCE. A prospector names themselves and then that is who they
+        // are: a name is drawn beside other players' on a shared map, and one
+        // that can change is one nobody can be recognised by. The column itself
+        // is the record -- null means the naming is still owed, anything else
+        // means it has been spent -- so there is nothing extra to store and
+        // nothing for a second copy of the answer to drift from.
+        if ($character->name !== null) {
+            throw new GameException(
+                'You have already named yourself, and that happens once.',
+                'name_spent',
+            );
+        }
+
         $name = trim($name);
 
         if (preg_match('/^[A-Za-z0-9]+$/', $name) !== 1) {
@@ -174,10 +187,6 @@ class GameService
                 'Prospector is what an unnamed character is called. Pick something of your own.',
                 'name_reserved',
             );
-        }
-
-        if ($name === $character->name) {
-            return $character;
         }
 
         // Case-insensitively, matching the collation the index is enforced
@@ -6450,9 +6459,10 @@ class GameService
                 // one place the client reads it from. Storing the label would
                 // make it a name somebody holds (see renameCharacter).
                 'name' => $character->name ?? 'Prospector',
-                // Whether that is a name or the label standing in for one. The
-                // screen offers "Take a name" against one and "Change" against
-                // the other, and cannot tell them apart from the string alone.
+                // Whether that is a name or the label standing in for one --
+                // which is also whether the one naming is still owed (§7), so
+                // the cluster shows the control against false and nothing at
+                // all against true. The string alone cannot say which.
                 'named' => $character->name !== null,
                 // The player's own address, in full. Abbreviating it here would
                 // only hide it from the one person it belongs to, and would make

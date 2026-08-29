@@ -33,7 +33,6 @@
  */
 import { computed, ref } from 'vue'
 import { useGame } from '@/stores/game'
-import { logout } from '@/wallet/wax'
 import {
   ITEM_BY_KEY,
   RARITY_LABEL,
@@ -44,7 +43,7 @@ import {
   slotForSkill,
 } from '@/game/catalog'
 import { formatPercent, formatStat, optionStatLine, swapChanges } from '@/game/formulas'
-import { CHARACTER, EQUIPMENT } from '@/game/balance'
+import { EQUIPMENT } from '@/game/balance'
 import { itemIcon, skillIcon } from '@/icons/procedural'
 import GearCell from '@/components/GearCell.vue'
 import RepairCost from '@/components/RepairCost.vue'
@@ -56,76 +55,6 @@ import type { EquipSlot, ItemDef, OwnedItem, SkillKey, StatKey } from '@/game/ty
 
 const game = useGame()
 
-const leaving = ref(false)
-
-/**
- * §7 -- claiming a name.
- *
- * Closed until asked for, because the overwhelmingly common case is a player
- * who has one already and is here to read their gear. An always-open text field
- * beside the wallet would make the sheet look like a form.
- */
-const naming = ref(false)
-const draft = ref('')
-
-const NAME_PATTERN = /^[A-Za-z0-9]+$/
-
-/** The same rules the server holds, said before the round trip rather than
- *  instead of it -- the refusal that counts is still GameService's. */
-const nameProblem = computed(() => {
-  const value = draft.value.trim()
-
-  if (value === '') return 'Type a name.'
-  if (!NAME_PATTERN.test(value)) return 'Letters and digits only.'
-  if (value.length < CHARACTER.nameMin || value.length > CHARACTER.nameMax) {
-    return `Between ${CHARACTER.nameMin} and ${CHARACTER.nameMax} characters.`
-  }
-  if (value.toLowerCase() === 'prospector') return 'That is what an unnamed character is called.'
-
-  return ''
-})
-
-function startNaming(): void {
-  naming.value = true
-  draft.value = game.character?.named ? (game.character?.name ?? '') : ''
-}
-
-/**
- * The form closes only if the name was actually taken. A refusal the client
- * could not have known about -- somebody already goes by it -- arrives as a
- * toast like every other refusal, and the field stays open with the text still
- * in it so the next attempt is an edit rather than a retype.
- */
-async function claimName(): Promise<void> {
-  if (nameProblem.value) return
-
-  if (await game.rename(draft.value.trim())) naming.value = false
-}
-
-/**
- * Letting go of the wallet, §2.
- *
- * It belongs on this screen and beside the address, because this is the one
- * place that says who you are -- and the thing being disconnected is right
- * above the button that does it.
- *
- * The page is RELOADED rather than the store being emptied. A session ending
- * invalidates every slice of it at once -- character, bag, jobs, quests, the
- * map's live half -- and clearing them by hand would be a second definition of
- * "a fresh session" for the first one to eventually disagree with. It is also
- * the rarest action in the game; there is nothing to optimise.
- */
-async function disconnect(): Promise<void> {
-  if (leaving.value) return
-
-  leaving.value = true
-
-  try {
-    await logout()
-  } finally {
-    window.location.reload()
-  }
-}
 
 /**
  * §8 -- the four worn slots, in the order a set is put on.
@@ -418,62 +347,24 @@ const ceilings = computed(() =>
     <section class="section">
       <h3 class="head" style="margin-bottom: 8px">Character</h3>
       <div class="inset stack">
-        <!-- §7 -- the name, and the one control that changes it. Above the
-             wallet because it is the half a player chose. -->
-        <div class="row-between tiny name-row">
-          <span class="muted">Name</span>
-          <span v-if="!naming" class="named">
-            <strong :class="{ unnamed: !game.character.named }">{{ game.character.name }}</strong>
-            <button class="btn btn-sm" type="button" @click="startNaming">
-              {{ game.character.named ? 'Change' : 'Take a name' }}
-            </button>
-          </span>
-        </div>
-
-        <form v-if="naming" class="naming" @submit.prevent="claimName">
-          <div class="row" style="gap: 7px">
-            <input
-              v-model="draft"
-              class="field"
-              type="text"
-              :maxlength="CHARACTER.nameMax"
-              autocapitalize="off"
-              autocomplete="off"
-              spellcheck="false"
-              placeholder="Letters and digits"
-              aria-label="New name"
-            />
-            <button class="btn btn-sm btn-primary" type="submit" :disabled="Boolean(nameProblem) || game.busy">
-              Claim
-            </button>
-            <button class="btn btn-sm" type="button" @click="naming = false">Cancel</button>
-          </div>
-          <!-- One line, and it holds whichever objection applies: this screen's
-               own, or the server's when it refused something this could not
-               know -- that somebody already goes by it. -->
-          <span class="tiny" :class="nameProblem && draft ? 'bad' : 'muted'">
-            {{ (draft && nameProblem) || 'No two prospectors may hold the same name.' }}
-          </span>
-        </form>
-
+        <!-- §7 -- the name is not offered here. It is taken ONCE and it is
+             taken in the top-left cluster, where a player actually reads it;
+             this sheet is a condition read-out of what is being worn (§8.2),
+             and the one irreversible thing about a character had no business
+             being filed under gear. -->
         <div class="row-between tiny">
           <span class="muted">Wallet</span>
           <span class="mono wallet">{{ game.character.wallet }}</span>
         </div>
       </div>
 
-      <!-- The character is soulbound and stays where it is; what ends here is
-           the session holding it. Saying what coming back costs is the point —
-           a login is a payment (§2), so leaving is not free to undo. -->
-      <div class="leave">
-        <button class="btn btn-sm" type="button" :disabled="leaving" @click="disconnect">
-          {{ leaving ? 'Disconnecting…' : 'Disconnect wallet' }}
-        </button>
-        <span class="tiny muted">
-          Soulbound. It stays with the wallet — signing back in costs another
-          transfer.
-        </span>
-      </div>
+      <!-- §2 -- what ends the session is a button of its own, top right. It
+           left this screen for the same reason the naming did: a sheet about
+           gear is not where the two things that are not gear belong. -->
+      <p class="tiny muted leave">
+        Soulbound. It stays with the wallet — signing back in costs another
+        transfer.
+      </p>
     </section>
 
     <!-- ----------------------------------------------------- slot plate -->
@@ -674,38 +565,13 @@ const ceilings = computed(() =>
   margin-top: 2px;
 }
 
-.field {
-  flex: 1;
-  min-width: 0;
-  padding: 6px 9px;
-  border: 1px solid var(--line);
-  background: var(--ink);
-  color: var(--vellum);
-  font: inherit;
-}
-
-.field:focus {
-  outline: none;
-  border-color: var(--copper);
-}
-
-/* §13.3 -- ember is a state to deal with, and a refused name is one. */
-.bad {
-  color: var(--ember);
-}
-
 /* The button first and the consequence beside it, so the sentence explaining
    the cost is read in the same glance as the control that charges it. */
+/* What is left of the leave block: the sentence, without the button. It says
+   what the wallet holds, which is a fact about the character; the button that
+   lets go of it lives in the top-right corner (§2). */
 .leave {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  margin-top: 10px;
-  flex-wrap: wrap;
-}
-
-.leave span {
-  flex: 1 1 190px;
+  margin: 10px 0 0;
   line-height: 1.45;
 }
 

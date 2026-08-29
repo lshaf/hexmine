@@ -107,15 +107,44 @@ final class CharacterNameTest extends TestCase
         $this->game->renameCharacter($this->character('wallet-two'), 'dIGGER7');
     }
 
-    /** Renaming to what you already are is not a collision with yourself. */
-    public function test_keeping_your_own_name_is_allowed(): void
+    /**
+     * §7 -- a prospector names themselves ONCE.
+     *
+     * A name is drawn beside other players' on a shared map, and one that can
+     * change is one nobody can be recognised by. The refusal covers the name
+     * they already hold as well as any other: there is no second naming, not
+     * even a harmless one.
+     */
+    public function test_a_name_is_taken_once_and_never_again(): void
     {
         $character = $this->character('wallet-one');
         $this->game->renameCharacter($character, 'Digger7');
 
-        $again = $this->game->renameCharacter($character->fresh(), 'Digger7');
+        foreach (['Delver9', 'Digger7'] as $attempt) {
+            try {
+                $this->game->renameCharacter($character->fresh(), $attempt);
+                $this->fail("a second naming was allowed: {$attempt}");
+            } catch (GameException $e) {
+                $this->assertSame('name_spent', $e->errorCode);
+            }
+        }
 
-        $this->assertSame('Digger7', $again->name);
+        $this->assertSame('Digger7', $character->fresh()->name);
+    }
+
+    /**
+     * The column IS the record of whether the naming has been spent, so the
+     * flag the client reads is the same fact rather than a second copy of it.
+     */
+    public function test_the_state_says_whether_the_naming_is_still_owed(): void
+    {
+        $character = $this->character('wallet-one');
+
+        $this->assertFalse($this->game->playerState($character)['character']['named']);
+
+        $this->game->renameCharacter($character, 'Digger7');
+
+        $this->assertTrue($this->game->playerState($character->fresh())['character']['named']);
     }
 
     /** Many may be unnamed at once -- which is what the nullable column is for. */

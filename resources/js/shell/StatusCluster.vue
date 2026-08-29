@@ -20,8 +20,9 @@
  * one urgent state -- full -- is said by the bag cell turning ember in the
  * top-right rather than by two more needles competing with AP for the eye.
  */
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useGame } from '@/stores/game'
+import { CHARACTER } from '@/game/balance'
 import { copyText, shortWallet } from '@/game/identity'
 import { walletSeal } from '@/icons/sigil'
 import { SCOPE_PATHS } from '@/icons/actions'
@@ -129,8 +130,53 @@ function toggleCharges(): void {
   openCharges.value = true
 }
 
+/**
+ * §7 -- the naming, which happens ONCE and is therefore offered here.
+ *
+ * Before the name rather than on the hero sheet, because this is where a
+ * player reads their name -- the sheet is a condition read-out of what they are
+ * wearing (§8.2), and the one irreversible thing about a character had no
+ * business being filed under gear. It is gone the moment it is spent: a control
+ * that can only ever be pressed once should not sit there afterwards saying so.
+ */
+const naming = ref(false)
+const draft = ref('')
+const field = ref<HTMLInputElement | null>(null)
+
+const nameProblem = computed<string | null>(() => {
+  const value = draft.value.trim()
+
+  if (!/^[A-Za-z0-9]*$/.test(value)) return 'Letters and digits only.'
+  if (value.length < CHARACTER.nameMin || value.length > CHARACTER.nameMax) {
+    return `Between ${CHARACTER.nameMin} and ${CHARACTER.nameMax} characters.`
+  }
+  if (value.toLowerCase() === 'prospector') return 'That is what an unnamed character is called.'
+
+  return null
+})
+
+async function startNaming(): Promise<void> {
+  openCharges.value = false
+
+  const box = panelEl.value?.getBoundingClientRect()
+  if (box) anchor.value = { top: box.bottom + 8, left: box.left }
+
+  draft.value = ''
+  naming.value = true
+  await nextTick()
+  field.value?.focus()
+}
+
+async function claimName(): Promise<void> {
+  if (nameProblem.value || game.busy) return
+  if (await game.rename(draft.value.trim())) naming.value = false
+}
+
 function onKey(event: KeyboardEvent): void {
-  if (event.key === 'Escape') openCharges.value = false
+  if (event.key !== 'Escape') return
+
+  openCharges.value = false
+  naming.value = false
 }
 
 onMounted(() => window.addEventListener('keydown', onKey))
@@ -143,7 +189,25 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
       <span class="seal" v-html="seal" />
 
       <div class="named">
-        <span class="name">{{ char.name }}</span>
+        <span class="line">
+          <!-- §7 -- once, and then never again, so it stands before the name
+               while it is still owed and vanishes when it is spent. -->
+          <button
+            v-if="!char.named"
+            class="claim"
+            type="button"
+            aria-label="Take a name"
+            title="Take a name — a prospector names themselves once"
+            @click="startNaming"
+          >
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor"
+                 stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M4 20h4L19.5 8.5a2.1 2.1 0 0 0-3-3L5 17v3Z" />
+              <path d="M14.5 6.5 17.5 9.5" />
+            </svg>
+          </button>
+          <span class="name">{{ char.name }}</span>
+        </span>
         <button
           class="wallet"
           type="button"
@@ -241,6 +305,47 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
   </div>
 
   <Teleport to="body">
+    <div v-if="naming" class="pop-wrap">
+      <div class="pop-scrim" @click="naming = false" />
+      <form
+        class="pop plate"
+        :style="{ top: `${anchor.top}px`, left: `${anchor.left}px` }"
+        @submit.prevent="claimName"
+      >
+        <div class="pop-inner">
+          <span class="label pop-key">Take a name</span>
+          <input
+            ref="field"
+            v-model="draft"
+            class="field"
+            type="text"
+            :maxlength="CHARACTER.nameMax"
+            autocapitalize="off"
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="Letters and digits"
+            aria-label="Your name"
+          />
+          <!-- One line, and it holds whichever objection applies: this screen's
+               own, or the server's when it refused something this could not
+               know -- that somebody already goes by it. -->
+          <p class="tiny say" :class="draft && nameProblem ? 'bad' : 'muted'">
+            {{ (draft && nameProblem) || 'Once only. No two prospectors hold the same name.' }}
+          </p>
+          <div class="pop-do">
+            <button class="btn btn-sm" type="button" @click="naming = false">Cancel</button>
+            <button
+              class="btn btn-sm btn-primary"
+              type="submit"
+              :disabled="Boolean(nameProblem) || game.busy"
+            >
+              Claim
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+
     <div v-if="openCharges && charges.length" class="pop-wrap">
       <div class="pop-scrim" @click="openCharges = false" />
       <div
@@ -306,7 +411,17 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
   gap: 2px;
 }
 
+/* The claim sits ON the name's line, before it -- an unnamed prospector reads
+   "take a name" and then what stands in for one, in that order. */
+.line {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
 .name {
+  min-width: 0;
   font-family: var(--font-display);
   font-size: 13px;
   font-weight: 600;
@@ -507,6 +622,82 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
   display: block;
   margin-bottom: 8px;
   color: var(--vellum-dim);
+}
+
+/* §7 -- the naming. Copper rather than vellum: §13.3 spends copper on work in
+   progress, and an unclaimed name is exactly that -- something owed, not
+   something wrong (ember) and not something won (sap). */
+/*
+ * §7 -- the naming: a pencil, and nothing round it.
+ *
+ * No chip and no border, because a box makes it a second element on a line
+ * that already holds two, and the plate is 238px wide -- a bordered "NAME"
+ * cost forty of them and took every one from the label beside it, so an
+ * unnamed prospector read "Prospect...". A mark in the margin of your own name
+ * is the smallest thing that can carry this, and it is the right shape for it:
+ * a pencil beside a word is what "you may still write this" looks like
+ * everywhere else in the world.
+ *
+ * Copper, and the ONLY copper on the plate: §13.3 spends it on work in
+ * progress, and an unclaimed name is exactly that -- something owed, not
+ * something wrong (ember) and not something won (sap).
+ */
+.claim {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  align-self: center;
+  /* Drawn at 12px and hit at 24: the glyph is small because the plate is, and
+     a thumb is not. Negative margins keep the hit area off the line's metrics. */
+  width: 24px;
+  height: 24px;
+  margin: -6px -7px -6px -6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--copper);
+  cursor: pointer;
+  opacity: 0.92;
+}
+
+.claim:hover,
+.claim:focus-visible {
+  opacity: 1;
+  color: var(--gold);
+}
+
+/* The naming field. It came here with the form it belongs to -- it was scoped
+   to the hero sheet, so the moment the form moved the input rendered as a bare
+   browser default in the middle of the HUD. */
+.field {
+  width: 100%;
+  padding: 6px 9px;
+  border: 1px solid var(--line);
+  background: var(--ink);
+  color: var(--vellum);
+  font: inherit;
+}
+
+.field:focus {
+  outline: none;
+  border-color: var(--copper);
+}
+
+.say {
+  margin: 6px 0 0;
+}
+
+/* §13.3 -- ember is a state to deal with, and a refused name is one. */
+.bad {
+  color: var(--ember);
+}
+
+.pop-do {
+  display: flex;
+  justify-content: flex-end;
+  gap: 7px;
+  margin-top: 9px;
 }
 
 /* The card is anchored under the cluster rather than centerd: it is a readout

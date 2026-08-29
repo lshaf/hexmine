@@ -19,6 +19,7 @@
  */
 import { onMounted, onBeforeUnmount, computed, ref, watch } from 'vue'
 import { useGame } from '@/stores/game'
+import { logout } from '@/wallet/wax'
 import HexMap from '@/map/HexMap.vue'
 import StatusCluster from '@/shell/StatusCluster.vue'
 import TravelStack from '@/shell/TravelStack.vue'
@@ -47,6 +48,29 @@ import LoginView from '@/views/LoginView.vue'
 import { loadSettings } from '@/wallet/wax'
 
 const game = useGame()
+
+/**
+ * §2 -- letting go of the wallet.
+ *
+ * The page is RELOADED rather than the store being emptied. A session ending
+ * invalidates every slice of it at once -- character, bag, jobs, quests, the
+ * map's live half -- and clearing them by hand would be a second definition of
+ * "a fresh session" for the first one to eventually disagree with. It is also
+ * the rarest action in the game; there is nothing to optimise.
+ */
+const leaving = ref(false)
+
+async function disconnect(): Promise<void> {
+  if (leaving.value) return
+
+  leaving.value = true
+
+  try {
+    await logout()
+  } finally {
+    window.location.reload()
+  }
+}
 
 /**
  * §2 -- the door.
@@ -179,6 +203,37 @@ onMounted(() => {
 
       <!-- ------------------------------------------------------ top right -->
       <div class="corner top-right">
+        <!-- §2 -- ending the session.
+             A hexagon, in the instrument cluster's own treatment rather than
+             the screens' -- `.hex` over `--ink-raised`, the same face the
+             charge sockets across the map wear. That is the distinction doing
+             the work: it is furniture, not a screen. It is also visibly
+             smaller than a cell, so it never joins the flower below it.
+
+             Quiet until it is reached for. Ember is what §13.3 spends on a
+             state to deal with, and a corner glowing red at somebody with
+             nothing wrong is an alarm nobody can switch off -- so the color
+             arrives on hover and focus, where the intent is. -->
+        <button
+          class="leave"
+          type="button"
+          :disabled="leaving"
+          :aria-label="leaving ? 'Disconnecting' : 'Disconnect wallet'"
+          title="Disconnect wallet — the character stays with it, and signing back in costs another transfer"
+          @click="disconnect"
+        >
+          <span class="hex">
+            <span class="face">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
+                   stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M14.5 4H18a1.5 1.5 0 0 1 1.5 1.5v13A1.5 1.5 0 0 1 18 20h-3.5" />
+                <path d="M10 8.5 6 12l4 3.5" />
+                <path d="M6 12h8.5" />
+              </svg>
+            </span>
+          </span>
+        </button>
+
         <div class="screens">
           <!-- The map's own control, at the head of the strip: the camera pans
                anywhere and costs nothing, so the way back belongs with the
@@ -367,6 +422,53 @@ onMounted(() => {
   align-items: flex-end;
 }
 
+/*
+ * §2 -- the way out, drawn as HUD furniture rather than as a screen.
+ *
+ * The hexagon is the cluster's, not the flower's: `.hex` paints the hairline
+ * and `.face` takes `--ink-raised`, which is the same socket a charge sits in
+ * on the top-left plate. Two thirds the size of a screens cell, so the eye
+ * never reads it as an eighth one.
+ */
+.leave {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--vellum-dim);
+  cursor: pointer;
+}
+
+.leave .hex {
+  /* A bare span is inline and ignores a width. `.hex` in app.css only paints
+     the hairline and the clip; the box is the caller's. */
+  display: block;
+  width: 38px;
+  height: 33px;
+  transition: background 0.14s ease;
+}
+
+.leave .face {
+  display: grid;
+  place-items: center;
+  background: var(--ink-raised);
+}
+
+.leave:hover:not(:disabled),
+.leave:focus-visible {
+  color: var(--ember);
+}
+
+.leave:hover:not(:disabled) .hex,
+.leave:focus-visible .hex {
+  background: var(--ember);
+}
+
+.leave:disabled {
+  cursor: progress;
+  opacity: 0.6;
+}
+
 .screens {
   /*
    * A honeycomb flower: 2 - 3 - 2.
@@ -512,6 +614,12 @@ onMounted(() => {
   .screens {
     --cell-w: 42px;
     --cell-h: 37px;
+  }
+
+  /* Down with them, so the proportion holds: furniture, never a cell. */
+  .leave .hex {
+    width: 30px;
+    height: 26px;
   }
 }
 </style>
