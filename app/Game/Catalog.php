@@ -225,87 +225,30 @@ final class Catalog
     /**
      * §8.0.1 -- what a rolled line may land on.
      *
-     * **A rolled line is drawn from what the piece is FOR.** That is one rule
-     * with three answers, because §8 gives equipment three jobs:
+     * **Every option is a solid number on the pair, and nothing else.** A
+     * percentage was the wrong unit for luck: it climbs toward §8.1's ceiling,
+     * which is one invisible number every line on every piece is already
+     * climbing toward, so a good roll and a bad one read the same on the plate
+     * and neither could be felt in play. §9.5.4 makes exactly that argument
+     * about the percentage twins -- "+3% power moves a common sword from 5
+     * attack to 5" -- and this is that argument carried to its conclusion.
      *
-     * - a **gathering tool** works one line and nothing else (§8 rule 1), so it
-     *   draws from the two mine stats. Rolling `travelSpeed` onto an axe would
-     *   be worth nothing -- walking is not woodcutting -- *and* would invite
-     *   equipping all five tools to stack five travel lines, the exact hole the
-     *   line-lock exists to close.
-     * - a **weapon** is combat only and never gathers (§8 rule 5), so it draws
-     *   from the pair and its percentage twins. A sword rolling "+4% hunting
-     *   yield" was the same category error read from the other side: the one
-     *   slot in the game that does no work at all, paying out on work.
-     * - **worn gear** genuinely does both. §9.5.4 makes armor "one set with two
-     *   axes, not a second wardrobe" -- a coat is on your back down a mine, on
-     *   the road and in a fight -- so it reaches the road, the pair, and the
-     *   work, with two named exceptions below.
+     * So a line is `attack` or `defense`, solid, simply added. What is left to
+     * decide is which of the two a piece is eligible for, and §8 answers that
+     * the same way it answers everything else -- by what the piece is FOR:
      *
-     * **`yield` never comes out of a worn piece unpointed.** It is the one
-     * percentage a mine has left (§7.3) and it belongs to the WORK, so a flat
-     * "+2% yield" on a coat is five bonuses in one garment for a stat the thing
-     * in your hands is supposed to own. Scoped it reads as what it actually is
-     * -- a coat cut for the quarry -- and that is the honest answer to *is this
-     * specific or global*: on worn gear it is always specific. The tool keeps
-     * the unpointed one, because its slot already names the line.
-     *
-     * **`processingSpeed` is not in any rolled pool.** It is the one stat that
-     * belongs to a BUILDING rather than to a body: what moves a bench clock is
-     * the settlement's tier, standing there (§6.2), the line's own tree, and
-     * the gloves that are advertised for it. A coat or a boot rolling "+3%
-     * processing speed" says nothing about a coat or a boot.
-     */
-    public const OPTION_STATS_TOOL = ['yield'];
-
-    public const OPTION_STATS_WEAPON = ['power', 'defense'];
-
-    public const OPTION_STATS_WORN = ['travelSpeed', 'power', 'defense'];
-
-    /**
-     * §8.0.1 -- the stat a worn line is pointed at ONE gathering line, which on
-     * worn gear is the ONLY way it comes out at all (see above).
-     *
-     * A tool needs none of this: it is already line-locked by its slot (§8 rule
-     * 1), so its yield is its line's yield and a scope would only be a second
-     * place for the two to disagree. Worn gear works every line at once, which
-     * is exactly why a narrower line is worth more there -- see
-     * Balance::OPTION_SCOPED_MULTIPLIER. Scoping reaches `yield` and nothing
-     * else: `travelSpeed` has no line to belong to, the pair has no line to
-     * belong to either, and processing is scoped by the recipe already.
-     */
-    public const OPTION_SCOPED_STATS = ['yield'];
-
-    /**
-     * §8.0.1 -- the flat lines a roll may land on, beside the percentage ones.
-     *
-     * `attack` and `defense` are SOLID numbers, not the percentage stats that
-     * share their names (§9.5.4): a fight is decided by an exchange and a ±15%
-     * swing cannot decide one. So a rolled line may be either kind, and `kind`
-     * on the line is what tells them apart -- without it "+2 defense" and "+2%
-     * defense" would be the same row saying two different things.
-     *
-     * On a gathering tool a flat `attack` is MINING attack (§7.3) and never
-     * touches a fight, exactly as the tool's own attack does not. `defense` has
-     * nothing to mean on a tool, so a tool never rolls one.
+     * - a **gathering tool** rolls `attack`, and on a tool that is §7.3's
+     *   MINING attack: it bites deeper into a hex and is worth nothing in a
+     *   fight, exactly as the tool's own attack is (§8 rule 5). It never rolls
+     *   `defense`, because there is nothing on a hex for a guard to mean.
+     * - a **weapon** rolls both -- except a focus, which guards nowhere in the
+     *   kit and may not roll one either (below).
+     * - **worn gear** rolls both. §9.5.4 makes armor "one set with two axes,
+     *   not a second wardrobe", and both axes are the pair.
      */
     public const OPTION_FLAT_TOOL = ['attack'];
 
     public const OPTION_FLAT_WORN = ['attack', 'defense'];
-
-    /**
-     * §8.0.1 -- the one line every piece of equipment may roll, whatever it is
-     * for, because every piece of equipment wears out (§8.2).
-     *
-     * A third kind rather than a percentage or a solid stat: it is rolled as a
-     * share of the piece's own max and stored as points (Balance::
-     * OPTION_DURABILITY_VALUE), it is not a StatKey, and it therefore never
-     * enters the §8.1 aggregate or meets STAT_CEILING. What it moves is the
-     * CEILING on the object, the same thing a Smith's `craftDurability` node
-     * moves (§8.2) -- so it pays out twice and permanently: the piece holds
-     * more, and a full mend still costs one recipe's worth of materials.
-     */
-    public const OPTION_DURABILITY = 'durability';
 
     /**
      * §9.5.4 -- a focus keeps nothing off you, of either kind.
@@ -319,68 +262,45 @@ final class Catalog
     public const OPTION_FAMILY_NO_DEFENSE = ['focus'];
 
     /**
-     * §8.0.1 -- every (stat, scope, kind) a roll on this piece may land on.
+     * §8.0.1 -- every line a roll on this piece may land on.
      *
      * Takes the whole def rather than the slot, because the `weapon` slot holds
      * three families and one of them (§9.5.4) may not roll a guard.
      *
      * @param  array<string,mixed>  $def
-     * @return array<int,array{stat:string,scope:?string,kind:string}>
+     * @return array<int,array{stat:string,kind:string}>
      */
     public static function optionRollsFor(array $def): array
     {
         // §8.5 -- no slot is a consumable, and a potion has no rolled line at
         // all: it is drunk once and gone, so there is nothing for an option to
-        // sit on. Falling through to the worn pool would have put "+4% mining
-        // yield" on a flask the moment anything asked.
+        // sit on. Falling through to the worn pool would have put a rolled
+        // guard on a flask the moment anything asked.
         $slot = (string) ($def['slot'] ?? '');
         if ($slot === '') {
             return [];
         }
 
-        $lines = fn (array $stats, string $kind) => array_map(
-            static fn (string $stat) => ['stat' => $stat, 'scope' => null, 'kind' => $kind],
+        $lines = fn (array $stats) => array_map(
+            static fn (string $stat) => ['stat' => $stat, 'kind' => 'flat'],
             $stats,
         );
 
-        // Every piece of equipment wears out, so every pool ends on the same
-        // line. It is appended rather than written into each list because it is
-        // not a fact about what the piece is FOR -- it is a fact about it being
-        // a piece.
-        $wear = [['stat' => self::OPTION_DURABILITY, 'scope' => null, 'kind' => 'durability']];
-
+        // A tool guards nothing, so it is the one pool with a single entry.
         if (self::skillForSlot($slot) !== null) {
-            return array_merge(
-                $lines(self::OPTION_STATS_TOOL, 'percent'),
-                $lines(self::OPTION_FLAT_TOOL, 'flat'),
-                $wear,
-            );
+            return $lines(self::OPTION_FLAT_TOOL);
         }
 
-        if ($slot === 'weapon') {
-            $pool = array_merge(
-                $lines(self::OPTION_STATS_WEAPON, 'percent'),
-                $lines(self::OPTION_FLAT_WORN, 'flat'),
-            );
+        $pool = $lines(self::OPTION_FLAT_WORN);
 
-            if (in_array($def['family'] ?? null, self::OPTION_FAMILY_NO_DEFENSE, true)) {
-                $pool = array_values(array_filter(
-                    $pool,
-                    static fn (array $entry) => $entry['stat'] !== 'defense',
-                ));
-            }
-
-            return array_merge($pool, $wear);
+        if ($slot === 'weapon' && in_array($def['family'] ?? null, self::OPTION_FAMILY_NO_DEFENSE, true)) {
+            $pool = array_values(array_filter(
+                $pool,
+                static fn (array $entry) => $entry['stat'] !== 'defense',
+            ));
         }
 
-        $pool = $lines(self::OPTION_STATS_WORN, 'percent');
-        foreach (self::OPTION_SCOPED_STATS as $stat) {
-            foreach (self::SKILLS as $line) {
-                $pool[] = ['stat' => $stat, 'scope' => $line, 'kind' => 'percent'];
-            }
-        }
-
-        return array_merge($pool, $lines(self::OPTION_FLAT_WORN, 'flat'), $wear);
+        return $pool;
     }
 
     /**

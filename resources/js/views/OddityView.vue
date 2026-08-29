@@ -306,7 +306,7 @@ const FORAGE = [
 const MIGRATION = [
   { where: 'Catalog::items()', rows: '32', what: "'stat' => 'yield' becomes 'cooldown', values re-pitched to the new curve" },
   { where: 'Jobs::NODES', rows: '57', what: 'Regenerated from gen_jobs.py; gathering trees rebalance across cooldown and oddity' },
-  { where: 'OPTION_STATS_TOOL / _WORN', rows: '2', what: 'Swap yield for cooldown, add oddity' },
+  { where: 'Catalog::OPTION_FLAT_TOOL / _WORN', rows: '2', what: 'Reopens a percentage pool — §8.0.1 now rolls the solid pair and nothing else' },
   { where: 'Formulas::mineYield / mineTime', rows: '2', what: 'Drop the equip term from yield; add the multiplier to time' },
   { where: 'State payload', rows: '1', what: 'toolYield becomes toolCooldown; client types and the Hero sheet follow' },
   { where: 'balance.ts, catalog.ts', rows: '~40', what: 'Hand-kept mirror — the drift risk the jobs plan already flags as overdue' },
@@ -904,9 +904,12 @@ const PHASES = [
             lever and the stat the tuning one.
           </li>
           <li class="on">
-            Joins <code>OPTION_STATS_TOOL</code>, so a rolled line on an axe can read
-            <em>+2% oddity</em>. That is the direct answer to “it changes with the boost
-            options the hero uses”.
+            Would need a percentage back in the rolled pool. §8.0.1 has since cut every
+            option down to a solid <code>attack</code> or <code>defense</code> — a
+            percentage climbs toward a ceiling nobody can see, so a lucky roll read the
+            same as an unlucky one. <em>+2% oddity</em> on an axe is the answer to “it
+            changes with the boost options the hero uses”, and it is the part of this
+            proposal that now costs a rule rather than a constant.
           </li>
           <li class="on">
             Gets a potion at each bench tier, built from forage reagents — the loop that

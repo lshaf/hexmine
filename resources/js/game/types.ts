@@ -410,36 +410,16 @@ export interface ActiveBuff {
 /**
  * §8.0.1 -- one rolled bonus line. Server-rolled and stored per instance, so two
  * of the same recipe are never the same object.
+ *
+ * Always a SOLID number on the pair (§9.5.4), never a percentage. A percentage
+ * climbs toward §8.1's invisible ceiling, so a lucky roll and an unlucky one
+ * read the same on the plate; a solid number simply adds, and is felt.
  */
 export interface ItemOption {
-  /**
-   * A `StatKey` on a percentage line; `attack` or `defense` on a solid one
-   * (§9.5.4); `durability` on a wear line, which is not a stat at all -- it is
-   * points on the object's own ceiling (§8.2).
-   */
-  stat: StatKey | 'attack' | 'durability'
+  stat: 'attack' | 'defense'
   value: number
-  /**
-   * §8.0.1 -- the one gathering line this roll pays on, and absent when it pays
-   * everywhere. Worn gear is where it matters: armor works all five lines at
-   * once, so a line it names is narrower than a flat roll and worth more for
-   * being so. A tool needs no scope -- its slot already locks it to one line.
-   */
-  scope?: SkillKey
-  /**
-   * §8.0.1 -- percentage or solid number, and absent means percentage so every
-   * row already stored keeps its shape.
-   *
-   * `attack` and `defense` are FLAT (§9.5.4) and share their names with two
-   * percentage stats, so without this "+2 defense" and "+2% defense" would be
-   * the same row saying two different things. A flat line never carries a
-   * scope: it has no gathering line to belong to, and on a tool the slot
-   * already names one.
-   *
-   * `durability` is the third: points added to this piece's own max (§8.2), so
-   * it never enters the §8.1 aggregate and never meets STAT_CEILING.
-   */
-  kind?: 'percent' | 'flat' | 'durability'
+  /** Always `flat`. Kept on the row because that is how every one is stored. */
+  kind?: 'flat'
 }
 
 /**

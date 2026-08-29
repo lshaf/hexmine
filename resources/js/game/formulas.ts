@@ -55,19 +55,10 @@ export function aggregateStat(
     const toolLine = def.slot ? skillForSlot(def.slot) : null
     if (toolLine !== null && toolLine !== line) continue
 
-    // §8 -- a tool has no percentage at all; its base is a solid attack.
+    // §8 -- a tool has no percentage at all; its base is a solid attack. And a
+    // rolled line is not a contributor here either: every option is a solid
+    // number on the pair now (§8.0.1), added where the solid number is read.
     if (def.stat === stat && def.value !== undefined) contributions.push({ def, value: def.value })
-    for (const option of owned.options ?? []) {
-      // §8.0.1 -- only a PERCENTAGE line climbs toward the ceiling. `defense`
-      // is a StatKey AND half the solid pair (§9.5.4), so without this a rolled
-      // "+3 defense" was read here as +300% and pegged the aggregate at the cap.
-      if ((option.kind ?? 'percent') !== 'percent') continue
-      if (option.stat !== stat) continue
-      // §8.0.1 -- a scoped line pays in full on the line it names and nothing
-      // anywhere else, and no line being worked is one of those elsewheres.
-      if (option.scope && option.scope !== line) continue
-      contributions.push({ def, value: option.value })
-    }
   }
 
   if (contributions.length === 0) return 0
@@ -466,31 +457,16 @@ export function statLine(
 }
 
 /**
- * §8.0.1 -- a rolled line, which may name a line of its own or take its item's.
+ * §8.0.1 -- a rolled line, which is always a solid number on the pair.
  *
- * Three kinds, and they are printed differently because they ARE different: a
- * percentage climbs toward §8.1's ceiling, a solid number just adds, and a
- * durability line is points on the object's own ceiling (§8.2) rather than a
- * stat at all. On a gathering tool a flat `attack` is mining attack (§7.3), so
- * it says so.
+ * On a gathering tool a rolled `attack` is MINING attack (§7.3) -- it bites
+ * deeper into a hex and is worth nothing in a fight -- so it says so.
  */
 export function optionStatLine(option: ItemOption, def: ItemDef): string {
-  // §8.2 -- points on this piece's own ceiling, said in the unit the bar is
-  // read in. Not a stat, so it never carries a line and never a percentage.
-  if (option.kind === 'durability') return `+${option.value} durability`
+  const line = def.slot ? skillForSlot(def.slot) : null
+  const what = line ? 'mining attack' : FLAT_LABEL[option.stat] ?? option.stat
 
-  if (option.kind === 'flat') {
-    const line = def.slot ? skillForSlot(def.slot) : null
-    const what = line ? 'mining attack' : FLAT_LABEL[option.stat] ?? option.stat
-
-    return `+${option.value} ${what}`
-  }
-
-  return statLine(
-    option.stat as StatKey,
-    option.value,
-    option.scope ?? (def.slot ? skillForSlot(def.slot) : null),
-  )
+  return `+${option.value} ${what}`
 }
 
 /**
@@ -574,11 +550,9 @@ export function statChips(def: ItemDef, options: ItemOption[] = []): StatChip[] 
   return chips
 }
 
-/** §8.0.1 -- what an item's flat rolled lines add to one solid number. */
+/** §8.0.1 -- what an item's rolled lines add to one solid number. */
 export function flatOption(options: ItemOption[], stat: string): number {
-  return options
-    .filter((o) => o.kind === 'flat' && o.stat === stat)
-    .reduce((sum, o) => sum + o.value, 0)
+  return options.filter((o) => o.stat === stat).reduce((sum, o) => sum + o.value, 0)
 }
 
 // ------------------------------------------------------------------ the swap
@@ -594,27 +568,22 @@ function solid(item: OwnedItem, def: ItemDef, stat: 'attack' | 'defense'): numbe
   return (def[stat] ?? 0) + flatOption(item.options ?? [], stat)
 }
 
-/** One piece's own percentage contribution to a stat, before any kit maths. */
-function ownPercent(item: OwnedItem, def: ItemDef, stat: StatKey): number {
-  return (
-    (def.stat === stat ? def.value ?? 0 : 0) +
-    (item.options ?? [])
-      .filter((o) => (o.kind ?? 'percent') === 'percent' && o.stat === stat)
-      .reduce((sum, o) => sum + o.value, 0)
-  )
+/**
+ * One piece's own percentage contribution to a stat, before any kit maths.
+ *
+ * Its base stat and nothing else: a rolled line is a solid number now (§8.0.1)
+ * and is compared as one, in `solid()` above.
+ */
+function ownPercent(_item: OwnedItem, def: ItemDef, stat: StatKey): number {
+  return def.stat === stat ? def.value ?? 0 : 0
 }
 
 /** Every percentage either piece touches. The pair is solid and is said apart. */
 function percentStats(pieces: Array<{ item: OwnedItem; def: ItemDef }>): StatKey[] {
   const stats = new Set<StatKey>()
 
-  for (const { item, def } of pieces) {
+  for (const { def } of pieces) {
     if (def.stat && !PAIR_STATS.has(def.stat)) stats.add(def.stat)
-    for (const option of item.options ?? []) {
-      if ((option.kind ?? 'percent') === 'percent' && !PAIR_STATS.has(option.stat as StatKey)) {
-        stats.add(option.stat as StatKey)
-      }
-    }
   }
 
   return [...stats]

@@ -50,56 +50,29 @@ final class Formulas
             if ($def === null) {
                 continue;
             }
+            // §8 rule 1 -- a tool pays out on its own line and on no other.
+            // A guard rather than a live path now: a tool has no percentage of
+            // its own (§7.3) and cannot roll one (§8.0.1), so nothing on a belt
+            // reaches this sum. It stays because the rule is older than that.
             $toolLine = Catalog::skillForSlot($def['slot'] ?? '');
             if ($toolLine !== null && $toolLine !== $line) {
                 continue;
             }
 
-            // §8.0.1 -- a rolled line is just another contributor. It goes into
-            // the same falloff and under the same cap, so options can add
-            // variety without ever becoming a second power ladder. Note they
-            // inherit the line-lock from their item, which is what stops five
-            // equipped tools stacking five copies of the same bonus.
-            $contributions = [];
-            // §8 -- a gathering tool has no percentage at all now; its base is
-            // a solid attack. Absent rather than zero, so nothing has to know
+            // §8.0.1 -- a rolled line is NOT a contributor here. Every option
+            // is a solid number on the pair now, added by whoever reads the
+            // solid number; putting "+3 attack" through the falloff and the
+            // clamp would be nonsense twice over. What a piece brings to a
+            // percentage is its own stat and nothing else.
+            //
+            // §8 -- a gathering tool has no percentage at all; its base is a
+            // solid attack. Absent rather than zero, so nothing has to know
             // which stat a tool would have had.
-            if (($def['stat'] ?? null) === $stat) {
-                $contributions[] = $def['value'];
-            }
-            foreach ($item['options'] ?? [] as $option) {
-                if (($option['stat'] ?? null) !== $stat) {
-                    continue;
-                }
-
-                // §8.0.1 -- only a PERCENTAGE line climbs toward the ceiling.
-                // A flat one is a solid number added by whoever reads the solid
-                // number, and a durability one moves the object's own ceiling
-                // (§8.2); putting either through the falloff and the clamp
-                // would be nonsense twice over.
-                if (($option['kind'] ?? 'percent') !== 'percent') {
-                    continue;
-                }
-
-                // §8.0.1 -- a scoped line pays in full on the line it names and
-                // nothing anywhere else. No line being worked is one of those
-                // elsewheres, which is what keeps "+4% mining yield" off the
-                // road and off the bench.
-                $scope = $option['scope'] ?? null;
-                if ($scope !== null && $scope !== $line) {
-                    continue;
-                }
-
-                $contributions[] = (float) $option['value'];
-            }
-
-            if ($contributions === []) {
+            if (($def['stat'] ?? null) !== $stat) {
                 continue;
             }
 
-            foreach ($contributions as $value) {
-                $values[] = $value;
-            }
+            $values[] = $def['value'];
             $found = true;
             $cap = Balance::STAT_CAP[$def['rarity']];
             if ($cap > $bestCap) {
@@ -133,16 +106,15 @@ final class Formulas
      * common-grade line), and what it is worth inside that tier. Two of the
      * same recipe are never the same object.
      *
-     * A worn line may come out pointed at one gathering line -- "+4% mining
-     * yield" -- and is worth OPTION_SCOPED_MULTIPLIER more when it does,
-     * because it is worth nothing on the other four. `scope` is absent on a
-     * flat line rather than null, so every row already stored keeps its shape.
+     * Every line is a solid number on the pair (§8.0.1), so what a roll varies
+     * is which of the two it lands on and how big it is. It never enters the
+     * percentage aggregate and never meets §8.1's ceiling.
      *
      * `$extra` widens the ceiling: a Smith's tree node, or the extra slot a
      * hard pack's loot rolls (§9.5.8). Nothing BOUGHT ever comes here -- gold
      * buys a plain item and always has.
      *
-     * @return array<int,array{stat:string,value:float,scope?:string}>
+     * @return array<int,array{stat:string,value:int,kind:string}>
      */
     public static function rollOptions(array $def, int $seed, int $extra = 0, float $upgrade = 0.0): array
     {
@@ -165,9 +137,11 @@ final class Formulas
         $used = [];
 
         for ($i = 0; $i < $slots; $i++) {
-            // One line per (stat, scope): two "+2% mining yield" rows on one
-            // item reads as a bug, while mining yield beside hunting yield is
-            // two things the same piece of armor is genuinely good at.
+            // One line per stat: "+2 attack" twice on one item reads as a bug
+            // where "+2 attack, +3 defense" reads as a piece that came out
+            // well. It is also what caps a roll at the size of the pool -- a
+            // tool has one entry, so it carries at most one line whatever its
+            // rung or whatever a Smith has bought.
             $choices = array_values(array_filter(
                 $pool,
                 static fn (array $entry) => ! in_array(self::optionKey($entry), $used, true),
@@ -197,63 +171,19 @@ final class Formulas
 
             $tier = $tiers[$index];
 
-            $kind = $pick['kind'] ?? 'percent';
-            $valueSeed = Hash::hash2($seed, 920 + $i, Balance::mapSeed());
+            // §9.5.4 -- attack and defense are solid numbers, so the line is
+            // one too. It simply adds, wherever the solid number is read.
+            [$min, $max] = Balance::OPTION_FLAT_VALUE[$tier];
 
-            if ($kind === 'durability') {
-                // §8.0.1 -- rolled as a share of the piece's own max and stored
-                // as POINTS, because points are the unit durability is read in.
-                // The share is what keeps the line worth the same on a 40-point
-                // axe and a 240-point coat; storing the result is what makes
-                // "+9 durability" legible on the plate.
-                [$min, $max] = Balance::OPTION_DURABILITY_VALUE[$tier];
-                $base = (int) ($def['maxDurability'] ?? 0);
-                $steps = max(1, (int) round(($max - $min) * 1000));
-                $share = $min + Hash::randInt($valueSeed, 0, $steps) / 1000;
-
-                $out[] = [
-                    'stat' => Catalog::OPTION_DURABILITY,
-                    'value' => max(1, (int) round($base * $share)),
-                    'kind' => 'durability',
-                ];
-
-                continue;
-            }
-
-            if ($kind === 'flat') {
-                // §9.5.4 -- attack and defense are solid numbers, so the line
-                // is one too. No scope: a flat pair has no gathering line to
-                // belong to, and on a tool the slot already names it.
-                [$min, $max] = Balance::OPTION_FLAT_VALUE[$tier];
-
-                $out[] = [
-                    'stat' => $pick['stat'],
-                    'value' => Hash::randInt($valueSeed, (int) $min, (int) $max),
-                    'kind' => 'flat',
-                ];
-
-                continue;
-            }
-
-            [$min, $max] = Balance::OPTION_VALUE[$tier];
-
-            if ($pick['scope'] !== null) {
-                $min *= Balance::OPTION_SCOPED_MULTIPLIER;
-                $max *= Balance::OPTION_SCOPED_MULTIPLIER;
-            }
-
-            $steps = max(1, (int) round(($max - $min) * 100));
-            $roll = Hash::randInt($valueSeed, 0, $steps);
-
-            $line = [
+            $out[] = [
                 'stat' => $pick['stat'],
-                'value' => round($min + $roll / 100, 2),
+                'value' => Hash::randInt(
+                    Hash::hash2($seed, 920 + $i, Balance::mapSeed()),
+                    (int) $min,
+                    (int) $max,
+                ),
+                'kind' => 'flat',
             ];
-            if ($pick['scope'] !== null) {
-                $line['scope'] = $pick['scope'];
-            }
-
-            $out[] = $line;
         }
 
         return $out;
@@ -262,28 +192,16 @@ final class Formulas
     /**
      * §8.2 -- the ceiling a NEW piece is born with, which is not the catalog's.
      *
-     * Two things raise it and they stack: a Smith's `craftDurability` node
-     * (§7.4.3), and a rolled durability line (§8.0.1). Both move the CEILING
-     * rather than the fill, so a piece holds more for the whole of its life and
-     * a full mend still costs one recipe's worth of materials.
-     *
-     * Everything that creates an item comes through here, so a looted piece and
-     * a crafted one agree about what a rolled line is worth.
+     * §7.4.3's `craftDurability` raises the max of what a Smith makes, and it
+     * raises the CEILING rather than the fill -- so a piece holds more for the
+     * whole of its life and a full mend still costs one recipe's worth of
+     * materials. Everything that creates an item comes through here.
      *
      * @param  array<string,mixed>  $def
-     * @param  array<int,array<string,mixed>>  $options
      */
-    public static function maxDurabilityFor(array $def, array $options, float $craftBonus = 0.0): int
+    public static function maxDurabilityFor(array $def, float $craftBonus = 0.0): int
     {
-        $max = (int) round((int) ($def['maxDurability'] ?? 1) * (1 + $craftBonus));
-
-        foreach ($options as $option) {
-            if (($option['kind'] ?? null) === 'durability') {
-                $max += (int) $option['value'];
-            }
-        }
-
-        return max(1, $max);
+        return max(1, (int) round((int) ($def['maxDurability'] ?? 1) * (1 + $craftBonus)));
     }
 
     /**
@@ -299,7 +217,7 @@ final class Formulas
     {
         $tiers = [];
 
-        foreach (array_keys(Balance::OPTION_VALUE) as $tier) {
+        foreach (array_keys(Balance::OPTION_FLAT_VALUE) as $tier) {
             $tiers[] = $tier;
 
             if ($tier === $rarity) {
@@ -310,20 +228,19 @@ final class Formulas
         return $tiers;
     }
 
-    /** @param array{stat:string,scope:?string,kind?:string} $entry */
+    /** @param array{stat:string,kind?:string} $entry */
     private static function optionKey(array $entry): string
     {
-        // Kind is part of the identity: "+2 defense" and "+2% defense" are two
-        // different lines that happen to share a name (§9.5.4).
-        return ($entry['kind'] ?? 'percent').'|'.$entry['stat'].'|'.($entry['scope'] ?? '');
+        // Every line is a solid one now (§8.0.1), so the stat IS the identity.
+        return (string) $entry['stat'];
     }
 
     /**
-     * §8.0.1 -- what an item's flat rolled lines add to one solid number.
+     * §8.0.1 -- what an item's rolled lines add to one solid number.
      *
-     * Percentage lines are aggregated somewhere else entirely (aggregateStat),
-     * under the falloff and the ceiling; these are not percentages and neither
-     * applies to them. They add.
+     * Every line is one of these now: a percentage was the wrong unit for luck,
+     * because it climbs toward a ceiling nobody can see. A solid number just
+     * adds, which is the whole of what a rolled line does.
      *
      * @param  array<int,array<string,mixed>>  $options
      */

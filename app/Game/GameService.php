@@ -2564,28 +2564,25 @@ class GameService
             return null;
         }
 
-        // §8.0.1 -- harder packs roll better options, never better rarity. The
-        // roll comes first because a durability line moves the piece's own
-        // ceiling (§8.2), and the battered fraction below is a share of THAT.
-        $options = $this->rollFor(
-            $character,
-            $def,
-            intdiv((int) $monster['tier'], 2) + $extraOption,
-        );
-        $max = Formulas::maxDurabilityFor($def, $options);
+        $max = Formulas::maxDurabilityFor($def);
         $durability = max(1, (int) round($max * Hash::randInt(
             Hash::hash2($seed, 41, Balance::mapSeed() ^ 0x5909),
             Balance::LOOT_DURABILITY_MIN_PERCENT,
             Balance::LOOT_DURABILITY_MAX_PERCENT,
         ) / 100));
 
+        // §8.0.1 -- harder packs roll better options, never better rarity.
         $item = CharacterItem::create([
             'character_id' => $character->id,
             'item_key' => $key,
             'durability' => $durability,
             'max_durability' => $max,
             'equipped' => false,
-            'options' => $options,
+            'options' => $this->rollFor(
+                $character,
+                $def,
+                intdiv((int) $monster['tier'], 2) + $extraOption,
+            ),
         ]);
 
         return [
@@ -5562,16 +5559,7 @@ class GameService
         // catalog's, which made the node worth one craft: the bar read past
         // 100%, resale clamped the fraction back to 1, and the first mend set
         // durability to the catalog max and threw the extra away for good.
-        //
-        // §8.0.1 -- and a rolled durability line moves the same ceiling, which
-        // is why the options are rolled BEFORE the max is worked out.
-        $options = $this->rollFor(
-            $character,
-            $def,
-            $this->extraRoll($character, $effects['craftOption'], 0x5C11),
-            (float) $effects['optionTier'],
-        );
-        $max = Formulas::maxDurabilityFor($def, $options, (float) $effects['craftDurability']);
+        $max = Formulas::maxDurabilityFor($def, (float) $effects['craftDurability']);
         $durability = $max;
 
         $item = CharacterItem::create([
@@ -5580,7 +5568,12 @@ class GameService
             'durability' => $durability,
             'max_durability' => $max,
             'equipped' => false,
-            'options' => $options,
+            'options' => $this->rollFor(
+                $character,
+                $def,
+                $this->extraRoll($character, $effects['craftOption'], 0x5C11),
+                (float) $effects['optionTier'],
+            ),
         ]);
 
         return [

@@ -432,40 +432,32 @@ export const skillForSlot = (slot: EquipSlot): SkillKey | null =>
   (TOOL_SLOT_SKILL as Partial<Record<EquipSlot, SkillKey>>)[slot] ?? null
 
 /**
- * §8.0.1 -- every (stat, scope, kind) a roll on this piece may land on.
+ * §8.0.1 -- every line a roll on this piece may land on.
  *
- * **A rolled line is drawn from what the piece is FOR**, which is one rule with
- * three answers because §8 gives equipment three jobs. A gathering tool works
- * one line and nothing else (§8 rule 1). A weapon is combat only and never
- * gathers (§8 rule 5) -- it used to draw from the worn pool, which is how a
- * sword came off the bench carrying "+4% hunting yield". Worn gear genuinely
- * does both, with two exceptions: `yield` never comes out of a worn piece
- * unpointed (it belongs to the work, and unpointed it is five bonuses in one
- * garment), and `processingSpeed` is in no rolled pool at all (it belongs to a
- * building, not to a body). Every pool ends on `durability`, because every
- * piece of equipment wears out.
+ * **Every option is a solid number on the pair, and nothing else.** A
+ * percentage was the wrong unit for luck: it climbs toward §8.1's ceiling,
+ * which every line on every piece is already climbing toward, so a good roll
+ * and a bad one read the same on the plate. §9.5.4 makes that argument about
+ * the percentage twins already; this is it carried to its conclusion.
+ *
+ * Which of the two a piece is eligible for is §8's usual question -- what is
+ * the piece FOR. A gathering tool rolls `attack`, and on a tool that is §7.3's
+ * MINING attack; it never rolls a guard, because there is nothing on a hex for
+ * one to mean. A weapon and worn gear roll both, except a focus (§9.5.4).
  *
  * Mirrors `Catalog::optionRollsFor()`. The client needs it because the almanac
  * is where a piece is read before it is owned, and what it *may* roll is part
  * of what it is.
  */
-export type OptionStat = StatKey | 'attack' | 'durability'
+export type OptionStat = 'attack' | 'defense'
 
 export interface OptionRoll {
   stat: OptionStat
-  scope: SkillKey | null
-  kind: 'percent' | 'flat' | 'durability'
+  kind: 'flat'
 }
 
-const OPTION_STATS_TOOL: OptionStat[] = ['yield']
-const OPTION_STATS_WEAPON: OptionStat[] = ['power', 'defense']
-const OPTION_STATS_WORN: OptionStat[] = ['travelSpeed', 'power', 'defense']
-const OPTION_SCOPED_STATS: OptionStat[] = ['yield']
 const OPTION_FLAT_TOOL: OptionStat[] = ['attack']
 const OPTION_FLAT_WORN: OptionStat[] = ['attack', 'defense']
-
-/** The line every pool ends on: a piece of equipment is a thing that wears out. */
-const OPTION_WEAR: OptionRoll[] = [{ stat: 'durability', scope: null, kind: 'durability' }]
 
 /**
  * §9.5.4 -- a focus keeps nothing off you, of either kind. "A focus that also
@@ -478,35 +470,17 @@ export function optionRollsFor(def: ItemDef): OptionRoll[] {
   // §8.5 -- no slot is a consumable, and a potion has no rolled line at all.
   if (!def.slot) return []
 
-  const lines = (stats: OptionStat[], kind: 'percent' | 'flat'): OptionRoll[] =>
-    stats.map((stat) => ({ stat, scope: null, kind }))
+  const lines = (stats: OptionStat[]): OptionRoll[] =>
+    stats.map((stat) => ({ stat, kind: 'flat' as const }))
 
-  if (skillForSlot(def.slot) !== null) {
-    return [...lines(OPTION_STATS_TOOL, 'percent'), ...lines(OPTION_FLAT_TOOL, 'flat'), ...OPTION_WEAR]
-  }
+  // A tool guards nothing, so it is the one pool with a single entry.
+  if (skillForSlot(def.slot) !== null) return lines(OPTION_FLAT_TOOL)
 
-  if (def.slot === 'weapon') {
-    const pool = [
-      ...lines(OPTION_STATS_WEAPON, 'percent'),
-      ...lines(OPTION_FLAT_WORN, 'flat'),
-    ]
+  const pool = lines(OPTION_FLAT_WORN)
 
-    return [
-      ...(def.family && OPTION_FAMILY_NO_DEFENSE.includes(def.family)
-        ? pool.filter((entry) => entry.stat !== 'defense')
-        : pool),
-      ...OPTION_WEAR,
-    ]
-  }
-
-  const pool = lines(OPTION_STATS_WORN, 'percent')
-  for (const stat of OPTION_SCOPED_STATS) {
-    for (const skill of SKILL_LIST) {
-      pool.push({ stat, scope: skill.key, kind: 'percent' })
-    }
-  }
-
-  return [...pool, ...lines(OPTION_FLAT_WORN, 'flat'), ...OPTION_WEAR]
+  return def.slot === 'weapon' && def.family && OPTION_FAMILY_NO_DEFENSE.includes(def.family)
+    ? pool.filter((entry) => entry.stat !== 'defense')
+    : pool
 }
 
 /** The slot a skill line draws its tool from. */

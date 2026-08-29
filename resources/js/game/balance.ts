@@ -277,19 +277,9 @@ export const EQUIPMENT = {
     legendary: 3,
     unique: 3,
   } as const,
-  /**
-   * §8.0.1 -- what a line off each tier of the pool is worth. Every line rolls
-   * its OWN tier, drawn from the tiers at or below the item's rarity, so a
-   * legendary regularly carries a common-grade line.
-   */
-  optionValue: {
-    common: [0.01, 0.02],
-    uncommon: [0.01, 0.03],
-    rare: [0.02, 0.04],
-    epic: [0.03, 0.05],
-    legendary: [0.04, 0.06],
-  } as const,
-  /** §8.0.1 -- the same tiers as solid numbers, for a line on the pair. */
+  /** §8.0.1 -- what a rolled line is worth, per tier. Every line is a solid
+   *  number on the pair: a percentage climbs toward a ceiling nobody can see,
+   *  and a line is luck, which has to be legible. */
   optionFlatValue: {
     common: [1, 2],
     uncommon: [1, 3],
@@ -297,19 +287,6 @@ export const EQUIPMENT = {
     epic: [3, 6],
     legendary: [4, 8],
   } as const,
-  /** §8.0.1 -- a durability line, as a share of the piece's own max. Rolled as
-   *  a share and stored as points, so it is worth the same on a 40-point axe
-   *  and a 240-point coat. Not a StatKey: it never meets STAT_CEILING. */
-  optionDurabilityValue: {
-    common: [0.03, 0.05],
-    uncommon: [0.04, 0.07],
-    rare: [0.05, 0.09],
-    epic: [0.07, 0.12],
-    legendary: [0.09, 0.15],
-  } as const,
-  /** §8.0.1 -- what naming one gathering line is worth, since it is worth
-   *  nothing on the other four. */
-  optionScopedMultiplier: 2,
   /** Diminishing returns on stacking, §8.1 rule 2: the nth item of the same
    *  stat contributes value * falloff^(n-1). */
   stackFalloff: 0.5,

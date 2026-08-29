@@ -31,7 +31,6 @@ import {
   SKILL_BY_KEY,
   SLOT_LABEL,
   ITEMS,
-  STAT_LABEL,
   optionRollsFor,
   skillForSlot,
 } from '@/game/catalog'
@@ -106,11 +105,13 @@ function traderLine(def: ItemDef): { buy: number; sell: number } {
  * than about the copy in somebody's bag.
  *
  * It says three things, because §8.0.1 says three things are random: how many
- * (a ceiling, never a quota), what band they are drawn from, and from which
- * pool. The pool is the interesting one now that it differs per piece -- an
- * axe reaches two stats, a wand four, a coat every stat there is.
+ * (a ceiling, never a quota), what band they are drawn from, and which of the
+ * pair each one lands on -- an axe reaches only `attack`, a wand `attack`, and
+ * everything else both.
  */
-const OPTION_TIERS = Object.keys(EQUIPMENT.optionValue) as (keyof typeof EQUIPMENT.optionValue)[]
+const OPTION_TIERS = Object.keys(
+  EQUIPMENT.optionFlatValue,
+) as (keyof typeof EQUIPMENT.optionFlatValue)[]
 
 /** Everything at or below the piece's own rung -- a deeper bag, not a better one. */
 function optionTiersFor(rarity: Rarity): typeof OPTION_TIERS {
@@ -126,75 +127,33 @@ function optionTiersFor(rarity: Rarity): typeof OPTION_TIERS {
 interface RollBrief {
   ceiling: number
   band: string
-  scopedBand: string | null
-  percent: string[]
-  flat: { label: string; value: string }[]
+  labels: string[]
   plainShelf: boolean
 }
 
 function rollBrief(def: ItemDef): RollBrief | null {
-  const ceiling = EQUIPMENT.optionRolls[def.rarity] ?? 0
   if (!def.slot) return null
 
   const tiers = optionTiersFor(def.rarity)
-  const low = EQUIPMENT.optionValue[tiers[0]!][0]
-  const high = EQUIPMENT.optionValue[tiers[tiers.length - 1]!][1]
-  const flatLow = EQUIPMENT.optionFlatValue[tiers[0]!][0]
-  const flatHigh = EQUIPMENT.optionFlatValue[tiers[tiers.length - 1]!][1]
-  const wearLow = EQUIPMENT.optionDurabilityValue[tiers[0]!][0]
-  const wearHigh = EQUIPMENT.optionDurabilityValue[tiers[tiers.length - 1]!][1]
-  const pct = (v: number) => Math.round(v * 1000) / 10
+  const low = EQUIPMENT.optionFlatValue[tiers[0]!][0]
+  const high = EQUIPMENT.optionFlatValue[tiers[tiers.length - 1]!][1]
 
   const pool = optionRollsFor(def)
   const line = skillForSlot(def.slot)
-  const scoped = pool.some((entry) => entry.scope !== null)
 
   return {
-    ceiling,
-    band: `${pct(low)}–${pct(high)}%`,
-    scopedBand: scoped
-      ? `${pct(low * EQUIPMENT.optionScopedMultiplier)}–${pct(high * EQUIPMENT.optionScopedMultiplier)}%`
-      : null,
-    // One name per stat: the five scoped copies of `yield` are the same line
-    // pointed somewhere, and listing them would be the same word six times.
-    //
-    // §8.0.1 -- but a stat that ONLY ever comes out pointed has to say so, or
-    // the pip promises a bonus on all five lines that the pool cannot roll.
-    percent: [
-      ...new Set(
-        pool
-          .filter((entry) => entry.kind === 'percent')
-          .map((entry) => {
-            const name = STAT_LABEL[entry.stat as keyof typeof STAT_LABEL]
-            const always = pool.every((o) => o.stat !== entry.stat || o.scope !== null)
-
-            return always ? `${name} · one line` : name
-          }),
-      ),
-    ],
-    flat: [
-      ...pool
-        .filter((entry) => entry.kind === 'flat')
-        .map((entry) => ({
-          // §7.3 -- a flat `attack` on a gathering tool is MINING attack, which
-          // is a different ladder wearing the same word (§8 rule 5).
-          label: entry.stat === 'attack' && line ? 'bite' : entry.stat === 'attack' ? 'atk' : 'def',
-          value: `+${flatLow}–${flatHigh}`,
-        })),
-      // §8.2 -- quoted in points rather than as a share, because that is how it
-      // is rolled onto the piece and how the bar reads it back.
-      ...(pool.some((entry) => entry.kind === 'durability')
-        ? [
-            {
-              label: 'dur',
-              value: `+${Math.max(1, Math.round((def.maxDurability ?? 0) * wearLow))}–${Math.max(
-                1,
-                Math.round((def.maxDurability ?? 0) * wearHigh),
-              )}`,
-            },
-          ]
-        : []),
-    ],
+    // §8.0.1 -- one line per stat, so the POOL is a ceiling too and it is the
+    // lower one on a tool: an epic axe has a rung that allows two and one thing
+    // it may roll. Quoting the rung alone would promise a line that cannot come.
+    ceiling: Math.min(EQUIPMENT.optionRolls[def.rarity] ?? 0, pool.length),
+    band: `+${low}–${high}`,
+    // The band is the same for every half now, so it is said once in the
+    // sentence and the pips are the halves themselves.
+    labels: pool.map((entry) =>
+      // §7.3 -- a rolled `attack` on a gathering tool is MINING attack, which
+      // is a different ladder wearing the same word (§8 rule 5).
+      entry.stat === 'attack' && line ? 'bite' : entry.stat === 'attack' ? 'atk' : 'def',
+    ),
     plainShelf: def.goldPrice !== undefined,
   }
 }
@@ -957,29 +916,22 @@ function nature(item: ItemDef): string {
                   </dd>
                 </div>
 
-                <!-- §8.0.1 -- what a bench MIGHT put on it. The rail is
-                     narrower on a tool than on a coat and narrower again on a
-                     wand, which is the rule itself made visible: a rolled line
-                     is drawn from what the piece is for. -->
+                <!-- §8.0.1 -- what a bench MIGHT put on it. Always a solid
+                     number on the pair, and the rail is narrower on a tool and
+                     on a wand than on a coat: which of the two a piece is
+                     eligible for is decided by what the piece is FOR. -->
                 <div v-if="entry.rolls" class="rail rolls">
                   <dt class="label">Rolls</dt>
                   <dd>
                     <template v-if="entry.rolls!.ceiling">
                       <span class="where">
                         Up to {{ entry.rolls!.ceiling }}
-                        {{ entry.rolls!.ceiling === 1 ? 'line' : 'lines' }},
-                        each {{ entry.rolls!.band }}<template
-                          v-if="entry.rolls!.scopedBand"
-                        >, or {{ entry.rolls!.scopedBand }} named to one
-                        gathering line and worth nothing on the other four</template>.
+                        {{ entry.rolls!.ceiling === 1 ? 'line,' : 'lines, each' }} a
+                        solid {{ entry.rolls!.band }} that simply adds.
                       </span>
                       <div class="cost">
-                        <span v-for="name in entry.rolls!.percent" :key="name" class="pip roll">
-                          {{ name }}
-                        </span>
-                        <span v-for="(f, i) in entry.rolls!.flat" :key="i" class="pip roll solid">
-                          <span class="key">{{ f.label }}</span>
-                          <span class="mono">{{ f.value }}</span>
+                        <span v-for="l in entry.rolls!.labels" :key="l" class="pip roll solid">
+                          <span class="key">{{ l }}</span>
                         </span>
                       </div>
                       <p v-if="entry.rolls!.plainShelf" class="tiny muted note">

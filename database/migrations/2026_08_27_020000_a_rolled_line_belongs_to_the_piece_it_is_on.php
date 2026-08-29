@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Game\Balance;
 use App\Game\Catalog;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
@@ -23,6 +22,14 @@ use Illuminate\Support\Facades\DB;
  */
 return new class extends Migration
 {
+    /**
+     * What a pointed line was worth over an unpointed one, at the time this
+     * migration was written. Inlined rather than read off Balance, because a
+     * migration is a snapshot: §8.0.1 has since made every rolled line a solid
+     * number and the constant is gone.
+     */
+    private const SCOPED_MULTIPLIER = 2.0;
+
     public function up(): void
     {
         DB::table('character_items')
@@ -112,7 +119,7 @@ return new class extends Migration
             // The scoped premium is paid for by naming a line. An unscoped
             // replacement has not paid it, so it does not keep it.
             if (($option['scope'] ?? null) !== null && ($pick['scope'] ?? null) === null) {
-                $value /= Balance::OPTION_SCOPED_MULTIPLIER;
+                $value /= self::SCOPED_MULTIPLIER;
             }
 
             $line['value'] = $kind === 'flat' ? (int) max(1, round($value)) : round($value, 2);

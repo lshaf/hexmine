@@ -1192,45 +1192,22 @@ final class Balance
     ];
 
     /**
-     * §8.0.1 -- what a line off each tier of the pool is worth.
+     * §8.0.1 -- what a rolled line off each tier is worth.
+     *
+     * Every line is a solid number on the pair, because that is what `attack`
+     * and `defense` are (§9.5.4) and because a percentage is not a thing a
+     * player can feel: it climbs toward a ceiling nobody can see, so a lucky
+     * roll and an unlucky one read the same on the plate. A line is luck, and
+     * luck has to be legible.
      *
      * Every line rolls its OWN tier, drawn from the tiers at or below the
      * item's rarity, so a legendary can come out carrying a common-grade line
      * and often does. That is what makes a good roll a good roll: the ceiling
      * is higher up the ladder, not the floor.
      *
-     * Small on purpose all the way up. Options are variety, not a second power
-     * ladder, and they feed the same aggregate and the same STAT_CEILING as
-     * everything else (§8.1 rule 1).
-     */
-    public const OPTION_VALUE = [
-        'common' => [0.01, 0.02],
-        'uncommon' => [0.01, 0.03],
-        'rare' => [0.02, 0.04],
-        'epic' => [0.03, 0.05],
-        'legendary' => [0.04, 0.06],
-    ];
-
-    /**
-     * §8.0.1 -- a line pointed at ONE gathering line is worth this much more
-     * than a flat one, because it is worth nothing on the other four.
-     *
-     * Without the gap a scoped roll would be strictly the worse outcome and the
-     * whole pool would read as a bad-luck table. With it, "+2% yield
-     * everywhere" against "+4% mining yield" is a real choice for a prospector
-     * who knows which line they actually work. Still clamped by STAT_CEILING:
-     * narrower buys a steeper climb to the same ceiling, never a higher one.
-     */
-    public const OPTION_SCOPED_MULTIPLIER = 2.0;
-
-    /**
-     * §8.0.1 -- what a FLAT line off each tier is worth.
-     *
-     * Solid numbers, because that is what `attack` and `defense` are (§9.5.4).
      * Sized against the pairs on the gear itself -- a common weapon is 7-12
      * attack and a legendary 22-34 -- so a rolled line is a real find at the
-     * bottom of the ladder and a nice extra at the top, which is the same shape
-     * the percentage bands have.
+     * bottom of the ladder and a nice extra at the top.
      */
     public const OPTION_FLAT_VALUE = [
         'common' => [1, 2],
@@ -1238,30 +1215,6 @@ final class Balance
         'rare' => [2, 4],
         'epic' => [3, 6],
         'legendary' => [4, 8],
-    ];
-
-    /**
-     * §8.0.1 -- what a DURABILITY line off each tier is worth, as a share of
-     * the piece's own max.
-     *
-     * Rolled as a fraction and stored as POINTS, because points are the unit a
-     * player reads durability in: a bar says 130/130, so "+9 durability" lands
-     * instantly where "+7%" is arithmetic. Rolling the share is what keeps the
-     * line worth the same on a 40-point stone axe and a 240-point coat -- a
-     * flat band would be a fifth of the axe and noise on the coat.
-     *
-     * Wider than OPTION_VALUE because it is not climbing toward anything:
-     * durability is not a StatKey, so this line never enters the §8.1 aggregate
-     * and never meets STAT_CEILING. What bounds it instead is §11.1 -- the
-     * repair bill is the largest continuous sink in the game, and a line that
-     * thinned it much further would be switching that sink off by luck.
-     */
-    public const OPTION_DURABILITY_VALUE = [
-        'common' => [0.03, 0.05],
-        'uncommon' => [0.04, 0.07],
-        'rare' => [0.05, 0.09],
-        'epic' => [0.07, 0.12],
-        'legendary' => [0.09, 0.15],
     ];
 
     // --------------------------------------------------------- consumables §8.5
