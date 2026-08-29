@@ -704,12 +704,20 @@ an unclaimed name is exactly that. **It is gone the moment it is spent**: a
 control that can only ever be pressed once must not sit there afterwards saying
 so.
 
-**Letting go of the wallet is a hexagon of its own, top right.** It is drawn in
-the instrument cluster's treatment rather than the screens honeycomb's, and
-smaller than a cell, because it is furniture and not a screen — every hexagon in
-that flower opens a panel and closes again, and the one control that throws the
-session away must not read as an eighth of them. Quiet until it is reached for:
-ember is what §13.3 spends on a state to deal with, and a corner glowing red at
+**Letting go of the wallet is a cell IN the screens honeycomb**, bottom right,
+and it is the ninth — the seat the lattice has been holding since the eighth
+filled the left-hand column. Three cells in every column, so the flower is
+symmetric for the first time since it was a six.
+
+*(It was a chamfered pill above the block first, then a smaller hexagon above
+it, on the argument that navigation and a destructive action should not share a
+shape. Both were wrong for the same reason: that corner is where everything a
+prospector can reach from any hex lives, and a control parked outside the block
+reads as something that did not fit rather than as something set apart.)*
+
+What keeps it from being another panel is the same grammar the dock already
+uses for a destructive cell — quiet in the row, ember under the pointer. Ember
+is what §13.3 spends on a state to deal with, and a corner glowing red at
 somebody with nothing wrong is an alarm nobody can switch off.
 
 ### 7.1 Level

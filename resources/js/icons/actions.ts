@@ -28,6 +28,10 @@ export const ACTION_PATHS: Record<string, string> = {
   zoomOut: 'M6 12h12 M6 10.4v3.2 M18 10.4v3.2',
   locate: 'M7 12 9.5 7.7h5L17 12l-2.5 4.3h-5Z M12 2.6v2.8 M12 18.6v2.8 M2.6 12h2.8 M18.6 12h2.8',
   close: 'M6 6l12 12 M18 6 6 18',
+  // §2 -- the way out. A door you are already through, not a cross: closing a
+  // panel and ending the session are not the same gesture and must not share a
+  // glyph. The arrow leaves the frame, which is the whole of what it says.
+  leave: 'M14.5 4H18a1.5 1.5 0 0 1 1.5 1.5v13A1.5 1.5 0 0 1 18 20h-3.5 M10 8.5 6 12l4 3.5 M6 12h8.5',
   /* §10 -- a pennant on a pole. The only glyph in the strip that is a piece of
      cloth, because a guild is the one thing here you can put your own mark on. */
   guild: 'M7 21V3 M7 4h11l-2.5 4L18 12H7',

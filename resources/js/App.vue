@@ -203,37 +203,6 @@ onMounted(() => {
 
       <!-- ------------------------------------------------------ top right -->
       <div class="corner top-right">
-        <!-- §2 -- ending the session.
-             A hexagon, in the instrument cluster's own treatment rather than
-             the screens' -- `.hex` over `--ink-raised`, the same face the
-             charge sockets across the map wear. That is the distinction doing
-             the work: it is furniture, not a screen. It is also visibly
-             smaller than a cell, so it never joins the flower below it.
-
-             Quiet until it is reached for. Ember is what §13.3 spends on a
-             state to deal with, and a corner glowing red at somebody with
-             nothing wrong is an alarm nobody can switch off -- so the color
-             arrives on hover and focus, where the intent is. -->
-        <button
-          class="leave"
-          type="button"
-          :disabled="leaving"
-          :aria-label="leaving ? 'Disconnecting' : 'Disconnect wallet'"
-          title="Disconnect wallet — the character stays with it, and signing back in costs another transfer"
-          @click="disconnect"
-        >
-          <span class="hex">
-            <span class="face">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
-                   stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M14.5 4H18a1.5 1.5 0 0 1 1.5 1.5v13A1.5 1.5 0 0 1 18 20h-3.5" />
-                <path d="M10 8.5 6 12l4 3.5" />
-                <path d="M6 12h8.5" />
-              </svg>
-            </span>
-          </span>
-        </button>
-
         <div class="screens">
           <!-- The map's own control, at the head of the strip: the camera pans
                anywhere and costs nothing, so the way back belongs with the
@@ -308,6 +277,26 @@ onMounted(() => {
                 : `${game.guild.name} · ${game.guild.members} in it`)
               : 'Not in one — halls stand in cities and capitals'"
             @activate="game.openPanel('guild')"
+          />
+          <!-- §2 -- ending the session, and the ninth seat the lattice has been
+               holding. It belongs IN the flower rather than above it: this
+               corner is where everything a prospector can reach from any hex
+               lives, and a control parked outside the block reads as something
+               that did not fit.
+
+               `danger` rather than a color of its own, which is the grammar the
+               dock already uses for a destructive cell: quiet in the row, ember
+               under the pointer. A corner glowing red at somebody with nothing
+               wrong is an alarm nobody can switch off. -->
+          <HexAction
+            icon="leave"
+            label="Leave"
+            danger
+            :disabled="leaving"
+            :hint="leaving
+              ? 'Disconnecting…'
+              : 'Disconnect the wallet — the character stays with it, and signing back in costs another transfer'"
+            @activate="disconnect"
           />
         </div>
       </div>
@@ -422,61 +411,16 @@ onMounted(() => {
   align-items: flex-end;
 }
 
-/*
- * §2 -- the way out, drawn as HUD furniture rather than as a screen.
- *
- * The hexagon is the cluster's, not the flower's: `.hex` paints the hairline
- * and `.face` takes `--ink-raised`, which is the same socket a charge sits in
- * on the top-left plate. Two thirds the size of a screens cell, so the eye
- * never reads it as an eighth one.
- */
-.leave {
-  display: block;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--vellum-dim);
-  cursor: pointer;
-}
-
-.leave .hex {
-  /* A bare span is inline and ignores a width. `.hex` in app.css only paints
-     the hairline and the clip; the box is the caller's. */
-  display: block;
-  width: 38px;
-  height: 33px;
-  transition: background 0.14s ease;
-}
-
-.leave .face {
-  display: grid;
-  place-items: center;
-  background: var(--ink-raised);
-}
-
-.leave:hover:not(:disabled),
-.leave:focus-visible {
-  color: var(--ember);
-}
-
-.leave:hover:not(:disabled) .hex,
-.leave:focus-visible .hex {
-  background: var(--ember);
-}
-
-.leave:disabled {
-  cursor: progress;
-  opacity: 0.6;
-}
-
 .screens {
   /*
-   * A honeycomb flower: 2 - 3 - 2.
+   * A honeycomb flower: 3 - 3 - 3.
    *
-   * Seven cells is the first count that closes into a shape rather than a
+   * Seven cells was the first count that closed into a shape rather than a
    * block. Three across and two down was square enough while there were six,
    * but a seventh left a ragged corner cell hanging off it -- and a lattice
-   * with one cell out of place reads worse than a list would.
+   * with one cell out of place reads worse than a list would. Nine is the
+   * count that finishes it: every column three deep, and the flower symmetric
+   * for the first time.
    *
    * The columns hold 2, 3 and 2 because these are FLAT-TOP hexes and that is
    * the way flat-top hexes nest (§13.2): three quarters of a width between
@@ -515,6 +459,9 @@ onMounted(() => {
    seat waiting: the short columns are one cell shorter than the tall one, so
    this fills the flower rather than growing a tail. */
 .screens :deep(.cell:nth-child(8)) { grid-column: 1; grid-row: 6 / span 2; }
+/* §2 -- and the ninth closes the flower: three cells in every column, so the
+   shape is symmetric for the first time since it was a six. */
+.screens :deep(.cell:nth-child(9)) { grid-column: 3; grid-row: 6 / span 2; }
 
 /* Nested cells overlap at the tips, so hit-testing has to follow the hexagon
    rather than the box, or the pointed corner of one cell would swallow clicks
@@ -616,10 +563,5 @@ onMounted(() => {
     --cell-h: 37px;
   }
 
-  /* Down with them, so the proportion holds: furniture, never a cell. */
-  .leave .hex {
-    width: 30px;
-    height: 26px;
-  }
 }
 </style>
