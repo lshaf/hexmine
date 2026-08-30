@@ -133,6 +133,10 @@ Route::middleware(ResolveCharacter::class)->group(function () {
     Route::get('/quests', [QuestController::class, 'index']);
     Route::post('/quests/{quest}/claim', [QuestController::class, 'claim'])
         ->where('quest', '[a-z_]+');
+    // §12.2 -- the day's three. Their pool ships with the quest catalog above;
+    // which three are yours is derived per character and rides in the state.
+    Route::post('/dailies/{task}/claim', [QuestController::class, 'claimDaily'])
+        ->where('task', '[a-z_]+');
 
     Route::post('/equipment/{item}/equip', [EquipmentController::class, 'equip'])->whereNumber('item');
     Route::post('/equipment/{item}/unequip', [EquipmentController::class, 'unequip'])->whereNumber('item');

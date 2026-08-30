@@ -6230,7 +6230,7 @@ final class GameLoopTest extends TestCase
     /** Fire a counted goal directly, standing in for the work behind it. */
     private function fireQuest(string $kind, int $amount, ?string $subject = null): void
     {
-        $fire = new ReflectionMethod($this->game, 'fireQuest');
+        $fire = new ReflectionMethod($this->game, 'fireGoal');
         $fire->setAccessible(true);
         $fire->invoke($this->game, $this->character->fresh(), $kind, $amount, $subject);
     }

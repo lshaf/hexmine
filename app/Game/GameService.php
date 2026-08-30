@@ -9,6 +9,7 @@ use App\Models\Character;
 use App\Models\CharacterBookmark;
 use App\Models\CharacterBuff;
 use App\Models\CharacterConsumable;
+use App\Models\CharacterDaily;
 use App\Models\CharacterItem;
 use App\Models\CharacterJob;
 use App\Models\CharacterMaterial;
@@ -1227,13 +1228,19 @@ class GameService
     // ----------------------------------------------------------------- quests §12
 
     /**
-     * §12 -- credit a counted goal.
+     * §12 -- credit a counted goal, on both ledgers.
      *
      * Called from wherever the work actually finishes. Two properties matter and
      * both come from riding the call sites the game already had rather than
-     * inventing new ones: a quest can only ever be advanced by work the server
-     * itself witnessed, and adding a quest costs a row in Quests::DEFS rather
-     * than a new hook.
+     * inventing new ones: a goal can only ever be advanced by work the server
+     * itself witnessed, and adding one costs a row in Quests::DEFS or
+     * Dailies::DEFS rather than a new hook.
+     *
+     * It is `fireGoal` rather than `fireQuest` because there are two ledgers
+     * reading the same counter now: the chain (§12.1), which is claimed once and
+     * never comes back, and the day's three (§12.2), which reset. Neither knows
+     * about the other, and neither needed a call site of its own -- which is the
+     * whole argument for dailies not being a new verb.
      *
      * These are the same eleven sites the tutorial cursor used to sit on, which
      * is most of why §12 converted to quests without losing anything.
@@ -1247,7 +1254,7 @@ class GameService
      * walked them, and being handed a task already half done is a better welcome
      * than being told to start again.
      */
-    private function fireQuest(Character $character, string $kind, int $amount, ?string $subject = null): void
+    private function fireGoal(Character $character, string $kind, int $amount, ?string $subject = null): void
     {
         if ($amount <= 0) {
             return;
@@ -1274,6 +1281,56 @@ class GameService
         }
 
         $character->unsetRelation('quests');
+
+        $this->fireDaily($character, $kind, $amount, $subject);
+    }
+
+    /**
+     * §12.2 -- the same work, credited against today's three.
+     *
+     * Only today's, and that is the one place this deliberately disagrees with
+     * the quest above it. A quest counts work done before it was ever offered,
+     * because being handed a task already half done is a better welcome than
+     * being told to start again; a daily that did the same would be a quest with
+     * a slower name. So the row is keyed to the day, and yesterday's haul is
+     * yesterday's.
+     *
+     * A task not drawn for this character today is not credited at all -- there
+     * is no row to put it in, and banking progress against an errand nobody was
+     * asked to run would make tomorrow's draw pay out on arrival.
+     */
+    private function fireDaily(Character $character, string $kind, int $amount, ?string $subject): void
+    {
+        $day = Dailies::dayIndex($this->now());
+        $today = Dailies::forDay((int) $character->id, $day);
+        $touched = false;
+
+        foreach ($today as $key) {
+            $goal = Dailies::task($key)['goal'];
+            if ($goal['kind'] !== $kind) {
+                continue;
+            }
+            if ($goal['subject'] !== null && $goal['subject'] !== $subject) {
+                continue;
+            }
+
+            $row = CharacterDaily::firstOrCreate(
+                ['character_id' => $character->id, 'day' => $day, 'task_key' => $key],
+                ['progress' => 0],
+            );
+
+            if ($row->claimed_at !== null) {
+                continue;
+            }
+
+            $row->progress = min($goal['target'], (int) $row->progress + $amount);
+            $row->save();
+            $touched = true;
+        }
+
+        if ($touched) {
+            $character->unsetRelation('dailies');
+        }
     }
 
     /**
@@ -1496,6 +1553,121 @@ class GameService
                         fn (string $next) => (Quests::DEFS[$next]['requires'] ?? null) === $key,
                     ),
                 )),
+            ];
+        });
+    }
+
+    // ---------------------------------------------------------------- dailies §12.2
+
+    /**
+     * §12.2 -- today's three, with where each one stands.
+     *
+     * Rides in the state for the same reason the quests do: which three they are
+     * is derived and cheap, but how far along they are moves with almost every
+     * action. The catalog behind them ships once, beside the quest catalog.
+     *
+     * `resetsAt` is on the payload rather than left to the client to work out.
+     * A day's length is `Balance::scaled()`-dependent, so a client computing it
+     * from a 24-hour constant would be wrong on every development server, and
+     * the deadline is the one fact that makes a daily a daily.
+     *
+     * @return array<string,mixed>
+     */
+    public function dailyPayload(Character $character): array
+    {
+        $now = $this->now();
+        $day = Dailies::dayIndex($now);
+        $today = Dailies::forDay((int) $character->id, $day);
+
+        $rows = CharacterDaily::where('character_id', $character->id)
+            ->where('day', $day)
+            ->get()
+            ->keyBy('task_key');
+
+        $tasks = [];
+
+        foreach ($today as $lane => $key) {
+            $def = Dailies::task($key);
+            $row = $rows->get($key);
+            $progress = min((int) ($row->progress ?? 0), $def['goal']['target']);
+
+            $tasks[] = [
+                'key' => $key,
+                'lane' => $lane,
+                'progress' => $progress,
+                // Server-decided, like every other rule (§16).
+                'complete' => $progress >= $def['goal']['target'],
+                'claimed' => $row?->claimed_at !== null,
+            ];
+        }
+
+        return [
+            'day' => $day,
+            'resetsAt' => Dailies::dayEndsAt($now),
+            'tasks' => $tasks,
+        ];
+    }
+
+    /**
+     * §12.2 -- take the day's gold.
+     *
+     * Every gate is here rather than on the button, exactly as it is for a
+     * quest: the client draws a list and the server decides what is payable.
+     * The unique index on (character, day, task) is the last line of defense
+     * against a doubled request.
+     *
+     * A task that is not one of *this character's* three for *this* day is
+     * refused rather than paid. That single check is what makes the rate cap
+     * real -- without it a client could name any of the eleven, and three a day
+     * would quietly become eleven.
+     *
+     * @return array<string,mixed>
+     */
+    public function claimDaily(Character $character, string $key): array
+    {
+        return DB::transaction(function () use ($character, $key) {
+            $def = Dailies::task($key);
+            if ($def === null) {
+                throw new GameException('No such task.', 'not_found');
+            }
+
+            $now = $this->now();
+            $day = Dailies::dayIndex($now);
+
+            if (! in_array($key, Dailies::forDay((int) $character->id, $day), true)) {
+                throw new GameException('That is not one of today\'s.', 'not_today');
+            }
+
+            $row = CharacterDaily::firstOrCreate(
+                ['character_id' => $character->id, 'day' => $day, 'task_key' => $key],
+                ['progress' => 0],
+            );
+
+            if ($row->claimed_at !== null) {
+                throw new GameException('Already claimed. A daily pays once a day.', 'already_claimed');
+            }
+
+            if ((int) $row->progress < $def['goal']['target']) {
+                throw new GameException('Not finished yet.', 'incomplete');
+            }
+
+            // §3.2 -- gold and only gold, here for the same reason as everywhere
+            // else: it is the one currency that bridges to nothing external.
+            $character->gold += $def['gold'];
+            $row->claimed_at = $now;
+            $row->save();
+            $character->save();
+            $character->unsetRelation('dailies');
+
+            return [
+                'quest' => $key,
+                'name' => $def['name'],
+                'gold' => $def['gold'],
+                'goldAfter' => (int) $character->gold,
+                // Nothing follows a daily -- the chain is §12.1's idea, and this
+                // ledger has none. The key stays so one receipt draws both.
+                'unlocked' => [],
+                'daily' => true,
             ];
         });
     }
@@ -3482,7 +3654,7 @@ class GameService
             // its line instead, because that is what the bench was running.
             $processing = $job->kind === 'processing';
             foreach ($gained as $materialKey => $qty) {
-                $this->fireQuest(
+                $this->fireGoal(
                     $character,
                     $processing ? 'process' : 'gather',
                     (int) $qty,
@@ -5100,8 +5272,8 @@ class GameService
             $character->gold -= $def['goldPrice'];
             // §12 -- fired under both names the quest could mean: the item and
             // the slot it goes in. The matcher knows about neither.
-            $this->fireQuest($character, 'buy', 1, $itemKey);
-            $this->fireQuest($character, 'buy', 1, $def['slot'] ?? null);
+            $this->fireGoal($character, 'buy', 1, $itemKey);
+            $this->fireGoal($character, 'buy', 1, $def['slot'] ?? null);
             $character->save();
 
             return CharacterItem::create([
@@ -5144,7 +5316,7 @@ class GameService
             $character->gold += $gold;
             // §12 -- counted in gold taken rather than stacks sold, so a
             // quest about the trader is about the rate rather than the mines.
-            $this->fireQuest($character, 'sell', $gold);
+            $this->fireGoal($character, 'sell', $gold);
             $character->save();
 
             return $gold;
@@ -5211,7 +5383,7 @@ class GameService
             $gold = $each * $count;
             $character->gold += $gold;
             // §12 -- gold taken from traders, like every other sale.
-            $this->fireQuest($character, 'sell', $gold);
+            $this->fireGoal($character, 'sell', $gold);
             $character->save();
 
             return ['gold' => $gold, 'name' => $def['name'], 'quantity' => $count];
@@ -5261,7 +5433,7 @@ class GameService
             }
 
             $character->gold += $gold;
-            $this->fireQuest($character, 'sell', $gold);
+            $this->fireGoal($character, 'sell', $gold);
             $character->save();
 
             return ['gold' => $gold, 'rows' => $rows, 'units' => $units];
@@ -5530,8 +5702,8 @@ class GameService
 
         // §12 -- the item and its bench, so a quest may name either. Fired on
         // collection: a craft walked away from made nothing.
-        $this->fireQuest($character, 'craft', 1, $itemKey);
-        $this->fireQuest($character, 'craft', 1, Catalog::category($def));
+        $this->fireGoal($character, 'craft', 1, $itemKey);
+        $this->fireGoal($character, 'craft', 1, Catalog::category($def));
         $character->save();
 
         // §7.4 -- the bench that made it is the job that learns from it, and
@@ -5794,7 +5966,7 @@ class GameService
         // §12 -- the same hexes, counted once. Paid on ground actually
         // crossed, so a journey abandoned halfway credits the half that
         // happened -- the same arithmetic the Explorer is paid on.
-        $this->fireQuest($character, 'travel', $hexes);
+        $this->fireGoal($character, 'travel', $hexes);
     }
 
     /**
@@ -6221,8 +6393,8 @@ class GameService
 
         // §12 -- the item and the slot, same as a purchase. "Put an axe on" and
         // "put the Stone Axe on" are the same event asked about differently.
-        $this->fireQuest($character, 'equip', 1, $item->item_key);
-        $this->fireQuest($character, 'equip', 1, $def['slot'] ?? null);
+        $this->fireGoal($character, 'equip', 1, $item->item_key);
+        $this->fireGoal($character, 'equip', 1, $def['slot'] ?? null);
         $character->save();
     }
 
@@ -6538,6 +6710,9 @@ class GameService
             // than on the quests endpoint because it moves with almost every
             // action, while the catalog behind it never moves at all.
             'quests' => $this->questPayload($character),
+            // §12.2 -- today's three and when they turn over. Derived rather
+            // than stored, so a day nobody played costs nothing.
+            'dailies' => $this->dailyPayload($character),
             // §8.4 -- the slate: what this prospector means to make. Keys only;
             // what each one costs and how close the bag is to it is arithmetic
             // against an inventory that is already here.

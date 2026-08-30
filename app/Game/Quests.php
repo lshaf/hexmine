@@ -23,8 +23,9 @@ namespace App\Game;
  * back. That is the cap that makes it safe for §2: an unbounded gold faucet is
  * a bot's whole business plan, and a finite list of one-time payouts is worth
  * exactly as much to a thousand wallets as it is to one -- which is to say, not
- * enough to be worth farming. Dailies, if they ever land, need their own cap
- * and their own argument; they must not be bolted on here.
+ * enough to be worth farming. Dailies landed with their own cap and their own
+ * argument -- see Dailies (§12.2). They are a separate ledger sharing this
+ * one's counters, never a row in DEFS.
  *
  * **Gold and only gold.** §3.3 forbids a grind→NFT faucet outright, and §3.2
  * makes gold the currency that may be inflated because it never bridges to

@@ -87,6 +87,12 @@ class Character extends Model
         return $this->hasMany(CharacterQuest::class);
     }
 
+    /** §12.2 -- one row per daily task touched, scoped to the day it was earned on. */
+    public function dailies(): HasMany
+    {
+        return $this->hasMany(CharacterDaily::class);
+    }
+
     /** §8.4 -- the slate: ten recipes this character means to make. */
     public function bookmarks(): HasMany
     {

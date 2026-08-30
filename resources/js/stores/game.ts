@@ -25,6 +25,7 @@ import type {
   MapMutations,
   PlayerState,
   QueueSlot,
+  DailyDef,
   QuestDef,
   QuestReward,
   SkillTree,
@@ -365,14 +366,30 @@ export const useGame = defineStore('game', () => {
   const quests = computed(() => state.value?.quests ?? [])
 
   /**
+   * §12.2 -- the day's three.
+   *
+   * Same split again, and they ride the same fetch: the pool is static, and
+   * which three are yours today is derived per character and lives in the state.
+   */
+  const dailyDefs = shallowRef<Record<string, DailyDef> | null>(null)
+  const dailies = computed(() => state.value?.dailies?.tasks ?? [])
+  const dailiesResetAt = computed(() => state.value?.dailies?.resetsAt ?? 0)
+
+  /**
    * How many are payable right now. The one number the HUD needs, so the button
    * can say there is gold waiting without the panel being open.
    */
-  const questsReady = computed(() => quests.value.filter((q) => q.complete && !q.claimed).length)
+  const questsReady = computed(
+    () =>
+      quests.value.filter((q) => q.complete && !q.claimed).length +
+      dailies.value.filter((d) => d.complete && !d.claimed).length,
+  )
 
   async function loadQuests(): Promise<void> {
     if (questDefs.value) return
-    questDefs.value = await api.getQuests()
+    const catalog = await api.getQuests()
+    questDefs.value = catalog.quests
+    dailyDefs.value = catalog.dailies
   }
 
   /**
@@ -387,6 +404,12 @@ export const useGame = defineStore('game', () => {
 
   async function claimQuest(quest: string): Promise<void> {
     const result = await act(() => api.claimQuest(quest))
+    if (result) questReward.value = result
+  }
+
+  /** §12.2 -- the same receipt, off a different ledger. */
+  async function claimDaily(task: string): Promise<void> {
+    const result = await act(() => api.claimDaily(task))
     if (result) questReward.value = result
   }
 
@@ -1055,6 +1078,7 @@ export const useGame = defineStore('game', () => {
     tree, skillPoints, jobLevels, ownedNodes,
     rename,
     questDefs, quests, questsReady, questReward,
+    dailyDefs, dailies, dailiesResetAt,
     slate, saved,
     activeJobs, fieldJob, workFull, benchJobs, benchReady, benchHere, underfoot, selectedTile,
     currentSettlement, shopStock, sight, travelPerHexMs, travelEta,
@@ -1073,7 +1097,7 @@ export const useGame = defineStore('game', () => {
     startMining, startGathering, collect, abandon, travelTo, cancelTravel, startProcessing, buy,
     sell, sellAllScrap, sellItem, sellPotion, craft, equip, unequip, repair, discard, discardMaterial, drink, openPanel, closePanel,
     battleSkills, loadTree, loadBattleSkills, buyNode,
-    loadQuests, claimQuest, clearQuestReward,
+    loadQuests, claimQuest, claimDaily, clearQuestReward,
     toggleSlate,
     openStation, closeStation, loadBench,
   }

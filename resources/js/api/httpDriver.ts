@@ -38,7 +38,7 @@ import type {
   GameApi,
   MapMutations,
   PlayerState,
-  QuestDef,
+  LedgerCatalog,
   QuestReward,
   SkillPoints,
   SkillTree,
@@ -265,12 +265,16 @@ export class HttpDriver implements GameApi {
     })
   }
 
-  getQuests(): Promise<Record<string, QuestDef>> {
-    return request<{ quests: Record<string, QuestDef> }>('/quests').then((r) => r.quests)
+  getQuests(): Promise<LedgerCatalog> {
+    return request<LedgerCatalog>('/quests')
   }
 
   claimQuest(quest: string): Promise<ActionResult<QuestReward>> {
     return post<ActionResult<QuestReward>>(`/quests/${quest}/claim`, {})
+  }
+
+  claimDaily(task: string): Promise<ActionResult<QuestReward>> {
+    return post<ActionResult<QuestReward>>(`/dailies/${task}/claim`, {})
   }
 
   saveRecipe(recipe: string): Promise<ActionResult<{ slate: string[] }>> {

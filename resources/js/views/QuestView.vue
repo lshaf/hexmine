@@ -17,10 +17,22 @@
  * GET /quests, live progress from the player state -- and are joined here. That
  * is the same split the job trees use, and for the same reason: one of the two
  * halves never changes, so it should not ride every refresh.
+ *
+ * ------------------------------------------------------------- and the day's
+ *
+ * §12.2's three sit ABOVE the tabs rather than becoming a third one, and that
+ * is the whole reason there is still no third tab. Pending and Completed are
+ * two *states of one ledger*; the day's three are a *different ledger*, with a
+ * different reset and a deadline on it. Putting all three in one tab row would
+ * make a category out of two things that are not the same kind of thing.
+ *
+ * They read first because they are the half that expires. A quest waits
+ * forever; today does not.
  */
 import { computed, onMounted, ref } from 'vue'
 import { useGame } from '@/stores/game'
 import { ITEM_BY_KEY, MATERIALS, SKILL_BY_KEY, SLOT_LABEL } from '@/game/catalog'
+import { formatSpan } from '@/game/formulas'
 import { ACTION_PATHS } from '@/icons/actions'
 import type { EquipSlot, MaterialKey, SkillKey } from '@/game/types'
 
@@ -114,6 +126,48 @@ const rows = computed<Row[]>(() => {
     })
 })
 
+/**
+ * §12.2 -- today's three, in lane order.
+ *
+ * Built into the same Row shape as a quest, because a daily *is* the same
+ * object minus the chain: one goal, one counter, one figure in gold. Anything
+ * that made the two rows look different would be saying they behave
+ * differently, and the only thing that does is when they reset.
+ */
+const today = computed<Array<Row & { lane: string }>>(() => {
+  const defs = game.dailyDefs
+  if (!defs) return []
+
+  return game.dailies
+    .filter((d) => defs[d.key])
+    .map((d) => {
+      const def = defs[d.key]!
+
+      return {
+        key: d.key,
+        lane: d.lane,
+        name: def.name,
+        description: def.description,
+        goal: goalLabel(def.goal.kind, def.goal.subject, def.goal.target),
+        progress: d.progress,
+        target: def.goal.target,
+        percent: Math.min(100, (d.progress / Math.max(1, def.goal.target)) * 100),
+        gold: def.gold,
+        ready: d.complete && !d.claimed,
+        claimed: d.claimed,
+      }
+    })
+})
+
+/**
+ * How long today has left, against the SERVER's clock.
+ *
+ * A day runs through `Balance::scaled()`, so its length is whatever the
+ * environment says it is -- the client is told when the three turn over and
+ * never works it out from a constant of its own.
+ */
+const resetsIn = computed(() => formatSpan(game.dailiesResetAt - game.now))
+
 /** Payable first, then whatever is furthest along: the ledger reads as a queue. */
 const pending = computed(() =>
   rows.value
@@ -133,6 +187,59 @@ const earned = computed(() => completed.value.reduce((n, r) => n + r.gold, 0))
     </div>
 
     <template v-else>
+      <!-- §12.2 -- the day's three. Above the tabs rather than inside them:
+           Pending and Completed are two states of one ledger, and this is a
+           different ledger with a deadline on it. -->
+      <div v-if="today.length" class="inset day">
+        <div class="row-between day-head">
+          <span class="label">Today</span>
+          <span class="tiny muted mono">resets in {{ resetsIn }}</span>
+        </div>
+
+        <div
+          v-for="row in today"
+          :key="row.key"
+          class="quest daily"
+          :class="{ ready: row.ready, spent: row.claimed }"
+        >
+          <div class="row-between">
+            <strong class="name">
+              <span class="lane">{{ row.lane }}</span>
+              {{ row.name }}
+            </strong>
+            <span class="reward readout" :class="{ paid: row.claimed }">{{ row.gold }}g</span>
+          </div>
+
+          <p class="tiny muted note">{{ row.description }}</p>
+
+          <div class="row-between goal tiny">
+            <span :class="row.ready || row.claimed ? 'done' : 'muted'">{{ row.goal }}</span>
+            <span class="mono muted">{{ row.progress }}/{{ row.target }}</span>
+          </div>
+
+          <div class="bar" :class="row.ready || row.claimed ? 'bar-sap' : ''">
+            <span :style="{ width: `${row.percent}%` }" />
+          </div>
+
+          <div v-if="row.ready" class="row-between foot">
+            <span class="tiny done">Finished — the gold is waiting.</span>
+            <button
+              class="btn btn-sm btn-primary"
+              type="button"
+              :disabled="game.busy"
+              @click="game.claimDaily(row.key)"
+            >
+              Claim
+            </button>
+          </div>
+        </div>
+
+        <p class="tiny muted day-note">
+          Three a day, one from each lane, and the field one is workable from
+          whatever hex you are standing on. Unclaimed gold goes with the day.
+        </p>
+      </div>
+
       <!-- §3.2 -- what this ledger has paid out so far. Gold and only gold: a
            quest that paid a material would be a hole in §2 rather than a nicer
            reward, so there is only ever one figure to total. -->
@@ -272,6 +379,50 @@ const earned = computed(() => completed.value.reduce((n, r) => n + r.gold, 0))
   line-height: 1.45;
   max-width: 190px;
   text-align: right;
+}
+
+/* ------------------------------------------------------------------ today */
+
+.day {
+  margin-bottom: 12px;
+}
+
+.day-head {
+  margin-bottom: 9px;
+}
+
+.daily + .daily {
+  margin-top: 9px;
+  padding-top: 9px;
+  border-top: 1px solid var(--line);
+}
+
+/*
+ * A claimed daily stays on the block until the day turns rather than vanishing.
+ * Three rows that quietly become two would read as something having gone wrong;
+ * a finished one greyed out with its bar full reads as a day going well.
+ */
+.daily.spent {
+  opacity: 0.55;
+}
+
+/*
+ * The lane, in copper -- §13.3 spends copper on work in progress, which is
+ * exactly what an errand with hours left on it is. It is a tag rather than a
+ * sentence because it answers one question: can I do this from here.
+ */
+.lane {
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--copper);
+  margin-right: 6px;
+  vertical-align: 1px;
+}
+
+.day-note {
+  margin: 10px 0 0;
+  line-height: 1.5;
 }
 
 /* ------------------------------------------------------------------- tabs */

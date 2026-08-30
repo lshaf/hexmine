@@ -3411,8 +3411,8 @@ whole of the design:
 back. That cap is what makes it safe for §2 — an unbounded gold faucet is a
 bot's entire business plan, while a finite list of one-time payouts is worth
 exactly as much to a thousand wallets as to one, which is not enough to farm.
-Dailies, if they ever land, need their own cap and their own argument; they must
-not be bolted onto this.
+Dailies landed with their own cap and their own argument, in §12.2, and they are
+a separate ledger rather than a row in this one.
 
 **Gold, and only gold.** §3.3 forbids a grind→NFT faucet outright and §3.2 makes
 gold the currency that may be inflated precisely because it bridges to nothing
@@ -3475,6 +3475,113 @@ holds — what was earned, what the purse is now, and what the claim just opened
 up. It gets the same one-beat arrival as the haul modal (§4), and like that one
 it carries no button: the gold landed before the plate was drawn, so "Take it"
 would be a question with one answer.
+
+### 12.2 Dailies — three a day, and the cap is a rate
+
+**The first gold faucet in the game that never runs out.** §12.1 is safe because
+it is finite: a quest is claimed once, so a list of one-time payouts is worth as
+much to a thousand wallets as to one. That argument does not survive a task that
+comes back tomorrow, so this needs its own — and §12.1 said so in as many words
+before this existed.
+
+**The cap is a RATE, not a total.** Three tasks a day, per character, and §7
+gives a wallet exactly one character. Playing ten hours does not produce a
+fourth. So the faucet's whole lifetime yield is *wallets × days*, and §2 has
+already priced both ends of that: a wallet costs a one-time mint fee and must
+hold a balance for **seven continuous days** before it can act at all. A farm on
+a thousand wallets earns a thousand small dailies a day and pays a thousand
+sybil costs to do it, which is exactly the arithmetic §2 exists to make lose.
+
+**And every task pays less than the work it asks for.** Forty-five units of raw
+fetch about ninety gold at the NPC's own poor rate; the daily asking for them
+pays twenty-eight. That is the second half of the safety and it is a rule rather
+than tuning: a daily is a **nudge toward a system you have not touched today**,
+never an income. The day tops out around 130 gold, which is under five mines'
+worth of selling, and there is a test pinning the ceiling so a template cannot
+drift up unnoticed.
+
+**Gold and only gold**, for §12.1's reason exactly. **And nothing here is a new
+verb** either — every goal rides a counter §12 already had, fired from the same
+call sites, so a daily can only ever be advanced by work the server itself
+witnessed. That is why adding them cost no hook: `fireGoal` credits both
+ledgers, and neither knows the other exists.
+
+#### Derived, like a pack
+
+The three are a **hash of (character, day, lane)**, the same way a pack (§9.5.1)
+and a pocket (§5.7) are hashes of a hex and a time bucket — so a day nobody
+played costs no storage. What gets written down is only what the hash cannot
+know: how far along you are, and whether you took the gold.
+
+**Per character rather than per server.** What today asks of you is your day, and
+two prospectors standing on one hex are not owed the same errand.
+
+#### One from each of three lanes
+
+| Lane | What it asks for |
+|---|---|
+| `field` | take something out of a hex |
+| `bench` | turn it into something — a run, or a craft |
+| `road` | the walk, and the counter you walk to |
+
+One of each rather than three from one pool, so a day is never three of the same
+verb.
+
+**The field task is workable from wherever you are standing, always** — and that
+is the rule the whole pool is built around. **No daily names a material, a line
+or a biome.** The map takes days to cross (§5.6); a task with a 24-hour clock
+that wants iron ore, handed to somebody standing in a forest, is not a task but
+a taunt. The same argument one step weaker kills a named processing line: a
+village runs one of the five (§6) and which one is not the player's choice. So
+the field lane counts **units, off any hex, of anything** — and it does not care
+whether a tool was used, because §7.3 says bare hands and a Stone Axe are the
+same arithmetic at different rungs.
+
+The other two lanes may want a settlement, precisely because one of your three
+never does. **A day always has something in it for the hex you are on.**
+
+#### Only today's work counts
+
+This is the one place §12.1's rule is deliberately reversed. A quest credits
+work done before it was ever offered, because being handed a task already half
+done is a better welcome than being told to start again. A daily whose tally
+carried over would be a quest with a slower name — so progress is keyed to the
+day, and yesterday's haul is yesterday's.
+
+**Unclaimed gold expires with the day. Nothing accrues, and there is no
+streak** — a streak is a punishment for a day off, and this is an idle game.
+
+**The day is a duration, so it runs through `Balance::scaled()`** like every
+other clock (§7.4.4 exempts XP alone), which is what makes dailies testable by
+hand. The boundary is **global**: everybody's day turns at the same instant,
+which is one less thing for a client to disagree about and nothing anybody can
+shop around by changing a timezone. When it turns is on the payload rather than
+worked out client-side, because a client deriving it from a 24-hour constant
+would be wrong on every development server.
+
+#### On screen
+
+They sit **above the tabs, not inside them**, and that is why §12.1 still has no
+third tab: Pending and Completed are two *states of one ledger*, and this is a
+*different ledger*. One tab row for both would make a category out of two things
+that are not the same kind of thing. They read first because they are the half
+that expires — a quest waits forever and today does not.
+
+A daily draws as **the same row a quest does**, because it is the same object
+minus the chain: one goal, one counter, one figure in gold. Anything that made
+the two look different would be claiming they behave differently, and the only
+thing that does is when they reset. What is not shared is the block around them:
+a header with the clock on it, and the **lane** tagged on each row in copper —
+§13.3 spends copper on work in progress, and the tag answers the one question
+worth answering at a glance, *can I do this from where I am*.
+
+**A claimed daily stays on the block until the day turns**, greyed with its bar
+full. Three rows quietly becoming two would read as something having gone wrong;
+a finished one still standing reads as a day going well.
+
+**One receipt for both ledgers**, since a claim is one moment however it was
+earned — a name, a figure, and the purse it changed. The two lines that are not
+shared are what a quest opened, and the fact that a daily comes round again.
 
 ---
 

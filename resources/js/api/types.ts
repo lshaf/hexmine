@@ -172,6 +172,11 @@ export interface PlayerState {
    */
   quests: QuestState[]
   /**
+   * §12.2 -- today's three, and the instant they turn over. Which three they
+   * are is derived per character from the day, so this moves on its own.
+   */
+  dailies: DailyBoard
+  /**
    * §8.4 -- the slate: recipe keys this prospector means to make, oldest first.
    *
    * Keys and nothing else. What each one costs is in the catalog the client
@@ -219,6 +224,55 @@ export interface QuestReward {
   gold: number
   goldAfter: number
   unlocked: Array<{ key: string; name: string }>
+  /** §12.2 -- set on a daily's receipt, which never has anything to unlock. */
+  daily?: boolean
+}
+
+/**
+ * §12.2 -- the day's three, as the state reports them.
+ *
+ * `resetsAt` is the server's, never the client's: a day's length runs through
+ * `Balance::scaled()`, so anything derived here from a 24-hour constant would be
+ * wrong on every development server -- and the deadline is the one fact that
+ * makes a daily a daily.
+ */
+export interface DailyBoard {
+  day: number
+  resetsAt: number
+  tasks: DailyState[]
+}
+
+/** One daily task's standing. The catalog behind it comes from GET /quests. */
+export interface DailyState {
+  key: string
+  /** Which of the three it was drawn from: field, bench or road. */
+  lane: string
+  progress: number
+  /** Server-decided, like every other rule (§16). */
+  complete: boolean
+  /** Claimed pays once, and only for today. */
+  claimed: boolean
+}
+
+/**
+ * §12.2 -- a daily task, as written down. Static and identical for everyone;
+ * which three are *yours* today is in the state.
+ *
+ * The same shape as a QuestDef minus `requires`, because a daily has no chain --
+ * which is what lets one row component and one goal label draw either.
+ */
+export interface DailyDef {
+  name: string
+  description: string
+  goal: QuestDef['goal']
+  gold: number
+  lane: string
+}
+
+/** Both catalogs, fetched together: they are drawn on one screen. */
+export interface LedgerCatalog {
+  quests: Record<string, QuestDef>
+  dailies: Record<string, DailyDef>
 }
 
 export interface SkillPoints {
@@ -875,10 +929,12 @@ export interface GameApi {
   /** §7.4 -- spend one point. Every gate is checked server-side. */
   buyNode(nodeKey: string): Promise<ActionResult<{ node: string; points: SkillPoints }>>
 
-  /** §12.1 -- the static quest catalog. Fetched once, never per action. */
-  getQuests(): Promise<Record<string, QuestDef>>
+  /** §12 -- both static catalogs, the chain and the day's pool. Fetched once. */
+  getQuests(): Promise<LedgerCatalog>
   /** §12.1 -- take the gold, once. Answers with no message: the receipt says it. */
   claimQuest(quest: string): Promise<ActionResult<QuestReward>>
+  /** §12.2 -- take the day's gold. Its own route: two ledgers, two resets. */
+  claimDaily(task: string): Promise<ActionResult<QuestReward>>
   /** §8.4 -- write a recipe on the slate. Refused when it is full. */
   saveRecipe(recipe: string): Promise<ActionResult<{ slate: string[] }>>
   /** §8.4 -- rub one off. Silent about a line that was not there. */

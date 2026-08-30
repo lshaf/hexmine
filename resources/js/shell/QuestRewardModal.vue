@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * What a claimed quest paid, §12.1.
+ * What a claim paid -- a quest's (§12.1) or one of the day's three (§12.2).
  *
  * This used to be a toast, and a toast was the wrong shape for it twice over.
  * A claim is not a status line -- it is the one thing on the ledger the player
@@ -17,6 +17,11 @@
  *
  * Everything here is the server's own response. The client never decides what a
  * quest paid, only how to show it (§16).
+ *
+ * One receipt for both ledgers, because a claim is one moment however it was
+ * earned: a name, a figure, and the purse it changed. The two lines that are
+ * not shared -- what a quest opened, and the fact that a daily comes round
+ * again -- are the only place `reward.daily` is read.
  */
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { ACTION_PATHS } from '@/icons/actions'
@@ -89,7 +94,7 @@ onBeforeUnmount(() => {
                stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path :d="ACTION_PATHS.quest" />
           </svg>
-          Quest complete
+          {{ reward.daily ? 'Daily done' : 'Quest complete' }}
         </span>
 
         <h3 class="name">{{ reward.name }}</h3>
@@ -109,13 +114,18 @@ onBeforeUnmount(() => {
         </div>
 
         <!-- §12.1 -- what this claim opened. The chain advances on claiming, so
-             this is the one moment the next quest exists to be named. -->
+             this is the one moment the next quest exists to be named. A daily
+             opens nothing: §12.2 has no chain, and comes round instead. -->
         <div v-if="reward.unlocked.length" class="opened">
           <span class="label">Now open</span>
           <ul>
             <li v-for="next in reward.unlocked" :key="next.key">{{ next.name }}</li>
           </ul>
         </div>
+
+        <p v-else-if="reward.daily" class="tiny muted end">
+          Nothing follows a daily. The day turns and three more are drawn.
+        </p>
 
         <p v-else class="tiny muted end">
           Nothing follows this one yet. The ledger will grow.
