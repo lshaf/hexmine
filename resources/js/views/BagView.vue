@@ -1,3 +1,20 @@
+<script lang="ts">
+import { ref } from 'vue'
+
+/**
+ * §7.6 -- how the comb is ordered. A preference, not a rule.
+ *
+ * Declared out here rather than inside `setup` so it outlives the panel being
+ * shut and reopened: this is a module binding, and every mount of the view
+ * shares it. There is no storage layer in this client and one preference is
+ * not a reason to invent one, so the choice lasts the session and no longer --
+ * which is the honest lifetime for something nobody was asked to commit to.
+ */
+export type Sort = 'type' | 'tier' | 'amount'
+
+const sort = ref<Sort>('type')
+</script>
+
 <script setup lang="ts">
 /**
  * The bag, §7.6.
@@ -21,12 +38,13 @@
  * a backdrop-filter, which would otherwise become the containing block for
  * anything fixed inside it.
  */
-import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, watch } from 'vue'
 import { useGame } from '@/stores/game'
 import {
   ITEM_BY_KEY,
   MATERIALS,
   RARITY_LABEL,
+  RARITY_RANK,
   SCOPE_ACTION,
   SCOPE_LABEL,
   SLOT_LABEL,
@@ -42,6 +60,37 @@ import SvgIcon from '@/components/SvgIcon.vue'
 import type { ItemDef, MaterialKey, OwnedItem } from '@/game/types'
 
 const game = useGame()
+
+/**
+ * Three orders, because there are exactly three questions a full bag gets
+ * asked: *where is my ore* (type), *what is the good stuff* (tier), and *what
+ * is taking up all the room* (amount).
+ *
+ * Anything past those is a filter, which is a different control for a different
+ * problem -- and hiding straps from a screen whose whole subject is how many
+ * straps there are would be answering the wrong question.
+ */
+const SORT_LABEL: Record<Sort, string> = {
+  type: 'Type',
+  tier: 'Tier',
+  amount: 'Amount',
+}
+
+/**
+ * Every comparator is partial on purpose: `slots` puts the name on the end of
+ * whichever of these is chosen, so each one only has to say what it is *for*.
+ */
+const SORTS: Record<Sort, (a: Holding, b: Holding) => number> = {
+  // Materials, then drafts, then gear; up the ladder inside each, biggest
+  // stack first. This is the order the bag has always been in.
+  type: (a, b) => a.group - b.group || a.rank - b.rank || b.held - a.held,
+  // Best first, whatever kind it is -- the one order that puts an Ironwood and
+  // an epic sword on the same question.
+  tier: (a, b) => b.rank - a.rank || a.group - b.group || b.held - a.held,
+  // What is costing you the most straps. Gear is always one, so it falls to the
+  // bottom on its own without being special-cased there.
+  amount: (a, b) => b.held - a.held || a.group - b.group || b.rank - a.rank,
+}
 
 /**
  * The size the SVG is authored at. What it ends up as is decided by `--art`
@@ -82,52 +131,69 @@ function across(held: number, stack: number): number[] {
   return out
 }
 
-const slots = computed<Slot[]>(() => {
-  const out: Slot[] = []
-  const b = bag.value
-  if (!b) return out
+/**
+ * One *kind* the bag is holding, before it is broken across straps.
+ *
+ * The sort works on these rather than on the straps themselves, and it has to:
+ * three straps of wood are one decision, and a comb that interleaved them with
+ * whatever happened to sort between 50 and 30 would be sorting places rather
+ * than things. Holdings are ordered, then each one expands into its own straps
+ * in order, so a kind is always contiguous however the comb is sorted.
+ */
+type Order = {
+  /**
+   * How good it is, on one ladder.
+   *
+   * A material's tier and a piece's rung are the same question asked of two
+   * different things, so they are put on one scale to be compared: tier 0-4 for
+   * a material, and rarity+1 for anything with a rung, which lands a common
+   * axe next to a tier-1 material. Rough, and it has to be rough -- there is no
+   * exchange rate between an Ironwood and an epic sword, and the sort only has
+   * to be *stable and defensible*, not correct in some deeper sense.
+   */
+  rank: number
+  /** Materials, then drafts, then gear -- the order `type` groups by. */
+  group: number
+}
 
-  const held = Object.entries(game.inventory)
-    .filter(([, qty]) => qty)
-    .map(([key, qty]) => ({ mat: MATERIALS[key as MaterialKey], qty: qty as number }))
-    // Tier first, then the big stacks: the ladder is still the order things
-    // make sense in, even without headings to say so.
-    .sort((a, b2) => a.mat.tier - b2.mat.tier || b2.qty - a.qty)
+/*
+ * Spelled out as a union rather than `Omit<Slot, ...>`: an Omit over a union
+ * collapses it to the keys they share, which quietly loses the `item` a gear
+ * holding carries and takes the discriminant with it.
+ */
+type Holding =
+  | ({ kind: 'material'; key: MaterialKey; name: string; icon: string; held: number } & Order)
+  | ({ kind: 'potion'; key: string; name: string; icon: string; held: number } & Order)
+  | ({ kind: 'gear'; key: string; name: string; icon: string; held: number; item: OwnedItem } & Order)
 
-  for (const { mat, qty } of held) {
-    const parts = across(qty, b.stackMaterial)
-    parts.forEach((on, i) => {
-      out.push({
-        // The index is part of the id because two straps of one material are
-        // two places, and a comb keyed on the material alone would collapse
-        // them into one cell the moment a haul outgrew a strap.
-        id: `m:${mat.key}:${i}`,
-        kind: 'material',
-        key: mat.key,
-        name: mat.name,
-        icon: materialIcon(mat, ICON),
-        qty: on,
-        held: qty,
-        straps: parts.length,
-      })
+const holdings = computed<Holding[]>(() => {
+  const out: Holding[] = []
+
+  for (const [key, qty] of Object.entries(game.inventory)) {
+    const mat = MATERIALS[key as MaterialKey]
+    if (!qty || !mat) continue
+    out.push({
+      kind: 'material',
+      key: mat.key,
+      name: mat.name,
+      icon: materialIcon(mat, ICON),
+      held: qty,
+      rank: mat.tier,
+      group: 0,
     })
   }
 
   for (const [key, qty] of Object.entries(game.consumables)) {
     const def = ITEM_BY_KEY[key]
     if (!qty || !def) continue
-    const parts = across(qty, b.stackPotion)
-    parts.forEach((on, i) => {
-      out.push({
-        id: `p:${key}:${i}`,
-        kind: 'potion',
-        key,
-        name: def.name,
-        icon: itemIcon({ rarity: def.rarity, palette: def.palette, size: ICON }),
-        qty: on,
-        held: qty,
-        straps: parts.length,
-      })
+    out.push({
+      kind: 'potion',
+      key,
+      name: def.name,
+      icon: itemIcon({ rarity: def.rarity, palette: def.palette, size: ICON }),
+      held: qty,
+      rank: RARITY_RANK[def.rarity] + 1,
+      group: 1,
     })
   }
 
@@ -138,7 +204,6 @@ const slots = computed<Slot[]>(() => {
     const def = ITEM_BY_KEY[item.key]
     if (item.equipped || !def) continue
     out.push({
-      id: `g:${item.id}`,
       kind: 'gear',
       key: item.key,
       name: def.name,
@@ -146,7 +211,48 @@ const slots = computed<Slot[]>(() => {
       // of gear draws as the flask consumables fall back to.
       icon: itemIcon({ slot: def.slot, family: def.family, rarity: def.rarity, palette: def.palette, size: ICON }),
       held: 1,
+      rank: RARITY_RANK[def.rarity] + 1,
+      group: 2,
       item,
+    })
+  }
+
+  return out
+})
+
+/**
+ * The comb, sorted, then broken across straps.
+ *
+ * Every comparator ends on the name, so the order is **total**: two holdings
+ * that tie on everything the player chose still have one fixed position
+ * between them, and the comb does not quietly rearrange itself when a haul
+ * lands on something unrelated.
+ */
+const slots = computed<Slot[]>(() => {
+  const b = bag.value
+  if (!b) return []
+
+  const by = SORTS[sort.value]
+  const ordered = [...holdings.value].sort((a, c) => by(a, c) || a.name.localeCompare(c.name))
+
+  const out: Slot[] = []
+  for (const h of ordered) {
+    if (h.kind === 'gear') {
+      out.push({ ...h, id: `g:${h.item.id}` })
+      continue
+    }
+
+    const parts = across(h.held, h.kind === 'potion' ? b.stackPotion : b.stackMaterial)
+    parts.forEach((on, i) => {
+      out.push({
+        // The index is part of the id because two straps of one material are
+        // two places, and a comb keyed on the material alone would collapse
+        // them into one cell the moment a haul outgrew a strap.
+        ...h,
+        id: `${h.kind === 'potion' ? 'p' : 'm'}:${h.key}:${i}`,
+        qty: on,
+        straps: parts.length,
+      })
     })
   }
 
@@ -505,6 +611,27 @@ async function mend(item: OwnedItem): Promise<void> {
 
 <template>
   <div v-if="bag" class="page">
+    <!--
+      How the comb is ordered.
+
+      Above the comb because it is about the comb, and quiet because it is a
+      preference rather than an action: three chips in the game's own chamfer,
+      the chosen one lit the way a tab is. It is not drawn as a control that
+      *does* something, since nothing here changes what is in the bag.
+    -->
+    <div v-if="slots.length > 1" class="sorter" role="group" aria-label="Order the straps">
+      <span class="eyebrow">Sort</span>
+      <button
+        v-for="(label, key) in SORT_LABEL"
+        :key="key"
+        type="button"
+        class="sort"
+        :class="{ on: sort === key }"
+        :aria-pressed="sort === key"
+        @click="sort = key"
+      >{{ label }}</button>
+    </div>
+
     <!-- Straps. Places rather than a quantity, so a comb -- and the empty ones
          are drawn exactly like the full ones, which is what makes room
          something you can see rather than subtract. A stack that outgrows a
@@ -970,6 +1097,45 @@ async function mend(item: OwnedItem): Promise<void> {
 /* The padding belongs to the bands, so each one can carry its own ground. */
 .pop-inner {
   padding: 0;
+}
+
+/* ----------------------------------------------------------------- sorter */
+
+.sorter {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 9px;
+}
+
+.sorter .eyebrow {
+  margin-right: 2px;
+}
+
+/*
+ * The chosen one is lit and the others are not, which is the same reading the
+ * quest tabs give. Smaller than a button on purpose: this changes nothing about
+ * what is in the bag, and a control that looks like it might is a control a
+ * player has to think about before pressing.
+ */
+.sort {
+  padding: 4px 9px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--vellum-dim);
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid transparent;
+  clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
+}
+
+.sort:hover {
+  color: var(--vellum);
+}
+
+.sort.on {
+  color: var(--vellum);
+  border-color: var(--line);
+  background: var(--ink-panel);
 }
 
 /* ------------------------------------------------------------------- head */

@@ -1449,6 +1449,27 @@ its depth simply draws as the next hexagon along, with its own count on it, so
 bar any more**: it was a second answer to a question the comb was already
 answering, and the only one of the two that could be passed.
 
+**The comb can be ordered three ways, and three is the whole list**: by
+**type** (materials, then drafts, then gear — the order it has always been in),
+by **tier** (best first, on one ladder, which is the only order that asks an
+Ironwood and an epic sword the same question), and by **amount** (what is
+costing you the most straps). Those are the three questions a full bag gets
+asked; anything past them is a *filter*, which is a different control for a
+different problem — and hiding straps from a screen whose whole subject is how
+many straps there are would be answering the wrong question.
+
+**The sort is over KINDS, never over straps.** Three straps of wood are one
+decision, so a holding is ordered and then broken across its straps, which
+keeps a kind contiguous however the comb is sorted. Every ordering ends on the
+name so it is total: two things that tie still have one fixed position between
+them, and the comb never quietly rearranges itself when an unrelated haul
+lands.
+
+It is a preference rather than an action — nothing it does changes what is in
+the bag — so it is drawn quiet, above the comb, in the chamfer everything else
+uses, with the chosen one lit the way a tab is. It lasts the session and is not
+written down anywhere: nobody was asked to commit to it.
+
 Tapping a strap opens what is on it — the *kind*, and the whole holding across
 however many straps it is on, because "my wood" is what a prospector means and
 not "my third strap of wood". The popup carries the one or two things that can
