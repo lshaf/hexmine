@@ -1363,14 +1363,44 @@ class GameService
      * is no row to put it in, and banking progress against an errand nobody was
      * asked to run would make tomorrow's draw pay out on arrival.
      */
+    /**
+     * §12.2 -- the seed today's three are drawn against.
+     *
+     * Built here rather than passed around, so the payload, the counter and the
+     * claim cannot end up drawing three different days for one character. It is
+     * made only of things that never change -- the wallet (§7: one per
+     * character, soulbound), when the player was created, and the row id -- for
+     * the reason `Dailies::identity()` spells out: progress is filed under the
+     * task keys the seed produced, so a seed that ever moved would orphan it.
+     *
+     * Public because "which three is this character on today" is a real
+     * question from outside — the ledger's tests ask it, and any telemetry that
+     * wants to preview a day will too — and reaching in through reflection to
+     * ask it would be worse than saying so.
+     */
+    public function dailyIdentity(Character $character): int
+    {
+        $player = $character->player;
+
+        return Dailies::identity(
+            (string) ($player->wallet ?? ''),
+            (int) ($player->created_at?->getTimestamp() ?? 0),
+            (int) $character->id,
+        );
+    }
+
     private function fireDaily(Character $character, string $kind, int $amount, ?string $subject): void
     {
         $day = Dailies::dayIndex($this->now());
-        $today = Dailies::forDay((int) $character->id, $day);
+        $today = Dailies::forDay($this->dailyIdentity($character), $day);
         $touched = false;
 
-        foreach ($today as $key) {
-            $goal = Dailies::task($key)['goal'];
+        foreach ($today as $draw) {
+            // §12.2 -- the GRADED target, because that is the only target this
+            // day has. Clamping against the `B` figure in the table would cap a
+            // C day above what it asks and an S day below it.
+            $def = Dailies::graded($draw['key'], $draw['grade']);
+            $goal = $def['goal'];
             if ($goal['kind'] !== $kind) {
                 continue;
             }
@@ -1379,7 +1409,7 @@ class GameService
             }
 
             $row = CharacterDaily::firstOrCreate(
-                ['character_id' => $character->id, 'day' => $day, 'task_key' => $key],
+                ['character_id' => $character->id, 'day' => $day, 'task_key' => $draw['key']],
                 ['progress' => 0],
             );
 
@@ -1606,6 +1636,7 @@ class GameService
             return [
                 'quest' => $key,
                 'name' => $def['name'],
+                'grade' => $def['grade'],
                 'gold' => $def['gold'],
                 'goldAfter' => (int) $character->gold,
                 // What this claim just made visible, so the modal can say the
@@ -1641,7 +1672,7 @@ class GameService
     {
         $now = $this->now();
         $day = Dailies::dayIndex($now);
-        $today = Dailies::forDay((int) $character->id, $day);
+        $today = Dailies::forDay($this->dailyIdentity($character), $day);
 
         $rows = CharacterDaily::where('character_id', $character->id)
             ->where('day', $day)
@@ -1650,14 +1681,21 @@ class GameService
 
         $tasks = [];
 
-        foreach ($today as $lane => $key) {
-            $def = Dailies::task($key);
-            $row = $rows->get($key);
+        foreach ($today as $lane => $draw) {
+            $def = Dailies::graded($draw['key'], $draw['grade']);
+            $row = $rows->get($draw['key']);
             $progress = min((int) ($row->progress ?? 0), $def['goal']['target']);
 
             $tasks[] = [
-                'key' => $key,
+                'key' => $draw['key'],
                 'lane' => $lane,
+                // §12.2 -- the grade, and the two figures it moved. They ride
+                // the day rather than the catalog because they ARE the day: the
+                // client mirrors the pool once and has no way to know that
+                // today's version of it asks for a hundred and eight.
+                'grade' => $def['grade'],
+                'target' => $def['goal']['target'],
+                'gold' => $def['gold'],
                 'progress' => $progress,
                 // Server-decided, like every other rule (§16).
                 'complete' => $progress >= $def['goal']['target'],
@@ -1690,16 +1728,27 @@ class GameService
     public function claimDaily(Character $character, string $key): array
     {
         return DB::transaction(function () use ($character, $key) {
-            $def = Dailies::task($key);
-            if ($def === null) {
-                throw new GameException('No such task.', 'not_found');
-            }
-
             $now = $this->now();
             $day = Dailies::dayIndex($now);
 
-            if (! in_array($key, Dailies::forDay((int) $character->id, $day), true)) {
+            // §12.2 -- which grade this character drew today, which is what
+            // decides both the bar to clear and the figure paid. Read here
+            // rather than taken from the request for the obvious reason: the
+            // client would otherwise be naming its own price.
+            $grade = null;
+            foreach (Dailies::forDay($this->dailyIdentity($character), $day) as $draw) {
+                if ($draw['key'] === $key) {
+                    $grade = $draw['grade'];
+                }
+            }
+
+            if ($grade === null) {
                 throw new GameException('That is not one of today\'s.', 'not_today');
+            }
+
+            $def = Dailies::graded($key, $grade);
+            if ($def === null) {
+                throw new GameException('No such task.', 'not_found');
             }
 
             $row = CharacterDaily::firstOrCreate(
@@ -1726,6 +1775,7 @@ class GameService
             return [
                 'quest' => $key,
                 'name' => $def['name'],
+                'grade' => $def['grade'],
                 'gold' => $def['gold'],
                 'goldAfter' => (int) $character->gold,
                 // Nothing follows a daily -- the chain is §12.1's idea, and this

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Game\Balance;
+use App\Game\Catalog;
 use App\Game\Dailies;
 use App\Game\GameException;
 use App\Game\GameService;
@@ -101,28 +102,234 @@ final class DailyTest extends TestCase
     /**
      * §12.2 -- the cap is a rate, so the richest possible day has to stay small.
      * This is the assert that notices a template drifting upward.
+     *
+     * The sweep is over every task at every GRADE, because the table's figures
+     * are only the `B` version and the richest day is three S tasks.
      */
     public function test_the_richest_possible_day_stays_little_money(): void
     {
         $most = 0;
 
         foreach (Dailies::LANES as $lane) {
-            $most += max(array_column(Dailies::DEFS[$lane], 'gold'));
+            $best = 0;
+            foreach (array_keys(Dailies::DEFS[$lane]) as $key) {
+                foreach (array_keys(Dailies::GRADES) as $grade) {
+                    $best = max($best, Dailies::graded($key, $grade)['gold']);
+                }
+            }
+            $most += $best;
         }
 
-        $this->assertLessThanOrEqual(150, $most, 'a day pays more than a day should');
+        $this->assertLessThanOrEqual(400, $most, 'a day pays more than a day should');
+    }
+
+    /**
+     * §12.2 -- and the day a player actually gets has to stay where it was.
+     *
+     * The ceiling above is the rare day; this is the ordinary one, and it is
+     * the number that decides whether grades were variance or a raise. Weighted
+     * by how often each grade and each task comes up, an average day pays about
+     * a hundred gold -- *less* than the flat day paid before grades existed,
+     * which is what makes S worth noticing rather than worth farming.
+     */
+    public function test_an_average_day_did_not_get_richer(): void
+    {
+        $weights = array_sum(array_column(Dailies::GRADES, 'weight'));
+        $expected = 0.0;
+
+        foreach (Dailies::LANES as $lane) {
+            $keys = array_keys(Dailies::DEFS[$lane]);
+            foreach ($keys as $key) {
+                foreach (Dailies::GRADES as $grade => $spec) {
+                    $expected += Dailies::graded($key, $grade)['gold']
+                        * ($spec['weight'] / $weights)
+                        / count($keys);
+                }
+            }
+        }
+
+        $this->assertLessThanOrEqual(120, $expected, 'grades turned into a raise');
+    }
+
+    /**
+     * §12.2 -- **every task pays less than the work it asks for**, at every
+     * grade. This is the second half of the faucet's safety and it was prose.
+     *
+     * Costed against **scrap**, at a gold a unit (§4.0), which is the least any
+     * of it can possibly be worth: the field lane counts anything off any hex,
+     * so a bare-handed day really is a pile of branches. The realistic figure is
+     * about a third, because raw sells for more than scrap -- but the claim has
+     * to survive the worst reading of "units", not the flattering one.
+     *
+     * A `sell` goal is costed at face value, since its target IS gold taken off
+     * a trader: paying more for taking it than it was worth would be a trader
+     * paying twice.
+     */
+    public function test_no_task_at_any_grade_pays_more_than_the_work(): void
+    {
+        foreach (Dailies::all() as $key => $_) {
+            foreach (array_keys(Dailies::GRADES) as $grade) {
+                $def = Dailies::graded($key, $grade);
+                $goal = $def['goal'];
+
+                $worth = match ($goal['kind']) {
+                    'gather' => $goal['target'] * $this->cheapestUnit(),
+                    'sell' => $goal['target'],
+                    // A run, a craft and a walk have no gold price to compare
+                    // against -- and none of them hands you anything sellable
+                    // that the gather lane has not already been costed for.
+                    default => null,
+                };
+
+                if ($worth === null) {
+                    continue;
+                }
+
+                $this->assertLessThan(
+                    $worth,
+                    $def['gold'],
+                    "{$key} at {$grade} pays {$def['gold']} for work worth {$worth}",
+                );
+            }
+        }
+    }
+
+    // --------------------------------------------------------------- grades
+
+    /**
+     * §12.2 -- a grade is the same errand asked bigger, so both halves move and
+     * both move the same way. A grade that paid more for less would be a
+     * discount wearing a letter.
+     */
+    public function test_a_higher_grade_asks_more_and_pays_more(): void
+    {
+        $ladder = array_keys(Dailies::GRADES);
+
+        foreach (Dailies::all() as $key => $_) {
+            foreach ($ladder as $i => $grade) {
+                if ($i === 0) {
+                    continue;
+                }
+
+                $under = Dailies::graded($key, $ladder[$i - 1]);
+                $over = Dailies::graded($key, $grade);
+
+                $this->assertGreaterThan(
+                    $under['gold'],
+                    $over['gold'],
+                    "{$key}: {$grade} does not pay more than {$ladder[$i - 1]}",
+                );
+                // Not *strictly* greater: a target of one cannot be asked for
+                // less than one, so the smallest tasks compress at the bottom.
+                $this->assertGreaterThanOrEqual(
+                    $under['goal']['target'],
+                    $over['goal']['target'],
+                    "{$key}: {$grade} asks less than {$ladder[$i - 1]}",
+                );
+            }
+        }
+    }
+
+    /** Nothing is ever asked for zero of, whatever the multiplier does. */
+    public function test_no_grade_can_ask_for_nothing(): void
+    {
+        foreach (Dailies::all() as $key => $_) {
+            foreach (array_keys(Dailies::GRADES) as $grade) {
+                $this->assertGreaterThanOrEqual(
+                    1,
+                    Dailies::graded($key, $grade)['goal']['target'],
+                    "{$key} at {$grade} is finished before it is read",
+                );
+            }
+        }
+    }
+
+    /**
+     * §12.2 -- all four turn up, and S is the rare one.
+     *
+     * A grade nobody is ever handed is a grade that does not exist, and one
+     * handed out as often as the rest is not a grade at all -- it is a coin
+     * flip with four faces.
+     */
+    public function test_every_grade_is_drawn_and_s_is_the_rare_one(): void
+    {
+        $seen = array_fill_keys(array_keys(Dailies::GRADES), 0);
+
+        for ($id = 1; $id <= 60; $id++) {
+            for ($day = 0; $day < 30; $day++) {
+                foreach (Dailies::forDay($id, $day) as $draw) {
+                    $seen[$draw['grade']]++;
+                }
+            }
+        }
+
+        foreach ($seen as $grade => $count) {
+            $this->assertGreaterThan(0, $count, "{$grade} is never handed to anybody");
+        }
+
+        $this->assertLessThan($seen['C'], $seen['S'], 'S is not rare');
+        $this->assertLessThan($seen['B'], $seen['S'], 'S is not rare');
+        $this->assertLessThan($seen['A'], $seen['S'], 'S is not rare');
+    }
+
+    /**
+     * §12.2 -- the seed is made of immutable things, and claiming a name is the
+     * one thing about a prospector that changes.
+     *
+     * This is the assert that would have caught the tempting version of the
+     * seed. Progress is filed under the task keys the draw produced, so a seed
+     * that moved when a name was claimed would re-roll the day underneath a
+     * player who had already half-finished it: banked progress orphaned, and a
+     * finished task answering "that is not one of today's" to its own claim.
+     */
+    public function test_claiming_a_name_does_not_re_roll_the_day(): void
+    {
+        $character = $this->character();
+        $day = Dailies::dayIndex($this->game->now());
+
+        $before = Dailies::forDay($this->game->dailyIdentity($character), $day);
+
+        // Bank some progress against today's field task, then take the name.
+        $this->fire($character, 'gather', 3, 'wood');
+        $this->game->renameCharacter($character, 'Grubstake');
+
+        $fresh = $character->fresh();
+        $after = Dailies::forDay($this->game->dailyIdentity($fresh), $day);
+
+        $this->assertSame($before, $after, 'naming yourself re-rolled the day');
+
+        $row = collect($this->game->dailyPayload($fresh)['tasks'])
+            ->firstWhere('key', $before['field']['key']);
+        $this->assertSame(3, $row['progress'], 'the banked progress was orphaned');
+    }
+
+    /**
+     * The grade rides its own hash, so retuning the grade table can never
+     * shuffle which task somebody was given.
+     */
+    public function test_the_grade_draw_is_stable_and_separate_from_the_task(): void
+    {
+        $this->assertSame(Dailies::forDay(11, 400), Dailies::forDay(11, 400));
+
+        $grades = [];
+        for ($day = 0; $day < 40; $day++) {
+            $grades[Dailies::forDay(5, $day)['field']['grade']] = true;
+        }
+
+        $this->assertGreaterThan(1, count($grades), 'one character only ever sees one grade');
     }
 
     // ---------------------------------------------------------------- the draw
 
     public function test_a_day_is_one_task_from_each_lane(): void
     {
-        $today = Dailies::forDay(1, Dailies::dayIndex($this->game->now()));
+        $today = Dailies::forDay(Dailies::identity('wallet-x', 1700000000, 1), Dailies::dayIndex($this->game->now()));
 
         $this->assertSame(Dailies::LANES, array_keys($today));
 
-        foreach ($today as $lane => $key) {
-            $this->assertArrayHasKey($key, Dailies::DEFS[$lane]);
+        foreach ($today as $lane => $draw) {
+            $this->assertArrayHasKey($draw['key'], Dailies::DEFS[$lane]);
+            $this->assertArrayHasKey($draw['grade'], Dailies::GRADES);
         }
     }
 
@@ -137,7 +344,7 @@ final class DailyTest extends TestCase
     {
         $seen = [];
         for ($day = 0; $day < 40; $day++) {
-            $seen[implode('/', Dailies::forDay(3, $day))] = true;
+            $seen[implode('/', Dailies::keysForDay(3, $day))] = true;
         }
 
         $this->assertGreaterThan(3, count($seen), 'the draw barely moves');
@@ -184,7 +391,9 @@ final class DailyTest extends TestCase
     {
         $character = $this->character();
         $task = $this->fieldTask($character);
-        $def = Dailies::task($task);
+        // §12.2 -- the GRADED figures: what the table says is only the B
+        // version, and this character was not necessarily handed that one.
+        $def = $this->fieldGraded($character);
 
         $this->fire($character, 'gather', $def['goal']['target'], 'wood');
 
@@ -204,7 +413,7 @@ final class DailyTest extends TestCase
         $character = $this->character();
         $task = $this->fieldTask($character);
 
-        $this->fire($character, 'gather', Dailies::task($task)['goal']['target'], 'wood');
+        $this->fire($character, 'gather', $this->fieldGraded($character)['goal']['target'], 'wood');
         $this->game->claimDaily($character->fresh(), $task);
 
         $this->expectException(GameException::class);
@@ -226,7 +435,7 @@ final class DailyTest extends TestCase
     public function test_a_task_that_is_not_one_of_todays_is_refused(): void
     {
         $character = $this->character();
-        $today = Dailies::forDay((int) $character->id, Dailies::dayIndex($this->game->now()));
+        $today = Dailies::keysForDay($this->game->dailyIdentity($character), Dailies::dayIndex($this->game->now()));
 
         $other = collect(array_keys(Dailies::all()))
             ->first(fn (string $key) => ! in_array($key, $today, true));
@@ -263,7 +472,7 @@ final class DailyTest extends TestCase
             'character_id' => $character->id,
             'day' => $today - 1,
             'task_key' => $task,
-            'progress' => Dailies::task($task)['goal']['target'],
+            'progress' => $this->fieldGraded($character)['goal']['target'],
         ]);
 
         $row = collect($this->game->dailyPayload($character)['tasks'])->firstWhere('key', $task);
@@ -297,7 +506,36 @@ final class DailyTest extends TestCase
 
     private function fieldTask(Character $character): string
     {
-        return Dailies::forDay((int) $character->id, Dailies::dayIndex($this->game->now()))['field'];
+        return $this->fieldDraw($character)['key'];
+    }
+
+    /**
+     * §4.0 -- the least a unit out of a hex can possibly be worth.
+     *
+     * Read off the catalog rather than written down here: scrap sells for a
+     * gold and every raw material must sell for more, which §4.0 makes a rule
+     * rather than a tuning value -- so the floor is whatever the cheapest thing
+     * a trader will take is, and it moves if the catalog ever does.
+     */
+    private function cheapestUnit(): int
+    {
+        $prices = array_filter(array_column(Catalog::materials(), 'npcPrice'));
+
+        return (int) min($prices);
+    }
+
+    /** The field lane's whole draw -- the task AND the grade it came out at. */
+    private function fieldDraw(Character $character): array
+    {
+        return Dailies::forDay($this->game->dailyIdentity($character), Dailies::dayIndex($this->game->now()))['field'];
+    }
+
+    /** What today's version of the field task actually asks for and pays. */
+    private function fieldGraded(Character $character): array
+    {
+        $draw = $this->fieldDraw($character);
+
+        return Dailies::graded($draw['key'], $draw['grade']);
     }
 
     private function fire(Character $character, string $kind, int $amount, ?string $subject = null): void

@@ -3609,6 +3609,85 @@ call sites, so a daily can only ever be advanced by work the server itself
 witnessed. That is why adding them cost no hook: `fireGoal` credits both
 ledgers, and neither knows the other exists.
 
+#### A grade, C through S
+
+**The same errand, asked bigger.** Every daily is drawn at one of four grades,
+and the grade scales **the target and the gold together**:
+
+| Grade | Asks | Pays | How often |
+|---|---|---|---|
+| **C** | ×0.6 | ×0.6 | 9 in 24 |
+| **B** | ×1 | ×1 | 8 in 24 |
+| **A** | ×1.6 | ×1.7 | 5 in 24 |
+| **S** | ×2.4 | ×2.6 | 2 in 24 |
+
+**B is the task as written, and the other three are read against it.** That is
+what keeps this variance rather than inflation: the numbers in the pool did not
+move, a C day is a lighter version of the day that used to be the only version,
+and an S day is the rare one worth noticing. **A weighted average day pays about
+100 gold — less than the flat day paid before grades existed**, and there is a
+test pinning that, because a grade ladder that quietly raised the mean would be
+a raise wearing a letter.
+
+**Gold climbs a little faster than the target, and only a little.** It has to
+climb at all — a grade that asked twice as much for twice the pay is not a
+harder task, it is two of the same task — and it must not climb much, because
+the second safety above is that *every task pays less than the work it asks
+for*. At C that ratio is about a third and at S it is still about a third.
+**There is a test sweeping every task at every grade**, costed against
+**scrap** at a gold a unit (§4.0), which is the least a unit out of a hex can
+possibly be worth: the claim has to survive the worst reading of "units", not
+the flattering one.
+
+**Nothing is ever asked for zero of.** The multiplier is clamped at one, so the
+smallest tasks compress at the bottom — a craft that asks for one thing asks
+for one thing at C and at B alike. That is a real cost of a multiplicative
+grade and it is the right one to pay: the alternative is a per-task table of
+four hand-written targets, which is four times the surface for a number to
+drift on.
+
+**The grade rides its own hash**, separate from the one that picks the task, so
+retuning the grade table can never shuffle which task somebody was handed and a
+rare S never quietly correlates with one errand.
+
+**Both are drawn against an identity, not a row id.** An autoincrement is a poor
+thing to seed with — sequential, guessable, and two wallets that signed up a
+minute apart sit next to each other in it — so the seed is built from the
+**wallet** (§7: one per character, and soulbound), **when the player was
+created**, and the id, folded together once.
+
+**Every ingredient of it is immutable, and the claimed name is deliberately not
+one of them.** A prospector names themselves once (§7), at a moment of their
+choosing — and progress is filed under the task keys the draw produced. A seed
+that moved when a name was claimed would re-roll the day underneath somebody who
+had already half-finished it: banked progress orphaned under keys that are no
+longer today's, and a finished task answering *that is not one of today's* to
+its own claim. Wallet, creation time and id cannot change; a name can, exactly
+once, which is once too many. There is a test that claims a name mid-day and
+checks the three did not move.
+
+**It is the day's figure that is authoritative, everywhere.** The pool ships to
+the client once and holds the B version of everything; what today asks of *this*
+character is a graded number, so the target and the gold ride the day's payload
+and the catalog's are never read for either. A client drawing the catalog's
+target would put a bar against the wrong number and a reward on the button that
+the server has no intention of paying — and the claim reads the grade off the
+draw rather than off the request, for the obvious reason.
+
+**No description names a figure**, because the grade is going to change it. The
+target belongs to the goal line, which is drawn from the graded number and is
+therefore always right; prose saying "forty-five units" over a task asking for a
+hundred and eight would be the screen arguing with itself. What a description is
+for is the *why*.
+
+**On screen it is a badge before the lane tag**, because those are two questions
+— the lane is *can I do this from here* and the grade is *what is it going to
+cost me*. It climbs in weight rather than in hue: C and B are drawn like any
+other label, A lifts to vellum, and **S is the only one that takes a colour**,
+gold, because §13.3 spends gold on the currency itself and an S day is exactly a
+day worth more. Ember would read as an alarm over good news, and sap is what
+*finished* already means three lines down the same row.
+
 #### Derived, like a pack
 
 The three are a **hash of (character, day, lane)**, the same way a pack (§9.5.1)

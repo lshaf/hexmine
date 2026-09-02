@@ -249,11 +249,28 @@ export interface DailyBoard {
   tasks: DailyState[]
 }
 
-/** One daily task's standing. The catalog behind it comes from GET /quests. */
+/** §12.2 -- how big today's version of a task is. C is the light one, S the rare one. */
+export type DailyGrade = 'C' | 'B' | 'A' | 'S'
+
+/**
+ * One daily task's standing. The catalog behind it comes from GET /quests.
+ *
+ * **`target` and `gold` are here rather than read off `DailyDef`**, and that is
+ * the whole of what a grade changes on the wire. The catalog holds the `B`
+ * version of every task because it ships once for everybody; what today asks of
+ * *this* character is a per-day figure, so it rides the day. Reading the
+ * catalog's numbers instead would leave the client drawing a bar against the
+ * wrong target and a reward the server has no intention of paying.
+ */
 export interface DailyState {
   key: string
   /** Which of the three it was drawn from: field, bench or road. */
   lane: string
+  grade: DailyGrade
+  /** What today asks for, with the grade already applied. */
+  target: number
+  /** What today pays, with the grade already applied. */
+  gold: number
   progress: number
   /** Server-decided, like every other rule (§16). */
   complete: boolean
@@ -267,6 +284,14 @@ export interface DailyState {
  *
  * The same shape as a QuestDef minus `requires`, because a daily has no chain --
  * which is what lets one row component and one goal label draw either.
+ */
+/**
+ * A daily as the pool writes it, which is the **`B`** version of it (§12.2).
+ *
+ * `goal.target` and `gold` here are the middle rung and are not what today is
+ * asking: the graded figures are on `DailyState`. What this is for is the name,
+ * the description and the goal's *kind* -- the half of a task that a grade does
+ * not touch.
  */
 export interface DailyDef {
   name: string

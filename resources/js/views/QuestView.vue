@@ -41,7 +41,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useGame } from '@/stores/game'
 import { ITEM_BY_KEY, MATERIALS, SKILL_BY_KEY, SLOT_LABEL } from '@/game/catalog'
 import { formatSpan } from '@/game/formulas'
-import { ACTION_PATHS } from '@/icons/actions'
+import type { DailyGrade } from '@/api/types'
 import type { EquipSlot, MaterialKey, SkillKey } from '@/game/types'
 
 const game = useGame()
@@ -151,7 +151,7 @@ const rows = computed<Row[]>(() => {
  * that made the two rows look different would be saying they behave
  * differently, and the only thing that does is when they reset.
  */
-const today = computed<Array<Row & { lane: string }>>(() => {
+const today = computed<Array<Row & { lane: string; grade: DailyGrade }>>(() => {
   const defs = game.dailyDefs
   if (!defs) return []
 
@@ -163,13 +163,19 @@ const today = computed<Array<Row & { lane: string }>>(() => {
       return {
         key: d.key,
         lane: d.lane,
+        grade: d.grade,
         name: def.name,
         description: def.description,
-        goal: goalLabel(def.goal.kind, def.goal.subject, def.goal.target),
+        // §12.2 -- the TARGET and the GOLD come off the day, never off the
+        // catalog. The pool ships once for everybody and holds the `B` version
+        // of every task; what today asks of this character is a graded figure,
+        // and drawing the catalog's would put a bar against the wrong number
+        // and a reward on the button that the server will not pay.
+        goal: goalLabel(def.goal.kind, def.goal.subject, d.target),
         progress: d.progress,
-        target: def.goal.target,
-        percent: Math.min(100, (d.progress / Math.max(1, def.goal.target)) * 100),
-        gold: def.gold,
+        target: d.target,
+        percent: Math.min(100, (d.progress / Math.max(1, d.target)) * 100),
+        gold: d.gold,
         ready: d.complete && !d.claimed,
         claimed: d.claimed,
       }
@@ -292,6 +298,11 @@ const earned = computed(() => completed.value.reduce((n, r) => n + r.gold, 0))
         >
           <div class="row-between">
             <strong class="name">
+              <!-- §12.2 -- how big today's version is, beside where it can be
+                   done. Two tags because they answer two questions: the lane is
+                   *can I do this from here* and the grade is *what is it going
+                   to cost me*. -->
+              <span class="grade" :class="`g-${row.grade}`">{{ row.grade }}</span>
               <span class="lane">{{ row.lane }}</span>
               {{ row.name }}
             </strong>
@@ -386,14 +397,6 @@ const earned = computed(() => completed.value.reduce((n, r) => n + r.gold, 0))
         </p>
       </template>
 
-      <p class="tiny muted footnote">
-        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor"
-             stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path :d="ACTION_PATHS.quest" />
-        </svg>
-        Nothing here asks for a new kind of work. Every goal counts something you
-        were going to do anyway — a haul, a walk, a run at a bench, a sale.
-      </p>
     </template>
   </div>
 </template>
@@ -458,6 +461,39 @@ const earned = computed(() => completed.value.reduce((n, r) => n + r.gold, 0))
  */
 .daily.spent {
   opacity: 0.55;
+}
+
+/*
+ * §12.2 -- the grade, C through S.
+ *
+ * It leads the row because it is what the row is *sized* by, and it climbs in
+ * weight rather than in hue: C and B are the ordinary days and are drawn like
+ * any other label, A lifts to vellum, and S is the only one that takes a colour
+ * -- gold, because §13.3 spends gold on the currency itself and an S day is
+ * exactly a day worth more. Ember would read as an alarm over good news and sap
+ * is what *finished* means on this very screen, three lines down.
+ */
+.grade {
+  display: inline-block;
+  min-width: 15px;
+  margin-right: 6px;
+  padding: 1px 4px;
+  font-family: var(--font-display);
+  font-size: 10px;
+  line-height: 1.3;
+  text-align: center;
+  color: var(--vellum-dim);
+  background: rgba(0, 0, 0, 0.4);
+  vertical-align: 1px;
+}
+
+.grade.g-A {
+  color: var(--vellum);
+}
+
+.grade.g-S {
+  color: var(--gold);
+  background: rgba(216, 179, 74, 0.14);
 }
 
 /*
@@ -580,19 +616,5 @@ const earned = computed(() => completed.value.reduce((n, r) => n + r.gold, 0))
   margin: 14px 0 0;
   text-align: center;
   line-height: 1.5;
-}
-
-.footnote {
-  display: flex;
-  align-items: flex-start;
-  gap: 7px;
-  margin: 18px 0 0;
-  line-height: 1.5;
-}
-
-.footnote svg {
-  flex: 0 0 auto;
-  margin-top: 2px;
-  color: var(--copper);
 }
 </style>
