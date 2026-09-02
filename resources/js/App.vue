@@ -343,8 +343,8 @@ onMounted(() => {
             @activate="game.centerOnCharacter()"
           />
           <!-- The atlas is about the map too, so it keeps a cell of its own
-               rather than a row in the menu: this corner is where the map's
-               own controls live, and the burger is where the screens went. -->
+               rather than a row in the menu: this corner is where the map's own
+               controls live, and the burger is where the screens went. -->
           <HexAction
             icon="atlas"
             label="Atlas"
@@ -539,26 +539,24 @@ onMounted(() => {
 
 .screens {
   /*
-   * Three cells in a zigzag, nested the way §13.2 tiles the map: three quarters
-   * of a width between columns, the middle one dropped half a height so the
-   * points interlock.
+   * Three cells straight down the right edge.
    *
-   * It was a flower of nine, and the flower was the right drawing of the wrong
-   * amount of thing. Three is not a shape to admire; it is a run, and a run
-   * only has to not look like a list. A cell and a half tall, against the old
-   * five.
+   * It ran across for a while, zigzagged the way §13.2 nests map hexes, and
+   * that spent the one thing this corner has least of: the top edge is shared
+   * with the instrument cluster, so anything growing leftward grows toward it.
+   * Down is the free direction — the map below the corner is the part of the
+   * screen a HUD is allowed to hang into.
+   *
+   * No offset and no gap, because these are FLAT-TOP hexes (§13.2): the clip is
+   * flat from a quarter to three quarters across the top, so stacked in one
+   * column they meet edge to edge and read as one cut strip. The half-height
+   * drop and the three-quarter step are what *horizontal* nesting needs, and
+   * there is no horizontal any more.
    */
-  display: grid;
-  grid-template-columns: repeat(2, calc(var(--cell-w) * 0.75)) var(--cell-w);
-  grid-auto-rows: calc(var(--cell-h) / 2);
-  justify-items: start;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
 }
-
-/* Recenter and the atlas sit up, the burger closes the run at the corner --
-   which is where a thumb reaching for a menu already goes. */
-.screens :deep(.cell:nth-child(1)) { grid-column: 1; grid-row: 1 / span 2; }
-.screens :deep(.cell:nth-child(2)) { grid-column: 2; grid-row: 2 / span 2; }
-.screens :deep(.cell:nth-child(3)) { grid-column: 3; grid-row: 1 / span 2; }
 
 /* Nested cells overlap at the tips, so hit-testing has to follow the hexagon
    rather than the box, or the pointed corner of one cell would swallow clicks
@@ -593,8 +591,8 @@ onMounted(() => {
  */
 .menu {
   position: absolute;
-  /* The block is a cell and a half tall, plus the corner's own gap. */
-  top: calc(var(--cell-h) * 1.5 + 10px);
+  /* The strip is three cells tall, plus the corner's own gap. */
+  top: calc(var(--cell-h) * 3 + 10px);
   right: 0;
   z-index: 30;
   width: 208px;

@@ -3928,17 +3928,25 @@ everything you open from *any hex* is behind the menu beside them. What you are
 standing on is the bottom-centre stack's business (§5.6) and is not in here
 either.
 
-Three cells in a zigzag, a cell and a half tall against the old five, with the
-**burger closing the run at the corner** — which is where a thumb reaching for a
-menu already goes.
+**Three cells straight down the right edge**, edge to edge, with the burger at
+the foot — nearest the thumb, and nearest the list it drops. No offset and no
+gap, because these are flat-top hexes (§13.2): stacked in one column they meet
+along their flat edges and read as one cut strip, and the half-height drop is
+what *horizontal* nesting needs.
+
+**Down rather than across, because down is the free direction.** It ran across
+for a while and that spent the one thing this corner has least of: the top edge
+is shared with the instrument cluster, so anything growing leftward grows toward
+it. The map below the corner is the part of the screen a HUD is allowed to hang
+into.
 
 *(The screens were a honeycomb, nested the way §13.2's map hexes are: three
 quarters of a width between columns, the middle one dropped half a height. That
 was the right drawing of the wrong amount of thing. Six cells fitted; nine —
 once the guild and the wallet had seats — reached a third of the way down a
-phone, standing over the one thing the game is about. The lattice survives at
-the size it works at, and the cells came down with the count: nine of them had
-to be big enough to tell apart in a block, and three do not.)*
+phone, standing over the one thing the game is about. The cells came down with
+the count, too: nine of them had to be big enough to tell apart in a block, and
+three do not.)*
 
 **The closed burger carries a roll-up of everything behind it**, and that is not
 a nicety — it is the whole cost of the change. A full bag and gold waiting on
