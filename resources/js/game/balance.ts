@@ -212,25 +212,33 @@ export const SKILLS = {
 } as const
 
 /**
- * §7.6 -- the bag, and the two limits on it.
+ * §7.6 -- the bag, and the one limit on it.
  *
  * Documentation only, like `sightRadius` above: what a character may carry is
- * published per character in the state payload (`character.bag`) because the
- * Explorer tree widens it. Reading these numbers instead of that field is how
- * the meters and the server end up disagreeing about whether you may leave.
+ * published per character in the state payload (`character.bag`) -- the cap
+ * because the Explorer tree widens it, and the stack depths because an
+ * Alchemist's shelf is deeper than anybody else's. Reading these numbers
+ * instead of that field is how the comb and the server end up disagreeing about
+ * how many straps a haul is on.
  */
 export const BAG = {
-  units: 120,
-  rows: 30,
+  slots: 50,
   /**
-   * §7.5 -- what the road adds, and the most it can ever add: 120 -> 200 units
-   * and 30 -> 50 rows, ten and four at a time across the Explorer's fifteen
-   * skills. Counts rather than percentages, so they have nothing to do with the
-   * §8.1 stat ceiling -- which is the whole reason a tree that costs no skill
-   * points is allowed to hand them out.
+   * How deep one strap goes, per kind. A stack that outgrows its strap takes
+   * another one -- nothing is refused for being big, only for having nowhere
+   * to go.
    */
-  skillUnitsCap: 80,
-  skillRowsCap: 20,
+  stackMaterial: 50,
+  stackPotion: 100,
+  stackGear: 1,
+  /**
+   * §7.5 -- what the road adds, and the most it can ever add: 50 -> 80 straps,
+   * two and four at a time across thirteen of the Explorer's fifteen skills. A
+   * count rather than a percentage, so it has nothing to do with the §8.1 stat
+   * ceiling -- which is the whole reason a tree that costs no skill points is
+   * allowed to hand it out.
+   */
+  skillSlotsCap: 30,
 } as const
 
 export const EQUIPMENT = {

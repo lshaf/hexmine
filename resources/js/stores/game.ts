@@ -290,14 +290,16 @@ export const useGame = defineStore('game', () => {
    * §7.6 -- the bag, and the one thing about it that has to be visible from
    * anywhere: it is full.
    *
-   * Full is not the same as over. Rows can never go over -- a full bag turns a
-   * new kind away at the door -- while units can, and being over on units is
-   * what stops the road. Both are worth an ember cell in the corner, because
-   * both mean the next thing you pick up will not go the way you expect.
+   * Straps can never go *over* -- there is nowhere to put a thing that has no
+   * strap, so the refusal comes at the door rather than at the gate -- which
+   * makes "every strap is taken" the whole of the warning. It is worth an ember
+   * cell in the corner because it means the next thing you pick up will not go
+   * the way you expect: a haul that outgrows the stack it is joining now needs
+   * a strap that is not there.
    */
   const bag = computed(() => state.value?.character.bag ?? null)
   const bagFull = computed(
-    () => (bag.value ? bag.value.rows >= bag.value.rowCap || bag.value.units >= bag.value.unitCap : false),
+    () => (bag.value ? bag.value.slots >= bag.value.slotCap : false),
   )
 
   const inventory = computed(() => state.value?.inventory ?? {})

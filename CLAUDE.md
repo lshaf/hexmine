@@ -28,7 +28,7 @@ structured so botting is *economically pointless* rather than technically preven
 | No P2P resource trade | Direct player-to-player resource transfer does **not exist**. Removes the laundering/arbitrage vector entirely. |
 | Gold has no NFT bridge | Gold buys *common and uncommon* only. Gold can never be converted to NFT value. |
 | Sybil cost | One-time character mint fee per wallet + **wallet must hold a minimum crypto balance for ≥7 continuous days** before it can act. |
-| Soft caps | Bag limits (§7.6), per-wallet rare-material caps, storage caps. A bot with 1000 wallets gets 1000× capped, non-liquid output, and 1000 bags that have to be emptied by hand. |
+| Soft caps | The bag's fifty straps (§7.6), per-wallet rare-material caps, storage caps. A bot with 1000 wallets gets 1000× capped, non-liquid output, and 1000 bags that have to be emptied by hand. |
 | Server authority | All timers are **server-side**. Client never asserts elapsed time. |
 
 **Rule for any new feature:** if it creates a path from "grind time" to "external value,"
@@ -43,7 +43,7 @@ The three currencies are strictly separated. No backdoor converts one into anoth
 ### 3.1 Resources (raw / refined / rare)
 - Mined from hex tiles, biome-locked
 - **Non-tradeable** between players
-- Carried against the two bag limits (§7.6) — over either one and you cannot travel
+- Carried on the bag's straps (§7.6) — fifty to a strap, and a full bag turns away what has nowhere to go
 - Consumed by: crafting, repair, building upgrades, raid charges
 
 ### 3.2 Gold
@@ -415,11 +415,20 @@ one currency an idle game cannot inflate — hours, at five minutes a hex — so
 level gate on top of it would be a second answer to a question the clock has
 already answered.
 
-There are exactly **two refusals**, and neither is a distance. The edge of the
-map, and an **overloaded bag** (§7.6). The second is the only one the player can
-undo, and it can always be undone from the hex they are standing on — sell,
-process, or throw something away. A refusal with no way out from where you are
-standing would be a dead end rather than a decision.
+There is exactly **one refusal**, and it is not a distance: the edge of the map.
+
+**The bag used to be the second one, and it no longer is.** §7.6 had a weight
+limit beside its straps, and being over it was what pinned a character to their
+hex. One limit replaced the pair, and a strap refuses at the *door* rather than
+at the gate — there is nowhere to put a thing that has no strap, so being full
+is something you are told before the work rather than after it. Nothing you are
+already carrying can stop you walking, because nothing you are already carrying
+got in without a place to go.
+
+That is the same argument the old rule was making, arrived at one step earlier.
+A refusal with no way out from where you are standing would be a dead end rather
+than a decision; a refusal that comes *before* anything is spent is not even
+that.
 
 **Outside sight the map is not blank, it is unscouted.** Terrain is a pure
 function of `(col, row, seed)` (§5), so the client draws the land itself for
@@ -1030,7 +1039,7 @@ not woodcutting, so they could never pay out at all.)*
 | processing | `processingSpeed` — the one thing a bench clock reads (§8.4) | `costReduction`, `batch`, `presence`, `runSlot` |
 | craft | `processingSpeed` | `costReduction`, and what the bench makes: `craftDurability`, `craftOption`, `optionTier` — or, at the consumable bench, `batch`, `brewExtra`, `stackCap` |
 | battle | none — the pair is solid (§9.5.4) | `pair`, `battleWear`, `weaponWear`, `goldFind`, `lootOption`, and the three that sharpen its skills (§9.5.9) |
-| wayfaring | nothing at all (§7.5) | `sight`, `bagUnits`, `bagRows` |
+| wayfaring | nothing at all (§7.5) | `sight`, `bagSlots` |
 
 **A craft tree spends most of itself on what comes off the bench** rather than on
 the clock, for two reasons: thirteen speed nodes came to 17% against a 15%
@@ -1124,12 +1133,11 @@ a matter of judgment. A node's effect must be one of these, and nothing else:
 | `optionTier` | Chance a rolled line is drawn a grade deeper, never past the rung | `SKILL_OPTION_TIER_CAP` (25%) |
 | `craftDurability` | Higher starting max durability on what you make | `SKILL_DURABILITY_CAP` |
 | `brewExtra` | Chance of an extra flask off a brew | `SKILL_BREW_EXTRA_CAP` (35%) |
-| `stackCap` | Deeper shelf for each potion carried (§8.5) | `SKILL_STACK_CAP` (+10) |
+| `stackCap` | Deeper shelf for each draft carried, so the same cellar rides on fewer straps (§8.5) | `SKILL_STACK_CAP` (+10) |
 | `costReduction` | Fewer inputs per craft | `SKILL_COST_REDUCTION_CAP` |
 | `batch` | More output per craft or processing run | `SKILL_BATCH_CAP` |
 | `sight` | Whole hexes of sight (§5.6), on top of the base one | `SKILL_SIGHT_CAP` |
-| `bagUnits` | Units the bag holds (§7.6), on top of the flat base | `SKILL_BAG_UNITS_CAP` (+80) |
-| `bagRows` | Distinct things the bag holds, on top of the flat base | `SKILL_BAG_ROWS_CAP` (+20) |
+| `bagSlots` | Straps on the bag (§7.6), on top of the flat base | `SKILL_BAG_SLOTS_CAP` (+30) |
 
 **Every kind on that list has a call site, and that is the rule the list is
 for.** `unlock` used to be on it — "makes a recipe craftable at all", uncapped,
@@ -1183,13 +1191,13 @@ rule 4 stays true.
 The caps that are not the stat ceiling exist to protect §11 and §5.6, not §8.
 `costReduction`, `batch` and `brewExtra` thin a materials sink; `craftDurability`
 and both wear kinds thin the repair sink; `seamGrade` reaches past the tool
-ladder and `stackCap` thins the bag pressure §7.6 runs on. Left uncapped, a maxed specialist would
+ladder and `stackCap` thins the bag pressure §7.6 runs on — a deeper shelf is fewer straps spent on the same cellar. Left uncapped, a maxed specialist would
 quietly switch off the loss the whole economy is balanced around.
 
-`bagUnits` and `bagRows` are the same argument in counts rather than
-percentages. The bag is the pressure that turns a haul into a decision (§7.6),
-and an uncapped tree could carry enough that the decision never arrives — which
-would switch off the selling, processing and dumping §11.1 runs on.
+`bagSlots` is the same argument in a count rather than a percentage. The bag is
+the pressure that turns a haul into a decision (§7.6), and an uncapped tree could
+carry enough that the decision never arrives — which would switch off the
+selling, processing and dumping §11.1 runs on.
 
 `sight` is the odd one, and its cap is the sharpest because sight is the
 radius of the map query — cost grows as the *square* of it. One hex is seven
@@ -1197,7 +1205,7 @@ tiles, two is nineteen, three is thirty-seven, and ten would be three hundred
 and thirty-one. `SKILL_SIGHT_CAP` is a query budget rather than a balance one,
 and it is what lets sight be a reward at all instead of a scanner handed to
 anyone patient enough to walk. It is also a **count, not a percentage**, so like
-`bite`, `runSlot`, `stackCap` and the bag pair it has nothing to do with the
+`bite`, `runSlot`, `stackCap` and `bagSlots` it has nothing to do with the
 stat ceiling. It is capability.
 
 **Where the trees grow now is depth, not a kind.** A node's value is read off the
@@ -1260,25 +1268,34 @@ bought here, so a row opening whole would be three rewards for one level. Each
 skill carries its own `jobLevel` instead, one every second level, and a row
 fills in across three of them.
 
-| Depth | Levels | Left column — room | Middle column — straps | Right column — the road |
+| Depth | Levels | Left column | Middle column | Right column — the road |
 |---|---|---|---|---|
-| I | **2 · 4 · 6** | Deep Pockets +10u | Second Strap **+4 rows** | Rolled Blanket +10u |
-| II | 8 · 10 · 12 | Even Load +10u | Side Pouch **+4 rows** | High Ground **+1 sight** |
-| III | 14 · 16 · 18 | Bindle +10u | Sorted Kit **+4 rows** | Tump Line +10u |
-| IV | 20 · 22 · 24 | Packer's Knot +10u | Outer Pockets **+4 rows** | Long Haul +10u |
-| V | 26 · 28 · **30** | Drover's Back +10u | Tinker's Roll **+4 rows** | Horizon Line **+1 sight** |
+| I | **2 · 4 · 6** | Deep Pockets **+2** | Second Strap **+2** | Rolled Blanket **+2** |
+| II | 8 · 10 · 12 | Even Load **+2** | Side Pouch **+2** | High Ground **+1 sight** |
+| III | 14 · 16 · 18 | Bindle **+2** | Sorted Kit **+2** | Tump Line **+2** |
+| IV | 20 · 22 · 24 | Packer's Knot **+2** | Outer Pockets **+2** | Long Haul **+2** |
+| V | 26 · 28 · **30** | Drover's Back **+4** | Tinker's Roll **+4** | Horizon Line **+1 sight** |
 
 `Jobs::WAYFARING_TIER_JOB_LEVEL` holds the level each *row* opens at — 2, 8, 14,
 20, 26 — which is what the panel prints in the gutter as a span (`lv 8–12`).
 What a given skill needs is on the skill: read `NODES[$key]['jobLevel']`.
 
-Totals: **120 → 200 units, 30 → 50 rows, 1 → 3 hexes of sight.** Eight nodes of
-ten units, five of four rows, two of one hex.
+Totals: **50 → 80 straps, 1 → 3 hexes of sight.** Eleven nodes of two straps,
+two of four, two of one hex.
+
+**Two columns used to mean different things and now mean the same one.** The
+left was *room* and the middle was *straps*, back when §7.6 counted weight and
+kinds separately; one limit replaced the pair, so both columns hand out the
+same thing. That is a fork with nothing on either side of it, which in a
+granted tree is fine — there was never anything to choose here — and it is why
+the last row is worth double rather than the same: a node's value is read off
+its depth everywhere else (§7.4.3), and a free tree has no reason to be the
+exception.
 
 **It is wired down its columns, not across.** A bought tree forks so that thirty
 points have to be spent through choices; there is nothing to choose here,
 because nothing is bought. Each node hangs off the one directly above it, which
-makes the three columns readable as three strands — room, straps, and the mixed
+makes the three columns readable as three strands — two of pack, and the mixed
 one that carries both hexes of sight.
 
 **Every node is the eye or the back, and not one of them is a stat.** This is
@@ -1344,81 +1361,101 @@ one hex is what makes the first of them felt: it trebles what a prospector can
 see rather than adding a fringe to a view that was already wide.
 
 **The back grows every other level**, because that is what a long career of
-walking should feel like. Ten units is most of a haul; four straps is four more kinds
-you never have to choose between. A maxed Explorer carries two hundred units
-across fifty straps — a different *game* from 120 across 30, and the only way to
-get there is to have walked several thousand hexes.
+walking should feel like. Two straps is a hundred more units of ore, or two more
+kinds you never have to choose between — a strap is both questions at once now
+(§7.6), which is what makes one node felt in two ways. A maxed Explorer carries
+eighty straps against fifty — a different *game*, and the only way to get there
+is to have walked several thousand hexes.
 
-### 7.6 The bag — two limits, and they refuse in two different ways
+### 7.6 The bag — one limit, and it is places
 
 Everything a character owns and is not wearing is in one bag, and the bag has
-**two limits that are counted separately**:
+**one limit: straps.**
 
 | | Limit | Constant |
 |---|---|---|
-| **Units** | **120.** Every unit of every material, every potion, and every unworn item. | `Balance::BAG_UNITS` |
-| **Rows** | **30.** How many *distinct* things that is: a stack is one row whether it holds 1 or 100, and two axes are two rows because gear does not stack. Roomy against a catalog of 29 materials and 5 drafts, on purpose — see below. | `Balance::BAG_ROWS` |
+| **Straps** | **50.** How many *places* there are to put something. | `Balance::BAG_SLOTS` |
 
-Both are **flat, and level does not move them** (§7.1). The only thing that
-widens either is the Explorer tree (§7.5), to **200 and 50** — fifteen nodes of
-ten units or four rows, earned by walking and by nothing else.
+**A strap is a place, and what sits on it is one stack of one kind.** How deep
+a stack goes is a fact about the *kind*, not about the bag:
 
-**Units are the limit that bites; rows are the ceiling on carrying one of
-everything.** A prospector who commits to a line or two will meet 120 units
-several times a day and the straps almost never. That is the intended shape: the
-daily decision is *what is this haul worth carrying home*, and the straps are
-there so that "a little of everything, forever" is not an answer to it.
-
-The two are enforced in two different places, and the difference is the design:
-
-| | What happens at the limit | Where it is checked |
+| On a strap | How many | Constant |
 |---|---|---|
-| **Units** | You **cannot travel.** Nothing is refused on the way in: a haul lands whole, and being too heavy stops the road rather than the work. | At the gate — `travelTo` |
-| **Rows** | A kind you are **not already carrying is turned away.** Rows can therefore never go over; there is nowhere to put a thing that has no strap. | At the door — mining, processing, crafting, buying, unequipping |
+| A material | **50** | `Balance::BAG_STACK_MATERIAL` |
+| A draft | **100**, and an Alchemist's shelf goes deeper (§8.5) | `Balance::BAG_STACK_POTION` |
+| A piece of gear | **1**, always | `Balance::BAG_STACK_GEAR` |
 
-**A row is a place, not a weight,** which is why it refuses rather than pins.
-Units can be dealt with after the fact — sell, process, drop — but "put it
-somewhere" has no after-the-fact answer, so the refusal has to come first.
+**A stack that outgrows its strap takes the next one along.** A hundred and
+thirty wood is three straps — fifty, fifty, thirty — and it lands whole if three
+are free. **Nothing is ever refused for being *big*; only for having nowhere to
+go.**
 
-Three rules follow from that, and all three are mandatory:
+Flat, and level does not move it (§7.1). The only thing that widens it is the
+Explorer tree (§7.5), to **80** — thirteen nodes of two straps and four,
+earned by walking and by nothing else.
+
+**It was two limits, and the second one was a bucket.** Units counted every
+unit of everything against one number and rows counted how many *kinds* that
+was; over on units you could not travel, and over on rows a kind was turned
+away at the door. The pair worked, and one number does the same job better:
+a strap that holds a stack says how much you are carrying *and* how many
+different things it is, in one reading, with nothing left to subtract. Sixty
+wood is two straps, so bulk still costs you — and it costs you in the same
+currency variety does, which is the part the old weight bar could never say.
+
+Gear is the proof the shape is right: one to a strap has always been true,
+because two axes are two objects with two durabilities and two sets of rolled
+lines (§8.0.1). Materials and drafts are the same rule with a deeper stack on
+it.
+
+**The refusal comes at the door, never at the gate.** A strap is a place, and
+"put it somewhere" has no after-the-fact answer — so straps can never go over,
+and being full is something you are told *before* the work rather than after
+it. **There is no travel refusal left**: §5.6's second refusal was the weight
+limit, and removing it removes that. What stops you is having nowhere to put
+the next thing, and that is said at the hex, at the bench, at the counter.
+
+Three rules follow, and all three are mandatory:
 
 - **The refusal is said before the work, never after it.** A dig whose haul has
-  nowhere to land is refused at the hex, with AP untouched; a craft is refused
-  before its inputs are spent. An hour of mining that ends in a lost haul would
-  be a worse rule than no rule.
-- **More of what you already carry always fits.** Topping up a stack needs no
-  new row, and that asymmetry is the whole point: the limit is on *variety*,
-  which is what keeps §4's five lines a choice rather than a checklist.
+  nowhere to land is refused at the hex; a craft is refused before its inputs
+  are spent. An hour of mining that ends in a lost haul would be a worse rule
+  than no rule.
+- **A stack with room left on it always takes more.** Topping one up needs no
+  new strap, and that asymmetry is still the point: what costs you is *another
+  place to keep something*, which is what keeps §4's five lines a choice rather
+  than a checklist.
 - **Worn gear is not carried.** An equipped axe is on your belt, not in your
-  pack — so equipping is itself a way to free a row, and a prospector who has
+  pack — so equipping is itself a way to free a strap, and a prospector who has
   committed to their five lines is not charged for the commitment. Taking
-  something off is the one action that *adds* a row, so a full bag leaves it on
-  the belt.
+  something off is the one action that *adds* a strap, so a full bag leaves it
+  on the belt.
 
-**Everything else keeps working while you are over on units.** Mining the hex
-you are standing on, selling, processing, drinking, dropping. Every one of those
+**Everything keeps working while the bag is full.** Mining a hex whose haul has
+somewhere to land, selling, processing, drinking, dropping. Every one of those
 is a way out, and every one of them works from where you already are.
-
-**Two numbers rather than one, because one is a bucket.** Units alone would let
-a prospector carry a little of everything for nothing, and the whole of §4 is
-built on not being able to work every line at once. Rows are the tighter limit
-in practice, and they are the one that makes a second material line a decision
-rather than an accumulation.
 
 **It replaced storage-overflow decay** (old §11.1). Decay punished the same
 state twice — you lost the surplus *and* it happened while you were not looking,
-which is the worst way for an idle game to take something away. A bag that stops
-the road takes nothing at all; it makes you choose what to do with the surplus,
+which is the worst way for an idle game to take something away. A bag that
+refuses takes nothing at all; it makes you choose what to do with the surplus,
 and every one of those choices is a §11 sink.
 
-**On screen** (§13.2's rules, off the map): rows are **drawn as a comb of
-hexagons**, never measured on a bar — an empty strap is the same shape as a full
-one, so free space is something you see rather than subtract. Units are a
-**bar**, because a quantity is not a set of places. Tapping a strap opens what
-is on it in a popup, with the one or two things that can be done with it, rather
-than growing a detail panel that would push the comb off its own screen.
+**On screen** (§13.2's rules, off the map): straps are **drawn as a comb of
+hexagons**, never measured on a bar — an empty strap is the same shape as a
+full one, so free space is something you see rather than subtract. A stack over
+its depth simply draws as the next hexagon along, with its own count on it, so
+*how much wood* and *how full the bag is* are the same picture. **There is no
+bar any more**: it was a second answer to a question the comb was already
+answering, and the only one of the two that could be passed.
 
-The bag cell in the top-right turns ember when either limit is reached, and that
+Tapping a strap opens what is on it — the *kind*, and the whole holding across
+however many straps it is on, because "my wood" is what a prospector means and
+not "my third strap of wood". The popup carries the one or two things that can
+be done with it, rather than growing a detail panel that would push the comb
+off its own screen.
+
+The bag cell in the top-right turns ember when every strap is taken, and that
 is the only place the state is reported outside the bag itself. It is
 deliberately **not** in the instrument cluster: that needle measures how far
 along you are — the level that gates where you may go — and the bag is about
@@ -2227,9 +2264,18 @@ the benches have five of their own, counted separately and refused separately.
   draft on top of a legendary philtre would be paid for and never felt, and an
   idle game must not take something away for nothing. The refusal reads as *you
   already have better*, and the flask stays in the bag.
-- **How many of one draft may be carried is the Alchemist's** (`stackCap`,
-  §7.4.3), on top of the flat stack. It widens the cellar and never the effect:
-  the clamp is on what an action's charges add up to, and that is untouched.
+- **A shelf of one draft is 100 deep** (`Balance::BAG_STACK_POTION`), and how
+  much deeper is the Alchemist's (`stackCap`, §7.4.3). A cellar that outgrows
+  its shelf simply takes the next strap along (§7.6) — there is no ceiling on
+  how many of one draft may be held beyond the straps it takes to carry them,
+  so what a deeper shelf buys is **straps**, not hoard.
+
+  It used to be a hard cap of twenty, and the argument for it was that it
+  *stops hoarding a stat*. The unique index below is what actually does that,
+  and it does it whatever the cellar looks like: forty-five flasks are still
+  four stats across eight actions once drunk. A second answer to a question
+  already answered is a second answer, and this one was the one making a
+  hundred-deep shelf mean nothing.
 - One charge per (stat, action) is still enforced by a unique index rather than
   by code, and that index is also the cap on hoarding: a cellar of forty-five
   drafts is still four stats across eight actions once drunk. The ceiling on
@@ -3330,11 +3376,14 @@ facility worth buying at all.
 
   On screen it is **two taps and a number**: the first opens a field, the second
   does it. There is no salvage and no undo, so one mis-tap must never be able to
-  empty a strap. The field arrives holding the **whole stack, selected** — the
-  common case is that the strap itself is what you want, so that is one tap, and
-  any other number is typed over the top of it. The confirm says the count
-  (*Trash 12*) rather than *OK*, because the last thing read before an
-  irreversible tap should be what it is about to do.
+  empty a stack. The field arrives holding the **whole holding, selected** — all
+  of it, across however many straps it is on (§7.6), because the common case is
+  that the *kind* is what you want gone. So that is one tap, and any other
+  number is typed over the top of it. A field that stopped at one strap would
+  make emptying a big stack a thing done in instalments, which is exactly what
+  this replaced. The confirm says the count (*Trash 12*) rather than *OK*,
+  because the last thing read before an irreversible tap should be what it is
+  about to do.
 
   *(It was three buttons: 1, 10, and all. Those are the three numbers somebody
   guessed a player would want, and every stack that was not one of them had to

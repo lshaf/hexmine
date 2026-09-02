@@ -864,33 +864,39 @@ final class Balance
     // ------------------------------------------------------------------ bag §7.6
 
     /**
-     * §7.6 -- what a prospector can carry, in units. Everything in the bag
-     * counts: materials, potions, and every piece of gear not being worn.
+     * §7.6 -- how many straps the bag has. The one limit on carrying.
      *
-     * Flat, and level does not move it. Carrying capacity used to be one of the
-     * things a level bought, which made the bag a number that solved itself --
-     * by the time it mattered you had outgrown it. A fixed floor makes "what do
-     * I take" a decision that lasts the whole game, and the only thing that
-     * widens it is the road (§7.5), which is the one reward that cannot be
-     * bought.
+     * A strap is a *place*, and what goes on it is one stack of one kind: fifty
+     * of a material, a hundred of a draft, one piece of gear. Sixty wood is
+     * therefore two straps, not one -- which is the whole difference between
+     * this and the pair of limits it replaced. A weight ceiling counted every
+     * unit against one number and had nothing to say about *shape*; straps that
+     * hold stacks say both at once, in one drawing, and there is nothing left
+     * to subtract.
+     *
+     * Flat, and level does not move it (§7.1). The only thing that widens it is
+     * the road (§7.5), which is the one reward that cannot be bought: fifty to
+     * eighty, across the Explorer's thirteen pack skills.
      */
-    public const BAG_UNITS = 120;
+    public const BAG_SLOTS = 50;
 
     /**
-     * §7.6 -- how many distinct things, regardless of how many of each.
+     * §7.6 -- how deep one strap goes, per kind of thing.
      *
-     * The second limit is what makes a bag a bag rather than a bucket. A stack
-     * is a row whether it holds one or a hundred; an unworn tool is a row of
-     * its own, because two axes do not stack.
+     * Three numbers rather than one, because the three things in a bag are not
+     * the same kind of thing. A material is bulk and stacks deep; a draft is
+     * small and stacks deeper; a piece of gear is an *object* with its own
+     * durability and its own rolled lines, so two axes are two objects and can
+     * never be one strap.
      *
-     * Thirty is deliberately roomy against a catalog of twenty-nine materials
-     * and five drafts: the straps are not meant to be the thing that bites on
-     * an ordinary mine. They are the ceiling on carrying *one of everything* --
-     * a prospector who never chooses a line still runs out of places to put
-     * things -- while `BAG_UNITS` is what actually decides when a haul has to be
-     * dealt with. Two limits, and only one of them is felt every day.
+     * A stack that outgrows its strap takes another one. Nothing is refused for
+     * being *big* -- only for having nowhere to go.
      */
-    public const BAG_ROWS = 30;
+    public const BAG_STACK_MATERIAL = 50;
+
+    public const BAG_STACK_POTION = 100;
+
+    public const BAG_STACK_GEAR = 1;
 
     // -------------------------------------------------------------- skills §7.2
 
@@ -1026,21 +1032,24 @@ final class Balance
     public const SKILL_LOOT_OPTION_CAP = 0.25;
 
     /**
-     * §7.6 -- what the Explorer tree (§7.5) may add to each limit: 120 -> 200
-     * units and 30 -> 50 rows, arrived at ten and four at a time across five
-     * rows of three, from job level 2 to 30.
+     * §7.6 -- what the Explorer tree (§7.5) may add to the bag: 50 -> 80 straps,
+     * arrived at two and four at a time across thirteen of the road's fifteen
+     * skills, from job level 2 to 30.
+     *
+     * One number rather than two, because there is one limit rather than two.
+     * The tree used to hand out room *and* straps, which was a fork in a
+     * granted tree where nothing is chosen -- both columns were taken, always,
+     * in the order the levels came.
      *
      * Bounded for the same reason every other skill cap is: the bag is the
      * pressure that turns hauls into decisions, and a tree that could switch it
      * off would switch off the selling, processing and dumping it drives (§11.1).
-     * These are counts rather than percentages, so like `sight` they have
-     * nothing to do with the stat ceiling -- which matters more here than
-     * anywhere, because the Explorer's rungs are granted rather than bought
-     * (§7.5) and capability is the only thing a free tree may ever hand out.
+     * A count rather than a percentage, so like `sight` it has nothing to do
+     * with the stat ceiling -- which matters more here than anywhere, because
+     * the Explorer's rungs are granted rather than bought (§7.5) and capability
+     * is the only thing a free tree may ever hand out.
      */
-    public const SKILL_BAG_UNITS_CAP = 80;
-
-    public const SKILL_BAG_ROWS_CAP = 20;
+    public const SKILL_BAG_SLOTS_CAP = 30;
 
     /**
      * §7.4.3 -- how much of the SOLID pair one battle tree may grant.
@@ -1352,14 +1361,20 @@ final class Balance
     // --------------------------------------------------------- consumables §8.5
 
     /**
-     * How many of one potion a character may hold. Stops hoarding a stat.
+     * §8.5 -- how deep a shelf of one draft goes is `BAG_STACK_POTION`, and the
+     * Alchemist's `stackCap` deepens it (§7.4.3).
      *
-     * There is no buff duration to tune any more: a draft arms the action it
-     * names and is spent by taking it (§8.5). Being *spent* is the sink -- a
+     * There is no ceiling on how many of one draft a character may hold beyond
+     * the straps it takes to carry them, and there does not need to be: what
+     * stops a cellar being a stat is that one charge per (stat, action) is
+     * enforced by a unique index, so forty-five flasks are still four stats
+     * across eight actions once drunk. Being *spent* is the sink -- a
      * consumable whose effect were permanent would only accumulate, which the
      * design's north star forbids outright.
+     *
+     * What a deeper shelf buys is therefore straps rather than hoard: the same
+     * hundred drafts on fewer of them.
      */
-    public const CONSUMABLE_STACK_CAP = 20;
 
     public static function stationReaches(string $stationTier, string $rarity): bool
     {

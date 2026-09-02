@@ -262,7 +262,7 @@ const BANDS: Band[] = [
     key: 'ground',
     tier: 1,
     name: 'The ground',
-    note: `Four grades of every biome, and the variant of hex you are standing on decides which one you get. The base grade is everywhere; the better ones start at the middle ring and the best is contested. This is the bulk of what fills a bag — ${BAG.units} units and ${BAG.rows} kinds is all a prospector carries, and a haul over either keeps you on the hex until you sell, process or drop it.`,
+    note: `Four grades of every biome, and the variant of hex you are standing on decides which one you get. The base grade is everywhere; the better ones start at the middle ring and the best is contested. This is the bulk of what fills a bag — ${BAG.slots} straps is all a prospector carries, and a strap holds ${BAG.stackMaterial} of one material, so a big haul is several of them.`,
     holds: (mat) => rawRole(mat.key) === 'ground',
   },
   {

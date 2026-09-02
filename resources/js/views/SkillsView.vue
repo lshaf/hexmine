@@ -274,11 +274,10 @@ const EFFECT_ICON: Record<NodeEffect['kind'], string> = {
   optionTier: 'effectCraftOption',
   craftDurability: 'effectCraftDurability',
   brewExtra: 'effectBrew',
-  stackCap: 'effectBagUnits',
+  stackCap: 'effectShelfDepth',
   costReduction: 'effectCostReduction',
   batch: 'effectBatch',
-  bagUnits: 'effectBagUnits',
-  bagRows: 'effectBagRows',
+  bagSlots: 'effectBagSlots',
 }
 
 /**
@@ -383,10 +382,8 @@ function effectPhrase(effect: NodeEffect, jobName?: string): string {
       return `+${n} round on a stun`
     case 'sight':
       return `+${n} hex of sight`
-    case 'bagUnits':
-      return `+${n} bag units`
-    case 'bagRows':
-      return `+${n} bag rows`
+    case 'bagSlots':
+      return `+${n} strap${n === 1 ? '' : 's'} on your bag`
   }
 
   return ''

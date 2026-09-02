@@ -1374,7 +1374,7 @@ final class BattleResolveTest extends TestCase
         $this->equip('longwatch_carapace');
 
         // Fill every strap with something else.
-        foreach (array_slice(array_keys(Catalog::materials()), 0, Balance::BAG_ROWS) as $key) {
+        foreach (array_slice(array_keys(Catalog::materials()), 0, Balance::BAG_SLOTS) as $key) {
             $this->give($key, 1);
         }
 

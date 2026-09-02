@@ -51,8 +51,7 @@ class SkillTreeController extends GameController
         'skillCooldown' => Balance::SKILL_BATTLE_COOLDOWN_CAP,
         'skillStun' => Balance::SKILL_BATTLE_STUN_CAP,
         'sight' => Balance::SKILL_SIGHT_CAP,
-        'bagUnits' => Balance::SKILL_BAG_UNITS_CAP,
-        'bagRows' => Balance::SKILL_BAG_ROWS_CAP,
+        'bagSlots' => Balance::SKILL_BAG_SLOTS_CAP,
     ];
 
     /** The whole tree, cacheable and player-independent. */

@@ -137,10 +137,10 @@ class SeedDemoCharacter extends Command
             ['equipment', count(self::ITEMS).' items, '
                 .count(array_filter(self::ITEMS, fn (array $i) => $i['equipped'])).' equipped, '
                 .count(array_filter(self::ITEMS, fn (array $i) => $i['durability'] === 0)).' broken'],
-            // §7.6 -- the one number that decides whether this character can
-            // leave the hex it was seeded on. Printed so a kit that outgrows the
-            // bag is caught here rather than in the app.
-            ['bag', "{$bag['units']}/{$bag['unitCap']} units, {$bag['rows']}/{$bag['rowCap']} rows"
+            // §7.6 -- the one limit on what this character is carrying. Printed
+            // so a kit that outgrows the bag is caught here rather than in the
+            // app; a strap holds a stack, so the count is not the kind count.
+            ['bag', "{$bag['slots']}/{$bag['slotCap']} straps"
                 .($bag['over'] ? '  — OVERLOADED, this character cannot travel' : '')],
             ['jobs', $summary['jobs']],
         ]);

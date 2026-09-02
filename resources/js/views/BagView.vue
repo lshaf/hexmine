@@ -2,18 +2,18 @@
 /**
  * The bag, §7.6.
  *
- * The screen is shaped like the two limits, because the two limits are what the
- * screen is about:
+ * The screen is shaped like the limit, because the limit is what the screen is
+ * about -- and there is one of it now. **Straps are drawn, not counted.** Every
+ * strap is a hexagon in a honeycomb -- the same nesting the map uses -- and the
+ * empty ones are drawn exactly like the full ones, so free space is a thing you
+ * can see rather than a number you have to subtract.
  *
- *  - **Kinds** are drawn, not counted. Every strap is a hexagon in a honeycomb
- *    -- the same nesting the map uses -- and the empty ones are drawn exactly
- *    like the full ones, so free space is a thing you can see rather than a
- *    number you have to subtract. A full bag turns away a kind it is not
- *    already carrying, so knowing at a glance how many straps are left is most
- *    of the decision.
- *  - **Amount** is a bar, because it is a quantity and not a set of places. It
- *    is also the one that can go over: a haul lands whole, and being too heavy
- *    stops the road rather than the work.
+ * What sits on a strap is one *stack*: fifty of a material, a hundred of a
+ * draft, one piece of gear. So a big haul is several straps side by side, and
+ * the comb says how much you are carrying and how many different things it is
+ * in one reading. That is what removed the weight bar that used to sit above
+ * it -- it was a second answer to a question the comb was already answering,
+ * and the only one of the two that could be passed.
  *
  * Tapping a strap opens what is on it, rather than growing a detail panel under
  * the grid. The comb is a shape, and pushing it up the screen every time
@@ -53,47 +53,87 @@ const ICON = 56
  * One strap. Three things can be on it and they behave differently, so the kind
  * is carried rather than inferred later -- the detail below is a different panel
  * for each, and guessing from the key would be a second source of truth.
+ *
+ * `qty` is what sits on **this** strap and `held` is the whole holding across
+ * all of them. The comb reads the first, because a strap is a place and the
+ * badge says how full that place is; the popup reads the second, because it is
+ * about the *kind* -- "my wood" is what a prospector means, not "my third strap
+ * of wood", and the trash field has to arrive holding the whole stack (§11.1).
  */
 type Slot =
-  | { id: string; kind: 'material'; key: MaterialKey; name: string; icon: string; qty: number }
-  | { id: string; kind: 'potion'; key: string; name: string; icon: string; qty: number }
-  | { id: string; kind: 'gear'; key: string; name: string; icon: string; item: OwnedItem }
+  | { id: string; kind: 'material'; key: MaterialKey; name: string; icon: string; qty: number; held: number; straps: number }
+  | { id: string; kind: 'potion'; key: string; name: string; icon: string; qty: number; held: number; straps: number }
+  | { id: string; kind: 'gear'; key: string; name: string; icon: string; held: number; item: OwnedItem }
+
+const bag = computed(() => game.bag)
+
+/**
+ * How a stack of `held` breaks across straps of `stack`, biggest first.
+ *
+ * A hundred and thirty wood is 50, 50, 30 -- full straps and then the
+ * remainder, which is the order they read in and the order they fill in. The
+ * depths come off the server (`bag.stackPotion` is not a constant: an
+ * Alchemist's shelf is deeper), so this never has to guess.
+ */
+function across(held: number, stack: number): number[] {
+  const out: number[] = []
+  for (let left = held; left > 0; left -= stack) out.push(Math.min(stack, left))
+
+  return out
+}
 
 const slots = computed<Slot[]>(() => {
   const out: Slot[] = []
+  const b = bag.value
+  if (!b) return out
 
   const held = Object.entries(game.inventory)
     .filter(([, qty]) => qty)
     .map(([key, qty]) => ({ mat: MATERIALS[key as MaterialKey], qty: qty as number }))
     // Tier first, then the big stacks: the ladder is still the order things
     // make sense in, even without headings to say so.
-    .sort((a, b) => a.mat.tier - b.mat.tier || b.qty - a.qty)
+    .sort((a, b2) => a.mat.tier - b2.mat.tier || b2.qty - a.qty)
 
   for (const { mat, qty } of held) {
-    out.push({
-      id: `m:${mat.key}`,
-      kind: 'material',
-      key: mat.key,
-      name: mat.name,
-      icon: materialIcon(mat, ICON),
-      qty,
+    const parts = across(qty, b.stackMaterial)
+    parts.forEach((on, i) => {
+      out.push({
+        // The index is part of the id because two straps of one material are
+        // two places, and a comb keyed on the material alone would collapse
+        // them into one cell the moment a haul outgrew a strap.
+        id: `m:${mat.key}:${i}`,
+        kind: 'material',
+        key: mat.key,
+        name: mat.name,
+        icon: materialIcon(mat, ICON),
+        qty: on,
+        held: qty,
+        straps: parts.length,
+      })
     })
   }
 
   for (const [key, qty] of Object.entries(game.consumables)) {
     const def = ITEM_BY_KEY[key]
     if (!qty || !def) continue
-    out.push({
-      id: `p:${key}`,
-      kind: 'potion',
-      key,
-      name: def.name,
-      icon: itemIcon({ rarity: def.rarity, palette: def.palette, size: ICON }),
-      qty,
+    const parts = across(qty, b.stackPotion)
+    parts.forEach((on, i) => {
+      out.push({
+        id: `p:${key}:${i}`,
+        kind: 'potion',
+        key,
+        name: def.name,
+        icon: itemIcon({ rarity: def.rarity, palette: def.palette, size: ICON }),
+        qty: on,
+        held: qty,
+        straps: parts.length,
+      })
     })
   }
 
-  // §7.6 -- worn gear is not carried, so only what is off the belt takes a strap.
+  // §7.6 -- worn gear is not carried, so only what is off the belt takes a
+  // strap. One each, always: two axes are two objects with two durabilities and
+  // can never be one stack.
   for (const item of game.equipment) {
     const def = ITEM_BY_KEY[item.key]
     if (item.equipped || !def) continue
@@ -105,6 +145,7 @@ const slots = computed<Slot[]>(() => {
       // §13.1 -- the slot is what picks the silhouette. Without it every piece
       // of gear draws as the flask consumables fall back to.
       icon: itemIcon({ slot: def.slot, family: def.family, rarity: def.rarity, palette: def.palette, size: ICON }),
+      held: 1,
       item,
     })
   }
@@ -112,10 +153,8 @@ const slots = computed<Slot[]>(() => {
   return out
 })
 
-const bag = computed(() => game.bag)
-
 /** Straps with nothing on them. Drawn, never stated. */
-const free = computed(() => Math.max(0, (bag.value?.rowCap ?? 0) - slots.value.length))
+const free = computed(() => Math.max(0, (bag.value?.slotCap ?? 0) - slots.value.length))
 
 /**
  * Every strap in one list, full ones first, so the comb is a single flow and a
@@ -220,16 +259,6 @@ watch([combEl, cells, popEl], async () => {
   if (combEl.value) fitToInk(combEl.value)
   if (popEl.value) fitToInk(popEl.value)
 }, { immediate: true })
-
-const overUnits = computed(() =>
-  bag.value ? bag.value.units > bag.value.unitCap : false,
-)
-
-const fill = computed(() => {
-  const b = bag.value
-  if (!b) return '0%'
-  return `${Math.min(100, Math.max(0, (b.units / b.unitCap) * 100))}%`
-})
 
 const pickedId = ref<string | null>(null)
 
@@ -362,9 +391,16 @@ const dropping = ref(false)
 const trashQty = ref(1)
 const trashField = ref<HTMLInputElement | null>(null)
 
-/** What the field is currently worth, clamped to what is actually on the strap. */
+/**
+ * What the field is currently worth, clamped to the whole holding.
+ *
+ * The holding rather than the strap, because the popup is about the *kind*: a
+ * hundred and thirty wood is three straps and one decision, and a field that
+ * stopped at fifty would make emptying it a thing done in instalments -- which
+ * is exactly what §11.1 replaced the three amount buttons to avoid.
+ */
 const trashing = computed(() => {
-  const held = picked.value && 'qty' in picked.value ? picked.value.qty : 1
+  const held = picked.value && 'held' in picked.value ? picked.value.held : 1
 
   return Math.max(1, Math.min(Math.floor(trashQty.value || 0), held))
 })
@@ -412,24 +448,10 @@ async function mend(item: OwnedItem): Promise<void> {
 
 <template>
   <div v-if="bag" class="page">
-    <!-- Amount. A quantity, so a bar -- and the one limit that can be passed. -->
-    <section class="amount" :class="{ over: overUnits }">
-      <div class="row-between" style="margin-bottom: 6px">
-        <span class="label">Amount</span>
-        <span class="mono read" :class="{ over: overUnits }">
-          {{ bag.units }}<span class="of">/{{ bag.unitCap }}</span>
-        </span>
-      </div>
-      <div class="bar bar-violet"><span :style="{ width: fill }" /></div>
-      <p v-if="overUnits" class="tiny warn">
-        Too heavy to set off. Sell, process or throw something away — all three
-        work from where you are standing.
-      </p>
-    </section>
-
-    <!-- Kinds. Places rather than a quantity, so a comb of straps -- and the
-         empty ones are drawn exactly like the full ones, which is what makes
-         room something you can see rather than subtract. -->
+    <!-- Straps. Places rather than a quantity, so a comb -- and the empty ones
+         are drawn exactly like the full ones, which is what makes room
+         something you can see rather than subtract. A stack that outgrows a
+         strap simply takes the next one along. -->
     <div ref="combEl" class="slots" :style="{ '--cols': columns }">
       <template v-for="(cell, i) in cells" :key="cell ? cell.id : `free-${i}`">
         <button
@@ -454,9 +476,12 @@ async function mend(item: OwnedItem): Promise<void> {
     </div>
 
     <p class="tiny muted straps">
-      {{ slots.length }} of {{ bag.rowCap }} straps used.
-      <template v-if="!free"> Full — a kind you are not already carrying will be turned away.</template>
-      <template v-else-if="slots.length"> Worn gear rides on your belt and costs nothing.</template>
+      {{ slots.length }} of {{ bag.slotCap }} straps used.
+      <template v-if="!free"> Full — anything that needs a strap of its own will be turned away.</template>
+      <template v-else-if="slots.length">
+        A strap holds {{ bag.stackMaterial }} of a material or {{ bag.stackPotion }} of a draft;
+        worn gear rides on your belt and costs nothing.
+      </template>
       <template v-else> Work a hex on the map to bring something back.</template>
     </p>
 
@@ -482,10 +507,12 @@ async function mend(item: OwnedItem): Promise<void> {
                 </strong>
                 <p class="tiny muted sub">
                   <template v-if="picked.kind === 'material' && material">
-                    Tier {{ material.tier }} · {{ picked.qty }} carried
+                    Tier {{ material.tier }} · {{ picked.held }} carried
+                    <template v-if="picked.straps > 1"> on {{ picked.straps }} straps</template>
                   </template>
                   <template v-else-if="picked.kind === 'potion' && def">
-                    {{ RARITY_LABEL[def.rarity] }} draft · {{ picked.qty }} on the shelf
+                    {{ RARITY_LABEL[def.rarity] }} draft · {{ picked.held }} on the shelf
+                    <template v-if="picked.straps > 1"> across {{ picked.straps }} straps</template>
                   </template>
                   <template v-else-if="def">
                     {{ def.slot ? SLOT_LABEL[def.slot] : '' }} · {{ RARITY_LABEL[def.rarity] }}
@@ -510,7 +537,7 @@ async function mend(item: OwnedItem): Promise<void> {
               </p>
               <form v-if="dropping" class="acts trash" @submit.prevent="drop(picked.key, trashing)">
                 <span class="tiny muted grow">
-                  How many of {{ picked.qty }}? Nothing comes back for it.
+                  How many of {{ picked.held }}? Nothing comes back for it.
                 </span>
                 <input
                   ref="trashField"
@@ -518,7 +545,7 @@ async function mend(item: OwnedItem): Promise<void> {
                   class="count"
                   type="number"
                   min="1"
-                  :max="picked.qty"
+                  :max="picked.held"
                   step="1"
                   inputmode="numeric"
                   aria-label="How many to trash"
@@ -535,7 +562,7 @@ async function mend(item: OwnedItem): Promise<void> {
                   class="btn btn-sm btn-danger"
                   type="button"
                   :disabled="game.busy"
-                  @click="startTrash(picked.qty)"
+                  @click="startTrash(picked.held)"
                 >
                   Trash
                 </button>
@@ -649,35 +676,6 @@ async function mend(item: OwnedItem): Promise<void> {
 .page {
   /* Sizing and scrolling belong to PanelOverlay. */
   padding: 0;
-}
-
-.amount {
-  padding: 10px 11px 11px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--ink-panel);
-}
-
-.amount.over {
-  border-color: var(--ember);
-}
-
-.read .of {
-  color: var(--vellum-dim);
-}
-
-.read.over {
-  color: var(--ember);
-}
-
-.amount.over .bar > span {
-  background: var(--ember);
-}
-
-.warn {
-  margin: 8px 0 0;
-  line-height: 1.45;
-  color: var(--ember);
 }
 
 /*

@@ -37,8 +37,7 @@ def weapon_wear(v): return ('weaponWear', None, v)
 def gold_find(v): return ('goldFind', None, v)
 def loot_option(v): return ('lootOption', None, v)
 def sight(n): return ('sight', None, n)
-def bag_units(n): return ('bagUnits', None, n)
-def bag_rows(n): return ('bagRows', None, n)
+def bag_slots(n): return ('bagSlots', None, n)
 
 # What one node of each kind is worth at each of the five depths.
 VALUES = {
@@ -699,26 +698,36 @@ RUNE_NAMES = [
 ]
 
 # ------------------------------------------------------------- wayfaring tree
+# Thirteen straps and two hexes of sight, and the straps are 50 -> 80.
+#
+# Every pack node used to be one of two kinds -- room, or straps -- and §7.6
+# collapsed those into one thing: a strap IS the room, because what sits on one
+# is a whole stack. So the two columns that used to mean different things now
+# mean the same one, and the tree simply hands out more of it.
+#
+# Two at a time, and four on the last row: a node's worth is read off its depth
+# everywhere else (§7.4.3), and a granted tree has no reason to be the exception.
+# Eleven twos and two fours is thirty.
 EXPLORER = [
  # row 1 -- lv 2, 4, 6. What a walker learns in the first fortnight.
- ('deep_pockets','Deep Pockets',bag_units(10),'You stop leaving things behind because there was nowhere to put them.'),
- ('second_strap','Second Strap',bag_rows(4),'A second strap, and four more things you never have to choose between.'),
- ('rolled_blanket','Rolled Blanket',bag_units(10),'Rolled, not folded. It takes half the room and sheds the rain.'),
+ ('deep_pockets','Deep Pockets',bag_slots(2),'You stop leaving things behind because there was nowhere to put them.'),
+ ('second_strap','Second Strap',bag_slots(2),'A second strap, and two more things you never have to choose between.'),
+ ('rolled_blanket','Rolled Blanket',bag_slots(2),'Rolled, not folded. It takes half the room and sheds the rain.'),
  # row 2 -- lv 8, 10, 12. The load starts sitting right, and the country opens up.
- ('even_load','Even Load',bag_units(10),'Weight over the hips, not the shoulders. The miles get shorter.'),
- ('side_pouch','Side Pouch',bag_rows(4),'Small things stop living at the bottom of the pack.'),
+ ('even_load','Even Load',bag_slots(2),'Weight over the hips, not the shoulders. The miles get shorter.'),
+ ('side_pouch','Side Pouch',bag_slots(2),'Small things stop living at the bottom of the pack.'),
  ('high_ground','High Ground',sight(1),'Take the ridge and the country opens a hex further out.'),
  # row 3 -- lv 14, 16, 18.
- ('bindle','Bindle',bag_units(10),'An old trick: the pack that hangs outside the pack.'),
- ('sorted_kit','Sorted Kit',bag_rows(4),'Everything has a place, so everything fits in it.'),
- ('tump_line','Tump Line',bag_units(10),'A strap across the brow. Your neck argues; the load moves.'),
+ ('bindle','Bindle',bag_slots(2),'An old trick: the pack that hangs outside the pack.'),
+ ('sorted_kit','Sorted Kit',bag_slots(2),'Everything has a place, so everything fits in it.'),
+ ('tump_line','Tump Line',bag_slots(2),'A strap across the brow. Your neck argues; the load moves.'),
  # row 4 -- lv 20, 22, 24.
- ('packers_knot','Packer\'s Knot',bag_units(10),'Cinch it once and it stays cinched for thirty miles.'),
- ('outer_pockets','Outer Pockets',bag_rows(4),'What you need on the road no longer lives under what you do not.'),
- ('long_haul','Long Haul',bag_units(10),'The day you stop counting the hours is the day you carry more of them.'),
- # row 5 -- lv 26, 28, 30. Six thousand hexes in.
- ('drovers_back','Drover\'s Back',bag_units(10),'Built by the road, and it shows in what you can pick up.'),
- ('tinkers_roll','Tinker\'s Roll',bag_rows(4),'A roll of pockets, and a pocket for everything worth keeping.'),
+ ('packers_knot','Packer\'s Knot',bag_slots(2),'Cinch it once and it stays cinched for thirty miles.'),
+ ('outer_pockets','Outer Pockets',bag_slots(2),'What you need on the road no longer lives under what you do not.'),
+ ('long_haul','Long Haul',bag_slots(2),'The day you stop counting the hours is the day you carry more of them.'),
+ # row 5 -- lv 26, 28, 30. Six thousand hexes in, and the last two are worth double.
+ ('drovers_back','Drover\'s Back',bag_slots(4),'Built by the road, and it shows in what you can pick up.'),
+ ('tinkers_roll','Tinker\'s Roll',bag_slots(4),'A roll of pockets, and a pocket for everything worth keeping.'),
  ('horizon_line','Horizon Line',sight(1),'You read the far edge of the ground the way others read the near.'),
 ]
 
@@ -933,7 +942,7 @@ def effect_php(e):
         return "['kind' => 'stat', 'stat' => %s, 'value' => %s]" % (php_str(target), value)
     if kind == 'pair':
         return "['kind' => 'pair', 'stat' => %s, 'value' => %d]" % (php_str(target), value)
-    if kind in ('batch', 'runSlot', 'stackCap', 'sight', 'bagUnits', 'bagRows', 'bite',
+    if kind in ('batch', 'runSlot', 'stackCap', 'sight', 'bagSlots', 'bite',
                 'skillCooldown', 'skillStun'):
         return "['kind' => %s, 'value' => %d]" % (php_str(kind), value)
     return "['kind' => %s, 'value' => %s]" % (php_str(kind), value)

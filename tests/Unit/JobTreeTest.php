@@ -119,7 +119,7 @@ final class JobTreeTest extends TestCase
         foreach (Jobs::nodesFor('explorer') as $key => $node) {
             $this->assertContains(
                 $node['effect']['kind'],
-                ['sight', 'bagUnits', 'bagRows'],
+                ['sight', 'bagSlots'],
                 "{$key} pays out in something a free tree must never buy",
             );
         }
@@ -134,17 +134,16 @@ final class JobTreeTest extends TestCase
         // can be a reward at all.
         $this->assertSame(Balance::SKILL_SIGHT_CAP, $sight);
 
-        // §7.6 -- the same argument for the bag. Both limits are counts rather
-        // than percentages, and both are capped because the bag is the pressure
-        // the §11 sinks run on: a chain that could switch it off would switch
-        // off the selling, processing and dumping it drives.
+        // §7.6 -- the same argument for the bag. It is a count rather than a
+        // percentage, and it is capped because the bag is the pressure the §11
+        // sinks run on: a chain that could switch it off would switch off the
+        // selling, processing and dumping it drives.
         $summed = fn (string $kind) => array_sum(array_map(
             fn (array $n) => $n['effect']['kind'] === $kind ? $n['effect']['value'] : 0,
             Jobs::nodesFor('explorer'),
         ));
 
-        $this->assertSame(Balance::SKILL_BAG_UNITS_CAP, $summed('bagUnits'));
-        $this->assertSame(Balance::SKILL_BAG_ROWS_CAP, $summed('bagRows'));
+        $this->assertSame(Balance::SKILL_BAG_SLOTS_CAP, $summed('bagSlots'));
     }
 
     public function test_prerequisites_point_backwards_at_real_nodes(): void
@@ -261,7 +260,7 @@ final class JobTreeTest extends TestCase
             'craftOption', 'craftDurability', 'optionTier', 'brewExtra', 'stackCap', 'bite',
             'skillPower', 'skillCooldown', 'skillStun',
             'costReduction', 'batch', 'runSlot', 'presence', 'toolWear', 'seamGrade',
-            'sight', 'bagUnits', 'bagRows',
+            'sight', 'bagSlots',
             // §9.5.9 -- teaches one of the three a battle job carries. The only
             // kind with no `value`: owning the node IS the effect.
             'battleSkill',
@@ -306,13 +305,20 @@ final class JobTreeTest extends TestCase
                 array_values(Jobs::nodesFor($job)),
             );
 
+            // §7.5 -- the granted tree is the exception, and the doc says so in
+            // as many words: *every node is the eye or the back*. Two things,
+            // deliberately, because capability is the only currency a tree that
+            // costs no skill point may ever spend. A floor of three here would
+            // be demanding it invent a third.
+            $floor = Jobs::JOBS[$job]['kind'] === Jobs::WAYFARING ? 2 : 3;
+
             $this->assertGreaterThanOrEqual(
-                3,
+                $floor,
                 count(array_unique(array_map(
                     fn (string $k) => implode(':', array_slice(explode(':', $k), 0, 2)),
                     $kinds,
                 ))),
-                "{$job} spends its thirty nodes on fewer than three different things",
+                "{$job} spends its nodes on fewer than {$floor} different things",
             );
 
             $shape = implode('|', $kinds);

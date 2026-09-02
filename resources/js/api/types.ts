@@ -53,21 +53,28 @@ export interface CharacterDto {
 }
 
 /**
- * §7.6 -- the bag.
+ * §7.6 -- the bag. One limit, and it is straps.
  *
- * Two limits, not one. `units` is the weight of everything carried -- materials,
- * potions, and every piece of gear not being worn -- and `rows` is how many
- * separate things that is. Over either one and the character cannot travel,
- * which is what `over` is for: the map reads it rather than comparing the pairs
- * itself, so the client and the server never disagree about whether a walk is
- * allowed.
+ * A strap is a *place*, and what sits on it is one stack of one kind: fifty of
+ * a material, `stackPotion` of a draft, one piece of gear. So sixty wood is two
+ * straps, and the count says how much you are carrying and how many different
+ * things it is in one number. There is no weight limit beside it any more.
+ *
+ * The stack depths ride along because one of them is not a constant: an
+ * Alchemist's shelf (§8.5) is deeper than anybody else's, so a client that
+ * mirrored a flat hundred would draw the wrong number of straps under the right
+ * number of flasks.
+ *
+ * `over` is the server's own answer to "can this character leave", read rather
+ * than recomputed, so the two never disagree about whether a walk is allowed.
  */
 export interface BagDto {
-  units: number
-  unitCap: number
-  rows: number
-  rowCap: number
+  slots: number
+  slotCap: number
   over: boolean
+  stackMaterial: number
+  stackPotion: number
+  stackGear: number
 }
 
 export interface SkillDto {
@@ -338,9 +345,8 @@ export type NodeEffect =
   | { kind: 'seamGrade'; value: number }
   /** §7.5 -- whole hexes of sight, on top of the base one. Not a percentage. */
   | { kind: 'sight'; value: number }
-  /** §7.6 -- units and rows of bag, on top of the flat base. Counts, not stats. */
-  | { kind: 'bagUnits'; value: number }
-  | { kind: 'bagRows'; value: number }
+  /** §7.6 -- straps of bag, on top of the flat base. A count, not a stat. */
+  | { kind: 'bagSlots'; value: number }
 
 export interface JobDef {
   name: string

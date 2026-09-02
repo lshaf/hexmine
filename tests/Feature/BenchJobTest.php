@@ -324,7 +324,7 @@ final class BenchJobTest extends TestCase
         // Fill every strap with something else.
         $rows = [];
         foreach (array_keys(Catalog::materials()) as $key) {
-            if (count($rows) >= Balance::BAG_ROWS) {
+            if (count($rows) >= Balance::BAG_SLOTS) {
                 break;
             }
             $rows[$key] = 1;

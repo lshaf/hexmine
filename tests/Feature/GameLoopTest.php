@@ -4484,24 +4484,24 @@ final class GameLoopTest extends TestCase
     /**
      * Put something on every strap, §7.6.
      *
-     * The cap is roomier than the material list is long, so this walks the
-     * three things that take a row -- stacks, then the potion shelf, then unworn
-     * gear -- until the bag is full. One unit each, so what it fills is rows and
-     * never weight: a test about straps must not accidentally be a test about
-     * how heavy the bag is.
+     * Walks the three things that take a strap -- stacks, then the potion
+     * shelf, then unworn gear -- until the bag is full. **One unit each**, so
+     * every strap is filled by a different *kind* rather than by a deep stack:
+     * a test about running out of places must not accidentally be a test about
+     * running out of room on one of them.
      *
-     * Rows are written straight to the tables rather than granted through the
+     * Straps are written straight to the tables rather than granted through the
      * service, because the service is the thing under test here: `addMaterial`
-     * refuses a new kind once the straps are gone, which is exactly the rule
-     * these tests are setting up to exercise.
+     * refuses what has nowhere to land, which is exactly the rule these tests
+     * are setting up to exercise.
      *
      * @param  array<int,string>  $except  material keys to leave off the straps
      */
     private function fillStraps(array $except = [], int $leaveFree = 0): void
     {
-        $target = Balance::BAG_ROWS - $leaveFree;
+        $target = Balance::BAG_SLOTS - $leaveFree;
 
-        $rows = fn () => $this->game->bag($this->character->fresh())['rows'];
+        $rows = fn () => $this->game->bag($this->character->fresh())['slots'];
 
         foreach (array_keys(Catalog::materials()) as $key) {
             if ($rows() >= $target) {
@@ -4544,12 +4544,11 @@ final class GameLoopTest extends TestCase
     }
 
     /**
-     * §7.6 -- the bag holds everything, and counts it two ways.
+     * §7.6 -- the bag holds everything, and counts it in straps.
      *
-     * Units are the weight, rows are how many separate things it is. A potion
-     * is not a material and a spare axe is neither, but all three are in the
-     * same pack and all three count -- otherwise "what do I carry" would only
-     * ever be a question about ore.
+     * A potion is not a material and a spare axe is neither, but all three are
+     * in the same pack and all three take a strap -- otherwise "what do I
+     * carry" would only ever be a question about ore.
      */
     public function test_the_bag_counts_materials_potions_and_unworn_gear(): void
     {
@@ -4564,11 +4563,62 @@ final class GameLoopTest extends TestCase
 
         $bag = $this->game->bag($this->character->fresh());
 
-        $this->assertSame(19, $bag['units'], '10 wood + 5 stone + 3 tonics + 1 axe');
-        $this->assertSame(4, $bag['rows'], 'two stacks, one shelf of tonics, one axe');
-        $this->assertSame(Balance::BAG_UNITS, $bag['unitCap']);
-        $this->assertSame(Balance::BAG_ROWS, $bag['rowCap']);
+        $this->assertSame(4, $bag['slots'], 'two stacks, one shelf of tonics, one axe');
+        $this->assertSame(Balance::BAG_SLOTS, $bag['slotCap']);
         $this->assertFalse($bag['over']);
+    }
+
+    /**
+     * §7.6 -- a strap holds a *stack*, and a stack that outgrows it takes the
+     * next strap along.
+     *
+     * This is the whole of what replaced the weight limit. One number now says
+     * both how much is being carried and how many different things it is, which
+     * is why there is nothing left to subtract.
+     */
+    public function test_a_stack_that_outgrows_a_strap_takes_another(): void
+    {
+        $stack = Balance::BAG_STACK_MATERIAL;
+
+        $this->give(['wood' => $stack]);
+        $this->assertSame(1, $this->game->bag($this->character->fresh())['slots'], 'exactly full is one strap');
+
+        $this->give(['wood' => 1]);
+        $this->assertSame(2, $this->game->bag($this->character->fresh())['slots'], 'one over spills to a second');
+
+        $this->give(['wood' => $stack * 2 - 1]);
+        $this->assertSame(3, $this->game->bag($this->character->fresh())['slots']);
+        $this->assertSame($stack * 3, $this->game->held($this->character->fresh(), 'wood'));
+
+        // §8.5 -- a draft stacks deeper than a material, because a flask is not
+        // a sack of ore. Same rule, its own depth.
+        $this->character->consumables()->create([
+            'item_key' => 'road_tonic',
+            'quantity' => Balance::BAG_STACK_POTION + 1,
+        ]);
+        $this->assertSame(5, $this->game->bag($this->character->fresh())['slots']);
+    }
+
+    /**
+     * §7.6 -- gear is one to a strap, always.
+     *
+     * Two axes are two objects with two durabilities and two sets of rolled
+     * lines (§8.0.1). They can never be one stack, whatever the pile of ore
+     * beside them does.
+     */
+    public function test_gear_never_stacks(): void
+    {
+        foreach (range(1, 3) as $n) {
+            CharacterItem::create([
+                'character_id' => $this->character->id,
+                'item_key' => 'stone_axe',
+                'durability' => 40,
+                'equipped' => false,
+            ]);
+            $this->assertSame($n, $this->game->bag($this->character->fresh())['slots']);
+        }
+
+        $this->assertSame(Balance::BAG_STACK_GEAR, $this->game->bag($this->character->fresh())['stackGear']);
     }
 
     /**
@@ -4586,13 +4636,13 @@ final class GameLoopTest extends TestCase
             'equipped' => false,
         ]);
 
-        $this->assertSame(1, $this->game->bag($this->character->fresh())['rows']);
+        $this->assertSame(1, $this->game->bag($this->character->fresh())['slots']);
 
         $this->game->equipItem($this->character->fresh(), $item->id);
-        $this->assertSame(0, $this->game->bag($this->character->fresh())['rows']);
+        $this->assertSame(0, $this->game->bag($this->character->fresh())['slots']);
 
         $this->game->unequipItem($this->character->fresh(), $item->id);
-        $this->assertSame(1, $this->game->bag($this->character->fresh())['rows']);
+        $this->assertSame(1, $this->game->bag($this->character->fresh())['slots']);
     }
 
     /**
@@ -4624,58 +4674,66 @@ final class GameLoopTest extends TestCase
     }
 
     /**
-     * §7.6 -- too much to carry means you do not carry it anywhere.
+     * §7.6 -- weight does not stop the road any more, and only straps could.
      *
-     * The refusal is travel and only travel. It is the second one the map has,
-     * after the edge (§5.6), and it is the only one a player can undo.
+     * There used to be a second limit that counted every unit against one
+     * number, and being over it was what pinned a character to their hex. It is
+     * gone: a stack that fits on the straps is carried, however heavy, because
+     * the straps have already said what fits. A big haul is a lot of straps and
+     * nothing else.
      */
-    public function test_too_many_units_pins_you_to_the_hex(): void
+    public function test_a_heavy_haul_does_not_stop_the_road(): void
     {
-        $this->give(['wood' => Balance::BAG_UNITS + 1]);
+        // Far more than the old weight ceiling, on four straps.
+        $this->give(['wood' => Balance::BAG_STACK_MATERIAL * 4]);
+
+        $bag = $this->game->bag($this->character->fresh());
+        $this->assertSame(4, $bag['slots']);
+        $this->assertFalse($bag['over'], 'weight is not a limit any more');
 
         [$col, $row] = $this->elsewhere();
-
-        try {
-            $this->game->travelTo($this->character->fresh(), $col, $row);
-            $this->fail('walked off with an overloaded bag');
-        } catch (GameException $e) {
-            $this->assertSame('overloaded', $e->errorCode);
-        }
-
-        // The way out is always in reach: drop one and the road opens.
-        $this->game->discardMaterial($this->character->fresh(), 'wood', 1);
         $travel = $this->game->travelTo($this->character->fresh(), $col, $row);
 
         $this->assertSame($col, $travel['toCol']);
     }
 
     /**
-     * §7.6 -- the second limit refuses instead of pinning.
+     * §7.6 -- the limit refuses instead of pinning.
      *
-     * A row is a place to put a thing, not weight, and there is nowhere to put a
-     * thing that has no strap. So a full bag turns away a kind it is not already
-     * carrying -- and still takes more of a kind it is.
+     * A strap is a place to put a thing, and there is nowhere to put a thing
+     * that has no strap. So a full bag turns away what would need a new one --
+     * and still takes more of a stack that has room left on it.
      */
-    public function test_a_full_bag_turns_away_a_kind_it_is_not_carrying(): void
+    public function test_a_full_bag_turns_away_what_needs_a_new_strap(): void
     {
         $spare = array_key_first(Catalog::materials());
         $this->fillStraps([$spare]);
 
         $bag = $this->game->bag($this->character->fresh());
-        $this->assertSame(Balance::BAG_ROWS, $bag['rows']);
-        $this->assertLessThan($bag['unitCap'], $bag['units'], 'this must be about rows, not weight');
+        $this->assertSame(Balance::BAG_SLOTS, $bag['slots']);
         $this->assertFalse($bag['over'], 'full is not over -- the limit was never passed');
 
-        // A kind it is not holding does not land.
+        // A kind with no strap of its own does not land.
         $this->give([$spare => 5]);
         $this->assertSame(0, $this->game->held($this->character->fresh(), $spare));
-        $this->assertSame(Balance::BAG_ROWS, $this->game->bag($this->character->fresh())['rows']);
+        $this->assertSame(Balance::BAG_SLOTS, $this->game->bag($this->character->fresh())['slots']);
 
-        // A kind it is holding still does: the limit is on variety, not amount.
+        // A stack with room left on its strap still takes more: topping one up
+        // is free, and what costs you is *another* place to keep something.
         $carried = (string) $this->character->fresh()->materials()->value('material_key');
         $before = $this->game->held($this->character->fresh(), $carried);
         $this->give([$carried => 9]);
         $this->assertSame($before + 9, $this->game->held($this->character->fresh(), $carried));
+
+        // ...and it stops exactly at the top of that strap, because the next
+        // unit would want a strap there is not.
+        $room = Balance::BAG_STACK_MATERIAL - ($before + 9);
+        $this->give([$carried => $room + 10]);
+        $this->assertSame(
+            Balance::BAG_STACK_MATERIAL,
+            $this->game->held($this->character->fresh(), $carried),
+            'a full bag let a stack spill onto a strap it does not have',
+        );
     }
 
     /**
@@ -4706,69 +4764,77 @@ final class GameLoopTest extends TestCase
     }
 
     /**
-     * §7.6 -- an overloaded bag stops the road, and nothing else.
+     * §7.6 -- a full bag stops what needs a new strap, and nothing else.
      *
-     * Working the hex you are standing on, selling, processing and dropping all
-     * have to keep working, because every one of them is a way out. A full bag
-     * that also refused the ways to empty it would be a dead end rather than a
-     * decision.
+     * Working a hex whose haul has somewhere to land, selling, processing and
+     * dropping all have to keep working, because every one of them is a way
+     * out. A full bag that also refused the ways to empty it would be a dead
+     * end rather than a decision.
      */
-    public function test_an_overloaded_bag_still_lets_you_work_and_sell(): void
+    public function test_a_full_bag_still_lets_you_work_and_sell(): void
     {
         $this->equipToolForHere();
-        $this->give(['wood' => Balance::BAG_UNITS + 20]);
-        $this->assertTrue($this->game->bag($this->character->fresh())['over']);
+        $col = (int) $this->character->col;
+        $row = (int) $this->character->row;
+        $material = $this->game->previewTile($this->character->fresh(), $col, $row)['material'];
 
-        $job = $this->game->startMining($this->character->fresh(), (int) $this->character->col, (int) $this->character->row);
+        // Every strap taken, and one of them is this hex's own material with
+        // room left on it -- so the dig has somewhere to go.
+        $this->give([$material => 1]);
+        $this->fillStraps([$material]);
+        $this->assertSame(Balance::BAG_SLOTS, $this->game->bag($this->character->fresh())['slots']);
+
+        $job = $this->game->startMining($this->character->fresh(), $col, $row);
         $this->assertNotNull($job);
 
-        $dropped = $this->game->discardMaterial($this->character->fresh(), 'wood', 20);
-        $this->assertSame(20, $dropped);
-        $this->assertFalse($this->game->bag($this->character->fresh())['over']);
+        $dropped = $this->game->discardMaterial($this->character->fresh(), $material, 1);
+        $this->assertSame(1, $dropped);
+        $this->assertLessThan(
+            Balance::BAG_SLOTS,
+            $this->game->bag($this->character->fresh())['slots'],
+            'throwing something away has to free a strap',
+        );
     }
 
     /**
      * §7.5 + §7.6 -- the road is the only thing that widens the bag, and it
-     * stops where the caps do.
+     * stops where the cap does.
      *
-     * Fifteen skills, ten units or four straps each, one every second job level
-     * from 2 to 30. The climb is what is being tested here as much as the
-     * ceiling: an early skill has to be felt, or a tree nobody spends points on
-     * is a tree nobody notices.
+     * Thirteen pack skills, two straps each and four on the last row, one every
+     * second job level from 2 to 30. The climb is what is being tested here as
+     * much as the ceiling: an early skill has to be felt, or a tree nobody
+     * spends points on is a tree nobody notices.
      */
     public function test_the_explorer_tree_widens_the_bag_and_then_stops(): void
     {
-        $bag = $this->game->bag($this->character);
-        $this->assertSame(Balance::BAG_UNITS, $bag['unitCap']);
-        $this->assertSame(Balance::BAG_ROWS, $bag['rowCap']);
+        $this->assertSame(Balance::BAG_SLOTS, $this->game->bag($this->character)['slotCap']);
 
         // Reaching the level is not having the skill (§7.5): it opens, and
         // then it is claimed.
         $this->explorerAt(2);
         $this->assertSame(
-            Balance::BAG_UNITS,
-            $this->game->bag($this->character->fresh())['unitCap'],
+            Balance::BAG_SLOTS,
+            $this->game->bag($this->character->fresh())['slotCap'],
             'the pack widened without anybody claiming anything',
         );
 
-        // The first skill, at Explorer 2: four hexes of walking, ten units of
-        // pack. One skill per level, so the straps are still a level away.
+        // The first skill, at Explorer 2: four hexes of walking, two straps.
         $this->claimExplorerTo(2);
-        $bag = $this->game->bag($this->character->fresh());
-        $this->assertSame(Balance::BAG_UNITS + 10, $bag['unitCap']);
-        $this->assertSame(Balance::BAG_ROWS, $bag['rowCap'], 'the straps arrived with the room');
+        $this->assertSame(
+            Balance::BAG_SLOTS + 2,
+            $this->game->bag($this->character->fresh())['slotCap'],
+        );
 
         $this->claimExplorerTo(4);
-        $bag = $this->game->bag($this->character->fresh());
-        $this->assertSame(Balance::BAG_UNITS + 10, $bag['unitCap']);
-        $this->assertSame(Balance::BAG_ROWS + 4, $bag['rowCap']);
+        $this->assertSame(
+            Balance::BAG_SLOTS + 4,
+            $this->game->bag($this->character->fresh())['slotCap'],
+        );
 
         $this->claimExplorerTo(Balance::JOB_MAX_LEVEL);
         $bag = $this->game->bag($this->character->fresh());
-        $this->assertSame(Balance::BAG_UNITS + Balance::SKILL_BAG_UNITS_CAP, $bag['unitCap']);
-        $this->assertSame(Balance::BAG_ROWS + Balance::SKILL_BAG_ROWS_CAP, $bag['rowCap']);
-        $this->assertSame(200, $bag['unitCap'], 'the ceiling moved without the doc moving with it');
-        $this->assertSame(50, $bag['rowCap'], 'the ceiling moved without the doc moving with it');
+        $this->assertSame(Balance::BAG_SLOTS + Balance::SKILL_BAG_SLOTS_CAP, $bag['slotCap']);
+        $this->assertSame(80, $bag['slotCap'], 'the ceiling moved without the doc moving with it');
     }
 
     /** The generation parameters the client needs, and nothing player-specific. */

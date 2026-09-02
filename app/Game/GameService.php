@@ -315,19 +315,18 @@ class GameService
         ]);
         $current = (int) ($row->quantity ?? 0);
 
-        // §7.6 -- a kind the bag is not already holding needs a free row, and
-        // when there is none the haul does not land. Silent rather than thrown,
-        // because the callers that grant are collections: they report what was
-        // lost through `lostToOverflow` and carry on.
-        if ($current <= 0 && ! $this->hasFreeRow($character)) {
-            return 0;
-        }
+        // §7.6 -- what lands is what the straps will take: the room left in the
+        // stack this key already has, plus a full stack for every empty strap.
+        // Silent rather than thrown, because the callers that grant are
+        // collections: they report what was lost through `lostToOverflow` and
+        // carry on. Nothing is refused for being *big* -- a haul of two hundred
+        // wood is four straps and lands whole if four are free.
+        $granted = min($quantity, $this->roomForMaterial($character, $key));
 
-        $granted = $quantity;
         $cap = Catalog::walletCap($key);
         if ($cap !== null) {
             // §2 -- a bot farm with 1000 wallets gets 1000x capped, non-liquid output.
-            $granted = max(0, min($quantity, $cap - $current));
+            $granted = max(0, min($granted, $cap - $current));
         }
 
         if ($granted > 0) {
@@ -355,25 +354,31 @@ class GameService
     // -------------------------------------------------------------------- bag
 
     /**
-     * §7.6 -- what is in the bag, against the two limits on it.
+     * §7.6 -- what is on the straps, against the one limit on them.
      *
-     * Two numbers, because one is not enough. `units` is the weight of the thing
-     * -- every material, every potion, every unworn tool -- and `rows` is how
-     * many separate things they are. A bucket has only the first, and a bucket
-     * lets a prospector carry one of everything for free, which is exactly the
-     * pressure §4's biome-locked ladder is built on.
+     * A strap is a *place*, and what sits on it is one stack of one kind: fifty
+     * of a material, a hundred of a draft (deeper with an Alchemist's shelf,
+     * §7.4.3), one piece of gear. So a stack that outgrows its strap takes
+     * another one, and the count of straps says both how much you are carrying
+     * and how many different things it is -- which is why there is no longer a
+     * weight limit beside it. One number, one drawing, nothing to subtract.
      *
      * **Worn gear is not carried.** An equipped axe is on your belt, not in your
-     * pack, so equipping is itself a way to free a row -- and a prospector who
+     * pack, so equipping is itself a way to free a strap -- and a prospector who
      * has committed to their five lines is not punished for it. Spares and
-     * anything waiting to be equipped cost a row each, because two axes do not
-     * stack.
+     * anything waiting to be equipped cost a strap each, because two axes are
+     * two objects with two durabilities and can never be one stack.
      *
      * Derived on every read and never stored. A counter would be a second
      * opinion about what you are carrying, and the two would eventually
-     * disagree the first time a row was deleted somewhere that forgot about it.
+     * disagree the first time a stack was deleted somewhere that forgot about it.
      *
-     * @return array{units:int,unitCap:int,rows:int,rowCap:int,over:bool}
+     * How deep each kind of strap goes rides along with the count, because one
+     * of the three is not a constant: an Alchemist's shelf (§8.5) is deeper
+     * than anybody else's, and a client that mirrored a flat hundred would draw
+     * the wrong number of straps under the right number of flasks.
+     *
+     * @return array{slots:int,slotCap:int,over:bool,stackMaterial:int,stackPotion:int,stackGear:int}
      */
     public function bag(Character $character): array
     {
@@ -384,51 +389,107 @@ class GameService
         // one action out of date exactly when it matters.
         $loose = $character->items()->where('equipped', false)->count();
 
-        $units = (int) $materials->sum() + (int) $potions->sum() + $loose;
-        $rows = $materials->count() + $potions->count() + $loose;
-
+        // Read once. Every strap question below is asked off this array rather
+        // than off another trip to the node table, because `bag()` itself is
+        // asked before nearly every write in the game.
+        //
+        // §8.5 -- the shelf is the Alchemist's, so it is read off that job's
+        // bucket rather than off the top level: `stackCap` is line-locked like
+        // every other craft effect (§7.4.3), and a global read here would hand
+        // it to anybody who had never brewed anything.
         $effects = $this->nodeEffects($character);
-        $unitCap = Balance::BAG_UNITS + $effects['bagUnits'];
-        $rowCap = Balance::BAG_ROWS + $effects['bagRows'];
+        $potionStack = Balance::BAG_STACK_POTION
+            + (int) ($effects['byJob']['alchemist']['stackCap'] ?? 0);
+
+        $slots = $loose;
+        foreach ($materials as $qty) {
+            $slots += (int) ceil((int) $qty / Balance::BAG_STACK_MATERIAL);
+        }
+        foreach ($potions as $qty) {
+            $slots += (int) ceil((int) $qty / $potionStack);
+        }
+
+        $slotCap = Balance::BAG_SLOTS + $effects['bagSlots'];
 
         return [
-            'units' => $units,
-            'unitCap' => $unitCap,
-            'rows' => $rows,
-            'rowCap' => $rowCap,
-            'over' => $units > $unitCap || $rows > $rowCap,
+            'slots' => $slots,
+            'slotCap' => $slotCap,
+            'over' => $slots > $slotCap,
+            'stackMaterial' => Balance::BAG_STACK_MATERIAL,
+            'stackPotion' => $potionStack,
+            'stackGear' => Balance::BAG_STACK_GEAR,
         ];
     }
 
     /**
-     * §7.6 -- is there a strap free for something the bag is not already holding?
+     * §7.6 -- is there a strap with nothing on it?
      *
-     * The two limits refuse in two different ways, on purpose. **Units** may go
-     * over: a haul lands whole, and being too heavy stops the road rather than
-     * the work, which is a decision the player can undo from where they stand.
-     * **Rows** may not, because a row is not weight -- it is a place to put a
-     * thing, and there is nowhere to put a thing that has no strap. So the row
-     * limit is checked at the door and the unit limit at the gate.
+     * The limit is checked at the door and never at the gate: a strap is a
+     * place, and "put it somewhere" has no after-the-fact answer, so the
+     * refusal has to come before the work rather than after it. That is also
+     * why straps can never go over -- there is nowhere to put a thing that has
+     * no strap.
      *
-     * More of what you already carry never needs a new row, and that asymmetry
-     * is the whole point: the limit is on *variety*, which is what keeps §4's
-     * five lines a choice instead of a checklist.
+     * A stack with room left in it never needs a new strap, and that asymmetry
+     * is still the point: topping one up is free, and what costs you is
+     * *another* place to keep something.
      */
     public function hasFreeRow(Character $character): bool
     {
         $bag = $this->bag($character);
 
-        return $bag['rows'] < $bag['rowCap'];
-    }
-
-    /** True when this material can land: an open strap, or a stack to join. */
-    public function canTakeMaterial(Character $character, string $key): bool
-    {
-        return $this->held($character, $key) > 0 || $this->hasFreeRow($character);
+        return $bag['slots'] < $bag['slotCap'];
     }
 
     /**
-     * §7.6 -- refuse a new row, in the words the player needs.
+     * §7.6 -- how many more units of this material could actually land.
+     *
+     * The room left in the stack it already has, plus a full stack for every
+     * empty strap. Nothing is refused for being *big*: a haul of two hundred
+     * wood is four straps, and it lands whole if four are free.
+     */
+    public function roomForMaterial(Character $character, string $key): int
+    {
+        $bag = $this->bag($character);
+        $free = max(0, $bag['slotCap'] - $bag['slots']);
+        $stack = $bag['stackMaterial'];
+
+        return $this->stackHeadroom($this->held($character, $key), $stack) + $free * $stack;
+    }
+
+    /** The same question about a shelf of drafts. */
+    public function roomForConsumable(Character $character, string $key): int
+    {
+        $bag = $this->bag($character);
+        $free = max(0, $bag['slotCap'] - $bag['slots']);
+        $stack = $bag['stackPotion'];
+
+        return $this->stackHeadroom($this->heldConsumable($character, $key), $stack) + $free * $stack;
+    }
+
+    /**
+     * What is left in the part-filled strap a stack of this size ends on.
+     *
+     * Zero when it happens to end flush, which is correct: a stack of exactly
+     * fifty has filled its strap and the next unit wants a new one.
+     */
+    private function stackHeadroom(int $held, int $stack): int
+    {
+        if ($held <= 0) {
+            return 0;
+        }
+
+        return (int) ceil($held / $stack) * $stack - $held;
+    }
+
+    /** True when at least one more of this material can land. */
+    public function canTakeMaterial(Character $character, string $key): bool
+    {
+        return $this->roomForMaterial($character, $key) > 0;
+    }
+
+    /**
+     * §7.6 -- refuse a new strap, in the words the player needs.
      *
      * Called before anything is spent, never after: a craft that takes the
      * planks and then finds nowhere to put the axe would be the worst version
@@ -443,7 +504,7 @@ class GameService
         $bag = $this->bag($character);
 
         throw new GameException(
-            "No room for {$what} — your bag is full at {$bag['rowCap']} kinds. Clear one out first.",
+            "No room for {$what} — every one of your {$bag['slotCap']} straps is full. Clear one out first.",
             'no_room',
         );
     }
@@ -451,25 +512,28 @@ class GameService
     /**
      * §7.6 -- why you cannot leave, in the words the player needs.
      *
-     * Null when the bag is fine. The message names the limit that is broken and
-     * by how much, because "your bag is full" in front of a map that will not
-     * move is the kind of refusal that reads as a bug.
+     * Null when the bag is fine, which under one limit is very nearly always.
+     * Straps are refused at the door rather than passed at the gate -- there is
+     * nowhere to put a thing that has no strap, so the count cannot climb past
+     * the cap in the ordinary course of play, and the weight limit that used to
+     * stop the road is gone.
+     *
+     * It is kept as a guard rather than deleted because a strap count is
+     * *derived* (§7.6): a shelf that ever got shallower, or a stack landing
+     * through a path that forgot to ask, would put a character over without any
+     * single action having done it. A refusal you can act on from where you
+     * stand is a far better answer to that than a bag quietly holding more than
+     * it may.
      */
     public function overloaded(Character $character): ?string
     {
         $bag = $this->bag($character);
 
-        if ($bag['units'] > $bag['unitCap']) {
-            $over = $bag['units'] - $bag['unitCap'];
+        if ($bag['slots'] > $bag['slotCap']) {
+            $over = $bag['slots'] - $bag['slotCap'];
+            $things = $over === 1 ? 'one strap' : "{$over} straps";
 
-            return "Too much to carry — {$bag['units']} of {$bag['unitCap']}. Sell, process or drop {$over} before you set off.";
-        }
-
-        if ($bag['rows'] > $bag['rowCap']) {
-            $over = $bag['rows'] - $bag['rowCap'];
-            $things = $over === 1 ? 'one kind of thing' : "{$over} kinds of thing";
-
-            return "Your pack will not close — {$bag['rows']} kinds against {$bag['rowCap']} straps. Clear {$things} before you set off.";
+            return "Your pack will not close — {$bag['slots']} straps against {$bag['slotCap']}. Clear {$things} before you set off.";
         }
 
         return null;
@@ -2968,14 +3032,23 @@ class GameService
      */
     private function requireRoomForLoot(Character $character, array $loot): void
     {
-        $joins = match ($loot['kind']) {
-            'material' => $this->held($character, (string) $loot['key']) > 0,
-            'consumable' => $this->heldConsumable($character, (string) $loot['key']) > 0,
-            default => false,
+        // A stack has to come home whole, so the question is room for the whole
+        // of it rather than room for one more: the recovery restores the object
+        // that was taken (§9.5.7), and half a stack coming back would be the row
+        // taken twice with extra steps. A piece of gear is one strap flat.
+        $fits = match ($loot['kind']) {
+            'material' => $this->roomForMaterial($character, (string) $loot['key']) >= (int) $loot['quantity'],
+            'consumable' => $this->roomForConsumable($character, (string) $loot['key']) >= (int) $loot['quantity'],
+            default => $this->hasFreeRow($character),
         };
 
-        if (! $joins) {
-            $this->requireFreeRow($character, (string) $loot['label']);
+        if (! $fits) {
+            $bag = $this->bag($character);
+
+            throw new GameException(
+                "No room for {$loot['label']} — {$bag['slots']} of your {$bag['slotCap']} straps are full. Clear some out first.",
+                'no_room',
+            );
         }
     }
 
@@ -5549,10 +5622,13 @@ class GameService
                 );
             }
 
-            // §7.6 -- a potion joins a shelf it may already have; anything with
-            // a slot is a new row every time, because gear does not stack. Asked
-            // now AND again on collection: an hour is long enough to fill a bag.
-            if (empty($def['consumable']) || $this->heldConsumable($character, $itemKey) <= 0) {
+            // §7.6 -- a potion joins a shelf it may already have, if that shelf
+            // has room left on it; anything with a slot is a new strap every
+            // time, because two axes are two objects. Asked now AND again on
+            // collection: an hour is long enough to fill a bag.
+            if (empty($def['consumable'])) {
+                $this->requireFreeRow($character, $def['name']);
+            } elseif ($this->roomForConsumable($character, $itemKey) <= 0) {
                 $this->requireFreeRow($character, $def['name']);
             }
 
@@ -5696,7 +5772,9 @@ class GameService
         // older than the one that was checked when the work started. Refused
         // rather than dropped: the thing is finished and waiting, and the way
         // out is a strap, which is always in reach.
-        if (empty($def['consumable']) || $this->heldConsumable($character, $itemKey) <= 0) {
+        if (empty($def['consumable'])) {
+            $this->requireFreeRow($character, $def['name']);
+        } elseif ($this->roomForConsumable($character, $itemKey) <= 0) {
             $this->requireFreeRow($character, $def['name']);
         }
 
@@ -5742,20 +5820,24 @@ class GameService
 
             // §7.4.3 -- the three things a consumable bench owns. A potion has
             // no durability and no rolled line, so an Alchemist's tree deals in
-            // how many come off the rack and how many the shelf holds instead.
-            $cap = Balance::CONSUMABLE_STACK_CAP + (int) $effects['stackCap'];
+            // how many come off the rack and how deep the shelf goes instead.
+            //
+            // §7.6 -- a deep shelf buys straps rather than a ceiling: a brew
+            // that outgrows the one it is on wants another, and what refuses a
+            // rack of flasks is having nowhere to put them.
             $made = 1
                 + (int) $effects['batch']
                 + $this->extraRoll($character, (float) $effects['brewExtra'], 0xB2E3);
 
-            if ($row->quantity >= $cap) {
+            $room = $this->roomForConsumable($character, $itemKey);
+            if ($room <= 0) {
                 throw new GameException(
-                    "You cannot carry more than {$row->quantity} {$def['name']}.",
-                    'at_cap',
+                    "No room for {$def['name']} — every strap is full. Clear one out first.",
+                    'no_room',
                 );
             }
 
-            $made = min($made, $cap - (int) $row->quantity);
+            $made = min($made, $room);
             $row->quantity = (int) $row->quantity + $made;
             $row->save();
 
@@ -6095,7 +6177,7 @@ class GameService
      * rest apply at the craft site. Each non-stat total is clamped to its own
      * cap, which is what keeps a maxed tree from switching off a §11 sink.
      *
-     * @return array{stats:array<string,float>,byJob:array<string,array<string,float>>,sight:int,bagUnits:int,bagRows:int}
+     * @return array{stats:array<string,float>,byJob:array<string,array<string,float>>,sight:int,bagSlots:int}
      */
     public function nodeEffects(Character $character): array
     {
@@ -6121,8 +6203,7 @@ class GameService
         $pair = [];
         $battleWear = [];
         $sight = 0;
-        $bagUnits = 0;
-        $bagRows = 0;
+        $bagSlots = 0;
 
         foreach ($keys as $key) {
             $node = Jobs::node($key);
@@ -6185,14 +6266,11 @@ class GameService
                     // cap it is bounded by.
                     $sight += (int) $effect['value'];
                     break;
-                case 'bagUnits':
-                    // §7.6 -- counts, like sight, and bounded by their own caps
-                    // rather than the stat ceiling. What they thin is the §11
+                case 'bagSlots':
+                    // §7.6 -- a count, like sight, and bounded by its own cap
+                    // rather than the stat ceiling. What it thins is the §11
                     // pressure to sell, process and dump, not a power curve.
-                    $bagUnits += (int) $effect['value'];
-                    break;
-                case 'bagRows':
-                    $bagRows += (int) $effect['value'];
+                    $bagSlots += (int) $effect['value'];
                     break;
                 case 'battleSkill':
                     // §9.5.9 -- teaches a skill rather than moving a number.
@@ -6250,8 +6328,7 @@ class GameService
             'pair' => $pair,
             'battleWear' => $battleWear,
             'sight' => min($sight, Balance::SKILL_SIGHT_CAP),
-            'bagUnits' => min($bagUnits, Balance::SKILL_BAG_UNITS_CAP),
-            'bagRows' => min($bagRows, Balance::SKILL_BAG_ROWS_CAP),
+            'bagSlots' => min($bagSlots, Balance::SKILL_BAG_SLOTS_CAP),
         ];
     }
 

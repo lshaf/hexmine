@@ -269,13 +269,11 @@ const travelHint = computed(() => {
       ? 'Claim your reward before you move on'
       : 'You are working this hex — claim or drop it first'
   }
-  // Named against the limit that is actually broken, because "bag full" in
+  // Said in the units the limit is actually counted in, because "bag full" in
   // front of a map that will not move reads as a bug rather than a decision.
   if (overloaded.value) {
     const bag = game.character!.bag
-    return bag.units > bag.unitCap
-      ? `Too much to carry — ${bag.units}/${bag.unitCap} units`
-      : `Too many kinds — ${bag.rows}/${bag.rowCap} straps`
+    return `Too much to carry — ${bag.slots}/${bag.slotCap} straps`
   }
   return `${distance.value} hexes · ${formatSpan(eta.value)}`
 })

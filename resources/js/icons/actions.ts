@@ -69,11 +69,14 @@ export const ACTION_PATHS: Record<string, string> = {
   effectBatch: 'M4 9h9v9H4Z M8 9V5h9v9h-4',
   // §7.5 -- sight: a horizon with the eye above it. Distance, not vision.
   effectSight: 'M3 17h18 M12 5.5c3.6 0 6 3.2 6 3.2s-2.4 3.2-6 3.2-6-3.2-6-3.2 2.4-3.2 6-3.2Z M12 7.6v2.2',
-  /* §7.6 -- the two bag limits, told apart the way the game tells them apart:
-     one pack filled to a line, and a stack of separate pockets. Same object,
-     two different questions about it. */
-  effectBagUnits: 'M6 9h12l1 11H5Z M9 9V6.5a3 3 0 0 1 6 0V9 M6.4 15h11.2',
-  effectBagRows: 'M4 5.5h16v4H4Z M4 11h16v4H4Z M4 16.5h16v4H4Z',
+  /* §7.6 -- a strap is a *place*, so the bag glyph is a stack of separate
+     pockets rather than a pack filled to a line. There is one limit now, and
+     it is counted in places.
+
+     The pack beside it is §8.5's shelf: how deep one of those places goes for
+     a draft, which is a different question about the same object. */
+  effectBagSlots: 'M4 5.5h16v4H4Z M4 11h16v4H4Z M4 16.5h16v4H4Z',
+  effectShelfDepth: 'M6 9h12l1 11H5Z M9 9V6.5a3 3 0 0 1 6 0V9 M6.4 15h11.2',
   /* An arch with a doorway in it. Dungeons are the one place tier 4 comes
      from, so the almanac needs a glyph for them even though raiding is not
      built yet. */
