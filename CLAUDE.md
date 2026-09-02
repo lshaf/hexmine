@@ -3921,18 +3921,24 @@ one worth crossing the screen for: a finished quest, a good toast. A payout in
 ember reads as an alarm; a warning in sap reads as a congratulation. `forest` is
 a biome fill and is not either of them.
 
-**The top-right corner holds two cells and a burger.** What stays out where it
-can be pressed without a tap first is the one control that is about **the map** —
-recenter, since the camera pans anywhere and costs nothing — and everything you
-open from *any hex* is behind the menu beside it. What you are standing on is
-the bottom-centre stack's business (§5.6) and is not in here either.
+**The top-right corner holds the map's own controls and a burger.** What stays
+out where it can be pressed without a tap first is what is about **the map** —
+recenter, since the camera pans anywhere and costs nothing, and the atlas — and
+everything you open from *any hex* is behind the menu beside them. What you are
+standing on is the bottom-centre stack's business (§5.6) and is not in here
+either.
+
+Three cells in a zigzag, a cell and a half tall against the old five, with the
+**burger closing the run at the corner** — which is where a thumb reaching for a
+menu already goes.
 
 *(The screens were a honeycomb, nested the way §13.2's map hexes are: three
 quarters of a width between columns, the middle one dropped half a height. That
 was the right drawing of the wrong amount of thing. Six cells fitted; nine —
 once the guild and the wallet had seats — reached a third of the way down a
 phone, standing over the one thing the game is about. The lattice survives at
-the size it works at: two cells, nested the same way.)*
+the size it works at, and the cells came down with the count: nine of them had
+to be big enough to tell apart in a block, and three do not.)*
 
 **The closed burger carries a roll-up of everything behind it**, and that is not
 a nicety — it is the whole cost of the change. A full bag and gold waiting on

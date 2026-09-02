@@ -191,7 +191,6 @@ const screens = computed<Screen[]>(() => [
   },
   { panel: 'skills', icon: 'skills', label: 'Jobs', hint: 'Seventeen trees, and the points to spend on them' },
   { panel: 'hero', icon: 'hero', label: 'Prospector', hint: 'What you are wearing, and what is about to break' },
-  { panel: 'atlas', icon: 'atlas', label: 'Atlas', hint: 'The whole map, and everything charted on it' },
   // §10 -- the cell says when you have none, since a guild is the only thing
   // standing between a prospector and §8.0's top rung, and "you are not in one"
   // is a decision to make rather than a problem to fix.
@@ -324,14 +323,14 @@ onMounted(() => {
 
       <!-- ------------------------------------------------------ top right -->
       <!--
-        §13.3 -- what is left in this corner is the map's own control, and one
+        §13.3 -- what is left in this corner is the map's own controls, and one
         cell holding every screen you can open from any hex.
 
         The screens were a honeycomb of nine here. That was the right drawing
         and the wrong amount of it: nine cells reached a third of the way down a
         phone, standing over the one thing the game is about. What the corner
-        keeps is the pair that is about *the map* — the way back to your
-        prospector — and the rest is behind the burger.
+        keeps is what is about *the map* — the way back to your prospector, and
+        the atlas — and the rest is behind the burger.
       -->
       <div class="corner top-right">
         <div class="screens">
@@ -342,6 +341,15 @@ onMounted(() => {
             label="Recenter"
             hint="Center the map on your prospector"
             @activate="game.centerOnCharacter()"
+          />
+          <!-- The atlas is about the map too, so it keeps a cell of its own
+               rather than a row in the menu: this corner is where the map's
+               own controls live, and the burger is where the screens went. -->
+          <HexAction
+            icon="atlas"
+            label="Atlas"
+            hint="The whole map, and everything charted on it"
+            @activate="game.openPanel('atlas')"
           />
           <!-- The roll-up: ember if anything behind it needs dealing with, sap
                if anything is worth crossing the screen for. Without it a full
@@ -519,27 +527,38 @@ onMounted(() => {
   top: 12px;
   right: 12px;
   align-items: flex-end;
+  /*
+   * The cell size lives on the corner rather than on `.screens`, because the
+   * menu hangs off the bottom of the block and has to know how tall it is. Two
+   * places holding that number is two places to change it and one of them to
+   * forget.
+   */
+  --cell-w: 46px;
+  --cell-h: 40px;
 }
 
 .screens {
   /*
-   * Two cells, nested the way §13.2 tiles the map: three quarters of a width
-   * between columns, the second dropped half a height so the points interlock.
+   * Three cells in a zigzag, nested the way §13.2 tiles the map: three quarters
+   * of a width between columns, the middle one dropped half a height so the
+   * points interlock.
    *
    * It was a flower of nine, and the flower was the right drawing of the wrong
-   * amount of thing. Two is not a shape to admire; it is a pair, and a pair
-   * only has to not look like a list.
+   * amount of thing. Three is not a shape to admire; it is a run, and a run
+   * only has to not look like a list. A cell and a half tall, against the old
+   * five.
    */
-  --cell-w: 58px;
-  --cell-h: 50px;
   display: grid;
-  grid-template-columns: calc(var(--cell-w) * 0.75) var(--cell-w);
+  grid-template-columns: repeat(2, calc(var(--cell-w) * 0.75)) var(--cell-w);
   grid-auto-rows: calc(var(--cell-h) / 2);
   justify-items: start;
 }
 
+/* Recenter and the atlas sit up, the burger closes the run at the corner --
+   which is where a thumb reaching for a menu already goes. */
 .screens :deep(.cell:nth-child(1)) { grid-column: 1; grid-row: 1 / span 2; }
 .screens :deep(.cell:nth-child(2)) { grid-column: 2; grid-row: 2 / span 2; }
+.screens :deep(.cell:nth-child(3)) { grid-column: 3; grid-row: 1 / span 2; }
 
 /* Nested cells overlap at the tips, so hit-testing has to follow the hexagon
    rather than the box, or the pointed corner of one cell would swallow clicks
@@ -574,7 +593,8 @@ onMounted(() => {
  */
 .menu {
   position: absolute;
-  top: calc(var(--cell-h, 50px) + 34px);
+  /* The block is a cell and a half tall, plus the corner's own gap. */
+  top: calc(var(--cell-h) * 1.5 + 10px);
   right: 0;
   z-index: 30;
   width: 208px;
@@ -656,12 +676,20 @@ onMounted(() => {
   color: var(--ember);
 }
 
-/* Over the map and under the plate, so a tap anywhere else shuts the list
-   without also landing on a hex. */
+/*
+ * Over the map and UNDER the corner, so a tap anywhere else shuts the list
+ * without also landing on a hex.
+ *
+ * Under is the load-bearing word. `.corner` carries `--z-hud` and is therefore
+ * a stacking context, so the menu's own z-index is only meaningful *inside* it:
+ * a scrim numbered above `--z-hud` sits above the entire corner, buries the
+ * plate it was meant to sit behind, and eats the clicks aimed at it. The menu
+ * opened and was invisible.
+ */
 .menu-scrim {
   position: absolute;
   inset: 0;
-  z-index: 25;
+  z-index: calc(var(--z-hud) - 1);
 }
 
 .screens :deep(.cell:hover:not(:disabled) .hex) {
@@ -735,15 +763,14 @@ onMounted(() => {
    * instrument cluster. The nesting maths reads these two, so it closes up with
    * them rather than coming apart.
    */
-  .screens {
-    --cell-w: 42px;
-    --cell-h: 37px;
+  .top-right {
+    --cell-w: 38px;
+    --cell-h: 33px;
   }
 
-  /* The list hangs off a shorter pair, and takes the width it is given rather
-     than a fixed 208 that would run off a narrow screen. */
+  /* The list takes the width it is given rather than a fixed 208 that would run
+     off a narrow screen. */
   .menu {
-    top: calc(var(--cell-h, 37px) + 26px);
     width: min(208px, calc(100vw - 24px));
   }
 
