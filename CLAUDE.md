@@ -3928,17 +3928,22 @@ everything you open from *any hex* is behind the menu beside them. What you are
 standing on is the bottom-centre stack's business (§5.6) and is not in here
 either.
 
-**Three cells straight down the right edge**, edge to edge, with the burger at
-the foot — nearest the thumb, and nearest the list it drops. No offset and no
-gap, because these are flat-top hexes (§13.2): stacked in one column they meet
-along their flat edges and read as one cut strip, and the half-height drop is
-what *horizontal* nesting needs.
+**Three cells zigzagging down**, nested the way §13.2 tiles the map — three
+quarters of a width between the two columns, the left one dropped half a height
+so the points interlock. The burger is last and therefore lowest and rightmost:
+nearest the thumb, and directly over the list it drops.
 
 **Down rather than across, because down is the free direction.** It ran across
 for a while and that spent the one thing this corner has least of: the top edge
 is shared with the instrument cluster, so anything growing leftward grows toward
 it. The map below the corner is the part of the screen a HUD is allowed to hang
-into.
+into. Two cells tall and under two wide, so it costs the corner nothing.
+
+*(A straight column was tried in between. It is the honest version of "down" and
+the wrong one of "honeycomb": flat-top hexes stacked in one column meet along
+their flat edges and read as three separate buttons in a row. The zigzag is what
+makes them a piece of lattice — the same shape the map is made of, which is the
+whole argument §13 makes for the hexagon in the first place.)*
 
 *(The screens were a honeycomb, nested the way §13.2's map hexes are: three
 quarters of a width between columns, the middle one dropped half a height. That

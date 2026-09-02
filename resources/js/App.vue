@@ -539,24 +539,36 @@ onMounted(() => {
 
 .screens {
   /*
-   * Three cells straight down the right edge.
+   * Three cells zigzagging DOWN, nested the way §13.2 tiles the map: three
+   * quarters of a width between the two columns, and the left one dropped half
+   * a height so the points interlock.
    *
-   * It ran across for a while, zigzagged the way §13.2 nests map hexes, and
-   * that spent the one thing this corner has least of: the top edge is shared
-   * with the instrument cluster, so anything growing leftward grows toward it.
-   * Down is the free direction — the map below the corner is the part of the
-   * screen a HUD is allowed to hang into.
+   * Down rather than across, because down is the free direction. Running across
+   * spent the one thing this corner has least of: the top edge is shared with
+   * the instrument cluster, so anything growing leftward grows toward it, while
+   * the map below the corner is the part of the screen a HUD may hang into.
    *
-   * No offset and no gap, because these are FLAT-TOP hexes (§13.2): the clip is
-   * flat from a quarter to three quarters across the top, so stacked in one
-   * column they meet edge to edge and read as one cut strip. The half-height
-   * drop and the three-quarter step are what *horizontal* nesting needs, and
-   * there is no horizontal any more.
+   * A straight column was tried in between, and it is the honest version of
+   * "down" and the wrong one of "honeycomb": stacked in one column these meet
+   * along their flat edges and read as three separate buttons in a row. The
+   * zigzag is what makes them a piece of lattice — the same shape the map is
+   * made of, which is the whole argument §13 makes for the hexagon in the first
+   * place. Two cells tall and under two wide, so it costs the corner nothing.
    */
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
+  display: grid;
+  grid-template-columns: calc(var(--cell-w) * 0.75) var(--cell-w);
+  grid-auto-rows: calc(var(--cell-h) / 2);
+  justify-items: start;
 }
+
+/*
+ * The right column holds the first and last, the left one hangs between them.
+ * The burger is last and therefore lowest and rightmost — nearest the thumb,
+ * and directly over the list it drops.
+ */
+.screens :deep(.cell:nth-child(1)) { grid-column: 2; grid-row: 1 / span 2; }
+.screens :deep(.cell:nth-child(2)) { grid-column: 1; grid-row: 2 / span 2; }
+.screens :deep(.cell:nth-child(3)) { grid-column: 2; grid-row: 3 / span 2; }
 
 /* Nested cells overlap at the tips, so hit-testing has to follow the hexagon
    rather than the box, or the pointed corner of one cell would swallow clicks
@@ -591,8 +603,8 @@ onMounted(() => {
  */
 .menu {
   position: absolute;
-  /* The strip is three cells tall, plus the corner's own gap. */
-  top: calc(var(--cell-h) * 3 + 10px);
+  /* The zigzag is two cells tall, plus the corner's own gap. */
+  top: calc(var(--cell-h) * 2 + 10px);
   right: 0;
   z-index: 30;
   width: 208px;
