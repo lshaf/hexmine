@@ -2,12 +2,13 @@
 /**
  * The ledger, §12.
  *
- * Two tabs, because a quest is only ever in one of two states worth a player's
- * attention: **pending** is everything still owed to you -- in progress, or
- * finished and waiting to be claimed -- and **completed** is everything already
- * paid. There is no third tab for "locked": a quest whose prerequisite is
- * unclaimed is not sent at all, so what is next is legible and what comes after
- * it is not yet anybody's problem.
+ * Three tabs. **Today** is §12.2's three and is dealt with below; **pending** is
+ * everything still owed to you -- in progress, or finished and waiting to be
+ * claimed -- and **completed** is everything already paid. Those two are the
+ * only states a quest is ever in that are worth a player's attention: there is
+ * no tab for "locked", because a quest whose prerequisite is unclaimed is not
+ * sent at all, so what is next is legible and what comes after it is not yet
+ * anybody's problem.
  *
  * Ready-to-claim sits at the top of pending and is the only thing on the screen
  * drawn in gold. A ledger where the payable row looks like the others is a
@@ -20,14 +21,21 @@
  *
  * ------------------------------------------------------------- and the day's
  *
- * §12.2's three sit ABOVE the tabs rather than becoming a third one, and that
- * is the whole reason there is still no third tab. Pending and Completed are
- * two *states of one ledger*; the day's three are a *different ledger*, with a
- * different reset and a deadline on it. Putting all three in one tab row would
- * make a category out of two things that are not the same kind of thing.
+ * §12.2's three get a **tab of their own**, and it is the first one.
  *
- * They read first because they are the half that expires. A quest waits
- * forever; today does not.
+ * They used to sit above the tabs, on the argument that Pending and Completed
+ * are two states of one ledger while the day's three are a different ledger —
+ * so one tab row for all three would make a category out of two things that
+ * are not the same kind of thing. The argument was right about what they *are*
+ * and wrong about what a screen is for: stacked, the day sat on top of however
+ * many quests happened to be out, so the half of the page that expires was the
+ * half you had to scroll a quest list to get past. A tab is not a claim that
+ * two things are the same kind of thing. It is a way to be looking at one of
+ * them.
+ *
+ * It is first, and it opens first, because that is the half with a deadline on
+ * it. A quest waits forever; today does not. Losing that ordering is the one
+ * way this change could have been a downgrade, so the default tab carries it.
  */
 import { computed, onMounted, ref } from 'vue'
 import { useGame } from '@/stores/game'
@@ -40,8 +48,17 @@ const game = useGame()
 
 onMounted(() => game.loadQuests())
 
-type Tab = 'pending' | 'completed'
-const tab = ref<Tab>('pending')
+type Tab = 'today' | 'pending' | 'completed'
+
+/**
+ * §12.2 -- the day opens first, because it is the half that expires.
+ *
+ * Not conditional on there being anything left to claim: three spent rows with
+ * their bars full is a day going well, and a screen that quietly showed you a
+ * different tab depending on how your morning went would be a screen you cannot
+ * learn.
+ */
+const tab = ref<Tab>('today')
 
 /**
  * What a goal is asking for, in the player's words.
@@ -168,6 +185,9 @@ const today = computed<Array<Row & { lane: string }>>(() => {
  */
 const resetsIn = computed(() => formatSpan(game.dailiesResetAt - game.now))
 
+/** How many of the day's three are finished and still owed. Drives the tally. */
+const dailiesReady = computed(() => today.value.filter((r) => r.ready).length)
+
 /** Payable first, then whatever is furthest along: the ledger reads as a queue. */
 const pending = computed(() =>
   rows.value
@@ -187,19 +207,87 @@ const earned = computed(() => completed.value.reduce((n, r) => n + r.gold, 0))
     </div>
 
     <template v-else>
-      <!-- §12.2 -- the day's three. Above the tabs rather than inside them:
-           Pending and Completed are two states of one ledger, and this is a
-           different ledger with a deadline on it. -->
-      <div v-if="today.length" class="inset day">
+      <!-- §3.2 -- what this ledger has paid out so far. Gold and only gold: a
+           quest that paid a material would be a hole in §2 rather than a nicer
+           reward, so there is only ever one figure to total.
+
+           It totals the QUEST ledger, so it is not drawn over the day's three:
+           "a quest pays once and never comes back" is a true sentence in the
+           wrong room when what you are looking at is the thing that comes back
+           tomorrow. -->
+      <div v-if="tab !== 'today'" class="inset purse">
+        <div class="row-between">
+          <div>
+            <span class="label">Claimed</span>
+            <div class="points">
+              <strong>{{ earned }}</strong>
+              <span class="tiny muted">gold off the ledger</span>
+            </div>
+          </div>
+          <p class="tiny muted note">
+            A quest pays once and never comes back.
+          </p>
+        </div>
+      </div>
+
+      <div class="tabs" role="tablist">
+        <!-- §12.2 -- first, and open by default: the half with a deadline. -->
+        <button
+          type="button"
+          role="tab"
+          class="tab"
+          :class="{ on: tab === 'today' }"
+          :aria-selected="tab === 'today'"
+          @click="tab = 'today'"
+        >
+          Today
+          <span class="tally" :class="{ ready: dailiesReady > 0 }">{{ today.length }}</span>
+        </button>
+        <button
+          type="button"
+          role="tab"
+          class="tab"
+          :class="{ on: tab === 'pending' }"
+          :aria-selected="tab === 'pending'"
+          @click="tab = 'pending'"
+        >
+          Pending
+          <span class="tally" :class="{ ready: game.questsReady > 0 }">{{ pending.length }}</span>
+        </button>
+        <button
+          type="button"
+          role="tab"
+          class="tab"
+          :class="{ on: tab === 'completed' }"
+          :aria-selected="tab === 'completed'"
+          @click="tab = 'completed'"
+        >
+          Completed
+          <span class="tally">{{ completed.length }}</span>
+        </button>
+      </div>
+
+      <!--
+        ----------------------------------------------------------- today
+
+        §12.2 -- a daily draws as the same row a quest does, because it is the
+        same object minus the chain: one goal, one counter, one figure in gold.
+        So it gets a quest's own inset rather than sharing one block with
+        dividers between them. That block existed to fence the day off from the
+        quest list; the tab does that now, and drawing them differently would
+        be claiming they behave differently when the only thing that does is
+        when they reset.
+      -->
+      <template v-if="tab === 'today'">
         <div class="row-between day-head">
-          <span class="label">Today</span>
-          <span class="tiny muted mono">resets in {{ resetsIn }}</span>
+          <span class="tiny muted">One from each lane. Unclaimed gold goes with the day.</span>
+          <span class="tiny muted mono nowrap">resets in {{ resetsIn }}</span>
         </div>
 
         <div
           v-for="row in today"
           :key="row.key"
-          class="quest daily"
+          class="inset quest daily"
           :class="{ ready: row.ready, spent: row.claimed }"
         >
           <div class="row-between">
@@ -234,57 +322,19 @@ const earned = computed(() => completed.value.reduce((n, r) => n + r.gold, 0))
           </div>
         </div>
 
-        <p class="tiny muted day-note">
-          Three a day, one from each lane, and the field one is workable from
-          whatever hex you are standing on. Unclaimed gold goes with the day.
+        <p v-if="!today.length" class="tiny muted hint">
+          Today's three have not been written up yet. They arrive with the day.
         </p>
-      </div>
 
-      <!-- §3.2 -- what this ledger has paid out so far. Gold and only gold: a
-           quest that paid a material would be a hole in §2 rather than a nicer
-           reward, so there is only ever one figure to total. -->
-      <div class="inset purse">
-        <div class="row-between">
-          <div>
-            <span class="label">Claimed</span>
-            <div class="points">
-              <strong>{{ earned }}</strong>
-              <span class="tiny muted">gold off the ledger</span>
-            </div>
-          </div>
-          <p class="tiny muted note">
-            A quest pays once and never comes back.
-          </p>
-        </div>
-      </div>
-
-      <div class="tabs" role="tablist">
-        <button
-          type="button"
-          role="tab"
-          class="tab"
-          :class="{ on: tab === 'pending' }"
-          :aria-selected="tab === 'pending'"
-          @click="tab = 'pending'"
-        >
-          Pending
-          <span class="tally" :class="{ ready: game.questsReady > 0 }">{{ pending.length }}</span>
-        </button>
-        <button
-          type="button"
-          role="tab"
-          class="tab"
-          :class="{ on: tab === 'completed' }"
-          :aria-selected="tab === 'completed'"
-          @click="tab = 'completed'"
-        >
-          Completed
-          <span class="tally">{{ completed.length }}</span>
-        </button>
-      </div>
+        <p v-else class="tiny muted hint">
+          The field task is workable from whatever hex you are standing on — no
+          daily ever names a material, a line or a biome, because the map takes
+          days to cross.
+        </p>
+      </template>
 
       <!-- --------------------------------------------------------- pending -->
-      <template v-if="tab === 'pending'">
+      <template v-else-if="tab === 'pending'">
         <div v-for="row in pending" :key="row.key" class="inset quest" :class="{ ready: row.ready }">
           <div class="row-between">
             <strong class="name">{{ row.name }}</strong>
@@ -383,22 +433,26 @@ const earned = computed(() => completed.value.reduce((n, r) => n + r.gold, 0))
 
 /* ------------------------------------------------------------------ today */
 
-.day {
-  margin-bottom: 12px;
-}
-
+/*
+ * The one line the day needs that a quest does not: when it turns over.
+ *
+ * It sits above the three rather than on each of them, because it is a fact
+ * about the day and not about any one task -- and it is read off the server's
+ * own figure, since a day runs through `Balance::scaled()` and is whatever the
+ * environment says it is.
+ */
 .day-head {
-  margin-bottom: 9px;
+  align-items: baseline;
+  margin-bottom: 10px;
+  gap: 12px;
 }
 
-.daily + .daily {
-  margin-top: 9px;
-  padding-top: 9px;
-  border-top: 1px solid var(--line);
+.nowrap {
+  white-space: nowrap;
 }
 
 /*
- * A claimed daily stays on the block until the day turns rather than vanishing.
+ * A claimed daily stays on the list until the day turns rather than vanishing.
  * Three rows that quietly become two would read as something having gone wrong;
  * a finished one greyed out with its bar full reads as a day going well.
  */
@@ -418,11 +472,6 @@ const earned = computed(() => completed.value.reduce((n, r) => n + r.gold, 0))
   color: var(--copper);
   margin-right: 6px;
   vertical-align: 1px;
-}
-
-.day-note {
-  margin: 10px 0 0;
-  line-height: 1.5;
 }
 
 /* ------------------------------------------------------------------- tabs */

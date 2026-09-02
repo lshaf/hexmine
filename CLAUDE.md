@@ -3513,10 +3513,13 @@ Gold is taken too, and deliberately not reused for this: gold is the currency,
 it is already on every reward figure in the panel, and spending it on status as
 well would make "20g" and "done" the same color saying two different things.
 
-Two tabs and no third: **pending** is everything still owed you, in progress or
-finished-and-waiting, sorted so the payable rows come first; **completed** is
-everything already paid. Finished reads green wherever it appears — the tally,
-the bar, the goal line — and nothing else on the screen does.
+Three tabs: **today** is §12.2's three and opens first; **pending** is
+everything still owed you, in progress or finished-and-waiting, sorted so the
+payable rows come first; **completed** is everything already paid. There is no
+fourth for *locked* — a quest whose prerequisite is unclaimed is not sent to the
+client at all, so what is next is legible and what comes after it is not yet
+anybody's problem. Finished reads green wherever it appears — the tally, the
+bar, the goal line — and nothing else on the screen does.
 
 **A claim answers with a receipt, never a toast.** It is the one thing on the
 ledger the player came back for, and there is more to say than a status line
@@ -3610,21 +3613,44 @@ would be wrong on every development server.
 
 #### On screen
 
-They sit **above the tabs, not inside them**, and that is why §12.1 still has no
-third tab: Pending and Completed are two *states of one ledger*, and this is a
-*different ledger*. One tab row for both would make a category out of two things
-that are not the same kind of thing. They read first because they are the half
-that expires — a quest waits forever and today does not.
+They get a **tab of their own, and it is the first one.**
 
-A daily draws as **the same row a quest does**, because it is the same object
-minus the chain: one goal, one counter, one figure in gold. Anything that made
-the two look different would be claiming they behave differently, and the only
-thing that does is when they reset. What is not shared is the block around them:
-a header with the clock on it, and the **lane** tagged on each row in copper —
-§13.3 spends copper on work in progress, and the tag answers the one question
-worth answering at a glance, *can I do this from where I am*.
+*(They sat above the tabs for a while, and the argument was that Pending and
+Completed are two states of one ledger while this is a different ledger — so one
+tab row for all three would make a category out of two things that are not the
+same kind of thing. That was right about what they **are** and wrong about what
+a screen is for. Stacked, the day sat on top of however many quests happened to
+be out, so the half of the page that expires was the half you had to scroll a
+quest list to get past. A tab is not a claim that two things are the same kind
+of thing; it is a way of looking at one of them.)*
 
-**A claimed daily stays on the block until the day turns**, greyed with its bar
+**It opens first, and that is the part that is not a layout preference.** The
+day is the half with a deadline on it — a quest waits forever and today does
+not — and burying the expiring half behind an unselected tab is the one way this
+could have been a downgrade. So the default tab carries the ordering the stack
+used to. It is not conditional on there being anything left to claim, either:
+three spent rows with their bars full is a day going well, and a screen that
+showed you a different tab depending on how your morning went would be a screen
+you cannot learn.
+
+A daily draws as **the same row a quest does**, in a plate of its own like every
+quest beside it, because it is the same object minus the chain: one goal, one
+counter, one figure in gold. Anything that made the two look different would be
+claiming they behave differently, and the only thing that does is when they
+reset. The three used to share one block with rules between them; that block was
+only ever a fence against the quest list, and the tab is the fence now.
+
+Two things are still the day's own. A **header with the clock on it**, above the
+three rather than on any one of them, because when the day turns is a fact about
+the day. And the **lane** tagged on each row in copper — §13.3 spends copper on
+work in progress, and the tag answers the one question worth answering at a
+glance, *can I do this from where I am*.
+
+**The purse is not drawn over the day.** It totals the quest ledger, and *a
+quest pays once and never comes back* is a true sentence in the wrong room when
+what you are looking at is the thing that comes back tomorrow.
+
+**A claimed daily stays on the list until the day turns**, greyed with its bar
 full. Three rows quietly becoming two would read as something having gone wrong;
 a finished one still standing reads as a day going well.
 
