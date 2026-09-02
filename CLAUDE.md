@@ -1449,26 +1449,56 @@ its depth simply draws as the next hexagon along, with its own count on it, so
 bar any more**: it was a second answer to a question the comb was already
 answering, and the only one of the two that could be passed.
 
-**The comb can be ordered three ways, and three is the whole list**: by
-**type** (materials, then drafts, then gear — the order it has always been in),
-by **tier** (best first, on one ladder, which is the only order that asks an
-Ironwood and an epic sword the same question), and by **amount** (what is
-costing you the most straps). Those are the three questions a full bag gets
-asked; anything past them is a *filter*, which is a different control for a
-different problem — and hiding straps from a screen whose whole subject is how
-many straps there are would be answering the wrong question.
+**The comb is ordered three ways and filtered one way**, on two rows of chips
+above it. They are two rows because they are two questions — *what order* and
+*what to look at* — and a sort and a filter **compose**; run together on one
+line they would read as six alternatives to each other.
+
+| Sort | Asks |
+|---|---|
+| **Type** | *where is my ore* — materials, then drafts, then gear, the order the bag has always been in |
+| **Tier** | *what is the good stuff* — one ladder, the only order that asks an Ironwood and an epic sword the same question |
+| **Amount** | *what is filling the bag* |
+
+**Pressing the order you are already on turns it round.** That is what keeps it
+one row of three rather than three plus a direction control beside them, and
+nothing is hidden by it: the chip carries a chevron saying which way it runs,
+so the second thing the press does is written on the thing you press.
+
+**Every comparator is written ascending and the flag turns it over**, which is
+what makes the flip mean the same thing on all three — comparators that each
+baked in their own obvious direction would leave the toggle saying *descending*
+over an order already running backwards. **Choosing an order resets the
+direction to that order's own natural one**: tier and amount read from the top
+the moment you press them, because neither of those questions is ever asked
+from the bottom first.
 
 **The sort is over KINDS, never over straps.** Three straps of wood are one
 decision, so a holding is ordered and then broken across its straps, which
-keeps a kind contiguous however the comb is sorted. Every ordering ends on the
-name so it is total: two things that tie still have one fixed position between
-them, and the comb never quietly rearranges itself when an unrelated haul
-lands.
+keeps a kind contiguous however the comb is sorted. The name is the last term
+of every ordering *and it is inside the flip*, so each order is total and
+reversing one reverses the whole of it — a tiebreak that stayed put while
+everything above it turned round would swap two equal things for no reason a
+player could see.
 
-It is a preference rather than an action — nothing it does changes what is in
-the bag — so it is drawn quiet, above the comb, in the chamfer everything else
-uses, with the chosen one lit the way a tab is. It lasts the session and is not
-written down anywhere: nobody was asked to commit to it.
+**The filter is kind, and only kind**: All · Materials · Drafts · Gear. It is
+the one axis a bag is actually squinted along — *where is my gear among ninety
+straps of ore* — and every other cut anybody might want is already the sort's
+job. A filter per tier, per biome and per line would be a query builder bolted
+to a picture.
+
+**No empty straps are drawn while a filter is on, and that is the rule that
+makes filtering safe here.** The empties are a picture of the whole bag; once
+the comb is showing only gear, forty-six of them under six cells would be a
+picture of a bag that does not exist. A filtered comb stops being a portrait of
+the bag and becomes a list of what matched — so the line under it says both
+numbers (*showing 4 of 11 straps used, out of 50*), which is the only place a
+count belongs: where the picture has stopped being true.
+
+Both are preferences rather than actions — nothing either does changes what is
+in the bag — so they are drawn quiet, in the chamfer everything else uses, with
+the chosen one lit the way a tab is. They last the session and are not written
+down anywhere: nobody was asked to commit to them.
 
 Tapping a strap opens what is on it — the *kind*, and the whole holding across
 however many straps it is on, because "my wood" is what a prospector means and

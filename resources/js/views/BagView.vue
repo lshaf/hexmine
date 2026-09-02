@@ -11,8 +11,23 @@ import { ref } from 'vue'
  * which is the honest lifetime for something nobody was asked to commit to.
  */
 export type Sort = 'type' | 'tier' | 'amount'
+export type Dir = 'asc' | 'desc'
+export type Show = 'all' | 'material' | 'potion' | 'gear'
 
 const sort = ref<Sort>('type')
+
+/**
+ * Which way the chosen order runs.
+ *
+ * One flag rather than one per order, and it is **reset to the order's own
+ * natural direction whenever the order changes** (see `pick`). Tier means
+ * best-first and amount means biggest-first the moment you press them, because
+ * that is what those words are asked for -- while an order that always started
+ * ascending would make the useful half of two of the three a second tap.
+ */
+const dir = ref<Dir>('asc')
+
+const show = ref<Show>('all')
 </script>
 
 <script setup lang="ts">
@@ -65,10 +80,6 @@ const game = useGame()
  * Three orders, because there are exactly three questions a full bag gets
  * asked: *where is my ore* (type), *what is the good stuff* (tier), and *what
  * is taking up all the room* (amount).
- *
- * Anything past those is a filter, which is a different control for a different
- * problem -- and hiding straps from a screen whose whole subject is how many
- * straps there are would be answering the wrong question.
  */
 const SORT_LABEL: Record<Sort, string> = {
   type: 'Type',
@@ -77,19 +88,54 @@ const SORT_LABEL: Record<Sort, string> = {
 }
 
 /**
- * Every comparator is partial on purpose: `slots` puts the name on the end of
- * whichever of these is chosen, so each one only has to say what it is *for*.
+ * Every comparator is written **ascending**, and `dir` is what turns it round.
+ *
+ * Writing them all one way is what makes the flip mean the same thing on all
+ * three; comparators that each baked in their own "obvious" direction would
+ * have left the toggle saying *descending* over an order that was already
+ * running backwards.
+ *
+ * They are also partial on purpose: `slots` puts the name on the end of
+ * whichever is chosen, so each one only has to say what it is *for*.
  */
 const SORTS: Record<Sort, (a: Holding, b: Holding) => number> = {
-  // Materials, then drafts, then gear; up the ladder inside each, biggest
-  // stack first. This is the order the bag has always been in.
-  type: (a, b) => a.group - b.group || a.rank - b.rank || b.held - a.held,
-  // Best first, whatever kind it is -- the one order that puts an Ironwood and
+  // Materials, then drafts, then gear; up the ladder inside each, then by size.
+  type: (a, b) => a.group - b.group || a.rank - b.rank || a.held - b.held,
+  // One ladder, whatever kind it is -- the only order that puts an Ironwood and
   // an epic sword on the same question.
-  tier: (a, b) => b.rank - a.rank || a.group - b.group || b.held - a.held,
-  // What is costing you the most straps. Gear is always one, so it falls to the
-  // bottom on its own without being special-cased there.
-  amount: (a, b) => b.held - a.held || a.group - b.group || b.rank - a.rank,
+  tier: (a, b) => a.rank - b.rank || a.group - b.group || a.held - b.held,
+  // What is costing you straps. Gear is always one, so it settles at the light
+  // end on its own without being special-cased there.
+  amount: (a, b) => a.held - b.held || a.rank - b.rank || a.group - b.group,
+}
+
+/**
+ * Which way each order runs before anybody touches it.
+ *
+ * `type` reads down from materials because that is the order the bag has always
+ * been in. The other two read from the top: *tier* is asked to find the good
+ * stuff and *amount* to find what is filling the bag, and neither question is
+ * ever asked from the bottom first.
+ */
+const NATURAL: Record<Sort, Dir> = {
+  type: 'asc',
+  tier: 'desc',
+  amount: 'desc',
+}
+
+/**
+ * §7.6 -- what the comb is showing.
+ *
+ * Kind, and only kind. It is the one axis a bag is actually squinted along --
+ * *where is my gear among ninety straps of ore* -- and every other cut anybody
+ * might want is already the sort's job. A filter per tier, per biome and per
+ * line would be a query builder bolted to a picture.
+ */
+const SHOW_LABEL: Record<Show, string> = {
+  all: 'All',
+  material: 'Materials',
+  potion: 'Drafts',
+  gear: 'Gear',
 }
 
 /**
@@ -115,6 +161,25 @@ type Slot =
   | { id: string; kind: 'gear'; key: string; name: string; icon: string; held: number; item: OwnedItem }
 
 const bag = computed(() => game.bag)
+
+/**
+ * Press an order: choose it, or -- if it is already chosen -- turn it round.
+ *
+ * The active chip doubling as the flip is what keeps this one row of three
+ * rather than three plus a direction control beside them. Nothing is hidden by
+ * it either: the chip carries a chevron saying which way it currently runs, so
+ * the second thing the press does is written on the thing you press.
+ */
+function pick(next: Sort): void {
+  if (sort.value === next) {
+    dir.value = dir.value === 'asc' ? 'desc' : 'asc'
+
+    return
+  }
+
+  sort.value = next
+  dir.value = NATURAL[next]
+}
 
 /**
  * How a stack of `held` breaks across straps of `stack`, biggest first.
@@ -233,7 +298,14 @@ const slots = computed<Slot[]>(() => {
   if (!b) return []
 
   const by = SORTS[sort.value]
-  const ordered = [...holdings.value].sort((a, c) => by(a, c) || a.name.localeCompare(c.name))
+  const flip = dir.value === 'asc' ? 1 : -1
+  const ordered = holdings.value
+    .filter((h) => show.value === 'all' || h.kind === show.value)
+    // The name is inside the flip rather than outside it, so reversing an order
+    // reverses the whole of it. A tiebreak that stayed put while everything
+    // above it turned round would make two equal things swap places for no
+    // reason a player could see.
+    .sort((a, c) => flip * (by(a, c) || a.name.localeCompare(c.name)))
 
   const out: Slot[] = []
   for (const h of ordered) {
@@ -259,8 +331,24 @@ const slots = computed<Slot[]>(() => {
   return out
 })
 
-/** Straps with nothing on them. Drawn, never stated. */
-const free = computed(() => Math.max(0, (bag.value?.slotCap ?? 0) - slots.value.length))
+const filtering = computed(() => show.value !== 'all')
+
+/**
+ * Straps with nothing on them. Drawn, never stated -- §7.6's whole reason for a
+ * comb is that free space is something you see rather than a number you
+ * subtract.
+ *
+ * **None of them are drawn while a filter is on**, and that is the rule that
+ * makes filtering safe on this screen. The empty straps are a picture of the
+ * whole bag; once the comb is only showing gear, forty-six empties under six
+ * cells would be a picture of a bag that does not exist. A filtered comb stops
+ * being a portrait of the bag and becomes a list of what matched, and the line
+ * under it says so in the only place a count belongs -- where the picture has
+ * stopped being true.
+ */
+const free = computed(() =>
+  filtering.value ? 0 : Math.max(0, (bag.value?.slotCap ?? 0) - slots.value.length),
+)
 
 /**
  * Every strap in one list, full ones first, so the comb is a single flow and a
@@ -619,17 +707,52 @@ async function mend(item: OwnedItem): Promise<void> {
       the chosen one lit the way a tab is. It is not drawn as a control that
       *does* something, since nothing here changes what is in the bag.
     -->
-    <div v-if="slots.length > 1" class="sorter" role="group" aria-label="Order the straps">
-      <span class="eyebrow">Sort</span>
-      <button
-        v-for="(label, key) in SORT_LABEL"
-        :key="key"
-        type="button"
-        class="sort"
-        :class="{ on: sort === key }"
-        :aria-pressed="sort === key"
-        @click="sort = key"
-      >{{ label }}</button>
+    <div v-if="holdings.length > 1" class="controls">
+      <div class="chips" role="group" aria-label="Order the straps">
+        <span class="eyebrow">Sort</span>
+        <button
+          v-for="(label, key) in SORT_LABEL"
+          :key="key"
+          type="button"
+          class="chip-btn"
+          :class="{ on: sort === key }"
+          :aria-pressed="sort === key"
+          :title="sort === key ? 'Turn it round' : `Sort by ${label.toLowerCase()}`"
+          @click="pick(key)"
+        >
+          {{ label }}
+          <!-- Which way it runs, on the thing that turns it round. A chevron
+               rather than a word: the row has three of these and "descending"
+               is longer than everything it would sit beside. -->
+          <svg
+            v-if="sort === key"
+            class="way"
+            :class="dir"
+            viewBox="0 0 24 24"
+            width="10"
+            height="10"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="3"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          ><path d="M5 9l7 7 7-7" /></svg>
+        </button>
+      </div>
+
+      <div class="chips" role="group" aria-label="Show only one kind">
+        <span class="eyebrow">Show</span>
+        <button
+          v-for="(label, key) in SHOW_LABEL"
+          :key="key"
+          type="button"
+          class="chip-btn"
+          :class="{ on: show === key }"
+          :aria-pressed="show === key"
+          @click="show = key"
+        >{{ label }}</button>
+      </div>
     </div>
 
     <!-- Straps. Places rather than a quantity, so a comb -- and the empty ones
@@ -659,14 +782,22 @@ async function mend(item: OwnedItem): Promise<void> {
       </template>
     </div>
 
+    <!-- The count, and while a filter is on it is the only thing still telling
+         the truth about the whole bag -- so it says both numbers. -->
     <p class="tiny muted straps">
-      {{ slots.length }} of {{ bag.slotCap }} straps used.
-      <template v-if="!free"> Full — anything that needs a strap of its own will be turned away.</template>
-      <template v-else-if="slots.length">
-        A strap holds {{ bag.stackMaterial }} of a material or {{ bag.stackPotion }} of a draft;
-        worn gear rides on your belt and costs nothing.
+      <template v-if="filtering">
+        Showing {{ slots.length }} of {{ bag.slots }} straps used, out of {{ bag.slotCap }}.
+        <template v-if="!slots.length"> Nothing of that kind in the bag.</template>
       </template>
-      <template v-else> Work a hex on the map to bring something back.</template>
+      <template v-else>
+        {{ bag.slots }} of {{ bag.slotCap }} straps used.
+        <template v-if="!free"> Full — anything that needs a strap of its own will be turned away.</template>
+        <template v-else-if="slots.length">
+          A strap holds {{ bag.stackMaterial }} of a material or {{ bag.stackPotion }} of a draft;
+          worn gear rides on your belt and costs nothing.
+        </template>
+        <template v-else> Work a hex on the map to bring something back.</template>
+      </template>
     </p>
 
     <p class="tiny muted footnote">
@@ -1099,26 +1230,44 @@ async function mend(item: OwnedItem): Promise<void> {
   padding: 0;
 }
 
-/* ----------------------------------------------------------------- sorter */
+/* --------------------------------------------------------------- controls */
 
-.sorter {
+/*
+ * Two rows, and they are two different questions -- what order, and what to
+ * look at. Run together on one line they read as six alternatives to each
+ * other, which they are not: a sort and a filter compose.
+ */
+.controls {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 5px;
-  margin-bottom: 9px;
+  margin-bottom: 10px;
 }
 
-.sorter .eyebrow {
-  margin-right: 2px;
+.chips {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+/* Fixed width so the two labels line their rows up rather than each row
+   starting wherever its own word happens to end. */
+.chips .eyebrow {
+  width: 34px;
+  flex: 0 0 auto;
 }
 
 /*
  * The chosen one is lit and the others are not, which is the same reading the
- * quest tabs give. Smaller than a button on purpose: this changes nothing about
- * what is in the bag, and a control that looks like it might is a control a
- * player has to think about before pressing.
+ * quest tabs give. Smaller than a button on purpose: nothing here changes what
+ * is in the bag, and a control that looks like it might is a control a player
+ * has to think about before pressing.
  */
-.sort {
+.chip-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   padding: 4px 9px;
   font-size: 11px;
   font-weight: 600;
@@ -1128,14 +1277,32 @@ async function mend(item: OwnedItem): Promise<void> {
   clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
 }
 
-.sort:hover {
+.chip-btn:hover {
   color: var(--vellum);
 }
 
-.sort.on {
+.chip-btn.on {
   color: var(--vellum);
   border-color: var(--line);
   background: var(--ink-panel);
+}
+
+/* One chevron drawn once and turned over, so the two directions are the same
+   mark and cannot drift into two slightly different arrows. */
+.way {
+  margin-right: -2px;
+  color: var(--copper);
+  transition: transform 0.12s ease;
+}
+
+.way.desc {
+  transform: rotate(180deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .way {
+    transition: none;
+  }
 }
 
 /* ------------------------------------------------------------------- head */
