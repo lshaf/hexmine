@@ -717,16 +717,18 @@ an unclaimed name is exactly that. **It is gone the moment it is spent**: a
 control that can only ever be pressed once must not sit there afterwards saying
 so.
 
-**Letting go of the wallet is a cell IN the screens honeycomb**, bottom right,
-and it is the ninth — the seat the lattice has been holding since the eighth
-filled the left-hand column. Three cells in every column, so the flower is
-symmetric for the first time since it was a six.
+**Letting go of the wallet is the last row of the screens menu** (§13.3), below
+a rule. It belongs with everything else a prospector can reach from any hex —
+that is what the menu is — and the rule under it is what keeps it from sitting
+inline with navigation, where a mistap on the way down the list costs a wallet
+connect.
 
-*(It was a chamfered pill above the block first, then a smaller hexagon above
-it, on the argument that navigation and a destructive action should not share a
-shape. Both were wrong for the same reason: that corner is where everything a
-prospector can reach from any hex lives, and a control parked outside the block
-reads as something that did not fit rather than as something set apart.)*
+*(It was a chamfered pill above the corner block first, then a smaller hexagon
+above it, on the argument that navigation and a destructive action should not
+share a shape. Both were wrong for the same reason: a control parked outside
+the block reads as something that did not fit rather than as something set
+apart. It then spent a while as the ninth cell of the honeycomb, which was
+right until the honeycomb itself went behind a burger.)*
 
 What keeps it from being another panel is the same grammar the dock already
 uses for a destructive cell — quiet in the row, ember under the pointer. Ember
@@ -3919,12 +3921,36 @@ one worth crossing the screen for: a finished quest, a good toast. A payout in
 ember reads as an alarm; a warning in sap reads as a congratulation. `forest` is
 a biome fill and is not either of them.
 
-**The screens block is three across and two down** — a honeycomb, nested the way
-§13.2's map hexes are: three quarters of a width between columns, middle column
-dropped half a height. Six cells in a row would eat 350px of the top edge, and
-six in a nested column reached a third of the way down a phone. Three by two is
-the squarest the lattice allows, and it keeps every screen within a thumb's
-reach of the corner.
+**The top-right corner holds two cells and a burger.** What stays out where it
+can be pressed without a tap first is the one control that is about **the map** —
+recenter, since the camera pans anywhere and costs nothing — and everything you
+open from *any hex* is behind the menu beside it. What you are standing on is
+the bottom-centre stack's business (§5.6) and is not in here either.
+
+*(The screens were a honeycomb, nested the way §13.2's map hexes are: three
+quarters of a width between columns, the middle one dropped half a height. That
+was the right drawing of the wrong amount of thing. Six cells fitted; nine —
+once the guild and the wallet had seats — reached a third of the way down a
+phone, standing over the one thing the game is about. The lattice survives at
+the size it works at: two cells, nested the same way.)*
+
+**The closed burger carries a roll-up of everything behind it**, and that is not
+a nicety — it is the whole cost of the change. A full bag and gold waiting on
+the ledger were visible without opening anything, and a menu that swallowed them
+would be a corner that is tidier and worse. **Ember outranks sap** on it,
+because a problem outranks a payout and one cell can only wear one of them; the
+row inside carries its own mark, which is the half a roll-up cannot say.
+
+**It is a plate and not more honeycomb.** A flower is a shape you take in at a
+glance; a list of screens is a thing you read down, and nine hexagons unfolding
+out of a corner would be exactly the drawing this replaced.
+
+**The burger is the second glyph in the game that is a plain interface symbol**
+rather than something off the subject's own bench — §8.2's scrap bin is the
+other, and it earns it the same way. Three lines is the one mark that means
+*everything else is behind here* to anybody who has ever used a phone, and a
+hexagonal invention in its place would be a puzzle standing where the way out of
+a corner should be.
 
 ---
 

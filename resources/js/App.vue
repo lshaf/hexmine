@@ -6,8 +6,8 @@
  * to corners, so nothing steals area from the thing the game is actually about.
  *
  *   top-left      instrument cluster (AP / level) + village work
- *   top-right     recenter and the location-independent screens, nested into
- *                 one honeycomb strip
+ *   top-right     recenter, and one burger holding every screen you can open
+ *                 from any hex
  *   bottom-center what you are pointing at, and what you can do here
  *
  * The camera pans freely and costs nothing, so it needs a way back -- but sight
@@ -26,6 +26,7 @@ import TravelStack from '@/shell/TravelStack.vue'
 import ActionDock from '@/shell/ActionDock.vue'
 import HexAction from '@/shell/HexAction.vue'
 import { placeLabel } from '@/game/formulas'
+import { ACTION_PATHS } from '@/icons/actions'
 import PanelOverlay from '@/shell/PanelOverlay.vue'
 import BenchView from '@/views/BenchView.vue'
 import GuildView from '@/views/GuildView.vue'
@@ -121,6 +122,126 @@ const PANELS = {
 
 const panel = computed(() => (game.panel ? PANELS[game.panel] : null))
 
+/**
+ * §13.3 -- the screens, behind one cell.
+ *
+ * They were a honeycomb of nine in this corner, which was the right drawing and
+ * the wrong amount of it: nine cells reached a third of the way down a phone,
+ * over the one thing the game is actually about. The flower is a burger now,
+ * and what is left in the corner is the pair that is *about the map* -- the way
+ * back to your prospector -- rather than the screens you can open from anywhere.
+ *
+ * Built as data rather than eight hand-written cells, because the badge on the
+ * closed burger has to be a roll-up of the badges inside it. Two copies of that
+ * list is two chances for a cell to light in the menu and not on the thing
+ * hiding it.
+ */
+type Screen = {
+  panel: keyof typeof PANELS
+  icon: string
+  label: string
+  /** A state to deal with -- ember, and it outranks `good` on the roll-up. */
+  alert?: boolean
+  /** A state worth crossing the screen for -- sap. */
+  good?: boolean
+  hint: string
+}
+
+const screens = computed<Screen[]>(() => [
+  // §7.6 -- the bag says when it is full, because nothing else does any more:
+  // no strap free means the next new kind is turned away.
+  {
+    panel: 'bag',
+    icon: 'bag',
+    label: 'Bag',
+    alert: game.bagFull,
+    hint: game.bagFull ? 'Full — no strap free for a new kind' : 'What you are carrying, and on how many straps',
+  },
+  /*
+   * §8.4 -- a bench holds work somewhere on the map and hands it over only to
+   * somebody standing there. It lights for anything FINISHED, wherever it is:
+   * the news is that a run is done, and where is what the panel exists to say.
+   *
+   * It used to light only for work under your feet, on the argument that a
+   * "ready" you cannot reach is crying wolf. The opposite turned out to be the
+   * problem -- a run finishing four hexes away went unmentioned until you
+   * happened to look. The hint carries the distinction the colour no longer does.
+   */
+  {
+    panel: 'bench',
+    icon: 'craft',
+    label: 'Benches',
+    good: game.benchReady > 0,
+    hint: game.benchHere > 0
+      ? `${game.benchHere} finished here — take it off the bench`
+      : game.benchReady > 0
+        ? `${game.benchReady} finished, elsewhere on the map`
+        : 'Crafts and processing runs, and which bench holds them',
+  },
+  // §12 -- green rather than the bag's ember, because ember is what a PROBLEM
+  // looks like and a finished quest is a payout.
+  {
+    panel: 'quests',
+    icon: 'quest',
+    label: 'Ledger',
+    good: game.questsReady > 0,
+    hint: game.questsReady > 0
+      ? `${game.questsReady} finished — the gold is waiting`
+      : 'What is owed, and what has been paid',
+  },
+  { panel: 'skills', icon: 'skills', label: 'Jobs', hint: 'Seventeen trees, and the points to spend on them' },
+  { panel: 'hero', icon: 'hero', label: 'Prospector', hint: 'What you are wearing, and what is about to break' },
+  { panel: 'atlas', icon: 'atlas', label: 'Atlas', hint: 'The whole map, and everything charted on it' },
+  // §10 -- the cell says when you have none, since a guild is the only thing
+  // standing between a prospector and §8.0's top rung, and "you are not in one"
+  // is a decision to make rather than a problem to fix.
+  {
+    panel: 'guild',
+    icon: 'guild',
+    label: 'Guild',
+    good: (game.guild?.pending ?? 0) > 0,
+    hint: game.guild
+      ? (game.guild.pending
+        ? `${game.guild.pending} asking to join ${game.guild.name}`
+        : `${game.guild.name} · ${game.guild.members} in it`)
+      : 'Not in one — halls stand in cities and capitals',
+  },
+])
+
+/**
+ * What the closed burger has to say on behalf of everything behind it.
+ *
+ * Without this the change would cost real news: a full bag and gold waiting on
+ * the ledger both used to be visible without opening anything, and a menu that
+ * swallowed them would be a corner that is tidier and worse.
+ *
+ * **Ember outranks sap**, because a problem outranks a payout -- §13.3 gives
+ * the pair opposite jobs and one cell can only wear one of them.
+ */
+const menuAlert = computed(() => screens.value.some((s) => s.alert))
+const menuGood = computed(() => !menuAlert.value && screens.value.some((s) => s.good))
+
+const menuOpen = ref(false)
+
+/** Everything that shuts it: a pick, the scrim, Escape. */
+function closeMenu(): void {
+  menuOpen.value = false
+}
+
+function openScreen(key: keyof typeof PANELS): void {
+  closeMenu()
+  game.openPanel(key)
+}
+
+function onMenuKey(e: KeyboardEvent): void {
+  if (e.key === 'Escape' && menuOpen.value) {
+    closeMenu()
+  }
+}
+
+onMounted(() => window.addEventListener('keydown', onMenuKey))
+onBeforeUnmount(() => window.removeEventListener('keydown', onMenuKey))
+
 /** The station opens for whichever settlement the player is standing on. */
 const station = computed(() => game.station)
 
@@ -202,104 +323,93 @@ onMounted(() => {
       </div>
 
       <!-- ------------------------------------------------------ top right -->
+      <!--
+        §13.3 -- what is left in this corner is the map's own control, and one
+        cell holding every screen you can open from any hex.
+
+        The screens were a honeycomb of nine here. That was the right drawing
+        and the wrong amount of it: nine cells reached a third of the way down a
+        phone, standing over the one thing the game is about. What the corner
+        keeps is the pair that is about *the map* — the way back to your
+        prospector — and the rest is behind the burger.
+      -->
       <div class="corner top-right">
         <div class="screens">
-          <!-- The map's own control, at the head of the strip: the camera pans
-               anywhere and costs nothing, so the way back belongs with the
-               things you can reach from any hex rather than in a corner of
-               its own. -->
+          <!-- The camera pans anywhere and costs nothing, so the way back is
+               the one control that has to stay in reach without a tap first. -->
           <HexAction
             icon="recenter"
             label="Recenter"
             hint="Center the map on your prospector"
             @activate="game.centerOnCharacter()"
           />
-          <HexAction icon="atlas" label="Atlas" @activate="game.openPanel('atlas')" />
-          <HexAction icon="skills" label="Jobs" @activate="game.openPanel('skills')" />
-          <!-- §12 -- the cell says when there is gold waiting, for the same
-               reason the bag says when it is full: the state is worth crossing
-               the screen for. Green rather than the bag's ember, because ember
-               is what a PROBLEM looks like and a finished quest is a payout. -->
+          <!-- The roll-up: ember if anything behind it needs dealing with, sap
+               if anything is worth crossing the screen for. Without it a full
+               bag and gold on the ledger would go quiet the moment they were
+               put behind a menu, which would make this corner tidier and
+               worse. -->
           <HexAction
-            icon="quest"
-            label="Ledger"
-            :good="game.questsReady > 0"
-            :hint="game.questsReady > 0
-              ? `${game.questsReady} finished — the gold is waiting`
-              : 'What is owed, and what has been paid'"
-            @activate="game.openPanel('quests')"
-          />
-          <!--
-            §8.4 -- a bench holds work somewhere on the map, and hands it over
-            only to somebody standing there. The cell lights for anything
-            FINISHED, wherever it is: the news is that a run is done, and where
-            it is done is what the panel behind the cell exists to say.
-
-            It used to light only for work under your feet, on the argument that
-            a "ready" you cannot reach is crying wolf. The opposite turned out
-            to be the problem -- a run finishing four hexes away went unmentioned
-            until you happened to open the panel, which made the whole ledger
-            something to remember to check. The hint carries the distinction the
-            colour no longer does.
-          -->
-          <HexAction
-            icon="craft"
-            label="Benches"
-            :good="game.benchReady > 0"
-            :hint="game.benchHere > 0
-              ? `${game.benchHere} finished here — take it off the bench`
-              : game.benchReady > 0
-                ? `${game.benchReady} finished, elsewhere on the map`
-                : 'Crafts and processing runs, and which bench holds them'"
-            @activate="game.openPanel('bench')"
-          />
-          <!-- §7.6 -- the bag says when it is full, because nothing else does
-               any more: no strap free means the next new kind is turned away. -->
-          <HexAction
-            icon="bag"
-            label="Bag"
-            :alert="game.bagFull"
-            :hint="game.bagFull ? 'Full — no strap free for a new kind' : ''"
-            @activate="game.openPanel('bag')"
-          />
-          <HexAction icon="hero" label="Hero" @activate="game.openPanel('hero')" />
-          <!-- §10 -- who you are with. The cell says when you have none, since
-               a guild is the only thing standing between a prospector and
-               §8.0's top rung, and "you are not in one" is a decision to make
-               rather than a problem to fix. -->
-          <HexAction
-            icon="guild"
-            label="Guild"
-            :good="(game.guild?.pending ?? 0) > 0"
-            :hint="game.guild
-              ? (game.guild.pending
-                ? `${game.guild.pending} asking to join ${game.guild.name}`
-                : `${game.guild.name} · ${game.guild.members} in it`)
-              : 'Not in one — halls stand in cities and capitals'"
-            @activate="game.openPanel('guild')"
-          />
-          <!-- §2 -- ending the session, and the ninth seat the lattice has been
-               holding. It belongs IN the flower rather than above it: this
-               corner is where everything a prospector can reach from any hex
-               lives, and a control parked outside the block reads as something
-               that did not fit.
-
-               `danger` rather than a color of its own, which is the grammar the
-               dock already uses for a destructive cell: quiet in the row, ember
-               under the pointer. A corner glowing red at somebody with nothing
-               wrong is an alarm nobody can switch off. -->
-          <HexAction
-            icon="leave"
-            label="Leave"
-            danger
-            :disabled="leaving"
-            :hint="leaving
-              ? 'Disconnecting…'
-              : 'Disconnect the wallet — the character stays with it, and signing back in costs another transfer'"
-            @activate="disconnect"
+            icon="menu"
+            label="Menu"
+            :alert="menuAlert"
+            :good="menuGood"
+            :hint="menuOpen ? 'Close' : 'Bag, benches, ledger, jobs and the rest'"
+            @activate="menuOpen = !menuOpen"
           />
         </div>
+
+        <!-- The list. A plate rather than more honeycomb: a flower is a shape
+             to take in at a glance and this is a thing to read down, and nine
+             hexagons unfolding out of a corner would be the drawing this change
+             was made to get rid of. -->
+        <Transition name="fade">
+          <nav v-if="menuOpen" class="menu plate" aria-label="Screens">
+            <div class="menu-inner">
+              <button
+                v-for="item in screens"
+                :key="item.panel"
+                type="button"
+                class="item"
+                :class="{ alert: item.alert, good: item.good }"
+                :title="item.hint"
+                @click="openScreen(item.panel)"
+              >
+                <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
+                     stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path :d="ACTION_PATHS[item.icon]" />
+                </svg>
+                <span class="grow">{{ item.label }}</span>
+                <!-- The badge says WHY the burger is lit, which is the half a
+                     roll-up cannot carry. -->
+                <span v-if="item.alert || item.good" class="mark" />
+              </button>
+
+              <!-- §2 -- ending the session, kept below a rule. It is the one
+                   destructive thing in the list and it must not sit inline
+                   with navigation, where a mistap costs a wallet connect. -->
+              <button
+                type="button"
+                class="item leave"
+                :disabled="leaving"
+                :title="leaving
+                  ? 'Disconnecting…'
+                  : 'Disconnect the wallet — the character stays with it, and signing back in costs another transfer'"
+                @click="disconnect"
+              >
+                <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
+                     stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path :d="ACTION_PATHS.leave" />
+                </svg>
+                <span class="grow">{{ leaving ? 'Disconnecting…' : 'Leave' }}</span>
+              </button>
+            </div>
+          </nav>
+        </Transition>
       </div>
+
+      <!-- Shuts the menu from anywhere on the map without swallowing the tap
+           that opened it. Under the plate, over everything else. -->
+      <div v-if="menuOpen" class="menu-scrim" @click="closeMenu" />
 
       <!-- -------------------------------------------------- bottom center -->
       <div ref="bottomStack" class="corner bottom-center">
@@ -413,55 +523,23 @@ onMounted(() => {
 
 .screens {
   /*
-   * A honeycomb flower: 3 - 3 - 3.
+   * Two cells, nested the way §13.2 tiles the map: three quarters of a width
+   * between columns, the second dropped half a height so the points interlock.
    *
-   * Seven cells was the first count that closed into a shape rather than a
-   * block. Three across and two down was square enough while there were six,
-   * but a seventh left a ragged corner cell hanging off it -- and a lattice
-   * with one cell out of place reads worse than a list would. Nine is the
-   * count that finishes it: every column three deep, and the flower symmetric
-   * for the first time.
-   *
-   * The columns hold 2, 3 and 2 because these are FLAT-TOP hexes and that is
-   * the way flat-top hexes nest (§13.2): three quarters of a width between
-   * columns, and the short columns dropped half a height so the points
-   * interlock. Read as rows it is the same flower, turned.
-   *
-   * The captions go with the block. They were never the thing being read at a
-   * glance, and there is nowhere to put them between two nested cells; every
-   * button keeps its title and aria-label, so nothing is lost but the ink.
+   * It was a flower of nine, and the flower was the right drawing of the wrong
+   * amount of thing. Two is not a shape to admire; it is a pair, and a pair
+   * only has to not look like a list.
    */
   --cell-w: 58px;
   --cell-h: 50px;
   display: grid;
-  /* Two steps and a whole cell, so the block ends on its own right edge rather
-     than overhanging the corner. */
-  grid-template-columns: repeat(2, calc(var(--cell-w) * 0.75)) var(--cell-w);
-  /* Half-height rows: a cell spans two of them, which is what lets the short
-     columns sit half a cell lower than the tall one. */
+  grid-template-columns: calc(var(--cell-w) * 0.75) var(--cell-w);
   grid-auto-rows: calc(var(--cell-h) / 2);
   justify-items: start;
 }
 
-/*
- * Explicit placement, because the shape is the point and flow order would
- * rebuild the old block. Middle column first, top to bottom; the two short
- * columns hang either side of it, half a cell down.
- */
-.screens :deep(.cell:nth-child(1)) { grid-column: 2; grid-row: 1 / span 2; }
-.screens :deep(.cell:nth-child(2)) { grid-column: 1; grid-row: 2 / span 2; }
-.screens :deep(.cell:nth-child(3)) { grid-column: 3; grid-row: 2 / span 2; }
-.screens :deep(.cell:nth-child(4)) { grid-column: 2; grid-row: 3 / span 2; }
-.screens :deep(.cell:nth-child(5)) { grid-column: 1; grid-row: 4 / span 2; }
-.screens :deep(.cell:nth-child(6)) { grid-column: 3; grid-row: 4 / span 2; }
-.screens :deep(.cell:nth-child(7)) { grid-column: 2; grid-row: 5 / span 2; }
-/* §10 -- the eighth hangs off the left at the foot, where the lattice has a
-   seat waiting: the short columns are one cell shorter than the tall one, so
-   this fills the flower rather than growing a tail. */
-.screens :deep(.cell:nth-child(8)) { grid-column: 1; grid-row: 6 / span 2; }
-/* §2 -- and the ninth closes the flower: three cells in every column, so the
-   shape is symmetric for the first time since it was a six. */
-.screens :deep(.cell:nth-child(9)) { grid-column: 3; grid-row: 6 / span 2; }
+.screens :deep(.cell:nth-child(1)) { grid-column: 1; grid-row: 1 / span 2; }
+.screens :deep(.cell:nth-child(2)) { grid-column: 2; grid-row: 2 / span 2; }
 
 /* Nested cells overlap at the tips, so hit-testing has to follow the hexagon
    rather than the box, or the pointed corner of one cell would swallow clicks
@@ -485,8 +563,107 @@ onMounted(() => {
   display: none;
 }
 
-/* The lift would be clipped by the shape above, and a cell that rises out of a
-   honeycomb reads as a mistake anyway. The face still lights on hover. */
+/* ------------------------------------------------------------- the screens */
+
+/*
+ * The list, hung under the pair.
+ *
+ * A plate rather than more honeycomb: a flower is a shape you take in at a
+ * glance, and this is a thing you read down. Nine hexagons unfolding out of a
+ * corner would be exactly the drawing this replaced.
+ */
+.menu {
+  position: absolute;
+  top: calc(var(--cell-h, 50px) + 34px);
+  right: 0;
+  z-index: 30;
+  width: 208px;
+}
+
+.menu-inner {
+  padding: 5px;
+}
+
+.menu .item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 8px 9px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--vellum-dim);
+  text-align: left;
+  clip-path: polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px);
+}
+
+.menu .item:hover:not(:disabled) {
+  color: var(--vellum);
+  background: var(--ink-raised);
+}
+
+.menu .item:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.menu .item svg {
+  flex: 0 0 auto;
+  color: var(--vellum-dim);
+}
+
+.menu .item:hover:not(:disabled) svg {
+  color: var(--vellum);
+}
+
+/*
+ * §13.3 -- the badge says WHY the burger is lit, which is the half a roll-up
+ * cannot carry. A dot rather than a count: the number is in the hint and on the
+ * panel, and three digits in a menu row is a dashboard.
+ */
+.menu .mark {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  clip-path: var(--hex-clip);
+  background: var(--sap);
+}
+
+.menu .item.alert .mark {
+  background: var(--ember);
+}
+
+.menu .item.alert,
+.menu .item.good {
+  color: var(--vellum);
+}
+
+/* §2 -- the one destructive row, kept below a rule so a mistap on the way down
+   the list cannot cost a wallet connect. */
+.menu .item.leave {
+  margin-top: 5px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  clip-path: none;
+}
+
+.menu .item.leave:hover:not(:disabled) {
+  color: var(--ember);
+  background: none;
+}
+
+.menu .item.leave:hover:not(:disabled) svg {
+  color: var(--ember);
+}
+
+/* Over the map and under the plate, so a tap anywhere else shuts the list
+   without also landing on a hex. */
+.menu-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 25;
+}
+
 .screens :deep(.cell:hover:not(:disabled) .hex) {
   transform: none;
 }
@@ -554,13 +731,20 @@ onMounted(() => {
   }
 
   /*
-   * Tighter cells on a phone, where the strip shares the top edge with the
-   * instrument cluster. The nesting maths reads these two, so the honeycomb
-   * closes up with them rather than coming apart.
+   * Tighter cells on a phone, where the pair shares the top edge with the
+   * instrument cluster. The nesting maths reads these two, so it closes up with
+   * them rather than coming apart.
    */
   .screens {
     --cell-w: 42px;
     --cell-h: 37px;
+  }
+
+  /* The list hangs off a shorter pair, and takes the width it is given rather
+     than a fixed 208 that would run off a narrow screen. */
+  .menu {
+    top: calc(var(--cell-h, 37px) + 26px);
+    width: min(208px, calc(100vw - 24px));
   }
 
 }
