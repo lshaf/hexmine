@@ -475,6 +475,25 @@ export interface Pack {
   until: number
 }
 
+/**
+ * §5.5 -- a huntable animal. What mining a plains hex used to be.
+ *
+ * It stands on every workable forest and grassland hex, always, and moves on
+ * the pack's own bucket. The GRADE is the ladder the plains variants used to
+ * carry: it decides which rung of pelt the kill gives up.
+ */
+export interface Animal {
+  key: string
+  name: string
+  /** forest or grassland, and nowhere else. */
+  biome: string
+  /** common | uncommon | rare | contested -- §5.3's own four. */
+  grade: string
+  /** The rung of pelt this one gives up. */
+  material: MaterialKey
+  description: string
+}
+
 export interface Monster {
   key: string
   name: string
