@@ -146,6 +146,15 @@ final class Catalog
      * the line's tool, a hex yields this instead of its real material. Same haul
      * size, a fraction of the worth, and no recipe will take it.
      */
+    /**
+     * §4.0/§5.5 -- what a hunt pays somebody with no bow.
+     *
+     * The hunting line's scrap. It sat in BIOME_SCRAP while the line was worked
+     * off plains ground; the line is the animal now, so its scrap is keyed to
+     * the hunt rather than to a country.
+     */
+    public const HUNT_SCRAP = 'torn_hide';
+
     public const BIOME_SCRAP = [
         'forest' => 'branch',
         'mountain' => 'ore_chips',

@@ -26,9 +26,23 @@ use Illuminate\Support\Facades\Cache;
  */
 final class Packs
 {
-    public static function key(int $col, int $row, int $bucket): string
+    /**
+     * §5.5 -- the hunt keeps its own flag under the same machinery.
+     *
+     * A separate prefix rather than a separate class: the question is
+     * identical -- has somebody already settled the thing standing on this hex
+     * this bucket -- and the answer is stored, expired and read the same way.
+     * Two classes would be one file of duplicated TTL arithmetic waiting to
+     * drift, and a pack and an animal can stand on one hex at once, so the two
+     * flags have to be independent rather than one bit shared.
+     */
+    public const PACK = 'pack';
+
+    public const HUNT = 'hunt';
+
+    public static function key(int $col, int $row, int $bucket, string $kind = self::PACK): string
     {
-        return "pack:{$col}:{$row}:{$bucket}";
+        return "{$kind}:{$col}:{$row}:{$bucket}";
     }
 
     /** Seconds of life left in this bucket, floored at one so a write sticks. */
@@ -38,14 +52,14 @@ final class Packs
     }
 
     /** Mark this pack settled, win or lose. It does not come back this bucket. */
-    public static function clear(int $col, int $row, int $bucket, int $until, int $now): void
+    public static function clear(int $col, int $row, int $bucket, int $until, int $now, string $kind = self::PACK): void
     {
-        Cache::put(self::key($col, $row, $bucket), true, self::ttl($until, $now));
+        Cache::put(self::key($col, $row, $bucket, $kind), true, self::ttl($until, $now));
     }
 
-    public static function isCleared(int $col, int $row, int $bucket): bool
+    public static function isCleared(int $col, int $row, int $bucket, string $kind = self::PACK): bool
     {
-        return (bool) Cache::get(self::key($col, $row, $bucket), false);
+        return (bool) Cache::get(self::key($col, $row, $bucket, $kind), false);
     }
 
     /**
@@ -56,7 +70,7 @@ final class Packs
      * "col,row" of the ones that are gone. One MGET rather than thirty-seven
      * GETs is the whole reason this takes a list.
      *
-     * @param  list<array{col:int,row:int,bucket:int}>  $packs
+     * @param  list<array{col:int,row:int,bucket:int,kind?:string}>  $packs
      * @return list<array{0:int,1:int}>
      */
     public static function clearedAmong(array $packs): array
@@ -66,7 +80,7 @@ final class Packs
         }
 
         $keys = array_map(
-            static fn (array $p) => self::key($p['col'], $p['row'], $p['bucket']),
+            static fn (array $p) => self::key($p['col'], $p['row'], $p['bucket'], $p['kind'] ?? self::PACK),
             $packs,
         );
 

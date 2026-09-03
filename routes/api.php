@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\CraftingController;
 use App\Http\Controllers\Api\EquipmentController;
 use App\Http\Controllers\Api\GuildController;
 use App\Http\Controllers\Api\InventoryController;
+use App\Http\Controllers\Api\HuntController;
 use App\Http\Controllers\Api\MapController;
 use App\Http\Controllers\Api\MiningController;
 use App\Http\Controllers\Api\QuestController;
@@ -74,6 +75,11 @@ Route::middleware(ResolveCharacter::class)->group(function () {
 
     // §9.5.5 -- no coordinates: the only fight on offer is the one standing on
     // the hex under your feet, and asking about anyone else's would be a scanner.
+    // §5.5 -- the hunt. One verb and no preview: an animal is not a decision
+    // the way a pack is, and the only question it asks is whether you brought a
+    // bow, which a player can answer off their own belt.
+    Route::post('/hunt', [HuntController::class, 'store']);
+
     Route::get('/battle/preview', [BattleController::class, 'preview']);
     Route::post('/battle', [BattleController::class, 'store']);
 

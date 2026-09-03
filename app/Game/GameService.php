@@ -1838,6 +1838,14 @@ class GameService
             $tile['pack'] = null;
         }
 
+        // §5.5 -- and the same for the animal. Its own flag, because a pack and
+        // an animal can stand on one hex at once and settling one says nothing
+        // about the other.
+        if ($tile['hunt'] !== null
+            && Packs::isCleared($col, $row, $tile['hunt']['bucket'], Packs::HUNT)) {
+            $tile['hunt'] = null;
+        }
+
         // Only mineable tiles have slots to occupy: barren capital-ring hexes,
         // settlements and dungeon entrances would otherwise show phantom pips.
         if ($tile['material'] !== null) {
@@ -2083,6 +2091,134 @@ class GameService
         }
 
         return $pack + ['monster' => Monsters::ROSTER[$pack['key']]];
+    }
+
+    /**
+     * §5.5 -- the animal standing on the hex under your feet, if there is one.
+     *
+     * Unlike a pack this does NOT pin (§9.5.3): an animal on every hex of two
+     * countries owning the ground for two hours would make those countries
+     * impassable. It is a hook on a hex that otherwise works normally — the
+     * standing a corpse has (§9.5.7) — so nothing here refuses travel, mining
+     * or anything else.
+     */
+    public function huntHere(Character $character): ?array
+    {
+        if ($this->isTraveling($character)) {
+            return null;
+        }
+
+        $tile = $this->buildTile((int) $character->col, (int) $character->row, $this->now());
+        $hunt = $tile['hunt'] ?? null;
+
+        if ($hunt === null || $hunt['until'] <= $this->now()) {
+            return null;
+        }
+
+        return $hunt + ['animal' => Hunts::ROSTER[$hunt['key']]];
+    }
+
+    /**
+     * §5.5/§4.0 -- is there a bow on the belt?
+     *
+     * The one thing that decides what a kill is worth. §8.0 rule 1 pays out on
+     * a line's own tool and nothing else, and §4.0 pays scrap without it — a
+     * hunt is that same bargain, so this is the whole of the question.
+     */
+    private function huntArmed(Character $character): bool
+    {
+        return $this->lineToolRarity($character, 'hunting') !== null;
+    }
+
+    /**
+     * §5.5 -- take the animal.
+     *
+     * Settled the instant you close, exactly as a fight is (§9.5.5): the haul
+     * is rolled here off the job's own seed, so it cannot be re-rolled by
+     * claiming twice and swapping to a better bow while a clock runs buys
+     * nothing.
+     *
+     * Clearing is SHARED, like a pack's: whoever takes it takes it for
+     * everybody, and there is no second roll to wait for inside the bucket.
+     * That is the anti-farm rule (§2) and it needs no cooldown of its own.
+     *
+     * @return array<string,mixed>
+     */
+    public function hunt(Character $character): array
+    {
+        return DB::transaction(function () use ($character) {
+            $now = $this->now();
+            $col = (int) $character->col;
+            $row = (int) $character->row;
+
+            $working = $this->miningTrip($character);
+            if ($working !== null) {
+                throw new GameException('You are working this hex. Finish that first.', 'working');
+            }
+
+            $hunt = $this->huntHere($character);
+            if ($hunt === null) {
+                throw new GameException('There is nothing to hunt here.', 'no_hunt');
+            }
+
+            $armed = $this->huntArmed($character);
+            $animal = $hunt['animal'];
+
+            // §7.6 -- the strap is asked for before the kill, never after. A
+            // haul with nowhere to land would be the work spent for nothing,
+            // and the way out is always in reach from where you stand.
+            $material = $armed ? $animal['material'] : Catalog::HUNT_SCRAP;
+            if (! $this->canTakeMaterial($character, $material)) {
+                $name = Catalog::material($material)['name'] ?? $material;
+                $this->requireFreeRow($character, $name);
+            }
+
+            $seed = Hash::hash2($col * 61 + $hunt['bucket'], $row * 47 + $hunt['bucket'], Balance::mapSeed() ^ 0x11B0);
+
+            // §8.0.1 -- the bow's own `haul` line, which is its line's the way a
+            // weapon's is the fight's.
+            $haul = Formulas::optionGain($this->itemRows($character), Catalog::OPTION_HAUL, 'hunting');
+            $rolled = Drops::huntSpoils($animal, $seed, $armed, $haul);
+
+            $gained = [];
+            $lost = 0;
+            foreach ($rolled as $key => $quantity) {
+                $granted = $this->addMaterial($character, (string) $key, (int) $quantity);
+                $lost += $quantity - $granted;
+                if ($granted > 0) {
+                    $gained[(string) $key] = $granted;
+                }
+            }
+
+            // §5.5 -- hunting is one of §7.2's five lines, and a kill teaches it
+            // exactly as a mine does. §4.0 -- bare-handed work still teaches,
+            // badly: a quarter, or the ladder would be optional.
+            // The same four a unit is worth on a mine, so a hunt teaches the
+            // line at the rate the line was always taught at.
+            $units = array_sum($gained);
+            $xp = $armed
+                ? $units * 4
+                : max(1, (int) round($units * 4 * Balance::SCRAP_XP_RATE));
+            $this->grantSkillXp($character, 'hunting', $xp);
+
+            // §7.1 -- and the character, at the same 0.6 of the line's XP a
+            // mine pays. Every verb that finishes work levels the character.
+            $levels = $this->grantCharacterXp($character, (int) round($xp * 0.6));
+
+            Packs::clear($col, $row, $hunt['bucket'], $hunt['until'], $now, Packs::HUNT);
+
+            $this->fireGoal($character, 'gather', $units, $material);
+            $character->save();
+
+            return [
+                'animal' => $animal + ['key' => $hunt['key']],
+                'armed' => $armed,
+                'gained' => $gained,
+                'lostToOverflow' => $lost,
+                'skillXp' => $xp,
+                'levels' => $levels,
+            ];
+        });
     }
 
     /**
