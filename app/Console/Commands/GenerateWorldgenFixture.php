@@ -82,6 +82,10 @@ class GenerateWorldgenFixture extends Command
                 // hex; a drift in that offset moves packs under characters who
                 // are standing on one, so it belongs in the fixture.
                 $tile['pack'] ? $tile['pack']['key'].':'.$tile['pack']['bucket'] : '-',
+                // §5.5 -- the animal, pinned for the same reason as the pack:
+                // it is always there on two biomes, so a drift here is a drift
+                // on half the workable map.
+                $tile['hunt'] ? $tile['hunt']['key'].':'.$tile['hunt']['bucket'] : '-',
                 // §5.7 -- rich ground, pinned for the same reason: at now = 0
                 // the bucket is fixed, and a drift in the roll takes half again
                 // on the haul away from a hex somebody is standing on.

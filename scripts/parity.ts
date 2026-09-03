@@ -62,6 +62,7 @@ for (const line of lines) {
     dungeon,
     water,
     pack,
+    hunt,
     pocket,
     propSeed,
   ] = line.split('|')
@@ -88,6 +89,9 @@ for (const line of lines) {
     // §9.5.1 -- the pack, and with it the per-hex bucket offset both sides fold
     // into the roll. A drift here moves packs under characters standing on one.
     tile.pack ? `${tile.pack.key}:${tile.pack.bucket}` : '-',
+    // §5.5 -- the animal, pinned for the same reason: it is always there on two
+    // biomes, so a drift here is a drift on half the workable map.
+    tile.hunt ? `${tile.hunt.key}:${tile.hunt.bucket}` : '-',
     // §5.7 -- rich ground, pinned for the same reason as the pack: a drift
     // takes half again on the haul away from a hex somebody is standing on.
     tile.pocketUntil === undefined ? '-' : String(tile.pocketUntil),
@@ -107,6 +111,7 @@ for (const line of lines) {
     dungeon,
     water,
     pack,
+    hunt,
     pocket,
     propSeed,
   ].join('|')

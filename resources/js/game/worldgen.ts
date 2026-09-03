@@ -21,10 +21,12 @@
 import { hash2, rand01, randInt } from './hash'
 import { BIOME_VARIANTS, type VariantDef } from './variants'
 import { MONSTERS_BY_BIOME_RING } from './monsters'
+import { ANIMAL_BY_BIOME_GRADE, HUNT_BIOMES, HUNT_GRADES } from './hunts'
 import { hexDistance } from '@/map/hexGeometry'
 import type {
   Biome,
   MaterialKey,
+  Hunt,
   Pack,
   Ring,
   Settlement,
@@ -756,6 +758,45 @@ function packAt(col: number, row: number, biome: string, ring: Ring, now: number
   }
 }
 
+/**
+ * The mirror of WorldGen::huntAt().
+ *
+ * §5.5 -- always there on a hex that carries one, which is the whole difference
+ * from a pack: a pack is a chance per ring because it is a hazard, and this is
+ * the hunting line's ground. Same bucket and same per-hex offset as a pack, so
+ * the two share one rhythm rather than teaching a player two.
+ */
+function huntAt(col: number, row: number, biome: string, ring: Ring, now: number): Hunt | undefined {
+  if (!(HUNT_BIOMES as readonly string[]).includes(biome)) return undefined
+
+  const c = cfg()
+  const lifetime = c.packLifetimeMs
+  const offset = randInt(hash2(col, row, c.seed ^ 0x11a7), 0, Math.max(0, lifetime - 1))
+  const bucket = Math.floor((now + offset) / lifetime)
+
+  // §5.2 -- the center rolls on the inner ring's column, exactly as a variant
+  // does: it IS the contested ring.
+  const column = ring === 'center' ? 'inner' : ring
+  const roll = rand01(hash2(col * 43 + bucket, row * 29 + bucket, c.seed ^ 0x11a8))
+
+  let grade = HUNT_GRADES[0]!.grade
+  let seen = 0
+  for (const rung of HUNT_GRADES) {
+    seen += rung.weights[column] ?? 0
+    if (roll < seen) {
+      grade = rung.grade
+      break
+    }
+  }
+
+  return {
+    key: ANIMAL_BY_BIOME_GRADE[biome]![grade]!,
+    grade,
+    bucket,
+    until: (bucket + 1) * lifetime - offset,
+  }
+}
+
 export interface TileMutation {
   slotsUsed?: number
   /** §5.1 -- bodies at work here, any verb. See Tile.workers. */
@@ -769,6 +810,8 @@ export interface TileMutation {
    * downstream sees the same absence.
    */
   packCleared?: boolean
+  /** §5.5 -- this hex's animal has been hunted this bucket. */
+  huntCleared?: boolean
 }
 
 /**
@@ -921,6 +964,12 @@ export function generateTile(
       water || settlement || dungeon || mutation?.packCleared
         ? undefined
         : packAt(col, row, biome, ring, now),
+    // §5.5 -- and the animal, on the same ground a pack is kept off, plus dead
+    // ground: there is nothing out there for one to feed on.
+    hunt:
+      water || settlement || dungeon || mutation?.huntCleared || barren
+        ? undefined
+        : huntAt(col, row, biome, ring, now),
     propSeed: hash2(col, row, c.seed ^ 0xf00d),
   }
 }

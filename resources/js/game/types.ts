@@ -476,6 +476,19 @@ export interface Pack {
 }
 
 /**
+ * §5.5 -- the animal on a hex. Always there on forest and grassland, unlike a
+ * pack, because it is the hunting line's ground rather than a hazard.
+ */
+export interface Hunt {
+  key: string
+  /** §5.3's own four, and what decides which rung of pelt the kill gives up. */
+  grade: string
+  /** Shares the pack's bucket: one rhythm on the map rather than two. */
+  bucket: number
+  until: number
+}
+
+/**
  * §5.5 -- a huntable animal. What mining a plains hex used to be.
  *
  * It stands on every workable forest and grassland hex, always, and moves on
@@ -825,6 +838,8 @@ export interface Tile {
    * live-state payload instead.
    */
   pack?: Pack
+  /** §5.5 -- the animal standing here. Forest and grassland only. */
+  hunt?: Hunt
   /** Elevation prop seed so mountains/trees render deterministically. */
   propSeed: number
 }

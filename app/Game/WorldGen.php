@@ -829,6 +829,64 @@ final class WorldGen
     }
 
     /**
+     * §5.5 -- the animal standing on this hex, if it is a hex that carries one.
+     *
+     * **Always there, and that is the difference from a pack.** A pack is a
+     * chance per ring (§9.5.1) because it is a hazard; this is not a hazard, it
+     * is the hunting line's ground — what mining a plains hex used to be — so
+     * every workable forest and grassland hex has one.
+     *
+     * It moves on the **pack's own bucket**, offset per hex the same way, so
+     * the world does not blink at once and a hunted hex is quiet until the herd
+     * comes back round. Sharing the bucket is deliberate: two clocks on one map
+     * would be two rhythms for a player to learn where one will do.
+     *
+     * The GRADE is rolled on §5.3's own weights, off the ring, so the ladder a
+     * plains hex used to carry is the ladder the animal carries — and Beastfang
+     * Hide stays contested-only without a rule of its own (§2).
+     */
+    private static function huntAt(int $col, int $row, string $biome, string $ring, int $now): ?array
+    {
+        if (! in_array($biome, Hunts::BIOMES, true)) {
+            return null;
+        }
+
+        $lifetime = Balance::scaled(Balance::PACK_LIFETIME_MS);
+        $offset = Hash::randInt(
+            Hash::hash2($col, $row, Balance::mapSeed() ^ 0x11A7),
+            0,
+            max(0, $lifetime - 1),
+        );
+
+        $bucket = intdiv($now + $offset, $lifetime);
+
+        // §5.2 -- the center rolls on the inner ring's column, exactly as a
+        // variant does: it IS the contested ring, and a fourth column here
+        // would be a twin of `inner` waiting to drift from it.
+        $column = $ring === 'center' ? 'inner' : $ring;
+        $roll = Hash::rand01(
+            Hash::hash2($col * 43 + $bucket, $row * 29 + $bucket, Balance::mapSeed() ^ 0x11A8),
+        );
+
+        $grade = array_key_first(Hunts::GRADES);
+        $seen = 0.0;
+        foreach (Hunts::GRADES as $key => $spec) {
+            $seen += $spec['weights'][$column] ?? 0.0;
+            if ($roll < $seen) {
+                $grade = $key;
+                break;
+            }
+        }
+
+        return [
+            'key' => Hunts::BY_BIOME_GRADE[$biome][$grade],
+            'grade' => $grade,
+            'bucket' => $bucket,
+            'until' => ($bucket + 1) * $lifetime - $offset,
+        ];
+    }
+
+    /**
      * §5.3 -- a hex's HP, scaled by the grade of ground it turned out to be.
      *
      * The roll is the same 2,700-5,400 it always was; what the grade decides is
@@ -957,6 +1015,14 @@ final class WorldGen
             'pack' => $water === null && $settlement === null && $dungeon === null
                 && empty($mutation['packCleared'])
                 ? self::packAt($col, $row, $biome, $ring, $now)
+                : null,
+            // §5.5 -- and the animal, on the same ground rules a pack keeps off:
+            // nothing stands on water, a settlement or a dungeon mouth. Dead
+            // ground (§5.2) carries none either — there is nothing out there for
+            // one to feed on, which is the same test the seam already applies.
+            'hunt' => $water === null && $settlement === null && $dungeon === null
+                && empty($mutation['huntCleared']) && ! $barren
+                ? self::huntAt($col, $row, $biome, $ring, $now)
                 : null,
             'propSeed' => Hash::hash2($col, $row, Balance::mapSeed() ^ 0xF00D),
         ];
