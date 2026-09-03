@@ -11,8 +11,10 @@ somebody's recipe already depends on.
 import io
 
 PALETTE = {
-    'forest': 'wood', 'mountain': 'iron', 'plains': 'pelt',
+    'forest': 'wood', 'mountain': 'iron',
     'badlands': 'stone', 'grassland': 'fiber',
+    # §5.5 -- the hunting line is not a country, and its palette is the hide.
+    'hunt': 'pelt',
 }
 
 # §4 Tier 1 -- the smith's and the armorer's raw stock, two per biome, exactly
@@ -27,8 +29,8 @@ COMPONENTS = [
     ('pine_pitch',  'Pine Pitch',  'forest',    'armor',  3, 'Boiled down off the bark. Everything it touches stays touched.'),
     ('flux_salt',   'Flux Salt',   'mountain',  'weapon', 4, 'Thrown on the weld so the join takes. Without it, iron only meets iron.'),
     ('slate_scale', 'Slate Scale', 'mountain',  'armor',  3, 'Splits off the seam in plates a thumb across. Overlaps like it was asked to.'),
-    ('horn',        'Horn',        'plains',    'weapon', 4, 'Cut off the herd bull and boiled soft. It remembers the shape you leave it.'),
-    ('sinew',       'Sinew',       'plains',    'armor',  3, 'Dried to a cord and split with the teeth. Stronger than anything spun.'),
+    ('horn',        'Horn',        'hunt',      'weapon', 4, 'Cut off the herd bull and boiled soft. It remembers the shape you leave it.'),
+    ('sinew',       'Sinew',       'hunt',      'armor',  3, 'Dried to a cord and split with the teeth. Stronger than anything spun.'),
     ('whetgrit',    'Whetgrit',    'badlands',  'weapon', 3, 'Sharp sand off the scree. It is what puts an edge on everything else.'),
     ('tar_seep',    'Tar Seep',    'badlands',  'armor',  3, 'Skimmed cold off a standing pool. Keeps the wet out of a boot for a season.'),
     ('quench_reed', 'Quench Reed', 'grassland', 'weapon', 2, 'Green stems packed round a hot blade. It cools slow, and slow is what holds.'),
@@ -45,6 +47,19 @@ DOC = """§4 Tier 1 -- craft components, biome-locked, the smith's and the
      * things off a single kind of ground."""
 
 
+def origin_php(biome):
+    """§5.5 -- ground gets a biome; the hunting line gets a source.
+
+    A material comes off a country or off a creature, and writing 'hunt' into
+    a biome field would be a fifth biome that does not exist -- every reader
+    that filters by biome would then have to know which one is a lie.
+    """
+    return "'source' => 'hunt', " if biome == 'hunt' else f"'biome' => '{biome}', "
+
+
+def origin_ts(biome):
+    return "source: 'hunt', " if biome == 'hunt' else f"biome: '{biome}', "
+
 def emit_php():
     o = io.StringIO()
     o.write('<?php\n\ndeclare(strict_types=1);\n\nnamespace App\\Game;\n\n')
@@ -55,7 +70,7 @@ def emit_php():
     o.write(f'    /**\n     * {DOC}\n     */\n')
     o.write('    public const CRAFT = [\n')
     for key, name, biome, bench, price, desc in COMPONENTS:
-        o.write(f"        '{key}' => ['name' => '{name}', 'tier' => 1, 'biome' => '{biome}', "
+        o.write(f"        '{key}' => ['name' => '{name}', 'tier' => 1, " + origin_php(biome) + ""
                 f"'palette' => '{PALETTE[biome]}', 'bench' => '{bench}', 'npcPrice' => {price}, "
                 f"'description' => '{desc}'],\n")
     o.write('    ];\n}\n')
@@ -71,7 +86,7 @@ def emit_ts():
     o.write(" */\nimport type { Material } from './types'\n\n")
     o.write('export const COMPONENTS: Material[] = [\n')
     for key, name, biome, bench, price, desc in COMPONENTS:
-        o.write(f"  {{ key: '{key}', name: '{name}', tier: 1, biome: '{biome}', "
+        o.write(f"  {{ key: '{key}', name: '{name}', tier: 1, " + origin_ts(biome) + ""
                 f"palette: '{PALETTE[biome]}', bench: '{bench}', npcPrice: {price}, "
                 f"description: '{desc}' }},\n")
     o.write(']\n')

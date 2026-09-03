@@ -52,12 +52,10 @@ final class Spoils
         'charred_sinew' => ['name' => 'Charred Sinew', 'tier' => 0, 'palette' => 'stone', 'grade' => 4, 'npcPrice' => 1, 'description' => 'Went through a fire before you got to it. It will not hold a knot.'],
         'sap_matted_fur' => ['name' => 'Sap-Matted Fur', 'tier' => 1, 'palette' => 'pelt', 'spoil' => 'biome', 'biome' => 'forest', 'npcPrice' => 8, 'description' => 'Comes off the shoulders in one piece, and everything it touched is stuck to it.'],
         'ore_crusted_chitin' => ['name' => 'Ore-Crusted Chitin', 'tier' => 1, 'palette' => 'pelt', 'spoil' => 'biome', 'biome' => 'mountain', 'npcPrice' => 8, 'description' => 'It fed on the seam it slept in. Half the shell is the seam.'],
-        'braided_sinew' => ['name' => 'Braided Sinew', 'tier' => 1, 'palette' => 'pelt', 'spoil' => 'biome', 'biome' => 'plains', 'npcPrice' => 8, 'description' => 'Laid down in cords by a thing that ran every day of its life. It will not part.'],
         'slagged_scale' => ['name' => 'Slagged Scale', 'tier' => 1, 'palette' => 'pelt', 'spoil' => 'biome', 'biome' => 'badlands', 'npcPrice' => 8, 'description' => 'Ran once and set again. Nothing the smith has will make it do that twice.'],
         'pollen_choked_gill' => ['name' => 'Pollen-Choked Gill', 'tier' => 1, 'palette' => 'pelt', 'spoil' => 'biome', 'biome' => 'grassland', 'npcPrice' => 8, 'description' => 'Packed solid with a summer of it. The alchemist takes the packing, not the gill.'],
         'trampled_fern' => ['name' => 'Trampled Fern', 'tier' => 0, 'palette' => 'stone', 'biome' => 'forest', 'npcPrice' => 1, 'description' => 'Flattened in the scuffle and already browning. It was not worth much standing up.'],
         'shale_grit' => ['name' => 'Shale Grit', 'tier' => 0, 'palette' => 'stone', 'biome' => 'mountain', 'npcPrice' => 1, 'description' => 'Came down off the slope while you were busy. It is in everything now.'],
-        'matted_turf' => ['name' => 'Matted Turf', 'tier' => 0, 'palette' => 'stone', 'biome' => 'plains', 'npcPrice' => 1, 'description' => 'Torn up by whatever was braced against it. Roots, dirt, and nothing else.'],
         'scorched_grit' => ['name' => 'Scorched Grit', 'tier' => 0, 'palette' => 'stone', 'biome' => 'badlands', 'npcPrice' => 1, 'description' => 'Fused into little beads where something hot went over it.'],
         'broken_stalks' => ['name' => 'Broken Stalks', 'tier' => 0, 'palette' => 'stone', 'biome' => 'grassland', 'npcPrice' => 1, 'description' => 'A double handful of what the fight went through. It will not even burn well.'],
     ];
@@ -83,7 +81,6 @@ final class Spoils
     public const BIOME_SPOIL = [
         'forest' => 'sap_matted_fur',
         'mountain' => 'ore_crusted_chitin',
-        'plains' => 'braided_sinew',
         'badlands' => 'slagged_scale',
         'grassland' => 'pollen_choked_gill',
     ];
@@ -92,7 +89,6 @@ final class Spoils
     public const BIOME_LEAVING = [
         'forest' => 'trampled_fern',
         'mountain' => 'shale_grit',
-        'plains' => 'matted_turf',
         'badlands' => 'scorched_grit',
         'grassland' => 'broken_stalks',
     ];

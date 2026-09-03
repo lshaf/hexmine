@@ -78,18 +78,6 @@ MONSTERS = [
     ('mythril_warden', 'Mythril Warden', 'mountain', 4, 'carapace',
      'Grew a seam through itself standing over one. Nothing has taken a hex off it yet.'),
 
-    # ------------------------------------------------------------------ plains
-    ('rill_skitter', 'Rill Skitter', 'plains', 1, 'swift',
-     'Crosses the road in one blur and is back before the dust drops.'),
-    ('hollowback_bison', 'Hollowback Bison', 'plains', 1, 'carapace',
-     'Turns its back to whatever is coming and lets the herd get away.'),
-    ('sinew_stalker', 'Sinew Stalker', 'plains', 2, 'swift',
-     'All cord and no meat. It runs a thing down over a whole afternoon.'),
-    ('iron_shrike', 'Iron Shrike', 'plains', 3, 'brute',
-     'Drops out of the sun onto the one thing in the party carrying metal.'),
-    ('beastfang_matriarch', 'Beastfang Matriarch', 'plains', 4, 'brute',
-     'The one the hide is named for. She is why the others are worth taking.'),
-
     # ---------------------------------------------------------------- badlands
     ('slagjaw', 'Slagjaw', 'badlands', 1, 'brute',
      'Chews the crust for what is under it and will chew you for the same reason.'),
@@ -115,7 +103,7 @@ MONSTERS = [
      'Whatever it was buried in, it is still wearing. Nothing gets through the front.'),
 ]
 
-BIOMES = ['forest', 'mountain', 'plains', 'badlands', 'grassland']
+BIOMES = ['forest', 'mountain', 'badlands', 'grassland']
 
 
 def stats(tier, profile):
@@ -225,8 +213,6 @@ BIOME_SPOIL = [
      'Comes off the shoulders in one piece, and everything it touched is stuck to it.'),
     ('ore_crusted_chitin', 'Ore-Crusted Chitin', 'mountain', 8,
      'It fed on the seam it slept in. Half the shell is the seam.'),
-    ('braided_sinew', 'Braided Sinew', 'plains', 8,
-     'Laid down in cords by a thing that ran every day of its life. It will not part.'),
     ('slagged_scale', 'Slagged Scale', 'badlands', 8,
      'Ran once and set again. Nothing the smith has will make it do that twice.'),
     ('pollen_choked_gill', 'Pollen-Choked Gill', 'grassland', 8,
@@ -247,8 +233,6 @@ BIOME_LEAVING = [
      'Flattened in the scuffle and already browning. It was not worth much standing up.'),
     ('shale_grit', 'Shale Grit', 'mountain',
      'Came down off the slope while you were busy. It is in everything now.'),
-    ('matted_turf', 'Matted Turf', 'plains',
-     'Torn up by whatever was braced against it. Roots, dirt, and nothing else.'),
     ('scorched_grit', 'Scorched Grit', 'badlands',
      'Fused into little beads where something hot went over it.'),
     ('broken_stalks', 'Broken Stalks', 'grassland',
@@ -543,7 +527,7 @@ def emit_spoils_ts():
 if __name__ == '__main__':
     keys = [m[0] for m in MONSTERS]
     assert len(keys) == len(set(keys)), 'duplicate monster key'
-    assert len(MONSTERS) == 25, 'five countries of five'
+    assert len(MONSTERS) == 20, 'four countries of five'
 
     for biome in BIOMES:
         mine = [m for m in MONSTERS if m[2] == biome]

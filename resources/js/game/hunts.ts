@@ -23,7 +23,7 @@
  * would make forest and grassland the same walk, and §9.5.2 has just finished
  * making that argument about monsters.
  */
-import type { Animal } from './types'
+import type { Animal, Material, Recipe } from './types'
 
 export const HUNT_BIOMES = ['forest', 'grassland'] as const
 
@@ -44,6 +44,25 @@ export const ANIMALS: Record<string, Animal> = {
   sedge_auroch: { key: 'sedge_auroch', name: 'Sedge Auroch', biome: 'grassland', grade: 'rare', material: 'dire_pelt', description: 'Older than the settlement it grazes past, and heavier than the gate.' },
   beastfang_sire: { key: 'beastfang_sire', name: 'Beastfang Sire', biome: 'grassland', grade: 'contested', material: 'beastfang_hide', description: 'The hide is named for it. So is most of what it has eaten.' },
 }
+
+export const HUNT_RAW: Material[] = [
+  { key: 'pelt', name: 'Pelt', tier: 1, source: 'hunt', palette: 'pelt', npcPrice: 3, description: 'Rough hide, taken off something that was using it.' },
+  { key: 'thick_pelt', name: 'Thick Pelt', tier: 1, source: 'hunt', palette: 'pelt', npcPrice: 5, description: 'Winter coat off a full-grown animal. Heavy, and it keeps its shape.' },
+  { key: 'dire_pelt', name: 'Dire Pelt', tier: 1, source: 'hunt', palette: 'pelt', npcPrice: 9, description: 'Off something that had no natural enemies until you turned up.' },
+  { key: 'beastfang_hide', name: 'Beastfang Hide', tier: 1, source: 'hunt', palette: 'pelt', npcPrice: 0, description: 'Taken off something that fought back.' },
+]
+
+export const HUNT_REFINED: Material[] = [
+  { key: 'leather', name: 'Leather', tier: 2, palette: 'pelt', npcPrice: 8, description: 'Scraped, soaked and worked soft. The first thing a tannery is for.' },
+  { key: 'boiled_leather', name: 'Boiled Leather', tier: 2, palette: 'pelt', npcPrice: 16, description: 'Boiled hard and molded wet. Sets like a shell and weighs nothing.' },
+  { key: 'lacquered_hide', name: 'Lacquered Hide', tier: 2, palette: 'pelt', npcPrice: 30, description: 'Layered, lacquered, and left in the dark to cure. Turns a blade.' },
+]
+
+export const HUNT_PROCESSING: Recipe[] = [
+  { key: 'tan_leather', name: 'Tan Leather', input: 'pelt', inputQty: 3, output: 'leather', outputQty: 1, baseSeconds: 13 * 60, skill: 'hunting' },
+  { key: 'tan_boiled_leather', name: 'Tan Boiled Leather', input: 'thick_pelt', inputQty: 3, output: 'boiled_leather', outputQty: 1, baseSeconds: 17 * 60, skill: 'hunting' },
+  { key: 'tan_lacquered_hide', name: 'Tan Lacquered Hide', input: 'dire_pelt', inputQty: 3, output: 'lacquered_hide', outputQty: 1, baseSeconds: 24 * 60, skill: 'hunting' },
+]
 
 export const ANIMAL_BY_BIOME_GRADE: Record<string, Record<string, string>> = {
   forest: {

@@ -478,11 +478,13 @@ final class BattleResolveTest extends TestCase
         $wyrm = Monsters::ROSTER['ridge_wyrm'];
         $this->assertGreaterThan(1.0, $wyrm['wearBias'], 'the blunting monster stopped blunting');
 
-        $shrike = Monsters::ROSTER['iron_shrike'];
-        $this->assertSame(1.0, (float) $shrike['wearBias']);
+        // Any tier-3 brute that does NOT blunt, for the comparison. The Iron
+        // Shrike was this one until it went with the plains biome (§5.5).
+        $plainOne = Monsters::ROSTER['rootbound_elder'];
+        $this->assertSame(1.0, (float) $plainOne['wearBias']);
 
         $biased = Formulas::battleWearSplit($wyrm);
-        $plain = Formulas::battleWearSplit($shrike);
+        $plain = Formulas::battleWearSplit($plainOne);
 
         // Both lean on attack, so both send the brunt to the worn set -- but
         // the one that blunts sends a bigger slice to the blade.

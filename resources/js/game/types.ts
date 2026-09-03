@@ -5,7 +5,7 @@
 
 // ---------------------------------------------------------------- world
 
-export type Biome = 'forest' | 'mountain' | 'plains' | 'badlands' | 'grassland'
+export type Biome = 'forest' | 'mountain' | 'badlands' | 'grassland'
 
 /** Concentric ring layout, §5.2. Drives generation, not just cosmetics. */
 export type Ring = 'outer' | 'mid' | 'inner' | 'center'
@@ -150,10 +150,6 @@ export type VariantKey =
   | 'mountain_uncommon'
   | 'mountain_rare'
   | 'mountain_epic'
-  | 'plains'
-  | 'plains_uncommon'
-  | 'plains_rare'
-  | 'plains_epic'
   | 'badlands'
   | 'badlands_uncommon'
   | 'badlands_rare'
@@ -260,6 +256,15 @@ export interface Material {
   spoil?: 'plate' | 'ichor' | 'biome'
   /** §9.5.8 -- 1..5, the monster tier that gives it up. Grade 5 is the center ring. */
   grade?: number
+  /**
+   * §5.5 -- where this comes from when it is not a country.
+   *
+   * A material is worked off ground or off a creature. Four of the five
+   * gathering lines are ground and carry a `biome`; the hunting line is an
+   * animal and carries this instead. Never both -- a source written into a
+   * biome field would be a fifth biome that does not exist.
+   */
+  source?: 'hunt'
   /** Biome lock for tier 1 and tier 3. Raid + refined materials are unlocked. */
   biome?: Biome
   /** Accent color for the procedural icon system, §13.1. */

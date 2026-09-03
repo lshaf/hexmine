@@ -60,7 +60,7 @@ GRADES = ['common', 'uncommon', 'rare', 'epic']
 RINGS = ['outer', 'mid', 'inner']
 
 PALETTE = {
-    'forest': 'wood', 'mountain': 'iron', 'plains': 'pelt',
+    'forest': 'wood', 'mountain': 'iron',
     'badlands': 'stone', 'grassland': 'fiber',
 }
 
@@ -89,12 +89,6 @@ SPEC = {
         ('rare',     'Crater Field',   '#5c6b7d', ('meteoric_iron',  'Meteoric Iron',   9), ('skysteel',        'Skysteel',        32, 26), 'crater'),
         ('epic',     'Mythril Seam',   '#7d93a8', ('mythril_ore',    'Mythril Ore',     0), None,                                            'mythril'),
     ],
-    'plains': [
-        ('common',   'Plains',         '#b08a5a', ('pelt',           'Pelt',            3), ('leather',         'Leather',          8, 13), 'tufts'),
-        ('uncommon', 'Herd Range',     '#bb9a63', ('thick_pelt',     'Thick Pelt',      5), ('boiled_leather',  'Boiled Leather',  16, 17), 'grazed'),
-        ('rare',     'Dire Range',     '#96703f', ('dire_pelt',      'Dire Pelt',       9), ('lacquered_hide',  'Lacquered Hide',  30, 24), 'bones'),
-        ('epic',     'Beastfang Reach','#a37452', ('beastfang_hide', 'Beastfang Hide',  0), None,                                            'fangs'),
-    ],
     'badlands': [
         ('common',   'Badlands',       '#96604c', ('stone',          'Stone',           2), ('cut_stone',       'Cut Stone',        7, 12), 'shards'),
         ('uncommon', 'Basalt Flats',   '#7a5347', ('basalt',         'Basalt',          4), ('dressed_basalt',  'Dressed Basalt',  15, 16), 'columns'),
@@ -110,15 +104,18 @@ SPEC = {
 }
 
 # Which gathering skill each biome's line belongs to, for the processing recipe.
+# §5.5 -- hunting is not here, and that is the point: the other four lines are
+# worked off ground and hunting is worked off an animal, so its whole ladder
+# lives in gen_hunts.py with the creature that carries it.
 SKILL = {
-    'forest': 'woodcutting', 'mountain': 'mining', 'plains': 'hunting',
+    'forest': 'woodcutting', 'mountain': 'mining',
     'badlands': 'quarrying', 'grassland': 'harvesting',
 }
 
 # What a processing run is called, per biome. The verb does not change with
 # grade -- sawing is sawing, whatever went on the bench.
 VERB = {
-    'forest': 'Saw', 'mountain': 'Smelt', 'plains': 'Tan',
+    'forest': 'Saw', 'mountain': 'Smelt',
     'badlands': 'Dress', 'grassland': 'Weave',
 }
 
@@ -127,8 +124,6 @@ DESCRIPTIONS = {
     'heartoak': 'The dark core of something that outlived everyone who saw it planted.',
     'hematite': 'Ore rich enough that the slag heap is barely worth picking over.',
     'meteoric_iron': 'Came down in the crater field. Takes an edge nothing smelted can hold.',
-    'thick_pelt': 'Winter coat off a full-grown animal. Heavy, and it keeps its shape.',
-    'dire_pelt': 'Off something that had no natural enemies until you turned up.',
     'basalt': 'Cooled in columns, and it splits along them. Harder than the shale next door.',
     'granite': 'Speckled and stubborn. It blunts what you dress it with.',
     'flax': 'Retted in the ditch for a fortnight. Spins finer than field grass ever will.',
@@ -138,8 +133,6 @@ DESCRIPTIONS = {
     'bentwood': 'Steamed, bent round a form, and left to set. It holds the curve forever.',
     'steel_ingots': 'Carbon worked through the iron. Springs back where plain bar stays bent.',
     'skysteel': 'Folded out of what fell. Pale, and it rings a long time after the strike.',
-    'boiled_leather': 'Boiled hard and molded wet. Sets like a shell and weighs nothing.',
-    'lacquered_hide': 'Layered, lacquered, and left in the dark to cure. Turns a blade.',
     'dressed_basalt': 'Squared out of the column. Every face is already flat; you only true it.',
     'polished_granite': 'Ground down through four grits. The finish is what makes it last.',
     'linen': 'Woven off the flax line. Cool, strong, and it takes a dye.',

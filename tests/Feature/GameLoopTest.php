@@ -13,6 +13,7 @@ use App\Game\Drops;
 use App\Game\Formulas;
 use App\Game\GameException;
 use App\Game\GameService;
+use App\Game\Hunts;
 use App\Game\Hash;
 use App\Game\HexGeometry;
 use App\Game\Jobs;
@@ -599,16 +600,23 @@ final class GameLoopTest extends TestCase
             $def = Catalog::material($key);
             $this->assertSame(1, $def['tier'], "{$key} is not a raw material");
             $this->assertGreaterThan(1, $def['npcPrice'], "{$key} sells for scrap money");
-            $this->assertNotNull($def['biome'] ?? null, "{$key} comes from no kind of ground");
+            // §5.5 -- a reagent comes off a country or off the hunt, and the
+            // hunting line is not a country: four biomes and one hunt is five
+            // SOURCES, which is what the shelf is keyed to.
+            $this->assertNotNull(
+                $def['biome'] ?? $def['source'] ?? null,
+                "{$key} comes from nowhere at all",
+            );
         }
 
-        // Two per biome, so a recipe can want two different things off one tile.
-        $byBiome = [];
+        // Two per source, so a recipe can want two different things off one.
+        $bySource = [];
         foreach ($reagents as $key) {
-            $byBiome[Catalog::material($key)['biome']][] = $key;
+            $def = Catalog::material($key);
+            $bySource[$def['biome'] ?? $def['source']][] = $key;
         }
-        $this->assertCount(5, $byBiome, 'reagents do not cover the five biomes');
-        foreach ($byBiome as $biome => $keys) {
+        $this->assertCount(5, $bySource, 'reagents do not cover the five lines');
+        foreach ($bySource as $biome => $keys) {
             $this->assertCount(2, $keys, "{$biome} does not have two reagents");
         }
     }
@@ -627,7 +635,7 @@ final class GameLoopTest extends TestCase
         $components = array_keys(Components::CRAFT);
         $this->assertCount(10, $components);
 
-        $byBiome = [];
+        $bySource = [];
         $byBench = [];
 
         foreach ($components as $key) {
@@ -635,15 +643,19 @@ final class GameLoopTest extends TestCase
             $this->assertNotNull($def, "{$key} is not in the catalog");
             $this->assertSame(1, $def['tier'], "{$key} is not a raw material");
             $this->assertGreaterThan(1, $def['npcPrice'], "{$key} sells for scrap money");
-            $this->assertNotNull($def['biome'] ?? null, "{$key} comes from no kind of ground");
+            // §5.5 -- a country or the hunt. Four biomes and one hunt.
+            $this->assertNotNull(
+                $def['biome'] ?? $def['source'] ?? null,
+                "{$key} comes from nowhere at all",
+            );
             $this->assertNull($def['walletCap'] ?? null, "{$key} is capped, which Tier 1 never is");
 
-            $byBiome[$def['biome']][] = $key;
+            $bySource[$def['biome'] ?? $def['source']][] = $key;
             $byBench[$def['bench']][] = $key;
         }
 
-        $this->assertCount(5, $byBiome, 'components do not cover the five biomes');
-        foreach ($byBiome as $biome => $keys) {
+        $this->assertCount(5, $bySource, 'components do not cover the five lines');
+        foreach ($bySource as $biome => $keys) {
             $this->assertCount(2, $keys, "{$biome} does not have two components");
         }
 
@@ -842,14 +854,17 @@ final class GameLoopTest extends TestCase
             $mined = Drops::table(Drops::MINING, $tile, 0);
             $gathered = Drops::table(Drops::GATHERING, $tile, 0);
 
+            // §5.5 -- hunt-sourced stock carries a `source` and no biome, and
+            // it has its faucet on the hunt (Drops::HUNTING) rather than on any
+            // country's table.
             foreach (Components::CRAFT as $key => $def) {
-                if ($def['biome'] === $biome) {
+                if (($def['biome'] ?? null) === $biome) {
                     $this->assertArrayHasKey($key, $mined, "{$key} has no faucet");
                 }
             }
 
             foreach (Alchemy::REAGENTS as $key => $def) {
-                if ($def['biome'] === $biome) {
+                if (($def['biome'] ?? null) === $biome) {
                     $this->assertArrayHasKey($key, $mined, "{$key} has no faucet");
                     $this->assertArrayHasKey($key, $gathered, "{$key} cannot be gathered");
                 }
@@ -861,6 +876,15 @@ final class GameLoopTest extends TestCase
             $critter = Critters::BY_BIOME[$biome];
             $this->assertArrayHasKey($critter, $mined, "{$critter} has no faucet");
             $this->assertArrayNotHasKey($critter, $gathered, "{$critter} can be picked up by hand");
+        }
+
+        // §5.5 -- and everything the hunt owns has its faucet on the hunt.
+        $hunted = Drops::tableFor(Drops::HUNTING, $this->tileOfGrade('forest', 0), 'pelt');
+
+        foreach (Components::CRAFT + Alchemy::REAGENTS as $key => $def) {
+            if (($def['source'] ?? null) === 'hunt') {
+                $this->assertArrayHasKey($key, $hunted, "{$key} has no faucet");
+            }
         }
     }
 
@@ -1154,7 +1178,9 @@ final class GameLoopTest extends TestCase
             }
         }
 
-        $this->assertCount(20, $materials);
+        // §5.5 -- sixteen: four countries of four. The hunting line's own four
+        // are the animal's (Hunts::GRADES) and are asserted with it.
+        $this->assertCount(16, $materials);
         $this->assertSame($materials, array_unique($materials), 'two variants give up the same material');
         $this->assertSame($tints, array_unique($tints), 'two variants share a tint');
     }
@@ -1168,9 +1194,11 @@ final class GameLoopTest extends TestCase
      */
     public function test_grade_processing_matches_the_base_ratio(): void
     {
-        $this->assertCount(10, Variants::PROCESSING);
+        // §5.5 -- eight off the ground, and the Tanner's three are the hunt's.
+        $this->assertCount(8, Variants::PROCESSING);
+        $this->assertCount(3, Hunts::PROCESSING);
 
-        foreach (Variants::PROCESSING as $key => $recipe) {
+        foreach (Variants::PROCESSING + Hunts::PROCESSING as $key => $recipe) {
             $this->assertSame(3, $recipe['inputQty'], "{$key} does not cost three raw");
             $this->assertSame(1, $recipe['outputQty'], "{$key} does not make one");
             $this->assertSame(1, Catalog::materialTier($recipe['input']));

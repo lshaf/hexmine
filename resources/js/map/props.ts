@@ -381,19 +381,6 @@ function rockmite(x: number, y: number): string {
   )
 }
 
-function dustleveret(x: number, y: number): string {
-  const back = '#7a5c3c'
-  const belly = '#d8c7a6'
-
-  return (
-    `<ellipse cx="${x}" cy="${y - 4}" rx="6" ry="3.6" fill="${back}"/>` +
-    `<ellipse cx="${x - 4}" cy="${y - 2.4}" rx="3.4" ry="1.8" fill="${belly}"/>` +
-    `<ellipse cx="${x + 5}" cy="${y - 7}" rx="2.6" ry="2.2" fill="${back}"/>` +
-    // The ears, which are the whole of what tells a hare from anything else.
-    `<path d="M${x + 5} ${y - 9} L${x + 3.5} ${y - 15} M${x + 6.5} ${y - 9} L${x + 7} ${y - 15}" stroke="${back}" stroke-width="1.6" stroke-linecap="round" fill="none"/>`
-  )
-}
-
 function ashnewt(x: number, y: number): string {
   const skin = '#cfc7b4'
   const spots = '#5d4a42'
@@ -425,7 +412,6 @@ function fenlark(x: number, y: number): string {
 const POCKET_CRITTER: Record<Biome, (x: number, y: number) => string> = {
   forest: glimmermoth,
   mountain: rockmite,
-  plains: dustleveret,
   badlands: ashnewt,
   grassland: fenlark,
 }
@@ -731,22 +717,6 @@ function waterProp(tile: Tile): string {
       return out
     }
 
-    // A slow meander with a sandbar in it, or a stock pool. Widest and
-    // laziest of the five, which is what plains water is.
-    case 'plains': {
-      const sand = shade(bank, 0.22)
-      let out = river
-        ? `<ellipse cx="3" cy="6" rx="14" ry="3.4" fill="${sand}"/>` + midstream(-17, 3, 0.8, sand)
-        : reeds(-21, 7, shade(bank, -0.05), 3) +
-          reeds(16, 6, shade(bank, -0.05), 3) +
-          `<ellipse cx="-2" cy="8" rx="8" ry="2.2" fill="${sand}"/>`
-      out += ripples(seed, 3, shade(foam, -0.2), 1.2)
-      return out
-    }
-
-    // A wash running over silt between cracked shelves, or an alkali pan with
-    // a pale crust round it. The only water here that looks like it might not
-    // last the season.
     case 'badlands': {
       const crust = shade(desaturate(bank, 0.45), 0.34)
       let out =

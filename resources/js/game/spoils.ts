@@ -45,12 +45,10 @@ export const SPOILS: Material[] = [
   { key: 'charred_sinew', name: 'Charred Sinew', tier: 0, palette: 'stone', grade: 4, npcPrice: 1, description: 'Went through a fire before you got to it. It will not hold a knot.' },
   { key: 'sap_matted_fur', name: 'Sap-Matted Fur', tier: 1, palette: 'pelt', spoil: 'biome', biome: 'forest', npcPrice: 8, description: 'Comes off the shoulders in one piece, and everything it touched is stuck to it.' },
   { key: 'ore_crusted_chitin', name: 'Ore-Crusted Chitin', tier: 1, palette: 'pelt', spoil: 'biome', biome: 'mountain', npcPrice: 8, description: 'It fed on the seam it slept in. Half the shell is the seam.' },
-  { key: 'braided_sinew', name: 'Braided Sinew', tier: 1, palette: 'pelt', spoil: 'biome', biome: 'plains', npcPrice: 8, description: 'Laid down in cords by a thing that ran every day of its life. It will not part.' },
   { key: 'slagged_scale', name: 'Slagged Scale', tier: 1, palette: 'pelt', spoil: 'biome', biome: 'badlands', npcPrice: 8, description: 'Ran once and set again. Nothing the smith has will make it do that twice.' },
   { key: 'pollen_choked_gill', name: 'Pollen-Choked Gill', tier: 1, palette: 'pelt', spoil: 'biome', biome: 'grassland', npcPrice: 8, description: 'Packed solid with a summer of it. The alchemist takes the packing, not the gill.' },
   { key: 'trampled_fern', name: 'Trampled Fern', tier: 0, palette: 'stone', biome: 'forest', npcPrice: 1, description: 'Flattened in the scuffle and already browning. It was not worth much standing up.' },
   { key: 'shale_grit', name: 'Shale Grit', tier: 0, palette: 'stone', biome: 'mountain', npcPrice: 1, description: 'Came down off the slope while you were busy. It is in everything now.' },
-  { key: 'matted_turf', name: 'Matted Turf', tier: 0, palette: 'stone', biome: 'plains', npcPrice: 1, description: 'Torn up by whatever was braced against it. Roots, dirt, and nothing else.' },
   { key: 'scorched_grit', name: 'Scorched Grit', tier: 0, palette: 'stone', biome: 'badlands', npcPrice: 1, description: 'Fused into little beads where something hot went over it.' },
   { key: 'broken_stalks', name: 'Broken Stalks', tier: 0, palette: 'stone', biome: 'grassland', npcPrice: 1, description: 'A double handful of what the fight went through. It will not even burn well.' },
 ]
@@ -75,7 +73,6 @@ export const TROPHY_BY_TIER: Record<number, string> = {
 export const BIOME_SPOIL: Record<string, string> = {
   forest: 'sap_matted_fur',
   mountain: 'ore_crusted_chitin',
-  plains: 'braided_sinew',
   badlands: 'slagged_scale',
   grassland: 'pollen_choked_gill',
 }
@@ -84,7 +81,6 @@ export const BIOME_SPOIL: Record<string, string> = {
 export const BIOME_LEAVING: Record<string, string> = {
   forest: 'trampled_fern',
   mountain: 'shale_grit',
-  plains: 'matted_turf',
   badlands: 'scorched_grit',
   grassland: 'broken_stalks',
 }

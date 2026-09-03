@@ -17,14 +17,12 @@ export const WATER_LABEL: Record<WaterKind, Record<Biome, string>> = {
   river: {
     forest: 'Brook',
     mountain: 'Rapids',
-    plains: 'Slow Water',
     badlands: 'Wash',
     grassland: 'Stream',
   },
   lake: {
     forest: 'Forest Pool',
     mountain: 'Tarn',
-    plains: 'Stock Pool',
     badlands: 'Alkali Pan',
     grassland: 'Mere',
   },

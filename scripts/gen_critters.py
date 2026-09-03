@@ -14,15 +14,17 @@ splitting the shelf: it is the difference between an errand and a hunt.
 import io
 
 PALETTE = {
-    'forest': 'wood', 'mountain': 'iron', 'plains': 'pelt',
+    'forest': 'wood', 'mountain': 'iron',
     'badlands': 'stone', 'grassland': 'fiber',
+    # §5.5 -- the hunting line is not a country, and its palette is the hide.
+    'hunt': 'pelt',
 }
 
 # key, name, biome, npcPrice, description
 CRITTERS = [
     ('glimmermoth', 'Glimmermoth', 'forest',    5, 'Comes to a lamp in numbers and leaves dust on everything. The dust is the part that works.'),
     ('rockmite',    'Rockmite',    'mountain',  5, 'Chews galleries through solid seam and is never seen doing it.'),
-    ('dustleveret', 'Dustleveret', 'plains',    4, 'A hare the color of the ground, and no slower for it.'),
+    ('dustleveret', 'Dustleveret', 'hunt',      4, 'A hare the color of the ground, and no slower for it.'),
     ('ashnewt',     'Ashnewt',     'badlands',  6, 'Sits out a vent that would cook anything else. Cold to hold, every time.'),
     ('fenlark',     'Fenlark',     'grassland', 4, 'Sings from inside the crop and never once from the top of it.'),
 ]
@@ -41,6 +43,19 @@ def php_str(s):
 ts_str = php_str
 
 
+def origin_php(biome):
+    """§5.5 -- ground gets a biome; the hunting line gets a source.
+
+    A material comes off a country or off a creature, and writing 'hunt' into
+    a biome field would be a fifth biome that does not exist -- every reader
+    that filters by biome would then have to know which one is a lie.
+    """
+    return "'source' => 'hunt', " if biome == 'hunt' else f"'biome' => '{biome}', "
+
+
+def origin_ts(biome):
+    return "source: 'hunt', " if biome == 'hunt' else f"biome: '{biome}', "
+
 def emit_php():
     o = io.StringIO()
     o.write('<?php\n\ndeclare(strict_types=1);\n\nnamespace App\\Game;\n\n')
@@ -51,13 +66,18 @@ def emit_php():
     o.write('    /** §4 Tier 1 -- biome-locked, hunted, and wanted by the consumable bench. */\n')
     o.write('    public const STOCK = [\n')
     for key, name, biome, price, desc in CRITTERS:
-        o.write(f"        '{key}' => ['name' => {php_str(name)}, 'tier' => 1, 'biome' => '{biome}', "
+        o.write(f"        '{key}' => ['name' => {php_str(name)}, 'tier' => 1, " + origin_php(biome) + ""
                 f"'palette' => '{PALETTE[biome]}', 'critter' => true, 'npcPrice' => {price}, "
                 f"'description' => {php_str(desc)}],\n")
     o.write('    ];\n\n')
     o.write('    /** Biome -> the animal that lives on it. */\n')
+    # §5.7 -- a pocket's tell is the critter that lives on that COUNTRY, so a
+    # hunt-sourced one has no place on this map: it comes off an animal rather
+    # than off ground, and no hex could draw it.
     o.write('    public const BY_BIOME = [\n')
     for key, _, biome, _, _ in CRITTERS:
+        if biome == 'hunt':
+            continue
         o.write(f"        '{biome}' => '{key}',\n")
     o.write('    ];\n}\n')
 
@@ -72,12 +92,14 @@ def emit_ts():
     o.write(" */\nimport type { Biome, Material } from './types'\n\n")
     o.write('export const CRITTERS: Material[] = [\n')
     for key, name, biome, price, desc in CRITTERS:
-        o.write(f"  {{ key: '{key}', name: {ts_str(name)}, tier: 1, biome: '{biome}', "
+        o.write(f"  {{ key: '{key}', name: {ts_str(name)}, tier: 1, " + origin_ts(biome) + ""
                 f"palette: '{PALETTE[biome]}', critter: true, npcPrice: {price}, "
                 f"description: {ts_str(desc)} }},\n")
     o.write(']\n\n')
     o.write('export const CRITTER_BY_BIOME: Record<Biome, string> = {\n')
     for key, _, biome, _, _ in CRITTERS:
+        if biome == 'hunt':
+            continue
         o.write(f"  {biome}: '{key}',\n")
     o.write('}\n')
 

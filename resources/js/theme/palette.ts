@@ -20,7 +20,6 @@ export const VIOLET = '#7d5fa8'
 export const BIOME_COLOR: Record<Biome, string> = {
   forest: '#5f8058',
   mountain: '#6d8399',
-  plains: '#b08a5a',
   badlands: '#96604c',
   grassland: '#a8a05c',
 }
@@ -28,7 +27,6 @@ export const BIOME_COLOR: Record<Biome, string> = {
 export const BIOME_LABEL: Record<Biome, string> = {
   forest: 'Forest',
   mountain: 'Mountain',
-  plains: 'Plains',
   badlands: 'Badlands',
   grassland: 'Grassland',
 }

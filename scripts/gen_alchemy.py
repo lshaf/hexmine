@@ -14,15 +14,28 @@ import io
 
 # ---------------------------------------------------------------- vocabulary
 
-BIOMES = ['forest', 'mountain', 'plains', 'badlands', 'grassland']
+BIOMES = ['forest', 'mountain', 'badlands', 'grassland']
 
+# §7.2 -- the five gathering lines and where each one's stock comes from.
+#
+# Four are countries; hunting is not (§5.5), so it is keyed to `hunt` and its
+# two reagents come off the animal rather than out of the ground. It is still a
+# line and it still gets its own rung of drafts -- the shelf is nine a rung
+# because there are five lines, not because there are five biomes.
 LINE = {
-    'forest': 'woodcutting', 'mountain': 'mining', 'plains': 'hunting',
+    'forest': 'woodcutting', 'mountain': 'mining',
     'badlands': 'quarrying', 'grassland': 'harvesting',
+    'hunt': 'hunting',
 }
+
+# Where a reagent grows. The hunt is not one of these -- it is on LINE and not
+# here, which is the whole difference between a line and a country.
+SOURCES = list(LINE.keys())
 PALETTE = {
-    'forest': 'wood', 'mountain': 'iron', 'plains': 'pelt',
+    'forest': 'wood', 'mountain': 'iron',
     'badlands': 'stone', 'grassland': 'fiber',
+    # §5.5 -- the hunting line is not a country, and its palette is the hide.
+    'hunt': 'pelt',
 }
 # ------------------------------------------------------------------ reagents
 # §4 Tier 1: raw, biome-locked. Two per biome so a recipe can want two different
@@ -38,8 +51,8 @@ REAGENTS = [
     ('birch_sap',   'Birch Sap',   'forest',    2, 'Tapped in the cold hour. Runs slow and keeps well.'),
     ('lichen',      'Lichen',      'mountain',  3, 'Scraped off north-facing rock. It grows a finger a decade.'),
     ('stonewort',   'Stonewort',   'mountain',  4, 'Grows out of bare rock on nothing at all. Bitter, and it keeps.'),
-    ('bitterroot',  'Bitterroot',  'plains',    3, 'Dug where the herds will not graze. They know why.'),
-    ('yarrow',      'Yarrow',      'plains',    4, 'Flat white heads over the whole range. Every field surgeon carries it.'),
+    ('bitterroot',  'Bitterroot',  'hunt',      3, 'Dug where the herds will not graze. They know why.'),
+    ('yarrow',      'Yarrow',      'hunt',      4, 'Flat white heads over the open ground. Every field surgeon carries it.'),
     ('ashcap',      'Ashcap',      'badlands',  3, 'Comes up gray on burnt ground, a season after the fire.'),
     ('sagebrush',   'Sagebrush',   'badlands',  4, 'Silver-leaved and shin-high. Burns sweet and steeps sweeter.'),
     ('blue_nettle', 'Blue Nettle', 'grassland', 2, 'Stings through leather. Worth the hands it costs.'),
@@ -52,7 +65,7 @@ REAGENTS = [
 JUNK = [
     ('deadfall',      'Deadfall',      'forest',    'A rotted limb off the floor. Too far gone to plank.'),
     ('slag',          'Slag',          'mountain',  'Spoil from an old working. Somebody already took the iron.'),
-    ('bone_splinter', 'Bone Splinter', 'plains',    'Picked clean long before you got there.'),
+    ('bone_splinter', 'Bone Splinter', 'hunt',      'Picked clean long before you got there.'),
     ('cinder',        'Cinder',        'badlands',  'Scraped off a burn scar. The trader takes it by weight.'),
     ('thistle',       'Thistle',       'grassland', 'Cut and bundled. Nothing spins it.'),
 ]
@@ -96,8 +109,8 @@ YIELD_WORD = {
 # `battle` is the odd one: its recipe runs on the ichor line (§9.5.8) rather
 # than on a biome's herbs, and the biome named here only decides its palette.
 SCOPE_BIOME = dict(
-    {LINE[b]: b for b in BIOMES},
-    **{'travel': 'grassland', 'processing': 'plains', 'battle': 'plains'},
+    {skill: source for source, skill in LINE.items()},
+    **{'travel': 'grassland', 'processing': 'forest', 'battle': 'badlands'},
 )
 
 # §9.5.8 -- the ichor grade each rung is brewed from. A battle draft is the
@@ -144,8 +157,11 @@ def consumables():
 
     for rarity, value, station, tradeable, mats in RANKS:
         effects = []
-        for b in BIOMES:
-            effects.append(('yield', LINE[b], YIELD_WORD[LINE[b]], FLAVOUR_YIELD[LINE[b]]))
+        # §7.2 -- one yield draft per LINE, not per country. Hunting is a line
+        # without a country (§5.5), and a shelf keyed to biomes would have
+        # quietly dropped its rung when plains stopped being one.
+        for source in SOURCES:
+            effects.append(('yield', LINE[source], YIELD_WORD[LINE[source]], FLAVOUR_YIELD[LINE[source]]))
         # 'Wayfarer', not 'Road': Road Tonic is pinned at common, and the
         # legacy names do not use their own rank's vessel, so a generated
         # "Road Tonic" at uncommon would collide with it.
@@ -237,15 +253,39 @@ def inputs_for(rarity, scope, mats):
 # the one that makes you travel and the dear ones are local.
 # Biome -> the animal that lives on it, §4. Mirrors gen_critters.py.
 CRITTER = {
-    'forest': 'glimmermoth', 'mountain': 'rockmite', 'plains': 'dustleveret',
+    'forest': 'glimmermoth', 'mountain': 'rockmite',
     'badlands': 'ashnewt', 'grassland': 'fenlark',
+    'hunt': 'dustleveret',
 }
 
+# Four biomes, so the ring closes on four: forest -> grassland -> badlands ->
+# mountain -> forest. Every common recipe still reaches into somebody else's
+# country and no biome pairs with itself.
 SECOND = {
-    'forest': 'grassland', 'mountain': 'badlands', 'plains': 'forest',
-    'badlands': 'mountain', 'grassland': 'plains',
+    'forest': 'grassland', 'grassland': 'badlands',
+    'badlands': 'mountain', 'mountain': 'forest',
+    # §5.5 -- the hunt is not a country, so it reaches into one: a hunting
+    # draft asks for what the forest grows, which is the same "the cheap tier
+    # makes you travel" rule the other four keep.
+    'hunt': 'forest',
 }
 
+# §4 -- the animal a rare rung wants. The hunt's own is its critter.
+
+
+
+def origin_php(biome):
+    """§5.5 -- ground gets a biome; the hunting line gets a source.
+
+    A material comes off a country or off a creature, and writing 'hunt' into
+    a biome field would be a fifth biome that does not exist -- every reader
+    that filters by biome would then have to know which one is a lie.
+    """
+    return "'source' => 'hunt', " if biome == 'hunt' else f"'biome' => '{biome}', "
+
+
+def origin_ts(biome):
+    return "source: 'hunt', " if biome == 'hunt' else f"biome: '{biome}', "
 
 # ------------------------------------------------------------------- emitters
 
@@ -282,14 +322,14 @@ def emit_php(items):
     o.write('    /** §4 Tier 1 -- reagents, biome-locked, the alchemist\'s raw stock. */\n')
     o.write('    public const REAGENTS = [\n')
     for key, name, biome, price, desc in REAGENTS:
-        o.write(f"        '{key}' => ['name' => '{esc_php(name)}', 'tier' => 1, 'biome' => '{biome}', "
+        o.write(f"        '{key}' => ['name' => '{esc_php(name)}', 'tier' => 1, " + origin_php(biome) + ""
                 f"'palette' => '{PALETTE[biome]}', 'npcPrice' => {price}, 'description' => '{esc_php(desc)}'],\n")
     o.write('    ];\n\n')
 
     o.write('    /** §4.0 Tier 0 -- junk. Sells for a copper and feeds nothing. */\n')
     o.write('    public const JUNK = [\n')
     for key, name, biome, desc in JUNK:
-        o.write(f"        '{key}' => ['name' => '{esc_php(name)}', 'tier' => 0, 'biome' => '{biome}', "
+        o.write(f"        '{key}' => ['name' => '{esc_php(name)}', 'tier' => 0, " + origin_php(biome) + ""
                 f"'palette' => '{PALETTE[biome]}', 'npcPrice' => 1, 'description' => '{esc_php(desc)}'],\n")
     o.write('    ];\n\n')
 
@@ -317,13 +357,13 @@ def emit_ts(items):
 
     o.write('export const REAGENTS: Material[] = [\n')
     for key, name, biome, price, desc in REAGENTS:
-        o.write(f"  {{ key: '{key}', name: '{esc_ts(name)}', tier: 1, biome: '{biome}', "
+        o.write(f"  {{ key: '{key}', name: '{esc_ts(name)}', tier: 1, " + origin_ts(biome) + ""
                 f"palette: '{PALETTE[biome]}', npcPrice: {price}, description: '{esc_ts(desc)}' }},\n")
     o.write(']\n\n')
 
     o.write('export const JUNK: Material[] = [\n')
     for key, name, biome, desc in JUNK:
-        o.write(f"  {{ key: '{key}', name: '{esc_ts(name)}', tier: 0, biome: '{biome}', "
+        o.write(f"  {{ key: '{key}', name: '{esc_ts(name)}', tier: 0, " + origin_ts(biome) + ""
                 f"palette: '{PALETTE[biome]}', npcPrice: 1, description: '{esc_ts(desc)}' }},\n")
     o.write(']\n\n')
 

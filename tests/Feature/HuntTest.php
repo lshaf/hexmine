@@ -29,6 +29,12 @@ final class HuntTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        // §9.5.3 -- quiet roads. A pack pins the hex and refuses the hunt with
+        // it, which is correct and is asserted on its own below; left on, it
+        // would refuse these tests on a schedule nobody can see.
+        config(['game.packs' => false]);
+
         $this->game = app(GameService::class);
     }
 
@@ -195,6 +201,46 @@ final class HuntTest extends TestCase
             0,
             (int) $character->fresh()->skills()->where('skill_key', 'hunting')->value('level'),
         );
+    }
+
+    /**
+     * §9.5.3 -- a pack stops a hunt the way it stops a mine.
+     *
+     * You are not working while something is looking at you, and an animal on
+     * the same hex is still work. The refusal names the pack rather than the
+     * animal, because the pack is what has to be dealt with first.
+     */
+    public function test_a_pack_on_the_hex_refuses_the_hunt(): void
+    {
+        config(['game.packs' => true]);
+
+        $character = $this->character('0xpinned');
+
+        // Asked through the service rather than off `generateTile(.., 0)`: a
+        // pack is bucketed on the CURRENT clock, so a hex that carries one at
+        // time zero need not carry one now.
+        for ($i = 0; $i < 3000; $i++) {
+            $col = ($i * 7919) % 400 - 200;
+            $row = ($i * 104729) % 400 - 200;
+
+            $character->update(['col' => $col, 'row' => $row]);
+            $fresh = $character->fresh();
+
+            if ($this->game->huntHere($fresh) === null || $this->game->packHere($fresh) === null) {
+                continue;
+            }
+
+            $preview = $this->game->previewTile($fresh, $col, $row, Drops::HUNTING);
+
+            $this->assertFalse($preview['canMine'], 'hunted a hex with a pack on it');
+            $this->assertTrue($preview['pinned']);
+            // And it still describes the ANIMAL, not the seam underneath.
+            $this->assertNotNull($preview['animal']);
+
+            return;
+        }
+
+        $this->markTestSkipped('found no hex with both a pack and an animal');
     }
 
     // ------------------------------------------------------------------ helpers

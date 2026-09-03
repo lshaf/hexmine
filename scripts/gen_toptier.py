@@ -32,7 +32,7 @@ import io
 LINES = {
     'axe':     ('forest',    'ironwood',        'heartoak',      'bentwood',         'heartknot',   'shard_verdant'),
     'pickaxe': ('mountain',  'mythril_ore',     'meteoric_iron', 'skysteel',         'flux_salt',   'shard_ferrous'),
-    'bow':     ('plains',    'beastfang_hide',  'dire_pelt',     'lacquered_hide',   'horn',        'shard_sanguine'),
+    'bow':     ('hunt',      'beastfang_hide',  'dire_pelt',     'lacquered_hide',   'horn',        'shard_sanguine'),
     'hammer':  ('badlands',  'obsidian_shard',  'granite',       'polished_granite', 'whetgrit',    'shard_cinder'),
     'sickle':  ('grassland', 'silkweave_fiber', 'hemp',          'canvas',           'quench_reed', 'shard_zephyr'),
 }
@@ -41,7 +41,7 @@ LINES = {
 # whose material the piece is actually made of.
 WORN = {
     'armor':  ('forest',    'ironwood',       'heartoak',  'bentwood',       'pine_pitch', 'shard_verdant'),
-    'boots':  ('plains',    'beastfang_hide', 'dire_pelt', 'lacquered_hide', 'sinew',      'shard_sanguine'),
+    'boots':  ('hunt',      'beastfang_hide', 'dire_pelt', 'lacquered_hide', 'sinew',      'shard_sanguine'),
     'gloves': ('grassland', 'silkweave_fiber', 'hemp',     'canvas',         'beeswax',    'shard_zephyr'),
 }
 
@@ -81,8 +81,10 @@ PAIR = {
 }
 
 PALETTE = {
-    'forest': 'wood', 'mountain': 'iron', 'plains': 'pelt',
+    'forest': 'wood', 'mountain': 'iron',
     'badlands': 'stone', 'grassland': 'fiber',
+    # §5.5 -- the hunting line is not a country, and its palette is the hide.
+    'hunt': 'pelt',
 }
 
 # ----------------------------------------------------------------- legendary

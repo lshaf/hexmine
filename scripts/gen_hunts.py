@@ -10,6 +10,35 @@ whole ladder, carried by the creature instead of by the country.
 """
 import io
 
+# ------------------------------------------------------------ the hunting line
+#
+# §5.5 -- the whole ladder, and it lives HERE rather than in gen_variants.py
+# with the other four. The other four are worked off ground, so their materials
+# belong with the country that carries them; hunting is worked off an animal, so
+# its materials belong with the creature. Leaving it among the biomes was what
+# made "remove the plains biome" mean "delete the tanner".
+#
+# Same shape as a biome's line: four grades, each a tier-1 raw and (except the
+# contested rung) the tier-2 it processes into.
+#
+# grade, raw (key, Name, npcPrice), refined (key, Name, npcPrice, minutes)
+LINE = [
+    ('common',    ('pelt',           'Pelt',           3), ('leather',        'Leather',         8, 13)),
+    ('uncommon',  ('thick_pelt',     'Thick Pelt',     5), ('boiled_leather', 'Boiled Leather', 16, 17)),
+    ('rare',      ('dire_pelt',      'Dire Pelt',      9), ('lacquered_hide', 'Lacquered Hide', 30, 24)),
+    ('contested', ('beastfang_hide', 'Beastfang Hide', 0), None),
+]
+
+DESCRIPTIONS = {
+    'pelt': 'Rough hide, taken off something that was using it.',
+    'thick_pelt': 'Winter coat off a full-grown animal. Heavy, and it keeps its shape.',
+    'dire_pelt': 'Off something that had no natural enemies until you turned up.',
+    'beastfang_hide': 'Taken off something that fought back.',
+    'leather': 'Scraped, soaked and worked soft. The first thing a tannery is for.',
+    'boiled_leather': 'Boiled hard and molded wet. Sets like a shell and weighs nothing.',
+    'lacquered_hide': 'Layered, lacquered, and left in the dark to cure. Turns a blade.',
+}
+
 # The grade ladder, lifted off the plains variants it replaces.
 #
 # A hex used to carry this -- Plains, Herd Range, Dire Range, Beastfang Reach --
@@ -18,12 +47,14 @@ import io
 # rim would be the grind->NFT path the threat model exists to close).
 #
 # grade, material, weights by ring
-GRADES = [
-    ('common',   'pelt',           {'outer': 0.975, 'mid': 0.68, 'inner': 0.42}),
-    ('uncommon', 'thick_pelt',     {'outer': 0.02,  'mid': 0.3,  'inner': 0.25}),
-    ('rare',     'dire_pelt',      {'outer': 0.005, 'mid': 0.02, 'inner': 0.15}),
-    ('contested', 'beastfang_hide', {'outer': 0.0,  'mid': 0.0,  'inner': 0.18}),
-]
+WEIGHTS = {
+    'common':    {'outer': 0.975, 'mid': 0.68, 'inner': 0.42},
+    'uncommon':  {'outer': 0.02,  'mid': 0.3,  'inner': 0.25},
+    'rare':      {'outer': 0.005, 'mid': 0.02, 'inner': 0.15},
+    'contested': {'outer': 0.0,   'mid': 0.0,  'inner': 0.18},
+}
+
+GRADES = [(grade, raw[0], WEIGHTS[grade]) for grade, raw, _ in LINE]
 
 # key, name, biome, grade, description
 #
@@ -111,6 +142,56 @@ def emit_php():
             f"'description' => {php_str(desc)}],\n"
         )
     o.write('    ];\n\n')
+    o.write('    /**\n')
+    o.write('     * §4 Tier 1 -- the hunting line\'s own raw ladder.\n')
+    o.write('     *\n')
+    o.write('     * `source` rather than `biome`, and that is the whole of what\n')
+    o.write('     * makes hunting different from the other four lines: these come\n')
+    o.write('     * off a creature rather than off a country, so nothing here is\n')
+    o.write('     * locked to ground and nothing reads a biome to find it.\n')
+    o.write('     */\n')
+    o.write('    public const RAW = [\n')
+    for grade, raw, _ in LINE:
+        key, name, price = raw
+        o.write(
+            f"        '{key}' => ['name' => {php_str(name)}, 'tier' => 1, "
+            f"'source' => 'hunt', 'grade' => '{grade}', 'palette' => 'pelt', "
+            f"'npcPrice' => {price}, 'description' => {php_str(DESCRIPTIONS[key])}],\n"
+        )
+    o.write('    ];\n\n')
+
+    o.write('    /** §4 Tier 2 -- what each rung tans into. Not locked to anything. */\n')
+    o.write('    public const REFINED = [\n')
+    for grade, _, refined in LINE:
+        if refined is None:
+            continue
+        key, name, price, _minutes = refined
+        o.write(
+            f"        '{key}' => ['name' => {php_str(name)}, 'tier' => 2, "
+            f"'palette' => 'pelt', 'npcPrice' => {price}, "
+            f"'description' => {php_str(DESCRIPTIONS[key])}],\n"
+        )
+    o.write('    ];\n\n')
+
+    o.write('    /** §6 -- the Tanner\'s line, one recipe per rung. */\n')
+    o.write('    public const PROCESSING = [\n')
+    for grade, raw, refined in LINE:
+        if refined is None:
+            continue
+        key, name, _price, minutes = refined
+        o.write(
+            f"        'tan_{key}' => ['name' => 'Tan {name}', 'input' => '{raw[0]}', "
+            f"'inputQty' => 3, 'output' => '{key}', 'outputQty' => 1, "
+            f"'baseSeconds' => {minutes} * 60, 'skill' => 'hunting'],\n"
+        )
+    o.write('    ];\n\n')
+
+    o.write('    /** §7.2 -- every rung of this ladder belongs to the hunting line. */\n')
+    o.write('    public const SKILL_FOR_MATERIAL = [\n')
+    for _grade, raw, _ in LINE:
+        o.write(f"        '{raw[0]}' => 'hunting',\n")
+    o.write('    ];\n\n')
+
     o.write('    /** Biome -> grade -> which animal that is. */\n')
     o.write('    public const BY_BIOME_GRADE = [\n')
     for biome in BIOMES:
@@ -126,7 +207,7 @@ def emit_php():
 def emit_ts():
     o = io.StringIO()
     doc(o, HEADER)
-    o.write("import type { Animal } from './types'\n\n")
+    o.write("import type { Animal, Material, Recipe } from './types'\n\n")
     o.write('export const HUNT_BIOMES = [' + ', '.join(f"'{b}'" for b in BIOMES) + '] as const\n\n')
     o.write('export const HUNT_GRADES: Array<{ grade: string; material: string; weights: Record<string, number> }> = [\n')
     for grade, material, weights in GRADES:
@@ -141,6 +222,36 @@ def emit_ts():
             f"grade: '{grade}', material: '{material}', description: {php_str(desc)} }},\n"
         )
     o.write('}\n\n')
+    o.write("import type { Material, Recipe } from './types'\n" if False else '')
+    o.write('export const HUNT_RAW: Material[] = [\n')
+    for grade, raw, _ in LINE:
+        key, name, price = raw
+        o.write(
+            f"  {{ key: '{key}', name: {php_str(name)}, tier: 1, source: 'hunt', "
+            f"palette: 'pelt', npcPrice: {price}, "
+            f"description: {php_str(DESCRIPTIONS[key])} }},\n"
+        )
+    o.write(']\n\n')
+    o.write('export const HUNT_REFINED: Material[] = [\n')
+    for grade, _, refined in LINE:
+        if refined is None:
+            continue
+        key, name, price, _m = refined
+        o.write(
+            f"  {{ key: '{key}', name: {php_str(name)}, tier: 2, palette: 'pelt', "
+            f"npcPrice: {price}, description: {php_str(DESCRIPTIONS[key])} }},\n"
+        )
+    o.write(']\n\n')
+    o.write('export const HUNT_PROCESSING: Recipe[] = [\n')
+    for grade, raw, refined in LINE:
+        if refined is None:
+            continue
+        key, name, _price, minutes = refined
+        o.write(
+            f"  {{ key: 'tan_{key}', name: 'Tan {name}', input: '{raw[0]}', inputQty: 3, "
+            f"output: '{key}', outputQty: 1, baseSeconds: {minutes} * 60, skill: 'hunting' }},\n"
+        )
+    o.write(']\n\n')
     o.write('export const ANIMAL_BY_BIOME_GRADE: Record<string, Record<string, string>> = {\n')
     for biome in BIOMES:
         o.write(f"  {biome}: {{\n")

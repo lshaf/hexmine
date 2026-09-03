@@ -100,7 +100,7 @@ worth, and no recipe anywhere will take it.
 |---|---|---|
 | Branch | Forest | Wood |
 | Ore Chips | Mountain | Iron ore |
-| Torn Hide | Plains/Tundra | Pelt |
+| Torn Hide | *the hunt* (§5.5) | Pelt |
 | Gravel | Badlands | Stone |
 | Chaff | Grassland | Fiber |
 
@@ -133,7 +133,7 @@ The five the gathering lines are named for:
 |---|---|
 | Wood | Forest |
 | Iron ore | Mountain |
-| Pelt | Plains/Tundra |
+| Pelt | *the hunt* (§5.5) |
 | Stone | Badlands |
 | Fiber | Grassland |
 
@@ -145,7 +145,7 @@ single kind of ground:
 |---|---|
 | Forest | Toadstool · Birch Sap |
 | Mountain | Lichen · Alum |
-| Plains | Bitterroot · Marrow |
+| *the hunt* | Bitterroot · Yarrow |
 | Badlands | Ashcap · Emberdust |
 | Grassland | Blue Nettle · Clover |
 
@@ -163,7 +163,7 @@ scrap**, which §4.0 makes a rule rather than a tuning value.
 | Reinforced Frame | Planks + Ingots (cross-combo) |
 
 ### Tier 3 — Rare (5, PvP-zone tiles only, **capped per wallet**)
-Ironwood (Forest) · Mythril Ore (Mountain) · Beastfang Hide (Plains) ·
+Ironwood (Forest) · Mythril Ore (Mountain) · Beastfang Hide (*the hunt*) ·
 Obsidian Shard (Badlands) · Silkweave Fiber (Grassland)
 
 ### Tier 4 — Raid materials (4, dungeon-sourced, not biome-locked)
@@ -368,9 +368,23 @@ them.
 ### 5.5 Hunting is mining, and there is no herd
 
 **Hunting is not a separate verb, and there is no herd marker on the map.** The
-bow is the plains line's tool exactly as the axe is the forest line's (§8.0):
-you work a plains hex with a bow and it gives up pelt, at the bow's rate, off
+bow is the hunting line's tool exactly as the axe is the forest line's (§8.0):
+you work an **animal** with a bow and it gives up pelt, at the bow's rate, off
 the same table every other line reads. That is the whole of hunting.
+
+**The animal is the ground.** There is no plains biome — there are four
+countries, and the fifth line is not a country at all. An animal stands on
+every workable forest and grassland hex, always, and moving on the pack's own
+bucket; hunting one is a mine with the creature in the seam's place, and its
+grade is the ladder a plains hex used to carry. Killing it clears it for
+everybody, the way a worked seam closes for everybody.
+
+*(Plains was a biome for a long time, and pelt came out of the ground on it.
+That was the odd one of the five: four lines took a material out of a hex and
+one took it off an animal that was not modelled. Removing the country and
+keeping the line is what put the animal back — and it is why the hunting
+ladder, the tanner's grades and the bow's rungs all live with the creature now
+rather than with a kind of dirt.)*
 
 *(It was its own verb for a long time: temporary herd markers on open plains,
 their own four-hour clock, their own drop table, their own dock button, taking
@@ -381,8 +395,8 @@ system, a preview, a job kind and a button to say so.)*
 
 **What survives is everything the LINE was.** Hunting is still one of §7.2's
 five skills, still has its own slot and its own five-rung ladder of bows (§8.0),
-still levels a job with a thirty-node tree, and pelt is still what the plains
-give up and what leather is tanned from. Nothing about the ladder moved; the
+still levels a job with a thirty-node tree, and pelt is still what a hunt
+gives up and what leather is tanned from. Nothing about the ladder moved; the
 second target standing on it went away.
 
 **The critter moved with it.** §4's five critters — the alchemist's other half —
@@ -393,8 +407,8 @@ never picked up by hand, which is the difference between the two halves of that
 shelf.
 
 **Two things are simply gone**, and both were the herd's rather than the line's:
-the animal parts' second faucet (horn and sinew are plains *components*, so
-mining a plains hex already pays them), and the fourth verb on the dock. §9.4's
+the animal parts' second faucet (horn and sinew come off the hunt itself), and
+the fourth verb on the dock. §9.4's
 difficulty ladder loses a rung and reads `mine → road pack → dungeon floors`,
 which is the honest version: what the pack teaches is a fight, and a herd never
 taught one.
@@ -921,7 +935,7 @@ That is exactly why it is a floor rather than a punishment. What it costs you is
 **Hunting is this arithmetic too, and it is nothing else** (§5.5). It used to be
 a flat 25 minutes sitting deliberately *outside* this formula, on its own verb
 and its own marker; putting it through the same equation is what eventually
-removed the verb, because a bow working plains at the bow's rate is a mine.
+removed the verb, because a bow working an animal at the bow's rate is a mine.
 
 **The floor is a guard rather than a lever, and it sits at 1 minute.** It was
 fifteen and it *bound*, which made the top half of the ladder wasted ground —
@@ -961,7 +975,7 @@ assuming a rule here covers all of them.
 |---|---|---|---|
 | Woodcutting | gathering | forest | its §7.2 skill level |
 | Mining | gathering | mountain | its §7.2 skill level |
-| Hunting | gathering | plains, tundra | its §7.2 skill level |
+| Hunting | gathering | the hunt (§5.5) | its §7.2 skill level |
 | Quarrying | gathering | badlands | its §7.2 skill level |
 | Harvesting | gathering | grassland | its §7.2 skill level |
 | Sawyer | processing | wood line (§6) | finishing a run of planks |
@@ -1768,7 +1782,7 @@ Nine slots. Five are **gathering tools, one per skill line**; the rest are worn.
 |---|---|---|---|
 | Axe | Woodcutting | Forest | Wood / Ironwood |
 | Pickaxe | Mining | Mountain | Iron ore / Mythril |
-| Bow | Hunting | Plains, Tundra | Pelt / Beastfang Hide |
+| Bow | Hunting | *the hunt* — forest and grassland | Pelt / Beastfang Hide |
 | Hammer | Quarrying | Badlands | Stone / Obsidian |
 | Sickle | Harvesting | Grassland | Fiber / Silkweave |
 
@@ -2385,12 +2399,16 @@ kit up, spend a charge, and go. **The road** (§9.5) is the other one, and it
 comes to you — packs stand on hexes and stop travelers. Dungeons are the ladder
 the map points inward at; the road is what teaches you to climb it.
 
-### 9.1 Five dungeons, one per biome, sited in the barren capital ring
+### 9.1 Five dungeons, sited in the barren capital ring
+
+Four are a country's own. **Beastwarren belongs to none** — it is where the
+things you hunt den (§5.5), which is the whole of its name, and it is the one
+dungeon that survived the plains biome going.
 | Dungeon | Biome | Signature drop |
 |---|---|---|
 | Rootvault | Forest | Verdant Shard |
 | Deepshaft | Mountain | Ferrous Shard |
-| Beastwarren | Plains | Sanguine Shard |
+| Beastwarren | *none — the beast dungeon* | Sanguine Shard |
 | Ashpit | Badlands | Cinder Shard |
 | Windhollow | Grassland | Zephyr Shard |
 
@@ -3947,7 +3965,7 @@ ink        #141b18   inkPanel  #1d2622   line    #3a463f
 vellum     #ece3cd   vellumDim #c9bd9e
 copper     #c1793f   ember     #b8453f   gold    #d8b34a   violet #7d5fa8
 sap        #8fbf7f
-forest     #5f8058   mountain  #6d8399   plains  #b08a5a
+forest     #5f8058   mountain  #6d8399
 badlands   #96604c   grassland #a8a05c
 ```
 Depleted tiles use a darker/desaturated variant of their **own biome color**, never gray —

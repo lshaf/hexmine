@@ -9,6 +9,7 @@ import { COMPONENTS } from './components'
 import { TOP_TIER } from './toptier'
 import { CRITTERS } from './critters'
 import { SPOILS } from './spoils'
+import { HUNT_RAW, HUNT_REFINED } from './hunts'
 import { BATTLE_GEAR } from './battlegear'
 import {
   BIOME_VARIANTS,
@@ -61,6 +62,10 @@ export const MATERIALS: Record<MaterialKey, Material> = {
       ...JUNK,
       ...VARIANT_RAW,
       ...VARIANT_REFINED,
+      // §5.5 -- the hunting line's own ladder. Off a creature rather than off
+      // a country, so it lives with the animal that carries it.
+      ...HUNT_RAW,
+      ...HUNT_REFINED,
     ].map((m) => [m.key, m]),
   ) as Record<
     | ReagentKey
@@ -70,7 +75,11 @@ export const MATERIALS: Record<MaterialKey, Material> = {
     | TrophyKey
     | JunkKey
     | GradeRawKey
-    | GradeRefinedKey,
+    | GradeRefinedKey
+    // §5.5 -- the hunting line: its base rung and its Tier 3 come off an
+    // animal, so they arrive with HUNT_RAW rather than being typed here.
+    | 'pelt'
+    | 'beastfang_hide',
     Material
   >,
 
@@ -86,7 +95,7 @@ export const MATERIALS: Record<MaterialKey, Material> = {
     npcPrice: 1, description: 'Loose flakes off the seam face. Barely worth carrying down.',
   },
   torn_hide: {
-    key: 'torn_hide', name: 'Torn Hide', tier: 0, biome: 'plains', palette: 'pelt',
+    key: 'torn_hide', name: 'Torn Hide', tier: 0, source: 'hunt', palette: 'pelt',
     npcPrice: 1, description: 'Scavenged, not hunted. Half of it is unusable.',
   },
   gravel: {
@@ -106,10 +115,6 @@ export const MATERIALS: Record<MaterialKey, Material> = {
   iron_ore: {
     key: 'iron_ore', name: 'Iron Ore', tier: 1, biome: 'mountain', palette: 'iron',
     npcPrice: 3, description: 'Raw ore hacked from mountain seams.',
-  },
-  pelt: {
-    key: 'pelt', name: 'Pelt', tier: 1, biome: 'plains', palette: 'pelt',
-    npcPrice: 3, description: 'Rough hide taken from plains herds.',
   },
   stone: {
     key: 'stone', name: 'Stone', tier: 1, biome: 'badlands', palette: 'stone',
@@ -156,11 +161,6 @@ export const MATERIALS: Record<MaterialKey, Material> = {
     key: 'mythril_ore', name: 'Mythril Ore', tier: 3, biome: 'mountain', palette: 'iron',
     npcPrice: 0, walletCap: ECONOMY.rareWalletCap,
     description: 'A pale seam that hums under the pick.',
-  },
-  beastfang_hide: {
-    key: 'beastfang_hide', name: 'Beastfang Hide', tier: 3, biome: 'plains', palette: 'pelt',
-    npcPrice: 0, walletCap: ECONOMY.rareWalletCap,
-    description: 'Taken off something that fought back.',
   },
   obsidian_shard: {
     key: 'obsidian_shard', name: 'Obsidian Shard', tier: 3, biome: 'badlands', palette: 'stone',
@@ -232,7 +232,7 @@ export const SKILL_LIST: Skill[] = [
   {
     key: 'hunting', name: 'Hunting', material: 'pelt', rareMaterial: 'beastfang_hide',
     scrapMaterial: 'torn_hide',
-    description: 'Faster mining and better yield on plains and tundra.',
+    description: 'Faster hunting and a better haul off what you take.',
   },
   {
     key: 'quarrying', name: 'Quarrying', material: 'stone', rareMaterial: 'obsidian_shard',
@@ -254,7 +254,6 @@ export const SKILL_BY_KEY: Record<SkillKey, Skill> = Object.fromEntries(
 export const BIOME_MATERIAL: Record<Biome, RawKey> = {
   forest: 'wood',
   mountain: 'iron_ore',
-  plains: 'pelt',
   badlands: 'stone',
   grassland: 'fiber',
 }
@@ -267,7 +266,6 @@ export const BIOME_MATERIAL: Record<Biome, RawKey> = {
 export const BIOME_SCRAP: Record<Biome, ScrapKey> = {
   forest: 'branch',
   mountain: 'ore_chips',
-  plains: 'torn_hide',
   badlands: 'gravel',
   grassland: 'chaff',
 }
@@ -279,7 +277,6 @@ export const isScrap = (key: MaterialKey): boolean =>
 export const BIOME_RARE: Record<Biome, RareKey> = {
   forest: 'ironwood',
   mountain: 'mythril_ore',
-  plains: 'beastfang_hide',
   badlands: 'obsidian_shard',
   grassland: 'silkweave_fiber',
 }
@@ -684,7 +681,7 @@ export const ITEMS: ItemDef[] = [
     key: 'recurve_bow', name: 'Recurve Bow', slot: 'bow', rarity: 'uncommon', tradeable: false,
     attack: 6, palette: 'pelt', maxDurability: 70, station: 'city',
     inputs: { pelt: 4, leather: 3, planks: 2, horn: 2 },
-    description: 'Backed and glued. Drops a plains buck without the chase.',
+    description: 'Backed and glued. Drops a buck without the chase.',
   },
   {
     key: 'iron_sledge', name: 'Iron Sledge', slot: 'hammer', rarity: 'uncommon', tradeable: false,
@@ -939,12 +936,13 @@ export const craftableItems = (): ItemDef[] => ITEMS.filter((i) => i.inputs !== 
 export const DUNGEONS = [
   { key: 'rootvault', name: 'Rootvault', biome: 'forest', drop: 'shard_verdant' },
   { key: 'deepshaft', name: 'Deepshaft', biome: 'mountain', drop: 'shard_ferrous' },
-  { key: 'beastwarren', name: 'Beastwarren', biome: 'plains', drop: 'shard_sanguine' },
+  // §9.1 -- the beast dungeon, and the one that belongs to no country.
+  { key: 'beastwarren', name: 'Beastwarren', biome: null, drop: 'shard_sanguine' },
   { key: 'ashpit', name: 'Ashpit', biome: 'badlands', drop: 'shard_cinder' },
   { key: 'windhollow', name: 'Windhollow', biome: 'grassland', drop: 'shard_zephyr' },
 ] as const satisfies ReadonlyArray<{
   key: string
   name: string
-  biome: Biome
+  biome: Biome | null
   drop: MaterialKey
 }>

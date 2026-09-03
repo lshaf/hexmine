@@ -170,7 +170,7 @@ final class WorldGen
         $cx = (int) floor($col / Balance::BIOME_CELL);
         $cy = (int) floor($row / Balance::BIOME_CELL);
 
-        $best = 'plains';
+        $best = Catalog::BIOMES[0];
         $bestDistance = INF;
 
         for ($i = -2; $i <= 2; $i++) {

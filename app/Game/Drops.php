@@ -693,7 +693,10 @@ final class Drops
     {
         $out = [];
         foreach (Alchemy::REAGENTS as $key => $def) {
-            if ($def['biome'] === $biome) {
+            // §5.5 -- a hunt-sourced material carries a `source` and no biome,
+            // so this asks rather than indexes: it belongs to no ground and
+            // must never turn up in a hex's table.
+            if (($def['biome'] ?? null) === $biome) {
                 $out[] = $key;
             }
         }
@@ -719,7 +722,9 @@ final class Drops
     {
         $out = [];
         foreach (Components::CRAFT as $key => $def) {
-            if ($def['biome'] === $biome) {
+            // §5.5 -- hunt-sourced components carry no biome and belong to no
+            // hex's table.
+            if (($def['biome'] ?? null) === $biome) {
                 $out[] = $key;
             }
         }
@@ -730,7 +735,7 @@ final class Drops
     private static function junkOf(string $biome): string
     {
         foreach (Alchemy::JUNK as $key => $def) {
-            if ($def['biome'] === $biome) {
+            if (($def['biome'] ?? null) === $biome) {
                 return $key;
             }
         }

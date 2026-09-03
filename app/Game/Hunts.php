@@ -54,6 +54,43 @@ final class Hunts
         'beastfang_sire' => ['name' => 'Beastfang Sire', 'biome' => 'grassland', 'grade' => 'contested', 'material' => 'beastfang_hide', 'description' => 'The hide is named for it. So is most of what it has eaten.'],
     ];
 
+    /**
+     * §4 Tier 1 -- the hunting line's own raw ladder.
+     *
+     * `source` rather than `biome`, and that is the whole of what
+     * makes hunting different from the other four lines: these come
+     * off a creature rather than off a country, so nothing here is
+     * locked to ground and nothing reads a biome to find it.
+     */
+    public const RAW = [
+        'pelt' => ['name' => 'Pelt', 'tier' => 1, 'source' => 'hunt', 'grade' => 'common', 'palette' => 'pelt', 'npcPrice' => 3, 'description' => 'Rough hide, taken off something that was using it.'],
+        'thick_pelt' => ['name' => 'Thick Pelt', 'tier' => 1, 'source' => 'hunt', 'grade' => 'uncommon', 'palette' => 'pelt', 'npcPrice' => 5, 'description' => 'Winter coat off a full-grown animal. Heavy, and it keeps its shape.'],
+        'dire_pelt' => ['name' => 'Dire Pelt', 'tier' => 1, 'source' => 'hunt', 'grade' => 'rare', 'palette' => 'pelt', 'npcPrice' => 9, 'description' => 'Off something that had no natural enemies until you turned up.'],
+        'beastfang_hide' => ['name' => 'Beastfang Hide', 'tier' => 1, 'source' => 'hunt', 'grade' => 'contested', 'palette' => 'pelt', 'npcPrice' => 0, 'description' => 'Taken off something that fought back.'],
+    ];
+
+    /** §4 Tier 2 -- what each rung tans into. Not locked to anything. */
+    public const REFINED = [
+        'leather' => ['name' => 'Leather', 'tier' => 2, 'palette' => 'pelt', 'npcPrice' => 8, 'description' => 'Scraped, soaked and worked soft. The first thing a tannery is for.'],
+        'boiled_leather' => ['name' => 'Boiled Leather', 'tier' => 2, 'palette' => 'pelt', 'npcPrice' => 16, 'description' => 'Boiled hard and molded wet. Sets like a shell and weighs nothing.'],
+        'lacquered_hide' => ['name' => 'Lacquered Hide', 'tier' => 2, 'palette' => 'pelt', 'npcPrice' => 30, 'description' => 'Layered, lacquered, and left in the dark to cure. Turns a blade.'],
+    ];
+
+    /** §6 -- the Tanner's line, one recipe per rung. */
+    public const PROCESSING = [
+        'tan_leather' => ['name' => 'Tan Leather', 'input' => 'pelt', 'inputQty' => 3, 'output' => 'leather', 'outputQty' => 1, 'baseSeconds' => 13 * 60, 'skill' => 'hunting'],
+        'tan_boiled_leather' => ['name' => 'Tan Boiled Leather', 'input' => 'thick_pelt', 'inputQty' => 3, 'output' => 'boiled_leather', 'outputQty' => 1, 'baseSeconds' => 17 * 60, 'skill' => 'hunting'],
+        'tan_lacquered_hide' => ['name' => 'Tan Lacquered Hide', 'input' => 'dire_pelt', 'inputQty' => 3, 'output' => 'lacquered_hide', 'outputQty' => 1, 'baseSeconds' => 24 * 60, 'skill' => 'hunting'],
+    ];
+
+    /** §7.2 -- every rung of this ladder belongs to the hunting line. */
+    public const SKILL_FOR_MATERIAL = [
+        'pelt' => 'hunting',
+        'thick_pelt' => 'hunting',
+        'dire_pelt' => 'hunting',
+        'beastfang_hide' => 'hunting',
+    ];
+
     /** Biome -> grade -> which animal that is. */
     public const BY_BIOME_GRADE = [
         'forest' => [

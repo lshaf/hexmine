@@ -15,7 +15,14 @@ namespace App\Game;
  */
 final class Catalog
 {
-    public const BIOMES = ['forest', 'mountain', 'plains', 'badlands', 'grassland'];
+    /**
+     * §5.3 -- the four kinds of ground.
+     *
+     * Four rather than five because hunting is not worked off ground (§5.5):
+     * its line is an animal standing on forest and grassland, so it has a
+     * roster and a ladder of its own (Hunts) instead of a country.
+     */
+    public const BIOMES = ['forest', 'mountain', 'badlands', 'grassland'];
 
     /**
      * The 20 economy materials of §4, plus the 5 scrap of §4.0.
@@ -35,14 +42,13 @@ final class Catalog
             // only to make the first tool obviously worth buying.
             'branch' => ['name' => 'Branch', 'tier' => 0, 'biome' => 'forest', 'palette' => 'wood', 'npcPrice' => 1, 'description' => 'Snapped off by hand. The trader gives you a copper and looks away.'],
             'ore_chips' => ['name' => 'Ore Chips', 'tier' => 0, 'biome' => 'mountain', 'palette' => 'iron', 'npcPrice' => 1, 'description' => 'Loose flakes off the seam face. Barely worth carrying down.'],
-            'torn_hide' => ['name' => 'Torn Hide', 'tier' => 0, 'biome' => 'plains', 'palette' => 'pelt', 'npcPrice' => 1, 'description' => 'Scavenged, not hunted. Half of it is unusable.'],
+            'torn_hide' => ['name' => 'Torn Hide', 'tier' => 0, 'source' => 'hunt', 'palette' => 'pelt', 'npcPrice' => 1, 'description' => 'Scavenged, not hunted. Half of it is unusable.'],
             'gravel' => ['name' => 'Gravel', 'tier' => 0, 'biome' => 'badlands', 'palette' => 'stone', 'npcPrice' => 1, 'description' => 'Kicked loose from the scree. Nobody dresses this into anything.'],
             'chaff' => ['name' => 'Chaff', 'tier' => 0, 'biome' => 'grassland', 'palette' => 'fiber', 'npcPrice' => 1, 'description' => 'Pulled up by the root and mostly broken. The trader takes it by the sack.'],
 
             // Tier 1 -- Raw, biome-locked, decays over cap
             'wood' => ['name' => 'Wood', 'tier' => 1, 'biome' => 'forest', 'palette' => 'wood', 'npcPrice' => 2, 'description' => 'Green timber from the forest belt.'],
             'iron_ore' => ['name' => 'Iron Ore', 'tier' => 1, 'biome' => 'mountain', 'palette' => 'iron', 'npcPrice' => 3, 'description' => 'Raw ore hacked from mountain seams.'],
-            'pelt' => ['name' => 'Pelt', 'tier' => 1, 'biome' => 'plains', 'palette' => 'pelt', 'npcPrice' => 3, 'description' => 'Rough hide taken from plains herds.'],
             'stone' => ['name' => 'Stone', 'tier' => 1, 'biome' => 'badlands', 'palette' => 'stone', 'npcPrice' => 2, 'description' => 'Blasted rubble from the badlands.'],
             'fiber' => ['name' => 'Fiber', 'tier' => 1, 'biome' => 'grassland', 'palette' => 'fiber', 'npcPrice' => 2, 'description' => 'Tough grassland stalks, retted for spinning.'],
 
@@ -57,7 +63,6 @@ final class Catalog
             // Tier 3 -- Rare, contested ring only, capped per wallet
             'ironwood' => ['name' => 'Ironwood', 'tier' => 3, 'biome' => 'forest', 'palette' => 'wood', 'npcPrice' => 0, 'walletCap' => Balance::RARE_WALLET_CAP, 'description' => 'Heartwood so dense it turns an axe. Contested ring only.'],
             'mythril_ore' => ['name' => 'Mythril Ore', 'tier' => 3, 'biome' => 'mountain', 'palette' => 'iron', 'npcPrice' => 0, 'walletCap' => Balance::RARE_WALLET_CAP, 'description' => 'A pale seam that hums under the pick.'],
-            'beastfang_hide' => ['name' => 'Beastfang Hide', 'tier' => 3, 'biome' => 'plains', 'palette' => 'pelt', 'npcPrice' => 0, 'walletCap' => Balance::RARE_WALLET_CAP, 'description' => 'Taken off something that fought back.'],
             'obsidian_shard' => ['name' => 'Obsidian Shard', 'tier' => 3, 'biome' => 'badlands', 'palette' => 'stone', 'npcPrice' => 0, 'walletCap' => Balance::RARE_WALLET_CAP, 'description' => 'Volcanic glass, edged sharper than steel.'],
             'silkweave_fiber' => ['name' => 'Silkweave Fiber', 'tier' => 3, 'biome' => 'grassland', 'palette' => 'fiber', 'npcPrice' => 0, 'walletCap' => Balance::RARE_WALLET_CAP, 'description' => 'Spun by something in the tall grass. Nobody asks what.'],
 
@@ -85,6 +90,11 @@ final class Catalog
             // material. Generated, not typed: see scripts/gen_variants.py.
             + Variants::RAW
             + Variants::REFINED
+            // §5.5 -- the hunting line's own ladder. Same four rungs as a
+            // biome's, off a creature rather than off a country, so it lives
+            // with the animal that carries it. See scripts/gen_hunts.py.
+            + Hunts::RAW
+            + Hunts::REFINED
             // §4 -- the alchemist's second stock: what LIVES on a kind of
             // ground, as against what grows on it. Hunted, never gathered.
             // Generated, not typed: see scripts/gen_critters.py.
@@ -117,7 +127,6 @@ final class Catalog
     public const BIOME_MATERIAL = [
         'forest' => 'wood',
         'mountain' => 'iron_ore',
-        'plains' => 'pelt',
         'badlands' => 'stone',
         'grassland' => 'fiber',
     ];
@@ -132,7 +141,7 @@ final class Catalog
     public const SCOPE_PHRASE = [
         'woodcutting' => 'a forest hex',
         'mining' => 'a mountain hex',
-        'hunting' => 'a herd',
+        'hunting' => 'a hunt',
         'quarrying' => 'a badlands hex',
         'harvesting' => 'a grassland hex',
         'travel' => 'the road',
@@ -142,11 +151,6 @@ final class Catalog
     ];
 
     /**
-     * Biome -> scrap, §4.0. What the hex gives up to bare hands: worked without
-     * the line's tool, a hex yields this instead of its real material. Same haul
-     * size, a fraction of the worth, and no recipe will take it.
-     */
-    /**
      * §4.0/§5.5 -- what a hunt pays somebody with no bow.
      *
      * The hunting line's scrap. It sat in BIOME_SCRAP while the line was worked
@@ -155,10 +159,14 @@ final class Catalog
      */
     public const HUNT_SCRAP = 'torn_hide';
 
+    /**
+     * Biome -> scrap, §4.0. What the hex gives up to bare hands: worked without
+     * the line's tool, a hex yields this instead of its real material. Same haul
+     * size, a fraction of the worth, and no recipe will take it.
+     */
     public const BIOME_SCRAP = [
         'forest' => 'branch',
         'mountain' => 'ore_chips',
-        'plains' => 'torn_hide',
         'badlands' => 'gravel',
         'grassland' => 'chaff',
     ];
@@ -167,7 +175,6 @@ final class Catalog
     public const BIOME_RARE = [
         'forest' => 'ironwood',
         'mountain' => 'mythril_ore',
-        'plains' => 'beastfang_hide',
         'badlands' => 'obsidian_shard',
         'grassland' => 'silkweave_fiber',
     ];
@@ -180,7 +187,7 @@ final class Catalog
         return [
             'woodcutting' => ['name' => 'Woodcutting', 'material' => 'wood', 'rare' => 'ironwood', 'scrap' => 'branch', 'description' => 'Faster mining and better yield in forest hexes.'],
             'mining' => ['name' => 'Mining', 'material' => 'iron_ore', 'rare' => 'mythril_ore', 'scrap' => 'ore_chips', 'description' => 'Faster mining and better yield in mountain hexes.'],
-            'hunting' => ['name' => 'Hunting', 'material' => 'pelt', 'rare' => 'beastfang_hide', 'scrap' => 'torn_hide', 'description' => 'Faster mining and better yield on plains and tundra.'],
+            'hunting' => ['name' => 'Hunting', 'material' => 'pelt', 'rare' => 'beastfang_hide', 'scrap' => 'torn_hide', 'description' => 'Faster hunting and a better haul off what you take.'],
             'quarrying' => ['name' => 'Quarrying', 'material' => 'stone', 'rare' => 'obsidian_shard', 'scrap' => 'gravel', 'description' => 'Faster mining and better yield in the badlands.'],
             'harvesting' => ['name' => 'Harvesting', 'material' => 'fiber', 'rare' => 'silkweave_fiber', 'scrap' => 'chaff', 'description' => 'Faster mining and better yield in grassland hexes.'],
         ];
@@ -190,6 +197,10 @@ final class Catalog
     {
         // §5.3 -- a grade belongs to the same line its base raw does. Without
         // this the fallback below would credit a hematite haul to woodcutting.
+        if (isset(Hunts::SKILL_FOR_MATERIAL[$materialKey])) {
+            return Hunts::SKILL_FOR_MATERIAL[$materialKey];
+        }
+
         if (isset(Variants::SKILL_FOR_MATERIAL[$materialKey])) {
             return Variants::SKILL_FOR_MATERIAL[$materialKey];
         }
@@ -395,7 +406,8 @@ final class Catalog
             // run. A better grade is a better material, never a better ratio:
             // making the good ore also process cheaper would turn one ladder
             // into two.
-            + Variants::PROCESSING;
+            + Variants::PROCESSING
+            + Hunts::PROCESSING;
     }
 
     public static function recipe(string $key): ?array
@@ -460,7 +472,7 @@ final class Catalog
 
             'iron_hatchet' => ['name' => 'Iron Hatchet', 'slot' => 'axe', 'rarity' => 'uncommon', 'tradeable' => false, 'attack' => 6, 'palette' => 'iron', 'maxDurability' => 70, 'station' => 'city', 'inputs' => ['iron_ore' => 4, 'ingots' => 3, 'planks' => 2, 'heartknot' => 2], 'description' => 'Plain iron on a plain haft. Reliable, unremarkable.'],
             'miners_pick' => ['name' => "Miner's Pick", 'slot' => 'pickaxe', 'rarity' => 'uncommon', 'tradeable' => false, 'attack' => 6, 'palette' => 'iron', 'maxDurability' => 70, 'station' => 'city', 'inputs' => ['iron_ore' => 4, 'ingots' => 3, 'planks' => 2, 'flux_salt' => 2], 'description' => 'Guild pattern, and every seam in the range has met one.'],
-            'recurve_bow' => ['name' => 'Recurve Bow', 'slot' => 'bow', 'rarity' => 'uncommon', 'tradeable' => false, 'attack' => 6, 'palette' => 'pelt', 'maxDurability' => 70, 'station' => 'city', 'inputs' => ['pelt' => 4, 'leather' => 3, 'planks' => 2, 'horn' => 2], 'description' => 'Backed and glued. Drops a plains buck without the chase.'],
+            'recurve_bow' => ['name' => 'Recurve Bow', 'slot' => 'bow', 'rarity' => 'uncommon', 'tradeable' => false, 'attack' => 6, 'palette' => 'pelt', 'maxDurability' => 70, 'station' => 'city', 'inputs' => ['pelt' => 4, 'leather' => 3, 'planks' => 2, 'horn' => 2], 'description' => 'Backed and glued. Drops a buck without the chase.'],
             'iron_sledge' => ['name' => 'Iron Sledge', 'slot' => 'hammer', 'rarity' => 'uncommon', 'tradeable' => false, 'attack' => 6, 'palette' => 'iron', 'maxDurability' => 70, 'station' => 'city', 'inputs' => ['iron_ore' => 4, 'ingots' => 3, 'cut_stone' => 2, 'whetgrit' => 2], 'description' => 'Heavy enough that the stone does most of the arguing.'],
             'steel_sickle' => ['name' => 'Steel Sickle', 'slot' => 'sickle', 'rarity' => 'uncommon', 'tradeable' => false, 'attack' => 6, 'palette' => 'iron', 'maxDurability' => 70, 'station' => 'city', 'inputs' => ['iron_ore' => 4, 'ingots' => 3, 'cloth' => 2, 'quench_reed' => 2], 'description' => 'Holds an edge through a full field, then wants a stone.'],
 
@@ -558,7 +570,9 @@ final class Catalog
     public const DUNGEONS = [
         ['key' => 'rootvault', 'name' => 'Rootvault', 'biome' => 'forest', 'drop' => 'shard_verdant'],
         ['key' => 'deepshaft', 'name' => 'Deepshaft', 'biome' => 'mountain', 'drop' => 'shard_ferrous'],
-        ['key' => 'beastwarren', 'name' => 'Beastwarren', 'biome' => 'plains', 'drop' => 'shard_sanguine'],
+        // §9.1 -- the beast dungeon, and the one that belongs to no country:
+        // it is where the things you hunt den, which is the whole of its name.
+        ['key' => 'beastwarren', 'name' => 'Beastwarren', 'biome' => null, 'drop' => 'shard_sanguine'],
         ['key' => 'ashpit', 'name' => 'Ashpit', 'biome' => 'badlands', 'drop' => 'shard_cinder'],
         ['key' => 'windhollow', 'name' => 'Windhollow', 'biome' => 'grassland', 'drop' => 'shard_zephyr'],
     ];

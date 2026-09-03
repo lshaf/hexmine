@@ -25,7 +25,6 @@ import type { Biome, Tile } from './types'
 export const DEAD_LABEL: Record<Biome, string> = {
   forest: 'Deadwood',
   mountain: 'Scree',
-  plains: 'Dust Flat',
   badlands: 'Hardpan',
   grassland: 'Stubble',
 }

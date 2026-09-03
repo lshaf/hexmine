@@ -211,7 +211,7 @@ export function biomeAt(col: number, row: number): Biome {
   const cx = Math.floor(col / c.biomeCell)
   const cy = Math.floor(row / c.biomeCell)
 
-  let best: Biome = 'plains'
+  let best: Biome = 'forest'
   let bestDistance = Infinity
 
   for (let i = -2; i <= 2; i++) {

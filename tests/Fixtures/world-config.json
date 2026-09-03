@@ -44,21 +44,18 @@
     "biomes": [
         "forest",
         "mountain",
-        "plains",
         "badlands",
         "grassland"
     ],
     "biomeMaterial": {
         "forest": "wood",
         "mountain": "iron_ore",
-        "plains": "pelt",
         "badlands": "stone",
         "grassland": "fiber"
     },
     "biomeRare": {
         "forest": "ironwood",
         "mountain": "mythril_ore",
-        "plains": "beastfang_hide",
         "badlands": "obsidian_shard",
         "grassland": "silkweave_fiber"
     },

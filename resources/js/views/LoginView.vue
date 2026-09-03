@@ -55,7 +55,6 @@ const DISC = [
   { col: 1, row: -1, fill: shade(BIOME_COLOR.mountain, UNSCOUTED), claim: false },
   { col: 1, row: 0, fill: shade(BIOME_COLOR.badlands, UNSCOUTED), claim: false },
   { col: 0, row: 1, fill: shade(BIOME_COLOR.grassland, UNSCOUTED), claim: false },
-  { col: -1, row: 0, fill: shade(BIOME_COLOR.plains, UNSCOUTED), claim: false },
   { col: -1, row: -1, fill: shade(BIOME_COLOR.forest, -0.68), claim: false },
 ]
 
