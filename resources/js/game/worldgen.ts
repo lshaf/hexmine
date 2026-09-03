@@ -68,6 +68,8 @@ export interface WorldConfig {
   /** §9.5.1 -- how long a pack stands, and the odds by ring. */
   packLifetimeMs: number
   packChance: Record<Ring, number>
+  /** §5.5 -- the share of forest and grassland with an animal standing on it. */
+  huntChance: number
   biomes: Biome[]
   biomeMaterial: Record<Biome, MaterialKey>
   biomeRare: Record<Biome, MaterialKey>
@@ -761,10 +763,10 @@ function packAt(col: number, row: number, biome: string, ring: Ring, now: number
 /**
  * The mirror of WorldGen::huntAt().
  *
- * §5.5 -- always there on a hex that carries one, which is the whole difference
- * from a pack: a pack is a chance per ring because it is a hazard, and this is
- * the hunting line's ground. Same bucket and same per-hex offset as a pack, so
- * the two share one rhythm rather than teaching a player two.
+ * §5.5 -- a share of forest and grassland, not all of it: an animal on every
+ * workable hex made the hunt a property of the ground. Same bucket and same
+ * per-hex offset as a pack, so the two share one rhythm rather than teaching a
+ * player two.
  */
 function huntAt(col: number, row: number, biome: string, ring: Ring, now: number): Hunt | undefined {
   if (!(HUNT_BIOMES as readonly string[]).includes(biome)) return undefined
@@ -773,6 +775,11 @@ function huntAt(col: number, row: number, biome: string, ring: Ring, now: number
   const lifetime = c.packLifetimeMs
   const offset = randInt(hash2(col, row, c.seed ^ 0x11a7), 0, Math.max(0, lifetime - 1))
   const bucket = Math.floor((now + offset) / lifetime)
+
+  // §5.5 -- is there one here at all? A share of the country rather than all of
+  // it: an animal on every workable hex made the hunt a property of the ground.
+  const there = hash2(col * 53 + bucket, row * 31 + bucket, c.seed ^ 0x11a9)
+  if (rand01(there) > c.huntChance) return undefined
 
   // §5.2 -- the center rolls on the inner ring's column, exactly as a variant
   // does: it IS the contested ring.

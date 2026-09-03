@@ -39,44 +39,59 @@ final class HuntTest extends TestCase
     }
 
     /**
-     * §5.5 -- an animal stands on every workable hex of its two countries, and
-     * on no hex of any other. That is the whole difference from a pack, which
-     * is a chance per ring because it is a hazard rather than a line's ground.
+     * §5.5 -- animals stand on forest and grassland, on some of it, and on no
+     * other country at all.
+     *
+     * A SHARE rather than all of it. One on every workable hex made the hunt a
+     * property of the ground -- walk onto forest, hunt -- which is the plains
+     * biome again under another name; a chance is what makes finding one a
+     * thing you do rather than a thing that is true.
      */
-    public function test_an_animal_stands_on_forest_and_grassland_and_nowhere_else(): void
+    public function test_animals_stand_on_some_of_two_countries_and_nowhere_else(): void
     {
-        $seen = 0;
+        $workable = 0;
+        $with = 0;
 
-        for ($i = 0; $i < 900; $i++) {
-            $col = ($i * 7919) % 400 - 200;
-            $row = ($i * 104729) % 400 - 200;
-            $tile = WorldGen::generateTile($col, $row, 0);
-            $hunt = $tile['hunt'] ?? null;
+        // A contiguous block rather than a strided sample: a stride can alias
+        // against the hash and report a rate the map does not actually have.
+        for ($col = -40; $col < 40; $col++) {
+            for ($row = -40; $row < 40; $row++) {
+                $tile = WorldGen::generateTile($col, $row, 0);
+                $hunt = $tile['hunt'] ?? null;
 
-            if ($hunt === null) {
-                // The only hexes of those two countries without one are the
-                // ones nothing stands on at all.
-                if (in_array($tile['biome'], Hunts::BIOMES, true)) {
-                    $this->assertTrue(
-                        $tile['dead'] || $tile['water'] !== null
-                            || $tile['settlement'] !== null || $tile['dungeon'] !== null,
-                        "workable {$tile['biome']} at {$col},{$row} carries no animal",
-                    );
+                if (! in_array($tile['biome'], Hunts::BIOMES, true)) {
+                    $this->assertNull($hunt, "an animal stood on {$tile['biome']}");
+
+                    continue;
                 }
 
-                continue;
-            }
+                if ($tile['dead'] || $tile['water'] !== null
+                    || $tile['settlement'] !== null || $tile['dungeon'] !== null) {
+                    $this->assertNull($hunt, 'an animal stood on ground nothing stands on');
 
-            $seen++;
-            $this->assertContains($tile['biome'], Hunts::BIOMES, 'an animal stood on the wrong country');
-            $this->assertSame(
-                $tile['biome'],
-                Hunts::ROSTER[$hunt['key']]['biome'],
-                'the animal belongs to another country',
-            );
+                    continue;
+                }
+
+                $workable++;
+
+                if ($hunt !== null) {
+                    $with++;
+                    $this->assertSame(
+                        $tile['biome'],
+                        Hunts::ROSTER[$hunt['key']]['biome'],
+                        'the animal belongs to another country',
+                    );
+                }
+            }
         }
 
-        $this->assertGreaterThan(50, $seen, 'no animals anywhere');
+        $this->assertGreaterThan(100, $workable, 'no huntable country in the sample');
+
+        // Loosely, and deliberately: this pins that it is a SHARE -- neither
+        // every hex nor a rarity -- rather than the exact rate.
+        $share = $with / $workable;
+        $this->assertGreaterThan(0.15, $share, 'there is barely any game');
+        $this->assertLessThan(0.6, $share, 'an animal on nearly every hex is the old rule back');
     }
 
     /**

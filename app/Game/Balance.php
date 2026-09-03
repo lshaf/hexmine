@@ -790,6 +790,26 @@ final class Balance
         'center' => 0.22,
     ];
 
+    /**
+     * §5.5 -- how much of the hunting countries has an animal standing on it.
+     *
+     * A share rather than all of it. Every workable forest and grassland hex
+     * carrying one made the hunt a property of the ground -- walk onto forest,
+     * hunt -- which is the plains biome again under another name. A chance is
+     * what makes finding one a thing you do rather than a thing that is true.
+     *
+     * Higher than a pack's, and it has to be: a pack is a hazard the map is
+     * better for being sparse with, and this is a whole gathering line's
+     * faucet. About a third means a short walk across the right country turns
+     * one up, and the country is still mostly ground you can mine.
+     *
+     * The same for both, and flat across the rings. What a ring changes is the
+     * animal's GRADE (§5.3's own weights), not whether there is one -- the
+     * ladder is the reward for walking inward, and a rim with no game on it
+     * would make the line unplayable exactly where a new prospector starts.
+     */
+    public const HUNT_CHANCE = 0.35;
+
     // ---------------------------------------------------------- processing §6
 
     /** Five open slots per feature, first-come-first-served, §6.1. */

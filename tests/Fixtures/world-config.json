@@ -35,6 +35,7 @@
     "pocketChance": 0.04,
     "pocketYield": 1.5,
     "packLifetimeMs": 720000,
+    "huntChance": 0.35,
     "packChance": {
         "outer": 0.04,
         "mid": 0.1,

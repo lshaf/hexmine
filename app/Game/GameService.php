@@ -1916,6 +1916,8 @@ class GameService
             // Zeroed rather than omitted when the roads are quiet, so the
             // client's mirror of packAt() agrees with the server's instead of
             // drawing packs nobody can meet.
+            // §5.5 -- how much of the hunting countries has game on it.
+            'huntChance' => Balance::HUNT_CHANCE,
             'packChance' => Balance::packsEnabled()
                 ? Balance::PACK_CHANCE
                 : array_map(static fn () => 0.0, Balance::PACK_CHANCE),

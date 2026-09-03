@@ -831,10 +831,11 @@ final class WorldGen
     /**
      * §5.5 -- the animal standing on this hex, if it is a hex that carries one.
      *
-     * **Always there, and that is the difference from a pack.** A pack is a
-     * chance per ring (§9.5.1) because it is a hazard; this is not a hazard, it
-     * is the hunting line's ground — what mining a plains hex used to be — so
-     * every workable forest and grassland hex has one.
+     * **A share of the country, not all of it.** An animal on every workable
+     * forest and grassland hex made the hunt a property of the ground — walk
+     * onto forest, hunt — which is the plains biome again under another name.
+     * A higher share than a pack's, because a pack is a hazard the map is
+     * better for being sparse with and this is a gathering line's whole faucet.
      *
      * It moves on the **pack's own bucket**, offset per hex the same way, so
      * the world does not blink at once and a hunted hex is quiet until the herd
@@ -859,6 +860,14 @@ final class WorldGen
         );
 
         $bucket = intdiv($now + $offset, $lifetime);
+
+        // §5.5 -- is there one here at all? A share of the country rather than
+        // all of it: an animal on every workable hex made the hunt a property
+        // of the ground, which is the plains biome again under another name.
+        $there = Hash::hash2($col * 53 + $bucket, $row * 31 + $bucket, Balance::mapSeed() ^ 0x11A9);
+        if (Hash::rand01($there) > Balance::HUNT_CHANCE) {
+            return null;
+        }
 
         // §5.2 -- the center rolls on the inner ring's column, exactly as a
         // variant does: it IS the contested ring, and a fourth column here

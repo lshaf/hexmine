@@ -373,11 +373,27 @@ you work an **animal** with a bow and it gives up pelt, at the bow's rate, off
 the same table every other line reads. That is the whole of hunting.
 
 **The animal is the ground.** There is no plains biome — there are four
-countries, and the fifth line is not a country at all. An animal stands on
-every workable forest and grassland hex, always, and moving on the pack's own
-bucket; hunting one is a mine with the creature in the seam's place, and its
-grade is the ladder a plains hex used to carry. Killing it clears it for
-everybody, the way a worked seam closes for everybody.
+countries, and the fifth line is not a country at all. Animals stand on **a
+share** of forest and grassland, moving on the pack's own bucket; hunting one is
+a mine with the creature in the seam's place, and its grade is the ladder a
+plains hex used to carry. Killing it clears it for everybody, the way a worked
+seam closes for everybody.
+
+**A share rather than all of it, and that is the load-bearing part.** One on
+every workable hex made the hunt a property of the ground — walk onto forest,
+hunt — which is the plains biome again under another name. A chance is what
+makes finding game something you do rather than something that is true. It is a
+higher share than a pack's (`Balance::HUNT_CHANCE`), because a pack is a hazard
+the map is better for being sparse with and this is a whole gathering line's
+faucet — and it is flat across the rings, because what a ring changes is the
+animal's **grade**, not whether there is one. A rim with no game on it would
+make the line unplayable exactly where a new prospector starts.
+
+**It does not pin.** A pack owns its hex for two hours (§9.5.3); an animal
+doing the same would fence off the country its own line is worked in. It is a
+hook on a hex that otherwise works normally — and a pack standing on the same
+hex *does* stop the hunt, because you are not working while something is
+looking at you.
 
 *(Plains was a biome for a long time, and pelt came out of the ground on it.
 That was the odd one of the five: four lines took a material out of a hex and
