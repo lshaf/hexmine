@@ -205,6 +205,11 @@ export class HttpDriver implements GameApi {
     return post<ActionResult<Job>>('/gathering', { col, row })
   }
 
+  /** §5.5 -- a hunt is a mine on the animal. Its own route, the same job back. */
+  startHunt(col: number, row: number): Promise<ActionResult<Job>> {
+    return post<ActionResult<Job>>('/hunt', { col, row })
+  }
+
   collectJob(jobId: string): Promise<ActionResult<CollectResult | BattleResult>> {
     return post<ActionResult<CollectResult | BattleResult>>(`/jobs/${jobId}/collect`)
   }

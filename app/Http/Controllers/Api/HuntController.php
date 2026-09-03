@@ -4,33 +4,45 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
+use App\Game\Balance;
+use App\Game\Drops;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 /**
  * §5.5 -- the hunt.
  *
- * One verb and no preview, which is the difference from a fight. A pack is a
- * decision — whether to close at all, at what cost — so §9.5.5 gives it a
- * promise to read first. An animal is not: it costs nothing but the walk you
- * already made, and the only question it asks is whether you brought a bow,
- * which a player can answer by looking at their own belt.
+ * There is no UI of its own here, and no endpoint of its own beyond this one:
+ * §7.3 already makes hunting the same arithmetic as a mine, so a hunt IS a
+ * mine — the same job, the same clock, the same haul plate — on the animal
+ * standing on the hex rather than on the seam under it. The dock says Hunt and
+ * everything behind the button is the mining path.
  */
 final class HuntController extends GameController
 {
     public function store(Request $request): JsonResponse
     {
         $character = $this->character($request);
-        $result = $this->game->hunt($character);
 
-        $name = $result['animal']['name'];
+        $validated = $request->validate([
+            'col' => ['required', 'integer', 'min:'.(-Balance::mapRadius()), 'max:'.Balance::mapRadius()],
+            'row' => ['required', 'integer', 'min:'.(-Balance::mapRadius()), 'max:'.Balance::mapRadius()],
+        ]);
+
+        // §5.5 -- a hunt is a mine, so it starts one. The activity is the whole
+        // difference: it decides what is being worked and what comes off it,
+        // and every other thing about the job is a mine's.
+        $job = $this->game->startMining(
+            $character,
+            (int) $validated['col'],
+            (int) $validated['row'],
+            Drops::HUNTING,
+        );
 
         return $this->respond(
             $character,
-            $result,
-            $result['armed']
-                ? "Took the {$name}."
-                : "Took the {$name} bare-handed — the hide is barely worth carrying.",
+            $this->game->jobPayload($job),
+            "Hunt started at {$validated['col']},{$validated['row']}.",
         );
     }
 }

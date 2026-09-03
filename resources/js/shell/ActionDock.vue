@@ -94,6 +94,20 @@ const emptyReason = computed(() => {
  */
 const gather = computed(() => underfoot.value?.gather)
 
+/** §5.5 -- the hunt preview for this hex, and the animal it is about. */
+const hunt = computed(() => underfoot.value?.hunt)
+const animal = computed(() => hunt.value?.animal ?? null)
+
+const huntHint = computed(() => {
+  const h = hunt.value
+  if (!h) return ''
+  if (h.reason) return h.reason
+
+  return h.bare
+    ? `${animal.value?.name} — no bow, so the hide is barely worth carrying`
+    : `${animal.value?.name}`
+})
+
 /**
  * Nothing here is grayed out for want of a tool, and that is the rule.
  *
@@ -314,6 +328,12 @@ function gathered(): void {
   const char = game.character
   if (char) void game.startGathering(char.col, char.row)
 }
+
+/** §5.5 -- the animal on this hex, worked the way the seam under it is. */
+function hunted(): void {
+  const char = game.character
+  if (char) void game.startHunt(char.col, char.row)
+}
 </script>
 
 <template>
@@ -473,6 +493,20 @@ function gathered(): void {
             :disabled="game.busy"
             :hint="gatherHint"
             @activate="gathered"
+          />
+
+          <!-- §5.5 -- the animal. A third verb on the hex rather than one that
+               replaces the seam: a forest hex has wood under it and a deer on
+               it, and they are two different afternoons. -->
+          <HexAction
+            v-if="animal"
+            small
+            icon="hunt"
+            label="Hunt"
+            :primary="Boolean(hunt?.canMine)"
+            :disabled="game.busy"
+            :hint="huntHint"
+            @activate="hunted"
           />
 
           <!-- §9.5.7 -- the hook. Somebody's row is standing on this hex, and

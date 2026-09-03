@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Game\Catalog;
+use App\Game\Drops;
 use App\Game\GameException;
 use App\Game\GameService;
 use App\Game\Hunts;
@@ -112,16 +113,14 @@ final class HuntTest extends TestCase
     {
         [$character, $hunt] = $this->standOnAnimal();
 
-        $bare = $this->game->hunt($character->fresh());
+        $bare = $this->takeIt($character);
         $this->assertArrayHasKey(Catalog::HUNT_SCRAP, $bare['gained'], 'bare hands paid no scrap');
-        $this->assertFalse($bare['armed']);
 
         // And the same animal, with a bow on the belt.
         [$armedCharacter, $armedHunt] = $this->standOnAnimal('0xbow');
         $this->equipBow($armedCharacter);
 
-        $armed = $this->game->hunt($armedCharacter->fresh());
-        $this->assertTrue($armed['armed']);
+        $armed = $this->takeIt($armedCharacter);
         $this->assertArrayHasKey(
             $armedHunt['animal']['material'],
             $armed['gained'],
@@ -139,15 +138,18 @@ final class HuntTest extends TestCase
     {
         [$character] = $this->standOnAnimal();
 
-        $this->game->hunt($character->fresh());
+        $this->takeIt($character);
 
         $this->assertNull(
             $this->game->huntHere($character->fresh()),
             'the animal was still standing after it was taken',
         );
 
-        $this->expectException(GameException::class);
-        $this->game->hunt($character->fresh());
+        // And the verb refuses on a hex it has just been spent on.
+        $fresh = $character->fresh();
+        $this->assertFalse(
+            $this->game->previewTile($fresh, (int) $fresh->col, (int) $fresh->row, Drops::HUNTING)['canMine'],
+        );
     }
 
     /** §5.5 -- and a hex with nothing on it refuses rather than paying. */
@@ -167,11 +169,17 @@ final class HuntTest extends TestCase
 
         $this->assertNull($this->game->huntHere($character->fresh()));
 
+        $fresh = $character->fresh();
+        $preview = $this->game->previewTile($fresh, (int) $fresh->col, (int) $fresh->row, Drops::HUNTING);
+
+        $this->assertFalse($preview['canMine']);
+        $this->assertSame('Nothing to hunt here.', $preview['reason']);
+
         try {
-            $this->game->hunt($character->fresh());
+            $this->game->startMining($fresh, (int) $fresh->col, (int) $fresh->row, Drops::HUNTING);
             $this->fail('hunted a hex with nothing on it');
         } catch (GameException $e) {
-            $this->assertSame('no_hunt', $e->errorCode);
+            $this->assertSame('blocked', $e->errorCode);
         }
     }
 
@@ -180,9 +188,9 @@ final class HuntTest extends TestCase
     {
         [$character] = $this->standOnAnimal();
 
-        $result = $this->game->hunt($character->fresh());
+        $result = $this->takeIt($character);
 
-        $this->assertGreaterThan(0, $result['skillXp']);
+        $this->assertGreaterThan(0, array_sum($result['gained']));
         $this->assertGreaterThan(
             0,
             (int) $character->fresh()->skills()->where('skill_key', 'hunting')->value('level'),
@@ -220,6 +228,20 @@ final class HuntTest extends TestCase
         }
 
         $this->fail('found nowhere with an animal on it');
+    }
+
+    /**
+     * §5.5 -- a hunt is a mine, so taking one is: start it, let the clock run
+     * out, claim the haul. The clock is the server's, so it is moved rather
+     * than waited on.
+     */
+    private function takeIt(Character $character): array
+    {
+        $fresh = $character->fresh();
+        $job = $this->game->startMining($fresh, (int) $fresh->col, (int) $fresh->row, Drops::HUNTING);
+        $job->update(['ends_at' => $this->game->now() - 1]);
+
+        return $this->game->collectJob($character->fresh(), $job->id);
     }
 
     private function equipBow(Character $character): void

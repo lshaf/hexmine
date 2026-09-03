@@ -151,7 +151,12 @@ export interface PlayerState {
    * The hex under the character's feet, already costed. The dock acts on this
    * rather than on the selection, because you work the ground you stand on.
    */
-  underfoot: TilePreview
+  underfoot: TilePreview & {
+    /** §4.0 -- the same hex, by hand. */
+    gather?: TilePreview
+    /** §5.5 -- the animal standing on it, costed the same way. */
+    hunt?: TilePreview
+  }
   /** Item keys this settlement stocks. Bigger settlements carry more, §3.2. */
   shopStock: string[]
   /**
@@ -458,8 +463,10 @@ export interface WorkPreview {
    * mine is for.
    */
   drops: MaterialKey[]
-  /** Which of the three verbs this costing is for. */
-  activity: 'gathering' | 'mining'
+  /** Which verb this costing is for. */
+  activity: 'gathering' | 'mining' | 'hunting'
+  /** §5.5 -- what is standing here, on a hunt costing. Null on every other. */
+  animal?: { key: string; name: string; grade: string; material: MaterialKey; description: string } | null
   /**
    * §5.7 -- when the pocket on this hex closes, or null if there is none.
    *
@@ -913,6 +920,8 @@ export interface GameApi {
   startMining(col: number, row: number): Promise<ActionResult<Job>>
   /** §4.0 -- the same hex, by hand. Its own call because it is its own verb. */
   startGathering(col: number, row: number): Promise<ActionResult<Job>>
+  /** §5.5 -- the hunt. A mine on the animal standing on the hex. */
+  startHunt(col: number, row: number): Promise<ActionResult<Job>>
   /** §9.5.5 -- a battle job answers with a BattleResult, everything else a haul. */
   collectJob(jobId: string): Promise<ActionResult<CollectResult | BattleResult>>
   abandonJob(jobId: string): Promise<ActionResult<null>>

@@ -42,6 +42,18 @@ final class Drops
     public const MINING = 'mining';
 
     /**
+     * §5.5 -- the hunt, and it is a MINE.
+     *
+     * A third activity rather than a verb of its own, because §7.3 already
+     * makes hunting the same arithmetic on the same clock: a pile of work with
+     * a number on it, divided by the rate of the thing in your hands. What
+     * differs is only what is being worked -- the animal standing on the hex
+     * rather than the seam under it -- so it branches where the haul is
+     * decided and nowhere else.
+     */
+    public const HUNTING = 'hunting';
+
+    /**
      * How many distinct materials one haul may split into.
      *
      * §7.6 -- rows are the tighter bag limit in practice, and a haul that came
@@ -107,6 +119,13 @@ final class Drops
             return self::gathering($biome);
         }
 
+        // §5.5 -- the animal's own table. It does not read the ground's grade:
+        // what a hunt is worth is the creature's rung, and the hex it happens
+        // to be standing on has nothing to say about it.
+        if ($activity === self::HUNTING) {
+            return self::hunting($primary);
+        }
+
         $reach = 0;
         foreach ($variants as $index => $variant) {
             if ($variant['material'] === $primary) {
@@ -124,7 +143,40 @@ final class Drops
      */
     public static function activityFor(string $kind, string $primary): string
     {
+        if ($kind === self::HUNTING) {
+            return self::HUNTING;
+        }
+
         return Catalog::isScrap($primary) ? self::GATHERING : self::MINING;
+    }
+
+    /**
+     * §5.5 -- what a hunt splits into.
+     *
+     * The pelt rung leads, and everything the plains biome used to give up
+     * comes off beside it: its two components, its two reagents, its critter
+     * and its junk. A hunt happens out in the field, so a plant pulled up
+     * beside the carcass is not a stretch -- and the alternative was five
+     * materials with nowhere to come from.
+     *
+     * Bare-handed the primary is Torn Hide (§4.0) and the parts are gone: a
+     * carcass torn at by hand gives up hide and nothing a bench wants. That gap
+     * is the whole argument for buying the first bow.
+     *
+     * @return array<string,float>
+     */
+    private static function hunting(string $primary): array
+    {
+        if ($primary === Catalog::HUNT_SCRAP) {
+            return [$primary => 88.0, self::HUNT_JUNK => 12.0];
+        }
+
+        $table = [$primary => 62.0, self::HUNT_JUNK => 9.0];
+        foreach (self::HUNT_PARTS as $key) {
+            $table[$key] = 5.8;
+        }
+
+        return $table;
     }
 
     /** Which rung of its biome's four this hex is, or 0 if it has no material. */

@@ -494,7 +494,7 @@ export const useGame = defineStore('game', () => {
   const workFull = computed(() => benchJobs.value.length >= PROCESSING.outstandingWorkCap)
 
   /** The hex underfoot, costed by the server. What the dock offers. */
-  const underfoot = computed<TilePreview | null>(() => state.value?.underfoot ?? null)
+  const underfoot = computed(() => state.value?.underfoot ?? null)
 
   const readyJobs = computed(() => jobs.value.filter((j) => j.endsAt <= now.value))
   const activeJobs = computed(() => jobs.value.filter((j) => j.endsAt > now.value))
@@ -771,6 +771,15 @@ export const useGame = defineStore('game', () => {
   async function startGathering(col: number, row: number): Promise<void> {
     const job = await act(() => api.startGathering(col, row))
     if (job) await select(col, row)
+  }
+
+  /** §5.5 -- the animal on this hex, worked the way the seam under it is. */
+  async function startHunt(col: number, row: number): Promise<void> {
+    const job = await act(() => api.startHunt(col, row))
+    if (job) {
+      await refreshMutations()
+      await select(col, row)
+    }
   }
 
   /**
@@ -1096,7 +1105,7 @@ export const useGame = defineStore('game', () => {
     loadGuilds, foundGuild, joinGuild, leaveGuild,
     updateGuild, removeGuildMember, setGuildRole, withdrawApplication, decideApplication,
     donateToGuild, upgradeGuildFacility,
-    startMining, startGathering, collect, abandon, travelTo, cancelTravel, startProcessing, buy,
+    startMining, startGathering, startHunt, collect, abandon, travelTo, cancelTravel, startProcessing, buy,
     sell, sellAllScrap, sellItem, sellPotion, craft, equip, unequip, repair, discard, discardMaterial, drink, openPanel, closePanel,
     battleSkills, loadTree, loadBattleSkills, buyNode,
     loadQuests, claimQuest, claimDaily, clearQuestReward,
