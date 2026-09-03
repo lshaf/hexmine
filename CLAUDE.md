@@ -2474,30 +2474,55 @@ That is the whole anti-farm argument, and it needs no cooldown: **you cannot
 re-roll a pack**, because after the roll there is no pack. Supply is capped by
 hexes and hours, not by patience.
 
-#### 9.5.2 The roster — twelve monsters, four overlapping pools
+#### 9.5.2 The roster — twenty-five monsters, five to a country
 
-| Ring | Pool | New here | Carried in from |
-|---|---|---|---|
-| Outer | 3 | 3 | — |
-| Mid | 6 | 3 | outer |
-| Inner | 6 | 3 | mid |
-| Center | 6 | 3 | inner |
+**A biome's five stand on that biome and nowhere else.** Walking out of the
+forest into the badlands changes what is on the road, which is what makes
+crossing the map a thing you look at rather than a distance you spend.
 
-Twelve in total, and the overlap is the design: walking inward you meet three
-you know how to fight and three you do not, so every ring is **legible and
-dangerous at the same time**. It also gives §5.2's barren center something to
-be, on the walk to a dungeon mouth.
+*(It was twelve, pooled by ring and biome-free, so the same Moss Hound met you
+on every kind of ground the map has. The gradient worked and the country meant
+nothing.)*
+
+**The biome decides which five you can meet at all; the ring decides which of
+them are out.** A ring fields its own tier and the one outside it, so walking
+inward you still meet one you know how to fight and one you do not:
+
+| Ring | Tiers out | Pool, per country |
+|---|---|---|
+| Outer | 1 | 2 |
+| Mid | 1–2 | 3 |
+| Inner | 2–3 | 2 |
+| Center | 3–4 | 2 |
+
+Each country's ladder is **1, 1, 2, 3, 4** — two on the rim, because a first
+country should not be a single creature repeated, and one for each ring after
+that.
+
+**A biome changes what you meet, never how hard it is.** The pair comes off
+(tier, profile) and nothing else, so a tier-1 brute hits for the same on every
+kind of ground and two prospectors on the same ring are on the same ladder
+whatever country they are standing in. What a country is worth is **its own
+drop** (§9.5.8), not an easier or a harder fight. Anything else would make one
+biome the place to grind and the rest scenery.
 
 Each carries its own `attack`, `defense` and a profile — a brute is high attack
 and low defense, a carapace the reverse, a fast one is middling in both and
 wears a weapon harder. The profile is what a player reads, not a level number.
 
-**Three per ring rather than two, and the third is what makes every ring run
-all three PROFILES.** It was two, which left the outer rim holding a brute and
-a carapace and no swift anywhere until the inner ring — so the one read that
-blunts a weapon (§9.5.6) was something a player met for the first time at tier
-3, in gear it was about to bill them for. There is a test asserting every ring
-runs all three.
+**Every country runs all three profiles**, and so does every ring across the
+map. The second was the older rule and the reason the roster grew a third
+monster per band: the one read that blunts a weapon (§9.5.6) must not be
+something a player meets for the first time at tier 3, in gear it is about to
+bill them for. The first is what biome-locking added — a country where you
+never meet a carapace would be a country where a whole read is missing. Both
+are tests.
+
+**No two monsters in a country share a (tier, profile) pair**, and that one is
+about the drawing. §9.5.2 gives the silhouette to the profile and the hide to
+the tier, so biome + tier + profile already identifies a creature; without the
+rule, two of a country's five come out as the same animal in the same colour.
+There is an assert in the generator.
 
 **A monster is drawn, and the drawing is the same one in both places.** The map
 used to put one generic dark mass with two lit eyes on every hex: the map said
@@ -2551,8 +2576,22 @@ corpse is a debt on a 24-hour clock rather than something looking at you.
 **And the almanac's bestiary shows a monster ON A HEX**, not in a crest — the
 same drawing the map puts on the tile, halo and all. A crest is how a thing
 looks in a fight; the tile is how it looks while you are still deciding whether
-to have one, which is what a bestiary is read for. It stands on plain stone
-rather than a biome, because a monster belongs to no ground.
+to have one, which is what a bestiary is read for.
+
+**The hex is its own country's**, which is the drawing catching up with
+§9.5.2. It stood on plain stone while a monster belonged to no ground — it
+walked here, and the tile said nothing about it — and a roster of five to a
+biome makes that false twice over: where a thing lives is now half of what the
+entry is for, and it is also the only thing telling a forest tier-1 brute from
+a badlands one, since the profile owns the silhouette and the tier owns the
+hide.
+
+**A crest draws no country, and that is a rule rather than an omission.** A
+crest is a portrait and it is shown on a fight plate — and a fight happens on
+the hex you are standing on, so where the thing lives is the one question the
+reader has already answered by being there. *(A tuft of biome at the feet was
+tried. A crest is a hexagon, and the corners it would have to sit in are
+exactly what the shape cuts off.)*
 
 **And the almanac carries the whole bestiary**, as a fourth half beside
 Materials, Equipment and Ground. It owes a monster the same two answers it owes
@@ -3001,9 +3040,10 @@ makes a whole new faucet safe under §2.
 | Drop | Notes |
 |---|---|
 | **Gold**, on a win | fills §3.2's monster drops, and needs no bag row — which matters when the fight was not your idea. A loss pays nothing at all (§9.5.3) |
-| **Monster materials** | 2 families × 5 grades: a plate/hide line for the smith and armorer, an ichor/organ line for the consumable bench. Tier 1, biome-free, dropped by nothing else |
-| **Leavings** | a **Tier 0** line of four, one per monster tier, dropped every time. §4's junk argument applied to combat: the rubbish carried out alongside |
-| **The ground's junk** | §4's own five, about two wins in five. The monster belongs to no ground, but the FIGHT happened somewhere |
+| **Monster materials** | 2 families × 5 grades: a plate/hide line for the smith and armorer, an ichor/organ line for the consumable bench. Tier 1, graded by tier, dropped by nothing else |
+| **The country's own stock** | a third Tier 1 line, **one per biome**, off that country's five and nothing else (§9.5.2). About as often as the ichor |
+| **Trophies** | a **Tier 0** line of four, one per monster tier, dropped every time — **what** you fought |
+| **Leavings** | a **Tier 0** line of five, one per biome, about two wins in five — **where** you fought it |
 | **Looted gear** | the kit the monster was using, at **5–50% durability**, rarity capped at **rare** |
 | **Battle job XP** | on a win only (§9.5.3) |
 | **Never** | Tier 3, Tier 4, or anything mintable |
@@ -3019,18 +3059,31 @@ something sit outside the containment above without threatening it. What it
 actually spends is a **strap** (§7.6), and that is the interesting part: it is
 the one drop in the game that can be worth throwing away.
 
-One per *tier* rather than one per monster, and that is the bag again. Twelve
-trophies would be twelve rows, and a fight that costs you a strap is a fight
-that cost more than it paid.
+One per *tier* rather than one per monster, and that is the bag again. Twenty-five
+trophies would be twenty-five rows, and a fight that costs you a strap is a
+fight that cost more than it paid.
 
-**And the hex itself turns up, about two wins in five.** A monster belongs to no
-ground — it walked here — but the *fight* did not happen in the abstract, and
-what gets trampled into the dirt is the ground's own. It is §4's existing junk,
-which is the tidy part: the same five a mine already turns up, so it costs no
-new kind of strap. Two tier-0 lines rather than one, and they answer two
-different questions — the trophy says **what** you fought and is always there,
-the junk says **where** and is a roll. Two guaranteed rows of rubbish on every
-win would be clutter dressed as variety.
+**And the ground turns up, about two wins in five.** The *fight* did not happen
+in the abstract, and what gets trampled into the dirt is the country's own. Two
+tier-0 lines rather than one, and they answer two different questions — the
+trophy says **what** you fought and is always there, the leaving says **where**
+and is a roll. Two guaranteed rows of rubbish on every win would be clutter
+dressed as variety.
+
+*(The leaving used to be §4's own mining junk, borrowed, on the argument that
+it cost no new kind of strap. That was only ever true while straps were scarce;
+§7.6 made them roomy, so the fight has its own rubbish now and the mine keeps
+its. It also came off a `biome` the caller passed in, which stopped making
+sense the moment the monster knew its own country — two answers to one
+question, and the caller's was the one that won.)*
+
+**And the country pays a stock of its own** (§9.5.2). It is the one drop a
+prospector cannot get by walking inward on ground they already know, which is
+what makes kitting out of a biome's line a reason to go and fight *in that
+biome* rather than the nearest one — and it is what stops biome-locking being
+scenery. Tier 1 like the rest of the spoil stock, and safe under §2 for the
+usual reason: it is capped by how many packs a country can hold, and it bridges
+to nothing external.
 
 **Harder packs roll better options, not better rarity.** A tougher monster
 grants **extra option slots** (§8.0.1) on what it drops — the same mechanism the

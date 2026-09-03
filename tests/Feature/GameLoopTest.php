@@ -3120,7 +3120,7 @@ final class GameLoopTest extends TestCase
         $total = function (float $haul) use ($monster): int {
             $sum = 0;
             for ($seed = 1; $seed <= 500; $seed++) {
-                $sum += array_sum(Drops::battleSpoils($monster, $seed, 'forest', $haul));
+                $sum += array_sum(Drops::battleSpoils($monster, $seed, $haul));
             }
 
             return $sum;
@@ -3141,10 +3141,10 @@ final class GameLoopTest extends TestCase
         // away -- the whole reason it is a chance and not a multiply-and-round.
         $ones = 0;
         for ($seed = 1; $seed <= 200; $seed++) {
-            $ones += Drops::battleSpoils($monster, $seed, null, 0.0) === []
+            $ones += Drops::battleSpoils($monster, $seed, 0.0) === []
                 ? 0
-                : (int) (array_sum(Drops::battleSpoils($monster, $seed, null, 1.0))
-                    > array_sum(Drops::battleSpoils($monster, $seed, null, 0.0)));
+                : (int) (array_sum(Drops::battleSpoils($monster, $seed, 1.0))
+                    > array_sum(Drops::battleSpoils($monster, $seed, 0.0)));
         }
         $this->assertGreaterThan(0, $ones, 'doubling the haul never paid a unit');
     }
@@ -3227,49 +3227,72 @@ final class GameLoopTest extends TestCase
      * §9.5.8/§4 -- a win pays two kinds of tier-0, and they answer two
      * different questions.
      *
-     * The trophy says WHAT you fought and is always there; the junk says WHERE
-     * you fought it and turns up about two times in five. Both are worth a gold
-     * and feed no recipe, which is the whole reason a combat faucet can be this
-     * generous without touching §9.5.8's containment.
+     * The trophy says WHAT you fought and is always there; the leaving says
+     * WHERE you fought it and turns up about two times in five. Both are worth
+     * a gold and feed no recipe, which is the whole reason a combat faucet can
+     * be this generous without touching §9.5.8's containment.
+     *
+     * The leaving is the monster's own country's now rather than §4's mining
+     * junk borrowed, so both come off the monster and there is no second
+     * opinion about which ground the fight was on.
      */
-    public function test_a_win_pays_a_trophy_every_time_and_the_ground_sometimes(): void
+    public function test_a_win_pays_a_trophy_every_time_and_a_leaving_sometimes(): void
     {
         $monster = Monsters::ROSTER['moss_hound'];
         $trophy = Spoils::TROPHY_BY_TIER[$monster['tier']];
-        $junk = null;
-        foreach (Alchemy::JUNK as $key => $def) {
-            if ($def['biome'] === 'forest') {
-                $junk = $key;
-            }
-        }
+        $leaving = $monster['biomeLeaving'];
 
-        $this->assertNotNull($junk);
+        $this->assertSame(Spoils::BIOME_LEAVING['forest'], $leaving, 'a forest monster left another country\'s rubbish');
 
-        $sawJunk = 0;
+        $sawLeaving = 0;
         for ($seed = 1; $seed <= 200; $seed++) {
-            $bare = Drops::battleSpoils($monster, $seed);
-            $onGround = Drops::battleSpoils($monster, $seed, 'forest');
+            $drops = Drops::battleSpoils($monster, $seed);
 
             // The trophy is not a roll.
-            $this->assertArrayHasKey($trophy, $bare, "no trophy off seed {$seed}");
-            $this->assertGreaterThan(0, $bare[$trophy]);
+            $this->assertArrayHasKey($trophy, $drops, "no trophy off seed {$seed}");
+            $this->assertGreaterThan(0, $drops[$trophy]);
 
-            // And the ground is the ONLY difference between the two calls.
-            $this->assertSame(
-                $bare,
-                array_diff_key($onGround, [$junk => true]),
-                "the biome changed something other than the junk, seed {$seed}",
-            );
-
-            if (isset($onGround[$junk])) {
-                $sawJunk++;
+            if (isset($drops[$leaving])) {
+                $sawLeaving++;
             }
         }
 
         // Two in five, loosely: this pins that it is a chance rather than
         // never or always, not the exact rate.
-        $this->assertGreaterThan(40, $sawJunk, 'the ground never turned up');
-        $this->assertLessThan(160, $sawJunk, 'the ground turned up every time');
+        $this->assertGreaterThan(40, $sawLeaving, 'the ground never turned up');
+        $this->assertLessThan(160, $sawLeaving, 'the ground turned up every time');
+    }
+
+    /**
+     * §9.5.2/§9.5.8 -- a country's own stock comes off that country's five and
+     * nothing else.
+     *
+     * This is what biome-locking is FOR. Without it, walking from forest into
+     * badlands changes the scenery and nothing a prospector can carry home.
+     */
+    public function test_a_biome_spoil_only_comes_off_that_biomes_monsters(): void
+    {
+        foreach (Monsters::ROSTER as $key => $monster) {
+            $mine = Spoils::BIOME_SPOIL[$monster['biome']];
+            $theirs = array_diff(array_values(Spoils::BIOME_SPOIL), [$mine]);
+
+            $saw = false;
+            for ($seed = 1; $seed <= 120; $seed++) {
+                $drops = Drops::battleSpoils($monster, $seed);
+
+                foreach ($theirs as $other) {
+                    $this->assertArrayNotHasKey(
+                        $other,
+                        $drops,
+                        "{$key} dropped another country's stock",
+                    );
+                }
+
+                $saw = $saw || isset($drops[$mine]);
+            }
+
+            $this->assertTrue($saw, "{$key} never gives up its own country's stock");
+        }
     }
 
     /** §4 -- and every one of them is a gold apiece, feeding nothing. */

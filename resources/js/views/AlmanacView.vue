@@ -49,7 +49,7 @@ import { formatPercent, resaleValue } from '@/game/formulas'
 import { EQUIPMENT, ECONOMY, PROCESSING, BAG } from '@/game/balance'
 import { ACTION_PATHS } from '@/icons/actions'
 import { CRITTER_BY_BIOME } from '@/game/critters'
-import { MONSTERS, MONSTERS_BY_RING } from '@/game/monsters'
+import { MONSTERS, MONSTERS_BY_BIOME_RING } from '@/game/monsters'
 import { TROPHY_BY_TIER } from '@/game/spoils'
 import { BIOME_LABEL } from '@/theme/palette'
 import {
@@ -522,8 +522,11 @@ const PROFILE_NOTE: Record<string, string> = {
 const monsterEntries = computed(() =>
   Object.values(MONSTERS)
     .map((m) => {
-      const rings = (Object.keys(MONSTERS_BY_RING) as Ring[]).filter((r) =>
-        MONSTERS_BY_RING[r]!.includes(m.key),
+      // §9.5.2 -- a monster stands on one country, so the rings it is out on
+      // are that country's rings and no others.
+      const byRing = MONSTERS_BY_BIOME_RING[m.biome] ?? {}
+      const rings = (Object.keys(byRing) as Ring[]).filter((r) =>
+        byRing[r]!.includes(m.key),
       )
       const trophy = TROPHY_BY_TIER[m.tier]
       const name = (key: string) => MATERIALS[key as MaterialKey]?.name ?? key
@@ -541,6 +544,10 @@ const monsterEntries = computed(() =>
           MATERIALS[m.ichor],
           ...(m.rareSpoil ? [MATERIALS[m.rareSpoil]] : []),
           ...(trophy ? [MATERIALS[trophy as MaterialKey]] : []),
+          // §9.5.8 -- the two that say where it lived, which is the half of a
+          // bestiary entry biome-locking made worth reading.
+          MATERIALS[m.biomeSpoil],
+          MATERIALS[m.biomeLeaving as MaterialKey],
         ],
         hay: [
           m.name,
@@ -551,6 +558,9 @@ const monsterEntries = computed(() =>
           name(m.ichor),
           m.rareSpoil ? name(m.rareSpoil) : '',
           trophy ? name(trophy) : '',
+          BIOME_LABEL[m.biome as keyof typeof BIOME_LABEL] ?? m.biome,
+          name(m.biomeSpoil),
+          name(m.biomeLeaving),
         ].join(' '),
       }
     })

@@ -138,10 +138,18 @@ final class PackSpawnTest extends TestCase
         }
     }
 
-    /** §9.5.2 -- a ring fights its own three and the three from outside it. */
-    public function test_a_pack_is_drawn_from_its_own_ring_pool(): void
+    /**
+     * §9.5.2 -- a pack is drawn from its own COUNTRY's pool, at its own ring.
+     *
+     * The biome decides which five you can meet at all and the ring decides
+     * which of them are out. Both halves are asserted here, and the first is
+     * the one biome-locking exists for: a Moss Hound on a badlands hex would
+     * mean crossing the map changes nothing about what is on the road.
+     */
+    public function test_a_pack_is_drawn_from_its_own_biome_and_ring(): void
     {
         $seen = [];
+        $byBiome = [];
 
         foreach ($this->sample() as $tile) {
             if ($tile['pack'] === null) {
@@ -149,21 +157,37 @@ final class PackSpawnTest extends TestCase
             }
 
             $key = $tile['pack']['key'];
+            $biome = $tile['biome'];
             $seen[$tile['ring']][$key] = true;
+            $byBiome[$biome][$key] = true;
 
             $this->assertContains(
                 $key,
-                Monsters::BY_RING[$tile['ring']],
-                "{$key} turned up on the {$tile['ring']} ring, which does not hold it",
+                Monsters::BY_BIOME_RING[$biome][$tile['ring']] ?? [],
+                "{$key} turned up on {$biome}/{$tile['ring']}, which does not hold it",
+            );
+
+            // The roster's own answer has to agree with where it was found.
+            $this->assertSame(
+                $biome,
+                Monsters::ROSTER[$key]['biome'],
+                "{$key} stands on {$biome} and belongs to another country",
             );
         }
 
-        $this->assertCount(3, $seen['outer'] ?? [], 'the outer ring should hold exactly three');
-        $this->assertCount(6, $seen['center'] ?? [], 'the center should hold six');
+        // Every country turned up, and none of them is one creature repeated.
+        foreach (array_keys(Monsters::BY_BIOME_RING) as $biome) {
+            $this->assertGreaterThanOrEqual(
+                3,
+                count($byBiome[$biome] ?? []),
+                "{$biome} barely fields a roster",
+            );
+        }
 
-        // §9.5.2 -- and every ring runs all three PROFILES, which is what the
-        // third monster per band is for: the read that wears a weapon harder is
-        // met on the safe rim rather than for the first time at tier 3.
+        // §9.5.2 -- and every ring still runs all three PROFILES across the
+        // map, which is the rule that predates biomes: the read that wears a
+        // weapon harder is met on the safe rim rather than for the first time
+        // at tier 3.
         foreach (['outer', 'mid', 'inner', 'center'] as $ring) {
             $profiles = array_unique(array_map(
                 static fn (string $key) => Monsters::ROSTER[$key]['profile'],

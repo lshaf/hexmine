@@ -41,6 +41,8 @@ interface GearDef {
 interface MonsterDef {
   key: string
   name: string
+  /** §9.5.2 -- the country it stands on, and it stands on no other. */
+  biome: string
   tier: number
   profile: 'brute' | 'carapace' | 'swift'
   attack: number

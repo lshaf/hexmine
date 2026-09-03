@@ -613,6 +613,8 @@ export interface BattleResult {
   monster: {
     key: string
     name: string
+    /** §9.5.2 -- the country it stands on. The crest draws its tuft from this. */
+    biome: string
     tier: number
     profile: 'brute' | 'carapace' | 'swift'
     attack: number

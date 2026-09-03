@@ -750,7 +750,7 @@ final class WorldGen
      * `until` is returned in the caller's time base rather than the bucket's, so
      * nothing outside here has to know the offset exists.
      */
-    private static function packAt(int $col, int $row, string $ring, int $now): ?array
+    private static function packAt(int $col, int $row, string $biome, string $ring, int $now): ?array
     {
         if (! Balance::packsEnabled()) {
             return null;
@@ -770,9 +770,11 @@ final class WorldGen
             return null;
         }
 
-        // §9.5.2 -- a ring fights its own two and the two from outside it, so
-        // which of the four turns up is another roll on the same bucket.
-        $pool = Monsters::BY_RING[$ring] ?? [];
+        // §9.5.2 -- a country's own five stand on that country and nowhere
+        // else, and the ring decides which of them are out: its own tier and
+        // the one outside it. Which of those turns up is another roll on the
+        // same bucket.
+        $pool = Monsters::BY_BIOME_RING[$biome][$ring] ?? [];
         if ($pool === []) {
             return null;
         }
@@ -954,7 +956,7 @@ final class WorldGen
             // remembering to ask.
             'pack' => $water === null && $settlement === null && $dungeon === null
                 && empty($mutation['packCleared'])
-                ? self::packAt($col, $row, $ring, $now)
+                ? self::packAt($col, $row, $biome, $ring, $now)
                 : null,
             'propSeed' => Hash::hash2($col, $row, Balance::mapSeed() ^ 0xF00D),
         ];

@@ -20,7 +20,7 @@
  */
 import { hash2, rand01, randInt } from './hash'
 import { BIOME_VARIANTS, type VariantDef } from './variants'
-import { MONSTERS_BY_RING } from './monsters'
+import { MONSTERS_BY_BIOME_RING } from './monsters'
 import { hexDistance } from '@/map/hexGeometry'
 import type {
   Biome,
@@ -728,7 +728,7 @@ function pocketUntil(col: number, row: number, now: number): number | undefined 
  * (§9.5.3) is a rhythm players would set a watch by. `until` comes back in the
  * caller's time base, so nothing outside here knows the offset exists.
  */
-function packAt(col: number, row: number, ring: Ring, now: number): Pack | undefined {
+function packAt(col: number, row: number, biome: string, ring: Ring, now: number): Pack | undefined {
   const c = cfg()
 
   const lifetime = c.packLifetimeMs
@@ -740,7 +740,7 @@ function packAt(col: number, row: number, ring: Ring, now: number): Pack | undef
 
   // §9.5.2 -- a ring fights its own two and the two from outside it, so which
   // of the four turns up is another roll on the same bucket.
-  const pool = MONSTERS_BY_RING[ring] ?? []
+  const pool = MONSTERS_BY_BIOME_RING[biome]?.[ring] ?? []
   if (pool.length === 0) return undefined
 
   const pick = randInt(
@@ -920,7 +920,7 @@ export function generateTile(
     pack:
       water || settlement || dungeon || mutation?.packCleared
         ? undefined
-        : packAt(col, row, ring, now),
+        : packAt(col, row, biome, ring, now),
     propSeed: hash2(col, row, c.seed ^ 0xf00d),
   }
 }

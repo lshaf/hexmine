@@ -1636,7 +1636,6 @@ class GameService
             return [
                 'quest' => $key,
                 'name' => $def['name'],
-                'grade' => $def['grade'],
                 'gold' => $def['gold'],
                 'goldAfter' => (int) $character->gold,
                 // What this claim just made visible, so the modal can say the
@@ -2367,6 +2366,10 @@ class GameService
             'monster' => [
                 'key' => $key,
                 'name' => $monster['name'],
+                // §9.5.2 -- the country it stands on. The crest has no ground
+                // under it, so this is what tells a forest tier-1 brute from a
+                // badlands one on the plate.
+                'biome' => $monster['biome'],
                 'tier' => $monster['tier'],
                 'profile' => $monster['profile'],
                 'attack' => $monster['attack'],
@@ -2707,7 +2710,7 @@ class GameService
             $spoilHaul = Formulas::optionGain($this->itemRows($character), Catalog::OPTION_HAUL);
 
             foreach (
-                Drops::battleSpoils($monster, $seed, WorldGen::biomeOf($col, $row), $spoilHaul) as $material => $quantity
+                Drops::battleSpoils($monster, $seed, $spoilHaul) as $material => $quantity
             ) {
                 $granted = $this->addMaterial($character, $material, $quantity);
                 if ($granted > 0) {
@@ -2785,6 +2788,10 @@ class GameService
             'monster' => [
                 'key' => $key,
                 'name' => $monster['name'],
+                // §9.5.2 -- the country it stands on. The crest has no ground
+                // under it, so this is what tells a forest tier-1 brute from a
+                // badlands one on the plate.
+                'biome' => $monster['biome'],
                 'tier' => $monster['tier'],
                 'profile' => $monster['profile'],
                 'attack' => $monster['attack'],

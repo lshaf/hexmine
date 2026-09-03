@@ -235,11 +235,14 @@ final class Drops
     /**
      * §9.5.8 -- what comes off a monster, beside the gold.
      *
-     * Two families and nothing else: a plate/hide line the smith and the
-     * armorer want, an ichor/organ line the consumable bench wants. Combat
-     * feeds combat, and that containment is what makes a whole new faucet safe
-     * under §2 -- nothing here touches the mining economy, and nothing here is
-     * Tier 3, Tier 4 or mintable.
+     * Four lines. A plate/hide line the smith and the armorer want and an
+     * ichor/organ line the consumable bench wants, both graded by tier; the
+     * COUNTRY's own stock, which only that biome's five give up (§9.5.2); and
+     * tier 0, which is the trophy for what you fought and the leaving for where.
+     *
+     * Combat feeds combat, and that containment is what makes a whole new
+     * faucet safe under §2 -- nothing here touches the mining economy, and
+     * nothing here is Tier 3, Tier 4 or mintable.
      *
      * The grade is the monster's tier, and the RARE roll is the grade above it,
      * which is §9.5.4's rule said the other way round: "rare for that rung" is
@@ -247,12 +250,16 @@ final class Drops
      * because the top of the ichor ladder is wanted by eight recipes and has to
      * come off something.
      *
+     * **The biome is not a parameter.** It used to be, back when the ground was
+     * the only thing in a fight that knew where it was; the monster carries its
+     * own country now, so passing one in would be a second opinion about which
+     * ground the fight was on -- and the caller's would be the one that wins.
+     *
      * @return array<string,int>
      */
     public static function battleSpoils(
         array $monster,
         int $seed,
-        ?string $biome = null,
         float $haul = 0.0,
     ): array {
         $grade = max(1, min(5, (int) $monster['tier']));
@@ -291,20 +298,43 @@ final class Drops
             );
         }
 
-        // §4 -- and what the ground gave up while the two of you were on it.
+        // §9.5.8 -- the country's own stock, which is the whole point of a
+        // roster that stands on one kind of ground (§9.5.2).
         //
-        // The monster belongs to no ground -- it walked here -- but the FIGHT
-        // happened somewhere, and what is trampled into the dirt is the hex's
-        // own. It is the same junk a mine turns up, so it costs no new strap
-        // kind, and it is junk: a gold, no recipe, nothing to inflate.
+        // It is the one drop a prospector cannot get by walking inward on
+        // ground they already know, so kitting out of a biome's line is a
+        // reason to go and fight in that biome rather than the nearest one.
+        // About as often as the ichor, because it is stock a bench wants
+        // rather than rubbish.
+        $biomeSpoil = $monster['biomeSpoil'] ?? null;
+        if ($biomeSpoil !== null
+            && Hash::rand01(Hash::hash2($seed, 41, Balance::mapSeed() ^ 0x5909)) < self::ICHOR_CHANCE) {
+            $out[$biomeSpoil] = Hash::randInt(
+                Hash::hash2($seed, 43, Balance::mapSeed() ^ 0x590A),
+                self::ICHOR_MIN,
+                self::ICHOR_MAX,
+            );
+        }
+
+        // §9.5.8 -- and what the ground gave up while the two of you were on it.
         //
-        // A chance rather than every time, because the trophy above already
+        // The trophy above says WHAT you fought; this says WHERE. It is the
+        // fight's own leaving, one per biome, worth a gold and wanted by no
+        // recipe -- so it can be generous without touching the containment
+        // §9.5.8 keeps combat inside.
+        //
+        // A chance rather than every time, because the trophy already
         // guarantees a tier-0 row. Two of them on every win would be clutter
         // dressed as variety.
-        if ($biome !== null
+        //
+        // It used to be §4's own mining junk, borrowed, on the argument that it
+        // cost no new kind of strap. That was only ever true while straps were
+        // scarce; §7.6 made them roomy, so the fight has its own rubbish now
+        // and the mine keeps its.
+        $leaving = $monster['biomeLeaving'] ?? null;
+        if ($leaving !== null
             && Hash::rand01(Hash::hash2($seed, 31, Balance::mapSeed() ^ 0x5907)) < self::BATTLE_JUNK_CHANCE) {
-            $key = self::junkOf($biome);
-            $out[$key] = ($out[$key] ?? 0) + Hash::randInt(
+            $out[$leaving] = ($out[$leaving] ?? 0) + Hash::randInt(
                 Hash::hash2($seed, 37, Balance::mapSeed() ^ 0x5908),
                 self::TROPHY_MIN,
                 self::TROPHY_MAX,

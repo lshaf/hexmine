@@ -190,12 +190,29 @@ export type SpoilKey =
   | 'bile_sac'
   | 'ember_gland'
   | 'grave_heart'
+  /*
+   * §9.5.8 -- the third line, and the one that says WHERE rather than how hard.
+   * One per biome, dropped only by that country's five (§9.5.2). On SpoilKey
+   * rather than a type of its own because it is stock a bench wants, exactly
+   * like the two ladders above it -- what differs is that it is keyed by
+   * country instead of graded by tier.
+   */
+  | 'sap_matted_fur'
+  | 'ore_crusted_chitin'
+  | 'braided_sinew'
+  | 'slagged_scale'
+  | 'pollen_choked_gill'
 
 /**
- * §4 -- tier 0, and what a fight leaves that nobody wants. One per monster
- * tier, dropped every time, worth a gold and wanted by no recipe.
+ * §4 -- tier 0, and what a fight leaves that nobody wants. Worth a gold and
+ * wanted by no recipe.
  *
- * Its own type rather than a sixth SpoilKey, because a spoil is a LADDER the
+ * Two lines. The **trophy** is one per monster tier and dropped every time --
+ * what you fought. The **leaving** is one per biome and is a roll -- where the
+ * fight happened. Two questions, so two lines; two guaranteed rows of rubbish
+ * on every win would be clutter dressed as variety.
+ *
+ * Its own type rather than more SpoilKey, because a spoil is a LADDER the
  * benches climb and these are not on it: filing them together would put a
  * chipped fang in the armorer's list of inputs.
  */
@@ -204,6 +221,11 @@ export type TrophyKey =
   | 'cracked_horn'
   | 'snapped_quill'
   | 'charred_sinew'
+  | 'trampled_fern'
+  | 'shale_grit'
+  | 'matted_turf'
+  | 'scorched_grit'
+  | 'broken_stalks'
 
 export type MaterialKey =
   | ScrapKey
@@ -228,8 +250,14 @@ export interface Material {
   bench?: 'weapon' | 'armor'
   /** §4 -- alchemy stock that is an animal rather than a plant. */
   critter?: boolean
-  /** §9.5.8 -- which half of a monster this is, and nothing else has it. */
-  spoil?: 'plate' | 'ichor'
+  /**
+   * §9.5.8 -- which line of a monster this is, and nothing else has it.
+   *
+   * `plate` and `ichor` are graded ladders the benches climb; `biome` is the
+   * third line and is keyed by country rather than graded, so it carries a
+   * `biome` below instead of a `grade`.
+   */
+  spoil?: 'plate' | 'ichor' | 'biome'
   /** §9.5.8 -- 1..5, the monster tier that gives it up. Grade 5 is the center ring. */
   grade?: number
   /** Biome lock for tier 1 and tier 3. Raid + refined materials are unlocked. */
@@ -450,6 +478,13 @@ export interface Pack {
 export interface Monster {
   key: string
   name: string
+  /**
+   * §9.5.2 -- the country it stands on, and it stands on no other.
+   *
+   * Five to a biome. The biome decides which five you can meet at all and the
+   * tier decides which of those the ring you are on has out.
+   */
+  biome: string
   /** 1..4, and the ring it is new on. A ring fights its own tier and the one outside. */
   tier: number
   /** What a player reads instead of a level: brute, carapace, swift. */
@@ -465,6 +500,10 @@ export interface Monster {
   ichor: SpoilKey
   /** The grade above its own, rarely. Grade 5 exists only off the center ring. */
   rareSpoil?: SpoilKey
+  /** §9.5.8 -- the Tier 1 stock only this country's monsters give up. */
+  biomeSpoil: SpoilKey
+  /** §9.5.8 -- the tier-0 leaving that says where the fight happened. */
+  biomeLeaving: TrophyKey
   description: string
 }
 

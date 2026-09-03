@@ -8,7 +8,7 @@
  * painter's-algorithm sort (§13.2): a mountain has to occlude the hexes behind it.
  */
 import { hash2, rand01, randInt } from '@/game/hash'
-import { desaturate, shade, variantColor, waterColor } from '@/theme/palette'
+import { BIOME_COLOR, desaturate, shade, variantColor, waterColor } from '@/theme/palette'
 import { HEX_H, HEX_SIDE_PATH, HEX_TOP_PATH, HEX_W, ROW_STEP } from './hexGeometry'
 import { VARIANT_PROPS } from '@/game/variants'
 import { MONSTERS } from '@/game/monsters'
@@ -1415,7 +1415,15 @@ export function monsterMark(key: string, width = 26, dead = false): string {
  */
 export function monsterSpecimen(key: string, size = 66): string {
   const def = MONSTERS[key]
-  const top = '#4b544d'
+  // §9.5.2 -- ON ITS OWN COUNTRY'S GROUND.
+  //
+  // It stood on plain stone while a monster belonged to no ground -- it walked
+  // here, and the hex it was met on said nothing about it. A roster of five to
+  // a biome makes that false: where a thing lives is now half of what a
+  // bestiary entry is for, and it is also the only thing telling a forest
+  // tier-1 brute apart from a badlands one, since profile owns the silhouette
+  // and tier owns the hide.
+  const top = def ? (BIOME_COLOR[def.biome as Biome] ?? '#4b544d') : '#4b544d'
   const w = 62
   const boxH = 52
   const h = Math.round((size * boxH) / w)

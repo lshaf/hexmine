@@ -268,6 +268,20 @@ export function monsterCrest(
   dead = false,
   key: string | null = null,
 ): string {
+  /*
+   * §9.5.2 -- no country is drawn here, and that is a rule rather than an
+   * omission.
+   *
+   * A crest is a PORTRAIT: it is shown on a fight plate, and a fight happens on
+   * the hex you are standing on, so where the thing lives is the one question
+   * the reader has already answered by being there. The almanac is the other
+   * way round -- you are not there, and which country a monster is of is half
+   * of what the entry is for -- so `monsterSpecimen` stands it on its own
+   * biome's ground instead.
+   *
+   * A tuft at the feet was tried. The crest is a hexagon and the corners it
+   * would have to sit in are exactly what the shape cuts off.
+   */
   return crest(monsterHide(tier, dead), monsterBody(profile, tier, dead, key), size)
 }
 
