@@ -220,8 +220,25 @@ export const useGame = defineStore('game', () => {
   }
 
   function centerOnCharacter(): void {
+    // §5.6 -- where the walker IS, not where they set off from. `here` is
+    // declared further down, so this reads the same derivation directly rather
+    // than reaching forward to it.
     const char = state.value?.character
-    if (char) setView(char.col, char.row)
+    if (!char) return
+
+    const journey = state.value?.travel
+    if (!journey || journey.path.length === 0) {
+      setView(char.col, char.row)
+
+      return
+    }
+
+    const walked = Math.max(
+      0,
+      Math.min(journey.stopHex, (now.value - journey.startedAt) / journey.perHexMs),
+    )
+    const at = journey.path[Math.min(journey.path.length - 1, Math.floor(walked))]!
+    setView(at[0], at[1])
   }
 
   /*
@@ -545,7 +562,7 @@ export const useGame = defineStore('game', () => {
     const char = character.value
     if (!char) return 0
 
-    return hexDistance(char.col, char.row, col, row) * travelPerHexMs.value
+    return hexDistance(hereCol.value, hereRow.value, col, row) * travelPerHexMs.value
   }
 
   /** The journey under way, §5. Null whenever the character is standing still. */
@@ -571,6 +588,44 @@ export const useGame = defineStore('game', () => {
 
   /** Whole hexes already banked -- what stopping right now would keep. */
   const travelHexesWalked = computed(() => Math.floor(travelProgress.value))
+
+  /**
+   * §5.6 -- the hex the prospector is actually standing on, right now.
+   *
+   * The server keeps `character.col/row` at the DEPARTURE hex for the whole
+   * journey and only writes a new one when you land or stop, so every readout
+   * that asked the character where it was got the place it set off from --
+   * three days into a walk the dock still named the forest you left, and the
+   * distance to a bench was measured from there.
+   *
+   * This is derived rather than asserted, and it is the same arithmetic the
+   * server itself uses: cancelTravel() lands you on
+   * `floor(elapsed / perHex)` steps along the same derived path, which is what
+   * `travelHexesWalked` already is. So this is not the client having an opinion
+   * about where it is -- it is the number the server will agree with the
+   * instant you stop, drawn a few minutes early.
+   *
+   * It is a READOUT and never a key. Every verb is refused on the road by the
+   * server anyway (§5.6), sight is zero out there, and the live-state query
+   * stays centred on the server's own position -- so nothing here can ask for
+   * ground the fog is holding back. What it fixes is the map telling you where
+   * you were.
+   */
+  const here = computed(() => {
+    const char = state.value?.character
+    if (!char) return null
+
+    const journey = travel.value
+    if (!journey || journey.path.length === 0) return { col: char.col, row: char.row }
+
+    const step = Math.min(journey.path.length - 1, travelHexesWalked.value)
+    const at = journey.path[step]!
+
+    return { col: at[0], row: at[1] }
+  })
+
+  const hereCol = computed(() => here.value?.col ?? 0)
+  const hereRow = computed(() => here.value?.row ?? 0)
 
   /**
    * Time to the DESTINATION, which is the journey the player asked for.
@@ -722,6 +777,15 @@ export const useGame = defineStore('game', () => {
   async function select(col: number, row: number): Promise<void> {
     selected.value = { col, row }
 
+    // §5.6 -- the SERVER's position, deliberately, and not `here`.
+    //
+    // This guard exists to ask the same question the server will ask, so that a
+    // hex it would refuse costs no round trip. The server costs against
+    // `character.col/row`, which sits on the departure hex for the whole
+    // journey; pointing this at the walker's derived hex would send requests
+    // the server answers with a refusal. `here` is what the map SAYS, this is
+    // what the server KNOWS, and the two are only the same when you are stood
+    // still.
     const char = state.value?.character
     if (char && hexDistance(char.col, char.row, col, row) > sight.value) {
       preview.value = null
@@ -1107,6 +1171,7 @@ export const useGame = defineStore('game', () => {
     slate, saved,
     activeJobs, fieldJob, workFull, benchJobs, benchReady, benchHere, underfoot, selectedTile,
     currentSettlement, shopStock, sight, travelPerHexMs, travelEta,
+    here, hereCol, hereRow,
     travel, travelProgress, travelHexesWalked, travelRemainingMs,
     // helpers
     tileAt, held, note,

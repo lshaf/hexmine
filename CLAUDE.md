@@ -524,7 +524,7 @@ map worth walking.
 | | Rule |
 |---|---|
 | **Sight** | **1 hex.** Base `Balance::SIGHT_RADIUS`, up to 3 through the Explorer tree (§7.5). |
-| **Sight while traveling** | **0.** You are between hexes, watching your feet. |
+| **Sight while traveling** | **0.** You are between hexes, watching your feet — and it is the hex under *those* feet, not the one you set off from. |
 | **Travel range** | **None.** Any hex on the map is walkable from any other. |
 
 **Travel has no reach limit and must not grow one.** Distance already costs the
@@ -613,6 +613,28 @@ Three consequences, all deliberate:
 The glyphs are what keep a fog navigable: you can always see *that* there is a
 capital over there, which is what makes deciding to walk to it possible, and
 never *what is happening* there, which is what makes arriving worth something.
+
+**Where you are is derived on the client, and it follows the walk.** The server
+keeps a character's `col`/`row` on the **departure** hex for the whole journey
+and only writes a new one when you land or stop — so every readout that asked
+the character where it was got the place it set off from. Three days into a
+walk the dock still named the forest you left, the atlas dot had not moved, the
+distance to a bench was measured from the wrong end, and the one hex sight-zero
+lights was the one behind you.
+
+So the client derives it: `path[floor(elapsed / perHex)]`, clamped to where the
+road actually ends. **That is not the client having an opinion about where it
+is** — it is the same arithmetic the server itself runs when you stop walking,
+so it is the answer the server will agree with the instant you do, drawn a few
+minutes early. It is the same derivation the marker has always been
+interpolated against; what changed is that the words now agree with the drawing.
+
+**It is a readout and never a key.** Every verb is refused on the road by the
+server anyway, and the live-state query stays centred on the server's own
+position — the per-tile costing endpoint is guarded against *that* hex, not
+this one, because its whole job is to ask the question the server will ask.
+`here` is what the map says; the character's own column is what the server
+knows; the two are the same only when you are stood still.
 
 ### 5.7 Pockets — ground that is briefly worth more
 

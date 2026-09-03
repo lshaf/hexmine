@@ -43,8 +43,10 @@ const tile = computed(() => game.selectedTile)
 const preview = computed(() => game.preview)
 
 const distance = computed(() => {
-  const char = game.character
-  return char && tile.value ? hexDistance(char.col, char.row, tile.value.col, tile.value.row) : 0
+  // §5.6 -- from where the walker IS. Measured off the character it counted
+  // from the hex they set off from, so a road already half walked still quoted
+  // the whole of it.
+  return tile.value ? hexDistance(game.hereCol, game.hereRow, tile.value.col, tile.value.row) : 0
 })
 
 const open = ref(false)
@@ -254,10 +256,9 @@ const compressed = computed(() => game.timeScale > 1)
 
 /* ------------------------------------------------------------------ travel */
 
-const onSelected = computed(() => {
-  const char = game.character
-  return Boolean(char && tile.value && char.col === tile.value.col && char.row === tile.value.row)
-})
+const onSelected = computed(() =>
+  Boolean(tile.value && game.hereCol === tile.value.col && game.hereRow === tile.value.row),
+)
 
 /** A mine pins you to the hex you are working until you claim or drop it. */
 const working = computed(() => game.fieldJob)

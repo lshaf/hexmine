@@ -53,7 +53,8 @@ const working = computed(() => game.benchJobs.filter((j) => j.endsAt > game.now)
 const distance = (job: BenchJob) => {
   if (job.col === null || job.row === null || !game.character) return null
 
-  return hexDistance(game.character.col, game.character.row, job.col, job.row)
+  // §5.6 -- from where the walker is, not from where the journey began.
+  return hexDistance(game.hereCol, game.hereRow, job.col, job.row)
 }
 
 /**

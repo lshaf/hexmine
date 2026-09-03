@@ -30,11 +30,15 @@ const here = computed(() => game.currentSettlement)
 /** The hex underfoot, costed by the server. Everything in the dock keys off it. */
 const underfoot = computed(() => game.underfoot)
 
-/** The same hex from the local generator, for naming open country. */
-const standing = computed(() => {
-  const char = game.character
-  return char ? game.tileAt(char.col, char.row) : undefined
-})
+/**
+ * The same hex from the local generator, for naming open country.
+ *
+ * §5.6 -- read off `here` rather than off the character, because the character
+ * stays on its departure hex for the whole journey. This is the one line on the
+ * dock that keeps working while you walk, and it named the forest you left for
+ * however many days the road took.
+ */
+const standing = computed(() => game.tileAt(game.hereCol, game.hereRow))
 
 /**
  * What this place is called. §5.3 water is named by biome, because a tarn and

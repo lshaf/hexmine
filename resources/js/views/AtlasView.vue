@@ -319,9 +319,11 @@ function draw(): void {
    * any zoom that fits a ring of capitals on screen is a fraction of a pixel. A ring drawn at its minimum legible size
    * would be claiming a reach the character does not have.
    */
-  const char = game.character
-  if (char) {
-    const { x, y } = toCanvas(char.col, char.row)
+  // §5.6 -- the walker's own hex rather than the character's, which sits on the
+  // departure hex until the road ends. The dot used to sit still for the whole
+  // journey on the one screen you open to see how far you have got.
+  if (game.character) {
+    const { x, y } = toCanvas(game.hereCol, game.hereRow)
 
     ctx.beginPath()
     ctx.arc(x, y, 4, 0, Math.PI * 2)
@@ -451,23 +453,22 @@ function setZoom(next: number, anchor?: { x: number; y: number }): void {
 }
 
 function centerOnCharacter(): void {
-  const char = game.character
-  if (char) center.value = clampCenter(char.col, char.row)
+  if (game.character) center.value = clampCenter(game.hereCol, game.hereRow)
 }
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v))
 
 const pickedDistance = computed(() => {
-  const char = game.character
   const mark = picked.value
-  return char && mark ? hexDistance(char.col, char.row, mark.col, mark.row) : 0
+  return game.character && mark
+    ? hexDistance(game.hereCol, game.hereRow, mark.col, mark.row)
+    : 0
 })
 
 const biomeHere = computed(() => {
-  const char = game.character
   // Rendering can outrun boot on a hot reload; the generator is not optional.
-  if (!char || !isWorldConfigured()) return ''
-  return BIOME_LABEL[biomeAt(char.col, char.row)]
+  if (!game.character || !isWorldConfigured()) return ''
+  return BIOME_LABEL[biomeAt(game.hereCol, game.hereRow)]
 })
 
 // ------------------------------------------------------------------- mount
