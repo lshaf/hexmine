@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
+use App\Game\Drops;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -46,6 +47,11 @@ class MapController extends GameController
         return response()->json([
             ...$this->game->previewTile($character, $col, $row),
             'gather' => $this->game->previewGather($character, $col, $row),
+            // §5.5 -- and the animal, which the comment above had been
+            // promising for a while without sending: the card that lists what
+            // a hex pays could name the seam's table and the bare-handed one
+            // and had nothing at all to say about the thing standing on it.
+            'hunt' => $this->game->previewTile($character, $col, $row, Drops::HUNTING),
         ]);
     }
 }

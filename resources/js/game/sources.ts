@@ -33,7 +33,15 @@ import { REAGENTS } from './alchemy'
 import { COMPONENTS } from './components'
 import { CRITTERS } from './critters'
 import { SPOILS } from './spoils'
-import { ANIMALS, HUNT_BIOMES } from './hunts'
+import {
+  ANIMALS,
+  HUNT_BIOMES,
+  HUNT_GRADED_FROM,
+  HUNT_GRADED_PART,
+  HUNT_GRADES,
+  HUNT_JUNK,
+  HUNT_LEAVING,
+} from './hunts'
 import type { Biome, ItemDef, Material, MaterialKey, SettlementTier } from './types'
 
 /** The five roads. Nothing in the world arrives by a sixth. */
@@ -198,6 +206,25 @@ export function materialSources(mat: Material): SourceLine[] {
           break
         }
 
+        // §5.5 -- the hunt's own two, and they are not pending: a kill really
+        // does pay them, one every time and one about twice in five. The
+        // generic line below says "no hex drops it yet", which was true of the
+        // mine's junk and was never true of these.
+        if (mat.key === HUNT_JUNK || mat.key === HUNT_LEAVING) {
+          lines.push({
+            kind: 'mine',
+            where: 'A hunt',
+            note:
+              mat.key === HUNT_JUNK
+                ? 'Comes home from every kill, bow or no bow. Worth a gold, wanted ' +
+                  'by no recipe — the rubbish carried out alongside the hide.'
+                : 'Torn up under the animal on about two kills in five. It says ' +
+                  'where the kill happened rather than what it was, which is the ' +
+                  'same pair a fight pays in.',
+          })
+          break
+        }
+
         lines.push({
           kind: 'mine',
           where: mat.source === 'hunt'
@@ -282,7 +309,16 @@ export function materialSources(mat: Material): SourceLine[] {
       // a component only if you did.
       if (role !== 'ground') {
         const bench = role === 'reagent' ? 'consumable' : (mat.bench ?? 'craft')
-        const verb = role === 'reagent' ? 'Gathering or mining' : 'Mining';
+        // §5.5 -- and the verb is the HUNT's when the thing comes off an
+        // animal. Both of the other words name a hex: "gathering or mining" is
+        // the two ways a country is worked, and neither of them is what you do
+        // to a deer.
+        const verb =
+          mat.source === 'hunt'
+            ? 'Hunting'
+            : role === 'reagent'
+              ? 'Gathering or mining'
+              : 'Mining'
         lines.push({
           kind: 'mine',
           where: mat.source === 'hunt'
@@ -303,6 +339,23 @@ export function materialSources(mat: Material): SourceLine[] {
       // §5.5 -- the hunting line has no ground under it. Its four rungs come
       // off the animal's own grade, so the card names the creature's country
       // and the rung rather than a kind of hex.
+      // §5.5 -- the one part the grade alone pays for. It is not a rung of
+      // hide, so no animal's `material` names it: which animals carry it is
+      // read off the ladder, and saying "needs a bow" is only half of it.
+      if (mat.key === HUNT_GRADED_PART) {
+        const rungs = HUNT_GRADES.map((g) => g.grade)
+        const carrying = rungs.slice(rungs.indexOf(HUNT_GRADED_FROM))
+
+        lines.push({
+          kind: 'mine',
+          where: `A hunt · ${carrying.join(', ')}`,
+          note:
+            'Never off a common animal, and a bow is what brings it home. The rung ' +
+            'pays in a kind of drop as well as in a rung of hide.',
+        })
+        break
+      }
+
       if (mat.source === 'hunt') {
         const animal = Object.values(ANIMALS).find((a) => a.material === mat.key)
 
@@ -388,7 +441,13 @@ function raidSources(key: MaterialKey): SourceLine[] {
     return [
       {
         kind: 'dungeon',
-        where: `${dungeon.name}, the ${dungeon.biome} dungeon`,
+        // §9.1 -- Beastwarren belongs to no country: it is where the things
+        // you hunt den, which is the whole of its name. Four dungeons take
+        // their country's name and the fifth has none to take, so it says what
+        // it is rather than printing the absence.
+        where: dungeon.biome
+          ? `${dungeon.name}, the ${dungeon.biome} dungeon`
+          : `${dungeon.name}, the beast dungeon`,
         pending: true,
         note: 'Reliable from floor 4 down, occasional above.',
       },

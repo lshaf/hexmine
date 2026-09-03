@@ -25,7 +25,15 @@ import {
   screenToTile,
   tileToScreen,
 } from './hexGeometry'
-import { corpseProp, dungeonGlyph, packProp, pocketProp, settlementGlyph, tileProps } from './props'
+import {
+  corpseProp,
+  dungeonGlyph,
+  huntProp,
+  packProp,
+  pocketProp,
+  settlementGlyph,
+  tileProps,
+} from './props'
 import { EMBER, GOLD, INK, VELLUM, VELLUM_DIM, depletedColor, shade, variantColor, waterColor } from '@/theme/palette'
 import { MINING } from '@/game/balance'
 import type { Job, Tile, TravelState } from '@/game/types'
@@ -198,6 +206,8 @@ interface RenderTile {
   pocket: string
   /** §9.5.1 -- the pack standing here, drawn only inside sight. */
   pack: string
+  /** §5.5 -- the animal standing here, which is the hunting line's seam. */
+  hunt: string
   /** §9.5.7 -- the corpse standing here, drawn regardless of sight. */
   corpse: string
   corpseLabel: string | null
@@ -362,6 +372,10 @@ const renderTiles = computed<RenderTile[]>(() =>
       // else. Beyond the ring the map says what the ground is and who lives on
       // it, never what is happening there (§13.2).
       pack: inSight ? packProp(tile) : '',
+      // §5.5 -- and the animal. Live state on the pack's own bucket, so it
+      // obeys the fog for the same reason: which hexes can be hunted is
+      // something you find out by standing near them.
+      hunt: inSight ? huntProp(tile) : '',
       // §9.5.7 -- drawn wherever the server sent one, INCLUDING outside the
       // ring. Which ones it sends is the rule: your own through any fog, and
       // anybody else's only inside sight. The client does not re-derive that.
@@ -503,6 +517,10 @@ const RARE_MARK = groundMark(6)
         <!-- §5.7 -- the critter that found the rich ground. It stands with the
              pack because it is the same kind of news: something alive is on
              this hex, and it is worth looking at. -->
+        <!-- §5.5 -- the animal is the hunting line's SEAM rather than news,
+             so it stands with the scenery and behind both of the things that
+             are: a hare in the foreground, a stag back among the trees. -->
+        <g v-if="t.hunt" v-html="t.hunt" />
         <g v-if="t.pocket" v-html="t.pocket" />
         <g v-if="t.pack" v-html="t.pack" />
         <g v-if="t.corpse" v-html="t.corpse" />

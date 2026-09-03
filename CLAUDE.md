@@ -429,6 +429,55 @@ difficulty ladder loses a rung and reads `mine → road pack → dungeon floors`
 which is the honest version: what the pack teaches is a fight, and a herd never
 taught one.
 
+**The animal is DRAWN on the hex, and drawn as the seam rather than as news.**
+A pack wears an ember halo and a pocket's critter a sap one (§13.2), because
+each is a piece of news: a state to deal with, and one worth crossing the
+screen for. An animal is neither — it is what the hunting line is worked *on* —
+so it stands with the trees and the peaks, unhaloed, and is drawn **before**
+both of them so the two that are news stand in front of it. That ring or its
+absence is the whole of what tells the two kinds of creature apart on a hex
+carrying both.
+
+Live state on the pack's own bucket, so it obeys the fog for the same reason a
+pack does: **which hexes can be hunted is something you find out by standing
+near them**, never by reading the map from four days away. That is §5.6's rule
+and this is the one thing on huntable country that most wanted breaking it.
+
+**Two axes, and the second one is what §13.1's usual pair could not carry
+alone.** The grade owns the hide, tan climbing to near-black — and it owns the
+**size** as well, 21px to 31px. One channel was not enough: four browns a shade
+apart are four browns at 25px on a moving map, and the grade is the entire
+reason to walk to one animal rather than the one behind it. Size survives being
+small, being dark and being half behind a tree, and it is true besides — a roe
+deer at the edge of the wood and something *heavier than the gate* are not the
+same silhouette at the same scale. The hide deliberately does **not** climb
+toward ember the way a monster's tier does (§9.5.2): the two ramps meet on one
+map, and a contested stag the colour of an Ash Revenant would be a payout
+wearing the alarm.
+
+The animal itself owns a **body plan and one crown**: deer-narrow with the head
+carried high, or heavy and low with it carried forward, plus a mark off the
+sentence already in the roster — the boar's tusks, the elk's rack it turns
+sideways, the ram's curl. Every crown breaks the top of the silhouette, which
+is what makes a mark survive at 21px.
+
+**A kill pays two things beside the hide, and one of them is the rung's.** The
+parts are flat — horn, sinew, the two reagents and the critter, off any animal
+with a bow. **Braided Sinew comes off an uncommon animal or better and never
+off a common one**, so the ladder pays in a *kind* of drop as well as in a rung
+of hide, and the eight almanac entries differ by something a player can act on.
+**Matted Turf** is the hunt's leaving, about two kills in five: §9.5.8's own
+pair of questions — the hide says *what* you took and this says *where* it was
+standing.
+
+Both of those came off plains ground as that country's §9.5.8 stock and had
+nowhere to go when the country was folded into a line. **Folding a biome away
+must not cost the game a material**, and the sentence on the sinew — *laid down
+in cords by a thing that ran every day of its life* — was always about an
+animal rather than about a kind of dirt. What the fold genuinely cost is the
+five plains monsters, and that is a count following a rule rather than a loss:
+§9.5.2 puts five to a country, and there are four countries.
+
 ### 5.6 Sight and travel — a fog, not a fence
 
 These were one number and are now two, and separating them is what makes the
@@ -2508,7 +2557,7 @@ That is the whole anti-farm argument, and it needs no cooldown: **you cannot
 re-roll a pack**, because after the roll there is no pack. Supply is capped by
 hexes and hours, not by patience.
 
-#### 9.5.2 The roster — twenty-five monsters, five to a country
+#### 9.5.2 The roster — twenty monsters, five to a country
 
 **A biome's five stand on that biome and nowhere else.** Walking out of the
 forest into the badlands changes what is on the road, which is what makes
@@ -3075,9 +3124,9 @@ makes a whole new faucet safe under §2.
 |---|---|
 | **Gold**, on a win | fills §3.2's monster drops, and needs no bag row — which matters when the fight was not your idea. A loss pays nothing at all (§9.5.3) |
 | **Monster materials** | 2 families × 5 grades: a plate/hide line for the smith and armorer, an ichor/organ line for the consumable bench. Tier 1, graded by tier, dropped by nothing else |
-| **The country's own stock** | a third Tier 1 line, **one per biome**, off that country's five and nothing else (§9.5.2). About as often as the ichor |
+| **The country's own stock** | a third Tier 1 line, **one per biome**, off that country's five and nothing else (§9.5.2). About as often as the ichor. The hunt keeps the fifth of them (§5.5) |
 | **Trophies** | a **Tier 0** line of four, one per monster tier, dropped every time — **what** you fought |
-| **Leavings** | a **Tier 0** line of five, one per biome, about two wins in five — **where** you fought it |
+| **Leavings** | a **Tier 0** line of four, one per biome, about two wins in five — **where** you fought it |
 | **Looted gear** | the kit the monster was using, at **5–50% durability**, rarity capped at **rare** |
 | **Battle job XP** | on a win only (§9.5.3) |
 | **Never** | Tier 3, Tier 4, or anything mintable |
@@ -3093,9 +3142,9 @@ something sit outside the containment above without threatening it. What it
 actually spends is a **strap** (§7.6), and that is the interesting part: it is
 the one drop in the game that can be worth throwing away.
 
-One per *tier* rather than one per monster, and that is the bag again. Twenty-five
-trophies would be twenty-five rows, and a fight that costs you a strap is a
-fight that cost more than it paid.
+One per *tier* rather than one per monster, and that is the bag again. Twenty
+trophies would be twenty rows, and a fight that costs you a strap is a fight
+that cost more than it paid.
 
 **And the ground turns up, about two wins in five.** The *fight* did not happen
 in the abstract, and what gets trampled into the dirt is the country's own. Two
@@ -3970,6 +4019,14 @@ The working approach, after several failed attempts:
 - **One exception, and it is one wallet wide: your own corpse** (§9.5.7). It is
   drawn through any fog at any distance, because it holds a row of yours on a
   24h clock. Anybody else's obeys the fog like everything else.
+- **Three things can stand on one hex, and the halo says which two are news.**
+  A pack (ember) and a pocket's critter (sap) are drawn last and in front; the
+  hunt's animal (§5.5) is drawn first, unhaloed, because it is the hunting
+  line's seam rather than something looking at you. All three obey the fog.
+- **A hunted hex stops drawing its animal at once.** Where one stands is a hash
+  and whether somebody has taken it is not, so the live-state query answers
+  both — `cleared` for packs and `hunted` for animals, kept apart because the
+  two stand on one hex independently and one flag could never speak for both.
 - Tiling: flat-top hexes, `colStep = W * 0.75`, `rowStep = H`, odd columns offset by `H/2`.
 - **Layout with inline styles, not Tailwind arbitrary values** (`w-[390px]` etc. silently
   failed in the artifact sandbox and collapsed the viewport to zero height). Use a flex

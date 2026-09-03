@@ -95,6 +95,26 @@ final class Hunts
         'beastfang_hide' => 'hunting',
     ];
 
+    /** §5.5 -- what a kill gives up beside the hide. */
+    public const PARTS = ['horn', 'sinew', 'bitterroot', 'yarrow', 'dustleveret'];
+
+    /** §5.5 -- the part only an uncommon animal or better gives up. */
+    public const GRADED_PART = 'braided_sinew';
+
+    public const GRADED_FROM = 'uncommon';
+
+    /** §4 -- the tier-0 rubbish carried out alongside, every time. */
+    public const JUNK = 'bone_splinter';
+
+    /** §9.5.8 -- the tier-0 leaving that says where the kill happened. */
+    public const LEAVING = 'matted_turf';
+
+    /** The two that are neither hide nor ladder: a graded part and a leaving. */
+    public const EXTRA = [
+        'braided_sinew' => ['name' => 'Braided Sinew', 'tier' => 1, 'source' => 'hunt', 'palette' => 'pelt', 'npcPrice' => 8, 'description' => 'Laid down in cords by a thing that ran every day of its life. It will not part.'],
+        'matted_turf' => ['name' => 'Matted Turf', 'tier' => 0, 'source' => 'hunt', 'palette' => 'stone', 'npcPrice' => 1, 'description' => 'Torn up where it was braced against you. Roots, dirt, and nothing else.'],
+    ];
+
     /** Biome -> grade -> which animal that is. */
     public const BY_BIOME_GRADE = [
         'forest' => [

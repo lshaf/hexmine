@@ -56,6 +56,51 @@ WEIGHTS = {
 
 GRADES = [(grade, raw[0], WEIGHTS[grade]) for grade, raw, _ in LINE]
 
+# §5.5 -- what a kill gives up BESIDE the hide, and it lives here for the same
+# reason the ladder does: it is the hunt's table, not a hex's.
+#
+# Two components, two reagents and the critter that used to come off plains
+# ground. Drops.php reads these rather than keeping a second copy, and the
+# almanac reads them so a player can find out what a hunt pays before taking
+# one -- which is the whole of what that screen is for.
+PARTS = ['horn', 'sinew', 'bitterroot', 'yarrow', 'dustleveret']
+
+# §5.5 -- and one part the grade alone pays for.
+#
+# It came off plains ground as that country's §9.5.8 stock and had nowhere to
+# go when the country did; the sentence on it was always about an ANIMAL rather
+# than about a kind of dirt -- "a thing that ran every day of its life" -- so
+# the hunt is where it belonged all along. Restoring it here is what keeps
+# folding a biome into a line from costing the game a material.
+#
+# Off the common rung deliberately: a Roe Deer never carries it, so the grade
+# ladder pays in a KIND of drop as well as in a rung of hide, and the almanac's
+# eight entries differ by something a player can act on.
+GRADED_PART = 'braided_sinew'
+GRADED_FROM = 'uncommon'
+
+# §4 -- the tier-0 rubbish carried out alongside, every time.
+JUNK = 'bone_splinter'
+
+# §9.5.8's other half, kept: what says WHERE, rather than what.
+#
+# The fight has a trophy and a leaving for exactly this reason -- one names what
+# you fought and one names the ground it happened on -- and a hunt is the same
+# two questions. The hide answers the first and this answers the second.
+LEAVING = 'matted_turf'
+
+# The two the plains roster carried, re-described for the creature they now come
+# off rather than for the country that is gone. Merged into Catalog beside the
+# rest of the hunting line.
+#
+# key, Name, tier, palette, npcPrice, description
+EXTRA = [
+    (GRADED_PART, 'Braided Sinew', 1, 'pelt', 8,
+     'Laid down in cords by a thing that ran every day of its life. It will not part.'),
+    (LEAVING, 'Matted Turf', 0, 'stone', 1,
+     'Torn up where it was braced against you. Roots, dirt, and nothing else.'),
+]
+
 # key, name, biome, grade, description
 #
 # Two countries of four, one per grade, because the grade is what decides the
@@ -114,6 +159,9 @@ making that argument about monsters."""
 
 def php_str(s):
     return "'" + s.replace('\\', '\\\\').replace("'", "\\'") + "'"
+
+
+ts_str = php_str
 
 
 def doc(o, header, prefix=' * '):
@@ -196,6 +244,22 @@ def emit_php():
         o.write(f"        '{raw[0]}' => 'hunting',\n")
     o.write('    ];\n\n')
 
+    o.write('    /** §5.5 -- what a kill gives up beside the hide. */\n')
+    o.write('    public const PARTS = [' + ', '.join(f"'{k}'" for k in PARTS) + '];\n\n')
+    o.write('    /** §5.5 -- the part only an uncommon animal or better gives up. */\n')
+    o.write(f"    public const GRADED_PART = '{GRADED_PART}';\n\n")
+    o.write(f"    public const GRADED_FROM = '{GRADED_FROM}';\n\n")
+    o.write('    /** §4 -- the tier-0 rubbish carried out alongside, every time. */\n')
+    o.write(f"    public const JUNK = '{JUNK}';\n\n")
+    o.write('    /** §9.5.8 -- the tier-0 leaving that says where the kill happened. */\n')
+    o.write(f"    public const LEAVING = '{LEAVING}';\n\n")
+    o.write('    /** The two that are neither hide nor ladder: a graded part and a leaving. */\n')
+    o.write('    public const EXTRA = [\n')
+    for key, name, tier, palette, price, desc in EXTRA:
+        o.write(f"        '{key}' => ['name' => {php_str(name)}, 'tier' => {tier}, "
+                f"'source' => 'hunt', 'palette' => '{palette}', 'npcPrice' => {price}, "
+                f"'description' => {php_str(desc)}],\n")
+    o.write('    ];\n\n')
     o.write('    /** Biome -> grade -> which animal that is. */\n')
     o.write('    public const BY_BIOME_GRADE = [\n')
     for biome in BIOMES:
@@ -255,6 +319,21 @@ def emit_ts():
             f"  {{ key: 'tan_{key}', name: 'Tan {name}', input: '{raw[0]}', inputQty: 3, "
             f"output: '{key}', outputQty: 1, baseSeconds: {minutes} * 60, skill: 'hunting' }},\n"
         )
+    o.write(']\n\n')
+    o.write('/** §5.5 -- what a kill gives up beside the hide. */\n')
+    o.write('export const HUNT_PARTS = [' + ', '.join(f"'{k}'" for k in PARTS) + '] as const\n\n')
+    o.write('/** §5.5 -- the part only an uncommon animal or better gives up. */\n')
+    o.write(f"export const HUNT_GRADED_PART = '{GRADED_PART}'\n\n")
+    o.write(f"export const HUNT_GRADED_FROM = '{GRADED_FROM}'\n\n")
+    o.write('/** §4 -- the tier-0 rubbish carried out alongside, every time. */\n')
+    o.write(f"export const HUNT_JUNK = '{JUNK}'\n\n")
+    o.write('/** §9.5.8 -- the tier-0 leaving that says where the kill happened. */\n')
+    o.write(f"export const HUNT_LEAVING = '{LEAVING}'\n\n")
+    o.write('/** The two that are neither hide nor ladder: a graded part and a leaving. */\n')
+    o.write('export const HUNT_EXTRA: Material[] = [\n')
+    for key, name, tier, palette, price, desc in EXTRA:
+        o.write(f"  {{ key: '{key}', name: {ts_str(name)}, tier: {tier}, source: 'hunt', "
+                f"palette: '{palette}', npcPrice: {price}, description: {ts_str(desc)} }},\n")
     o.write(']\n\n')
     o.write('export const ANIMAL_BY_BIOME_GRADE: Record<string, Record<string, string>> = {\n')
     for biome in BIOMES:

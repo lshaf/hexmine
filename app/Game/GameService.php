@@ -1968,7 +1968,7 @@ class GameService
      * is which of them somebody has already fought. One MGET over the disc
      * answers that for every hex at once.
      *
-     * @return array{depleted:array<int,array{0:int,1:int,2:int}>,occupied:array<int,array{0:int,1:int,2:int}>,cleared:array<int,array{0:int,1:int}>}
+     * @return array{depleted:array<int,array{0:int,1:int,2:int}>,occupied:array<int,array{0:int,1:int,2:int}>,cleared:array<int,array{0:int,1:int}>,hunted:array<int,array{0:int,1:int}>}
      */
     public function mapMutations(Character $character): array
     {
@@ -2043,15 +2043,29 @@ class GameService
         // (§5.6 caps sight at three), and it is the only way to know which of
         // them the hash put a pack on this bucket.
         $packs = [];
+        $hunts = [];
         for ($col = $minCol; $col <= $maxCol; $col++) {
             for ($row = $minRow; $row <= $maxRow; $row++) {
                 if (! $inSight($col, $row)) {
                     continue;
                 }
 
-                $pack = WorldGen::generateTile($col, $row, $now)['pack'] ?? null;
+                $tile = WorldGen::generateTile($col, $row, $now);
+
+                $pack = $tile['pack'] ?? null;
                 if ($pack !== null) {
                     $packs[] = ['col' => $col, 'row' => $row, 'bucket' => $pack['bucket']];
+                }
+
+                // §5.5 -- and the animal, which is the same question asked of
+                // the other thing standing on a hex: the seed says where one
+                // is, and only the cache knows whether it has been taken.
+                $hunt = $tile['hunt'] ?? null;
+                if ($hunt !== null) {
+                    $hunts[] = [
+                        'col' => $col, 'row' => $row,
+                        'bucket' => $hunt['bucket'], 'kind' => Packs::HUNT,
+                    ];
                 }
             }
         }
@@ -2060,6 +2074,12 @@ class GameService
             'depleted' => $depleted,
             'occupied' => $occupied,
             'cleared' => Packs::clearedAmong($packs),
+            // §5.5 -- a hunt is spent once and the animal is gone until the
+            // bucket rolls it somewhere else. Kept apart from `cleared`
+            // because a pack and an animal stand on one hex independently:
+            // folding them into one list would take an animal off a hex
+            // somebody had merely fought on.
+            'hunted' => Packs::clearedAmong($hunts),
             // §9.5.7 -- other people's corpses, and only inside sight like
             // everything else here. Your own ride the player state instead:
             // they are yours and the fog does not apply to them.

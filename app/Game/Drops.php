@@ -123,7 +123,7 @@ final class Drops
         // what a hunt is worth is the creature's rung, and the hex it happens
         // to be standing on has nothing to say about it.
         if ($activity === self::HUNTING) {
-            return self::hunting($primary);
+            return self::hunting($primary, $tile['hunt'] ?? null);
         }
 
         $reach = 0;
@@ -165,18 +165,50 @@ final class Drops
      *
      * @return array<string,float>
      */
-    private static function hunting(string $primary): array
+    private static function hunting(string $primary, ?array $animal = null): array
     {
         if ($primary === Catalog::HUNT_SCRAP) {
-            return [$primary => 88.0, self::HUNT_JUNK => 12.0];
+            // §4.0 -- bare hands take the hide and trample the ground. Nothing
+            // off a bench comes home, but the leaving is not off a bench.
+            return [$primary => 82.0, self::HUNT_JUNK => 12.0, Hunts::LEAVING => 6.0];
         }
 
-        $table = [$primary => 62.0, self::HUNT_JUNK => 9.0];
+        $table = [$primary => 60.0, self::HUNT_JUNK => 9.0, Hunts::LEAVING => 5.0];
         foreach (self::HUNT_PARTS as $key) {
             $table[$key] = 5.8;
         }
 
+        // §5.5 -- named only when the animal standing there actually carries
+        // it. A card promising a drop a Roe Deer cannot give would be the
+        // preview lying about the one thing the grade is read for.
+        if (self::gradedPartStands($animal)) {
+            $table[Hunts::GRADED_PART] = 11.0;
+        }
+
         return $table;
+    }
+
+    /**
+     * §5.5 -- does this animal's rung carry the graded part.
+     *
+     * Read off the ladder rather than off a list, so adding a rung above
+     * contested would carry it for free and could not silently skip it.
+     */
+    private static function gradedPartStands(?array $animal): bool
+    {
+        $grade = $animal['grade'] ?? null;
+        if ($grade === null) {
+            return false;
+        }
+
+        // GRADES is keyed BY grade and ordered low to high, so the ladder is
+        // the key order: reading it this way means a rung added above
+        // contested carries the part for free and cannot be silently skipped.
+        $rungs = array_keys(Hunts::GRADES);
+        $from = array_search(Hunts::GRADED_FROM, $rungs, true);
+        $at = array_search($grade, $rungs, true);
+
+        return $from !== false && $at !== false && $at >= $from;
     }
 
     /** Which rung of its biome's four this hex is, or 0 if it has no material. */
@@ -419,69 +451,6 @@ final class Drops
     }
 
     /**
-     * §5.5 -- what comes off a hunted animal.
-     *
-     * The hunting line's whole haul, which is what mining a plains hex used to
-     * pay. The animal's GRADE decides the rung of pelt, exactly as the hex's
-     * variant used to (§5.3), so the ladder did not change hands -- only what
-     * carries it.
-     *
-     * **A bow or nothing.** §8.0 rule 1 refuses a mine outright without the
-     * line's tool and §4.0 pays scrap for the bare-handed version; a hunt is the
-     * same bargain. Without a bow the kill still happens and what comes home is
-     * Torn Hide, a gold apiece and wanted by no recipe — the gap that is the
-     * whole argument for buying the first bow.
-     *
-     * Everything the plains biome used to give up comes off here now: its two
-     * components, its two reagents, its critter and its junk. A hunt happens out
-     * in the field, so a plant pulled up beside the carcass is not a stretch —
-     * and the alternative was five materials with nowhere to come from.
-     *
-     * @return array<string,int>
-     */
-    public static function huntSpoils(array $animal, int $seed, bool $armed, float $haul = 0.0): array
-    {
-        $out = [];
-
-        // §4.0 -- the tool is the whole difference. Same haul size, a fraction
-        // of the worth, and no recipe anywhere will take it.
-        $out[$armed ? $animal['material'] : Catalog::HUNT_SCRAP] = Hash::randInt(
-            Hash::hash2($seed, 53, Balance::mapSeed() ^ 0x5920),
-            self::PLATE_MIN,
-            self::PLATE_MAX,
-        );
-
-        // The animal parts, and only to somebody who brought a bow: a carcass
-        // torn at by hand gives up hide and nothing worth a bench.
-        if ($armed) {
-            foreach (self::HUNT_PARTS as $i => $key) {
-                if (Hash::rand01(Hash::hash2($seed, 59 + $i, Balance::mapSeed() ^ 0x5921)) < self::ICHOR_CHANCE) {
-                    $out[$key] = ($out[$key] ?? 0) + Hash::randInt(
-                        Hash::hash2($seed, 67 + $i, Balance::mapSeed() ^ 0x5922),
-                        self::ICHOR_MIN,
-                        self::ICHOR_MAX,
-                    );
-                }
-            }
-        }
-
-        // §4 -- and the rubbish, every time, worth a gold and feeding nothing.
-        $out[self::HUNT_JUNK] = ($out[self::HUNT_JUNK] ?? 0) + Hash::randInt(
-            Hash::hash2($seed, 71, Balance::mapSeed() ^ 0x5923),
-            self::TROPHY_MIN,
-            self::TROPHY_MAX,
-        );
-
-        if ($haul > 0) {
-            foreach ($out as $key => $quantity) {
-                $out[$key] = self::scaleSpoil($quantity, $haul, Hash::hash2($seed, crc32($key), Balance::mapSeed() ^ 0x5924));
-            }
-        }
-
-        return $out;
-    }
-
-    /**
      * §8.0.1 -- a share applied to a small count, without losing the share.
      *
      * Spoil rows are one to three units, so rounding a 30% bonus would pay
@@ -712,10 +681,11 @@ final class Drops
      * so a hunt that comes home with two of them is a good one rather than an
      * exception the code had to allow for.
      */
-    private const HUNT_PARTS = ['horn', 'sinew', 'bitterroot', 'yarrow', 'dustleveret'];
+    private const HUNT_PARTS = Hunts::PARTS;
+
 
     /** §4 -- the tier-0 rubbish, every time. */
-    private const HUNT_JUNK = 'bone_splinter';
+    private const HUNT_JUNK = Hunts::JUNK;
 
     /** @return list<string> */
     private static function componentsOf(string $biome): array

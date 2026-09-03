@@ -9,7 +9,7 @@ import { COMPONENTS } from './components'
 import { TOP_TIER } from './toptier'
 import { CRITTERS } from './critters'
 import { SPOILS } from './spoils'
-import { HUNT_RAW, HUNT_REFINED } from './hunts'
+import { HUNT_EXTRA, HUNT_RAW, HUNT_REFINED } from './hunts'
 import { BATTLE_GEAR } from './battlegear'
 import {
   BIOME_VARIANTS,
@@ -66,6 +66,9 @@ export const MATERIALS: Record<MaterialKey, Material> = {
       // a country, so it lives with the animal that carries it.
       ...HUNT_RAW,
       ...HUNT_REFINED,
+      // §5.5 -- the graded part and the leaving, which are neither hide nor
+      // ladder and came off plains ground before the country was folded away.
+      ...HUNT_EXTRA,
     ].map((m) => [m.key, m]),
   ) as Record<
     | ReagentKey

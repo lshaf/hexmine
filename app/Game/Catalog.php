@@ -95,6 +95,11 @@ final class Catalog
             // with the animal that carries it. See scripts/gen_hunts.py.
             + Hunts::RAW
             + Hunts::REFINED
+            // §5.5 -- and the two a kill gives up that are neither hide nor
+            // ladder: the part only an uncommon animal or better carries, and
+            // the leaving that says where it was standing. Both came off
+            // plains ground and had nowhere to go when the country did.
+            + Hunts::EXTRA
             // §4 -- the alchemist's second stock: what LIVES on a kind of
             // ground, as against what grows on it. Hunted, never gathered.
             // Generated, not typed: see scripts/gen_critters.py.

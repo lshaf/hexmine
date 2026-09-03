@@ -173,6 +173,38 @@ final class HuntTest extends TestCase
         );
     }
 
+    /**
+     * §5.5 -- and the map is told, so the animal stops being drawn.
+     *
+     * Where one stands is a hash the client runs for itself; whether somebody
+     * has taken it is the one thing the seed cannot know. Without this the hex
+     * would keep drawing an animal that is no longer there and the glyph would
+     * be advertising a refusal.
+     *
+     * Its own list rather than `cleared`, because a pack and an animal stand on
+     * one hex independently and one flag could never speak for both.
+     */
+    public function test_a_kill_is_reported_to_the_map(): void
+    {
+        [$character] = $this->standOnAnimal();
+
+        $before = $this->game->mapMutations($character->fresh());
+        $this->assertSame([], $before['hunted']);
+
+        $this->takeIt($character);
+
+        $fresh = $character->fresh();
+        $after = $this->game->mapMutations($fresh);
+
+        $this->assertContains(
+            [(int) $fresh->col, (int) $fresh->row],
+            $after['hunted'],
+            'the map was not told the animal is gone',
+        );
+        // And the pack list is untouched: nothing was fought here.
+        $this->assertSame([], $after['cleared']);
+    }
+
     /** §5.5 -- and a hex with nothing on it refuses rather than paying. */
     public function test_a_hex_with_no_animal_refuses(): void
     {

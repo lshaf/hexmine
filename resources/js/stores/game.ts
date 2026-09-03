@@ -130,7 +130,13 @@ export const useGame = defineStore('game', () => {
    */
   const view = ref({ col: 0, row: 0, w: 900, h: 620 })
 
-  const mutations = ref<MapMutations>({ depleted: [], occupied: [], cleared: [], carriers: [] })
+  const mutations = ref<MapMutations>({
+    depleted: [],
+    occupied: [],
+    cleared: [],
+    hunted: [],
+    carriers: [],
+  })
 
   /**
    * §9.5.7 -- every corpse this character can see, from both halves.
@@ -163,6 +169,9 @@ export const useGame = defineStore('game', () => {
     )
     // §9.5.1 -- the pack itself is derived; whether it is still standing is not.
     const cleared = new Set((mutations.value.cleared ?? []).map(([c, r]) => key(c, r)))
+    // §5.5 -- and the animal's own, which is the same subtraction: the seed
+    // says where one stands and only the server knows it has been taken.
+    const hunted = new Set((mutations.value.hunted ?? []).map(([c, r]) => key(c, r)))
 
     const built: Tile[] = []
     for (const coord of visibleTiles(col, row, w, h)) {
@@ -179,6 +188,7 @@ export const useGame = defineStore('game', () => {
           slotsUsed: occupied.get(k)?.seats ?? 0,
           workers: occupied.get(k)?.bodies ?? 0,
           packCleared: cleared.has(k),
+          huntCleared: hunted.has(k),
         }),
       )
     }

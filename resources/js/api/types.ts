@@ -504,6 +504,15 @@ export interface TilePreview extends WorkPreview {
    * is the whole of what makes it the floor under the §8.0 ladder.
    */
   gather: WorkPreview
+  /**
+   * §5.5 -- and the animal standing on it, costed the same way.
+   *
+   * Present on every hex and available on almost none of them: a hunt is a
+   * mine with a creature in the seam's place, so the costing exists whether or
+   * not anything is standing there and answers "Nothing to hunt here" when it
+   * is not.
+   */
+  hunt: WorkPreview
 }
 
 export interface MapMutations {
@@ -519,6 +528,14 @@ export interface MapMutations {
   occupied: Array<[number, number, number, number]>
   /** §9.5.1 -- packs in sight that somebody has already fought, win or lose. */
   cleared: Array<[number, number]>
+  /**
+   * §5.5 -- animals in sight that somebody has already taken.
+   *
+   * The hunt's own half of `cleared`, and a separate list for the same reason
+   * it is a separate cache key: a pack and an animal stand on one hex
+   * independently, so one flag could never speak for both.
+   */
+  hunted: Array<[number, number]>
   /** §9.5.7 -- other people's corpses, inside sight like everything else here. */
   carriers: Carrier[]
 }

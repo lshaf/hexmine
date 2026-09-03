@@ -22,7 +22,14 @@ import { groundLabel } from '@/game/ground'
 import { hexDistance } from '@/map/hexGeometry'
 import { worldParams } from '@/game/worldgen'
 import { materialIcon } from '@/icons/procedural'
-import { deadGlyph, dungeonProp, pocketSpecimen, unscoutedGlyph, waterGlyph } from '@/map/props'
+import {
+  animalMark,
+  deadGlyph,
+  dungeonProp,
+  pocketSpecimen,
+  unscoutedGlyph,
+  waterGlyph,
+} from '@/map/props'
 import HexAction from '@/shell/HexAction.vue'
 import SvgIcon from './SvgIcon.vue'
 import LineMarks from './LineMarks.vue'
@@ -168,6 +175,17 @@ const shown = (keys: readonly MaterialKey[] | undefined) =>
  */
 const drops = computed(() => shown(preview.value?.drops))
 const gatherDrops = computed(() => shown(preview.value?.gather?.drops))
+/** §5.5 -- and what comes off the animal, when there is one standing here. */
+const huntDrops = computed(() => shown(preview.value?.hunt?.drops))
+
+/**
+ * §5.5 -- the animal, and it is only on the card when there is one.
+ *
+ * A hunt costing comes back for every hex, because the verb exists whether or
+ * not the bucket put anything on the ground; what says there is something to
+ * hunt is this, not the costing.
+ */
+const animal = computed(() => preview.value?.hunt?.animal ?? null)
 
 /**
  * One entry per verb the dock offers here, in the order the dock offers them.
@@ -185,7 +203,13 @@ const tables = computed(() => {
   return [
     { key: 'mine', label: 'Mine', rows: drops.value, cost: p },
     { key: 'gather', label: 'Gather', rows: gatherDrops.value, cost: p.gather },
-  ].filter((t) => t.rows.length)
+    // §5.5 -- the third verb, and the only one of the three that is not always
+    // on offer: the seam is a property of the ground and the animal is not.
+    // Named for the animal rather than for the verb, because "Hunt" repeated
+    // over a row of hides says nothing the button below has not, and WHICH
+    // animal is the whole of what decides the rung.
+    { key: 'hunt', label: 'Hunt', rows: huntDrops.value, cost: p.hunt },
+  ].filter((t) => t.cost && t.rows.length)
 })
 
 /**
@@ -439,6 +463,18 @@ watch(open, (isOpen) => {
                haul still belongs to the hex's own line, §4.0. -->
           <p v-if="mine && mat" class="tiny muted lede">
             {{ mat.name }} · trains {{ SKILL_BY_KEY[mine.skill ?? skillForMaterial(mat.key)].name }}
+          </p>
+
+          <!-- §5.5 -- the animal gets the lede the seam's material gets, for
+               the same reason: the row below is a price list and this is what
+               it is a price list FOR. Which animal is the whole of what
+               decides the rung of hide, so naming it is not decoration.
+
+               Drawn as well as named, because it is the drawing the player
+               just tapped on the map. -->
+          <p v-if="animal" class="tiny muted lede quarry">
+            <span class="mark" aria-hidden="true" v-html="animalMark(animal.key, 22)" />
+            {{ animal.name }} · {{ animal.grade }} rung · trains Hunting
           </p>
 
           <!-- §4 / §7.3 -- one price line per verb, because this hex answers
@@ -843,6 +879,18 @@ watch(open, (isOpen) => {
 /* §4.0 -- the floor under the ladder, and it says so by being the quiet one. */
 .verb.gather .label {
   color: #7b8580;
+}
+
+/* §5.5 -- the animal's lede carries its drawing, so the mark rides the text
+   baseline rather than sitting above it in a block of its own. */
+.lede.quarry {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.lede.quarry .mark :deep(svg) {
+  display: block;
 }
 
 @media (prefers-reduced-motion: reduce) {

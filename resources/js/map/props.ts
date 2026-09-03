@@ -12,6 +12,7 @@ import { BIOME_COLOR, desaturate, shade, variantColor, waterColor } from '@/them
 import { HEX_H, HEX_SIDE_PATH, HEX_TOP_PATH, HEX_W, ROW_STEP } from './hexGeometry'
 import { VARIANT_PROPS } from '@/game/variants'
 import { MONSTERS } from '@/game/monsters'
+import { ANIMALS } from '@/game/hunts'
 import { MONSTER_VIEW, monsterBody } from '@/icons/combatants'
 import type { Biome, SettlementTier, Tile, VariantKey, WaterKind } from '@/game/types'
 
@@ -414,6 +415,270 @@ const POCKET_CRITTER: Record<Biome, (x: number, y: number) => string> = {
   mountain: rockmite,
   badlands: ashnewt,
   grassland: fenlark,
+}
+
+// ------------------------------------------------------------------- the hunt
+
+/*
+ * §5.5 -- the animal on a huntable hex, and it is the SEAM rather than news.
+ *
+ * A pack and a pocket's critter are two pieces of news standing on a hex, and
+ * §13.3 gives each of them a halo saying which: ember for a state to deal with,
+ * sap for one worth crossing the screen for. An animal is neither. It is what
+ * the hunting line is worked ON -- "the animal is the ground", and hunting one
+ * is a mine with the creature in the seam's place -- so it is drawn the way the
+ * trees and the peaks are: standing on the country, part of it, unhaloed.
+ *
+ * That is also what tells the two kinds of creature apart at a glance on a hex
+ * carrying both. A ring means somebody is telling you something; no ring means
+ * this is what the ground is like.
+ *
+ * Two axes, §13.1's own rule and nothing new:
+ *
+ *   grade  -> the hide, tan climbing to near-black
+ *   animal -> the body plan, and one crown off its own description
+ *
+ * The hide deliberately does NOT climb toward ember the way a monster's tier
+ * does (§9.5.2): the two ramps meet on the same map, and a contested stag that
+ * came out the colour of an Ash Revenant would be a payout wearing the alarm.
+ */
+const GAME_HIDE: Record<string, string> = {
+  common: '#cfae83',
+  uncommon: '#a37c4b',
+  rare: '#6b4d2a',
+  contested: '#3b2e20',
+}
+
+/**
+ * §5.5 -- and the grade owns the SIZE as well as the hide.
+ *
+ * One channel was not enough. Four browns separated by a shade apiece are four
+ * browns at 25px on a moving map, and the grade is the whole reason to walk to
+ * one animal rather than the one behind it. Size survives being small, being
+ * dark, and being half behind a tree -- and it is true besides: a roe deer at
+ * the edge of the wood and something "heavier than the gate" are not the same
+ * silhouette at the same scale.
+ */
+const GAME_SIZE: Record<string, number> = {
+  common: 21,
+  uncommon: 24,
+  rare: 27,
+  contested: 31,
+}
+
+/** Feet on the floor of a 24-box, so every animal plants on one ground line. */
+const ANIMAL_VIEW = 24
+
+/*
+ * The crowns, one per animal, each off the sentence already in the roster: the
+ * boar is rooting under the mast, the elk has a rack it turns sideways, the ram
+ * comes down the slope at you. Nothing invented -- the same discipline §9.5.2
+ * puts on a monster's one mark.
+ *
+ * Every one of them breaks the top of the silhouette, which is what makes a
+ * mark survive at 21px: an outline that changes shape is read before any detail
+ * inside it is. Drawn in the hide's own light tone rather than in bone, because
+ * §13.2 spends pale vellum on masonry and an antler near it reads as built.
+ */
+const CROWN: Record<string, (lit: string, dark: string) => string> = {
+  // Two short spikes. A roe buck carries barely more than that, and "gone into
+  // the trees the moment you are seen" is not an animal that stands and poses.
+  roe_deer: (lit) =>
+    `<path d="M5.4 5.0 L4.2 0.6 L6.2 3.4 Z" fill="${lit}"/>` +
+    `<path d="M7.0 4.6 L7.4 0.4 L8.6 3.6 Z" fill="${lit}"/>`,
+
+  // Ears up out of the seed heads, which is how you find it. Wide rather than
+  // tall, so it never reads as the spikes above.
+  field_doe: (lit) =>
+    `<path d="M5.6 4.8 Q2.0 1.4 1.2 2.6 Q1.6 4.6 5.0 6.2 Z" fill="${lit}"/>` +
+    `<path d="M7.2 4.4 Q6.2 0.6 7.8 0.8 Q9.2 2.4 8.6 5.4 Z" fill="${lit}"/>`,
+
+  // "A rack it has to turn sideways to walk." Wide before it is tall, and the
+  // one crown on the map that is broader than the animal carrying it.
+  bracken_elk: (lit) =>
+    `<path d="M5.2 4.6 L1.6 0.8 L3.4 0.2 L6.4 3.2 Z" fill="${lit}"/>` +
+    `<path d="M2.4 1.8 L-1.8 1.2 L-1.4 2.8 L2.8 3.4 Z" fill="${lit}"/>` +
+    `<path d="M7.4 4.2 L7.0 0.0 L8.8 0.4 L9.0 3.4 Z" fill="${lit}"/>` +
+    `<path d="M7.8 1.2 L11.8 -0.2 L12.2 1.4 L8.2 2.6 Z" fill="${lit}"/>`,
+
+  // The same rack, heavier and tined. "Nothing in the wood has taken one down
+  // in living memory" is a crown with more of it above the head than below.
+  ironhide_stag: (lit) =>
+    `<path d="M5.0 4.8 L1.0 0.4 L3.0 -0.4 L6.2 3.2 Z" fill="${lit}"/>` +
+    `<path d="M1.6 1.4 L-2.6 0.2 L-2.2 2.0 L2.0 3.0 Z" fill="${lit}"/>` +
+    `<path d="M2.6 -0.2 L1.8 -4.0 L3.6 -4.0 L4.2 -0.6 Z" fill="${lit}"/>` +
+    `<path d="M7.6 4.2 L7.2 -1.0 L9.2 -0.6 L9.4 3.4 Z" fill="${lit}"/>` +
+    `<path d="M8.0 0.6 L12.2 -1.6 L12.8 0.2 L8.6 2.2 Z" fill="${lit}"/>` +
+    `<path d="M7.8 -1.0 L8.0 -4.6 L9.8 -4.4 L9.8 -0.8 Z" fill="${lit}"/>`,
+
+  // Tusks up out of a snout that is already at the ground, and the bristle
+  // ridge that says which end of a boar you are looking at.
+  wood_boar: (lit, dark) =>
+    `<path d="M2.6 12.2 Q0.4 11.0 0.8 8.2 L2.6 8.8 Q2.4 10.6 3.8 11.4 Z" fill="${lit}"/>` +
+    `<path d="M4.6 12.8 Q3.0 11.6 3.4 9.6 L5.0 10.0 Q4.8 11.4 5.8 12.0 Z" fill="${lit}"/>` +
+    `<path d="M9.0 9.6 L10.0 6.6 L11.4 9.0 L12.6 6.2 L13.8 9.0 L15.2 6.8 L16.0 9.8 Z"` +
+    ` fill="${dark}"/>`,
+
+  // The curl. One horn round on itself is the entire silhouette of a ram, and
+  // it is the only closed shape in the set.
+  horned_ram: (lit, dark) =>
+    `<path d="M4.4 10.6 Q-1.0 9.8 -0.6 5.4 Q-0.2 2.0 3.6 2.2 Q6.6 2.6 6.2 5.4` +
+    ` Q5.8 7.6 3.2 7.2 L3.6 5.0 Q4.4 5.2 4.4 4.4 Q4.2 3.8 3.0 4.0` +
+    ` Q1.4 4.6 1.8 6.6 Q2.4 8.6 4.8 8.6 Z" fill="${lit}"/>` +
+    `<circle cx="3.2" cy="4.8" r="0.9" fill="${dark}"/>`,
+
+  // Long horns carried forward and level, off something older than the
+  // settlement it grazes past.
+  sedge_auroch: (lit) =>
+    `<path d="M4.6 10.8 Q-1.6 10.6 -3.4 6.0 L-1.4 5.2 Q0.2 9.0 4.8 9.0 Z" fill="${lit}"/>` +
+    `<path d="M7.0 9.6 Q2.4 8.0 2.0 3.8 L4.0 3.6 Q4.4 6.8 7.8 8.0 Z" fill="${lit}"/>`,
+
+  // Short thick horns and the fang the hide is named for.
+  beastfang_sire: (lit, dark) =>
+    `<path d="M4.4 10.2 Q0.8 8.6 0.4 4.6 L2.6 4.4 Q3.0 7.4 5.0 8.6 Z" fill="${lit}"/>` +
+    `<path d="M7.2 9.2 Q4.4 6.8 4.8 3.2 L6.8 3.2 Q6.6 6.0 8.0 7.8 Z" fill="${lit}"/>` +
+    `<path d="M2.2 13.6 L3.2 17.6 L4.0 13.8 Z" fill="${lit}"/>` +
+    `<path d="M5.0 14.0 L5.8 17.2 L6.6 14.1 Z" fill="${lit}"/>` +
+    `<circle cx="4.0" cy="12.0" r="1.0" fill="${dark}"/>`,
+}
+
+/**
+ * The deer plan: narrow, long-legged, head carried high on a rising neck.
+ *
+ * Told from the heavy plan by PROPORTION rather than by detail, the same way
+ * §9.5.2's three monster profiles are: at this size a leg length and the height
+ * a head is carried at both survive, and a muzzle does not.
+ */
+function cervid(hide: string, lit: string, dark: string): string {
+  return (
+    `<path d="M7.6 23 V13.6 M10.4 23 V13.6 M16.4 23 V13.4 M19.0 23 V13.4"` +
+    ` stroke="${dark}" stroke-width="1.7" stroke-linecap="round" fill="none"/>` +
+    `<ellipse cx="13.4" cy="11.9" rx="6.5" ry="3.6" fill="${hide}"/>` +
+    // A pale rump and a pale underline, which is what a deer actually carries
+    // and what a solid two-tone needs (§5.7): one flat colour is invisible on
+    // the country it belongs to.
+    `<path d="M13.4 15.2 Q17.0 15.8 19.4 13.6 L19.6 11.4 Q18.0 14.2 13.4 13.6 Z" fill="${lit}"/>` +
+    `<path d="M8.8 13.4 L4.2 5.4 L7.2 4.4 L11.6 11.6 Z" fill="${hide}"/>` +
+    `<path d="M7.4 4.2 L2.2 5.2 L2.6 7.9 L8.0 7.0 Z" fill="${hide}"/>` +
+    `<path d="M2.2 5.4 L0.0 6.0 L0.2 7.8 L2.6 7.9 Z" fill="${dark}"/>` +
+    `<path d="M19.4 10.0 L21.6 9.6 L20.4 12.8 Z" fill="${lit}"/>`
+  )
+}
+
+/**
+ * The heavy plan: low, short-legged, head carried forward at the ground.
+ *
+ * A boar rooting under the mast, a ram coming down the slope, an auroch that
+ * outweighs the gate. All three read as bulk close to the floor, which is the
+ * inverse of the deer and survives at the same size.
+ */
+function heavy(hide: string, lit: string, dark: string): string {
+  return (
+    `<path d="M8.4 23 V17.4 M11.2 23 V17.4 M16.4 23 V17.4 M19.0 23 V17.4"` +
+    ` stroke="${dark}" stroke-width="2.4" stroke-linecap="round" fill="none"/>` +
+    // Deep through the body and highest at the SHOULDER rather than level: that
+    // forward-heavy line is the read, and it is the opposite of the deer's.
+    `<path d="M6.6 16.4 Q7.0 8.4 13.0 8.6 Q19.6 8.8 20.4 14.0 Q21.0 18.0 17.0 18.6` +
+    ` Q11.0 19.4 6.6 16.4 Z" fill="${hide}"/>` +
+    `<path d="M8.4 17.6 Q13.6 19.8 19.4 17.6 L19.0 15.8 Q13.6 17.8 8.8 15.8 Z" fill="${lit}"/>` +
+    `<path d="M8.0 10.4 L2.4 10.0 L1.6 16.0 L7.6 17.0 Z" fill="${hide}"/>` +
+    `<path d="M2.4 10.6 L-0.4 11.8 L-0.2 15.2 L2.0 15.7 Z" fill="${dark}"/>` +
+    `<path d="M20.6 12.4 L22.6 12.0 L21.6 15.2 Z" fill="${lit}"/>`
+  )
+}
+
+/** Which body plan an animal is built on. The crown does the rest. */
+const ANIMAL_PLAN: Record<string, (hide: string, lit: string, dark: string) => string> = {
+  roe_deer: cervid,
+  wood_boar: heavy,
+  bracken_elk: cervid,
+  ironhide_stag: cervid,
+  field_doe: cervid,
+  horned_ram: heavy,
+  sedge_auroch: heavy,
+  beastfang_sire: heavy,
+}
+
+/** The whole animal in its own 24-box, feet on the floor. */
+function animalBody(key: string, grade: string): string {
+  const hide = GAME_HIDE[grade] ?? GAME_HIDE.common!
+  const lit = shade(hide, 0.46)
+  const dark = shade(hide, -0.45)
+
+  return (ANIMAL_PLAN[key] ?? cervid)(hide, lit, dark) + (CROWN[key]?.(lit, dark) ?? '')
+}
+
+/**
+ * §5.5 -- the animal, drawn where it is standing.
+ *
+ * Anchored at the FEET like a monster is, so a stag and a boar plant on the
+ * same line however tall each one turns out.
+ */
+function animalOnGround(key: string, grade: string, x: number, y: number, width: number): string {
+  const s = width / ANIMAL_VIEW
+
+  return (
+    `<g transform="translate(${(x - width / 2).toFixed(2)},${(y - width).toFixed(2)}) scale(${s.toFixed(3)})">` +
+    animalBody(key, grade) +
+    '</g>'
+  )
+}
+
+/**
+ * §5.5 -- what is standing on this hex to be hunted, inside sight only.
+ *
+ * Back and slightly left of centre, and drawn BEFORE the pocket's critter and
+ * the pack: it is the biggest of the three and the only one that is scenery, so
+ * the two that are news stand in front of it. On the hex underfoot the
+ * prospector's own pin crosses it, exactly as it crosses the trees.
+ */
+export function huntProp(tile: Tile): string {
+  const hunt = tile.hunt
+  if (!hunt) return ''
+
+  const grade = ANIMALS[hunt.key]?.grade ?? 'common'
+
+  return animalOnGround(hunt.key, grade, -3, 7, GAME_SIZE[grade] ?? 24)
+}
+
+/** The same animal off the map, for anything drawn beside its name. */
+export function animalMark(key: string, width = 26): string {
+  const def = ANIMALS[key]
+
+  return (
+    `<svg viewBox="-5 -6 34 31" width="${width}" height="${width}"` +
+    ` aria-hidden="true">${animalBody(key, def?.grade ?? 'common')}</svg>`
+  )
+}
+
+/**
+ * §5.5 -- one animal, off the map, standing on its own country's ground.
+ *
+ * The almanac's idiom for everything else on a hex (variantSpecimen,
+ * pocketSpecimen, monsterSpecimen): the thing drawn by the function that draws
+ * it on the map, on the ground it is actually met on. Where an animal lives is
+ * half of what the entry is for -- the other half is which rung of hide it
+ * gives up, and the two are the same fact read from opposite ends.
+ */
+export function animalSpecimen(key: string, size = 66): string {
+  const def = ANIMALS[key]
+  const top = BIOME_COLOR[(def?.biome ?? 'forest') as Biome] ?? '#4b544d'
+  const grade = def?.grade ?? 'common'
+  const w = 62
+  // Taller above the hex than the critter and water specimens, which chose
+  // their box on the honest observation that "none of the five stands more
+  // than 15px tall". A stag with a full rack does, so the box grows rather
+  // than the antlers being cropped to fit one that was measured for a moth.
+  const boxH = 60
+  const h = Math.round((size * boxH) / w)
+
+  return (
+    `<svg viewBox="-31 -30 ${w} ${boxH}" width="${size}" height="${h}" aria-hidden="true">` +
+    `<path d="${HEX_SIDE_PATH}" fill="${shade(top, -0.4)}"/>` +
+    `<path d="${HEX_TOP_PATH}" fill="${top}" stroke="${shade(top, -0.2)}" stroke-width="0.5"/>` +
+    animalOnGround(key, grade, 0, 11, (GAME_SIZE[grade] ?? 24) * 1.05) +
+    '</svg>'
+  )
 }
 
 // ------------------------------------------------------------- settlements

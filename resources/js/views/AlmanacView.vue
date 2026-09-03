@@ -50,6 +50,15 @@ import { EQUIPMENT, ECONOMY, PROCESSING, BAG } from '@/game/balance'
 import { ACTION_PATHS } from '@/icons/actions'
 import { CRITTER_BY_BIOME } from '@/game/critters'
 import { MONSTERS, MONSTERS_BY_BIOME_RING } from '@/game/monsters'
+import {
+  ANIMALS,
+  HUNT_GRADED_FROM,
+  HUNT_GRADED_PART,
+  HUNT_GRADES,
+  HUNT_JUNK,
+  HUNT_LEAVING,
+  HUNT_PARTS,
+} from '@/game/hunts'
 import { TROPHY_BY_TIER } from '@/game/spoils'
 import { BIOME_LABEL } from '@/theme/palette'
 import {
@@ -59,7 +68,13 @@ import {
   type VariantDef,
 } from '@/game/variants'
 import { itemIcon, materialIcon } from '@/icons/procedural'
-import { monsterSpecimen, pocketSpecimen, variantSpecimen, waterSpecimen } from '@/map/props'
+import {
+  animalSpecimen,
+  monsterSpecimen,
+  pocketSpecimen,
+  variantSpecimen,
+  waterSpecimen,
+} from '@/map/props'
 import { waterLabel } from '@/game/water'
 import SvgIcon from '@/components/SvgIcon.vue'
 import StatChips from '@/components/StatChips.vue'
@@ -568,6 +583,100 @@ const monsterEntries = computed(() =>
     .sort((a, b) => a.tier - b.tier || a.name.localeCompare(b.name)),
 )
 
+/**
+ * §5.5 -- the eight animals, which is the other half of what stands on a hex.
+ *
+ * Filed with the monsters rather than with the ground, and that is a judgment
+ * about what a reader is asking. "The animal is the ground" is true of how a
+ * hunt WORKS -- it is a mine with a creature in the seam's place -- and it is
+ * not true of how one is found: you find an animal by seeing a creature, the
+ * same way you find a pack, and this is the screen you come to afterwards to
+ * ask what it was.
+ *
+ * What it owes is the same two answers everything else here owes: where it
+ * comes from, and what comes off it. The second is the one the game had
+ * nowhere to say at all -- a hunt paid a rung of hide, two components, two
+ * reagents and a critter, and none of that was written down anywhere a player
+ * could read it before taking one.
+ */
+const animalEntries = computed(() =>
+  Object.values(ANIMALS)
+    .map((a) => {
+      const name = (key: string) => MATERIALS[key as MaterialKey]?.name ?? key
+
+      return {
+        ...a,
+        // The rings this grade is actually rolled on. A contested animal is
+        // inner-and-in and nowhere else, which is §2 keeping Beastfang Hide
+        // off the safe rim -- and it is the one fact here worth walking for.
+        rings: (() => {
+          const w = HUNT_GRADES.find((g) => g.grade === a.grade)?.weights ?? {}
+          const out = (['outer', 'mid', 'inner'] as Ring[]).filter((r) => (w[r] ?? 0) > 0)
+
+          // §5.2 -- the center rolls on the INNER ring's column, because it is
+          // the contested ring with the towns taken out. The weight table has
+          // three columns for that reason, and a bestiary that listed them
+          // literally would say a Beastfang Sire does not stand at a dungeon
+          // mouth, which is the one place it most certainly does.
+          return out.includes('inner') ? [...out, 'center' as Ring] : out
+        })(),
+        // The MATERIAL rather than its name, like every other list here: a
+        // screen that only spelled its drops would be the one you cannot
+        // recognise anything on.
+        drops: [
+          MATERIALS[a.material],
+          ...HUNT_PARTS.map((k) => MATERIALS[k as MaterialKey]),
+          // §5.5 -- the one drop the RUNG pays for, so a common animal's list
+          // is genuinely shorter than the rest and the eight entries differ by
+          // something a player can act on.
+          ...(carriesGradedPart(a.grade) ? [MATERIALS[HUNT_GRADED_PART as MaterialKey]] : []),
+          MATERIALS[HUNT_JUNK as MaterialKey],
+          MATERIALS[HUNT_LEAVING as MaterialKey],
+        ].filter(Boolean),
+        hay: [
+          a.name,
+          a.grade,
+          a.description,
+          BIOME_LABEL[a.biome as keyof typeof BIOME_LABEL] ?? a.biome,
+          name(a.material),
+          ...HUNT_PARTS.map(name),
+          carriesGradedPart(a.grade) ? name(HUNT_GRADED_PART) : '',
+          name(HUNT_JUNK),
+          name(HUNT_LEAVING),
+        ].join(' '),
+      }
+    })
+    .filter((a) => matches(a.hay))
+    .sort(
+      (a, b) =>
+        HUNT_GRADE_ORDER.indexOf(a.grade) - HUNT_GRADE_ORDER.indexOf(b.grade) ||
+        a.biome.localeCompare(b.biome),
+    ),
+)
+
+/** §5.3's own four, in the order the ladder climbs. */
+const HUNT_GRADE_ORDER = HUNT_GRADES.map((g) => g.grade)
+
+/**
+ * §5.5 -- which rungs carry the graded part, read off the ladder rather than
+ * off a list, exactly as the server reads it.
+ */
+const carriesGradedPart = (grade: string) =>
+  HUNT_GRADE_ORDER.indexOf(grade) >= HUNT_GRADE_ORDER.indexOf(HUNT_GRADED_FROM)
+
+/**
+ * §5.5 -- what a hunt pays that is not the hide, said once above the eight.
+ *
+ * Every animal drops the same parts; only the hide rung differs. Repeating the
+ * sentence on all eight entries would be eight copies of one fact.
+ */
+const HUNT_BLURB =
+  'An animal is a mine with the creature in the seam\'s place: the same hex, the same ' +
+  'arithmetic, worked at the bow\'s rate. Which one is standing there decides the rung of ' +
+  'hide, and nothing else about the kill changes — the horn, the sinew and the two herbs ' +
+  'come off every one of them. Without a bow the hide comes back as Torn Hide, which no ' +
+  'recipe anywhere will take.'
+
 /** By tier, which is the ring each one is NEW on -- the bestiary's own order. */
 const monsterBands = computed(() =>
   [1, 2, 3, 4]
@@ -575,7 +684,10 @@ const monsterBands = computed(() =>
     .filter((b) => b.entries.length > 0),
 )
 
-const monsterCount = computed(() => monsterEntries.value.length)
+// §5.5 -- the half's own tally, and it counts the game as well: a search for
+// "Roe Deer" that answered "nothing matches" over an entry drawn right below
+// it would be the count disagreeing with the page.
+const monsterCount = computed(() => monsterEntries.value.length + animalEntries.value.length)
 
 const tileCount = computed(
   () =>
@@ -767,7 +879,7 @@ function nature(item: ItemDef): string {
             Ground <span class="tally">{{ tileCount }}</span>
           </button>
           <button type="button" :class="{ on: half === 'monsters' }" @click="half = 'monsters'">
-            Monsters <span class="tally">{{ monsterCount }}</span>
+            Creatures <span class="tally">{{ monsterCount }}</span>
           </button>
         </div>
 
@@ -1216,6 +1328,52 @@ function nature(item: ItemDef): string {
             </article>
           </div>
         </section>
+
+        <!-- §5.5 -- the other thing that stands on a hex, and the only one you
+             are meant to walk toward. It sits under the monsters rather than
+             above them because the bestiary's own order is the walk inward,
+             and the hunt is a ladder crossing all of it. -->
+        <section v-if="animalEntries.length">
+          <div class="sect">
+            <h3>Game</h3>
+            <span class="tally">{{ animalEntries.length }}</span>
+          </div>
+
+          <p class="tiny muted lede">{{ HUNT_BLURB }}</p>
+
+          <div class="entries">
+            <article v-for="a in animalEntries" :key="a.key" class="entry">
+              <div class="head">
+                <span class="specimen" v-html="animalSpecimen(a.key, 76)" />
+                <div class="grow">
+                  <span class="label eyebrow">{{ BIOME_LABEL[a.biome as Biome] }}</span>
+                  <strong class="name">{{ a.name }}</strong>
+                  <span class="figs tiny mono">{{ a.grade }} rung</span>
+                </div>
+              </div>
+
+              <p class="tiny muted desc">{{ a.description }}</p>
+
+              <dl class="rails">
+                <!-- Neutral rail: where a thing stands is a fact about the map
+                     rather than a road anything arrives by. -->
+                <div class="rail out">
+                  <dt class="label">Found</dt>
+                  <dd>{{ a.rings.map((r) => RING_LABEL[r]).join(' · ') }}</dd>
+                </div>
+
+                <div class="rail" :style="{ '--road': SOURCE_COLOR.mine }">
+                  <dt class="label">Gives up</dt>
+                  <dd class="pips">
+                    <span v-for="d in a.drops" :key="d.key" class="pip mat">
+                      <SvgIcon :svg="materialIcon(d, 15)" />{{ d.name }}
+                    </span>
+                  </dd>
+                </div>
+              </dl>
+            </article>
+          </div>
+        </section>
       </template>
 
       <p class="tiny muted footnote">
@@ -1238,7 +1396,9 @@ function nature(item: ItemDef): string {
           not. Clearing one removes it for everybody, win or lose, and there is
           no second roll: supply is capped by hexes and hours rather than by
           patience. Nothing here drops a rare material, a raid material, or
-          anything that can be minted.
+          anything that can be minted. Game stands on the same buckets and is
+          the opposite errand — a hex you walk toward rather than around, and
+          the hunting line's whole faucet.
         </template>
 
         <template v-else>

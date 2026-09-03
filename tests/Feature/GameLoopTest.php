@@ -4154,19 +4154,26 @@ final class GameLoopTest extends TestCase
      *
      * The client generates 25 million tiles from the world seed, so this must
      * cost only the facts it cannot derive: what is worked out, who is standing
-     * there, which §9.5.1 pack somebody has already fought, and where the
-     * §9.5.7 corpses are. Shipping generated tiles was ~200KB per pan; this
-     * guards against that creeping back in.
+     * there, which §9.5.1 pack somebody has already fought, which §5.5 animal
+     * somebody has already taken, and where the §9.5.7 corpses are. Shipping
+     * generated tiles was ~200KB per pan; this guards against that creeping
+     * back in.
      */
     public function test_the_map_endpoint_sends_mutations_only(): void
     {
         $empty = $this->game->mapMutations($this->character);
 
-        $this->assertSame(['depleted', 'occupied', 'cleared', 'carriers'], array_keys($empty));
+        $this->assertSame(
+            ['depleted', 'occupied', 'cleared', 'hunted', 'carriers'],
+            array_keys($empty),
+        );
         $this->assertSame([], $empty['depleted']);
         $this->assertSame([], $empty['occupied']);
         // Nothing has been fought yet, so nothing is subtracted.
         $this->assertSame([], $empty['cleared']);
+        // §5.5 -- and nothing has been hunted, which is a separate subtraction
+        // because a pack and an animal stand on one hex independently.
+        $this->assertSame([], $empty['hunted']);
 
         // A live mine is the one thing that has to show up.
         $this->game->startMining($this->character, $this->character->col, $this->character->row, Drops::GATHERING);

@@ -68,6 +68,26 @@ export const HUNT_PROCESSING: Recipe[] = [
   { key: 'tan_lacquered_hide', name: 'Tan Lacquered Hide', input: 'dire_pelt', inputQty: 3, output: 'lacquered_hide', outputQty: 1, baseSeconds: 24 * 60, skill: 'hunting' },
 ]
 
+/** §5.5 -- what a kill gives up beside the hide. */
+export const HUNT_PARTS = ['horn', 'sinew', 'bitterroot', 'yarrow', 'dustleveret'] as const
+
+/** §5.5 -- the part only an uncommon animal or better gives up. */
+export const HUNT_GRADED_PART = 'braided_sinew'
+
+export const HUNT_GRADED_FROM = 'uncommon'
+
+/** §4 -- the tier-0 rubbish carried out alongside, every time. */
+export const HUNT_JUNK = 'bone_splinter'
+
+/** §9.5.8 -- the tier-0 leaving that says where the kill happened. */
+export const HUNT_LEAVING = 'matted_turf'
+
+/** The two that are neither hide nor ladder: a graded part and a leaving. */
+export const HUNT_EXTRA: Material[] = [
+  { key: 'braided_sinew', name: 'Braided Sinew', tier: 1, source: 'hunt', palette: 'pelt', npcPrice: 8, description: 'Laid down in cords by a thing that ran every day of its life. It will not part.' },
+  { key: 'matted_turf', name: 'Matted Turf', tier: 0, source: 'hunt', palette: 'stone', npcPrice: 1, description: 'Torn up where it was braced against you. Roots, dirt, and nothing else.' },
+]
+
 export const ANIMAL_BY_BIOME_GRADE: Record<string, Record<string, string>> = {
   forest: {
     common: 'roe_deer',
