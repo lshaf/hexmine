@@ -70,7 +70,7 @@ final class Hunts
         'pelt' => ['name' => 'Pelt', 'tier' => 1, 'source' => 'hunt', 'grade' => 'common', 'palette' => 'pelt', 'npcPrice' => 3, 'description' => 'Rough hide, taken off something that was using it.'],
         'thick_pelt' => ['name' => 'Thick Pelt', 'tier' => 1, 'source' => 'hunt', 'grade' => 'uncommon', 'palette' => 'pelt', 'npcPrice' => 5, 'description' => 'Winter coat off a full-grown animal. Heavy, and it keeps its shape.'],
         'dire_pelt' => ['name' => 'Dire Pelt', 'tier' => 1, 'source' => 'hunt', 'grade' => 'rare', 'palette' => 'pelt', 'npcPrice' => 9, 'description' => 'Off something that had no natural enemies until you turned up.'],
-        'beastfang_hide' => ['name' => 'Beastfang Hide', 'tier' => 1, 'source' => 'hunt', 'grade' => 'contested', 'palette' => 'pelt', 'npcPrice' => 0, 'description' => 'Taken off something that fought back.'],
+        'beastfang_hide' => ['name' => 'Beastfang Hide', 'tier' => 3, 'source' => 'hunt', 'grade' => 'contested', 'palette' => 'pelt', 'npcPrice' => 0, 'walletCap' => Balance::RARE_WALLET_CAP, 'description' => 'Taken off something that fought back.'],
     ];
 
     /** §4 Tier 2 -- what each rung tans into. Not locked to anything. */

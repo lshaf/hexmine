@@ -28,6 +28,7 @@
  * making that argument about monsters.
  */
 import type { Animal, Material, Recipe } from './types'
+import { ECONOMY } from './balance'
 
 export const HUNT_BIOMES = ['forest', 'grassland'] as const
 
@@ -53,7 +54,7 @@ export const HUNT_RAW: Material[] = [
   { key: 'pelt', name: 'Pelt', tier: 1, source: 'hunt', palette: 'pelt', npcPrice: 3, description: 'Rough hide, taken off something that was using it.' },
   { key: 'thick_pelt', name: 'Thick Pelt', tier: 1, source: 'hunt', palette: 'pelt', npcPrice: 5, description: 'Winter coat off a full-grown animal. Heavy, and it keeps its shape.' },
   { key: 'dire_pelt', name: 'Dire Pelt', tier: 1, source: 'hunt', palette: 'pelt', npcPrice: 9, description: 'Off something that had no natural enemies until you turned up.' },
-  { key: 'beastfang_hide', name: 'Beastfang Hide', tier: 1, source: 'hunt', palette: 'pelt', npcPrice: 0, description: 'Taken off something that fought back.' },
+  { key: 'beastfang_hide', name: 'Beastfang Hide', tier: 3, source: 'hunt', palette: 'pelt', npcPrice: 0, walletCap: ECONOMY.rareWalletCap, description: 'Taken off something that fought back.' },
 ]
 
 export const HUNT_REFINED: Material[] = [
@@ -67,6 +68,14 @@ export const HUNT_PROCESSING: Recipe[] = [
   { key: 'tan_boiled_leather', name: 'Tan Boiled Leather', input: 'thick_pelt', inputQty: 3, output: 'boiled_leather', outputQty: 1, baseSeconds: 17 * 60, skill: 'hunting' },
   { key: 'tan_lacquered_hide', name: 'Tan Lacquered Hide', input: 'dire_pelt', inputQty: 3, output: 'lacquered_hide', outputQty: 1, baseSeconds: 24 * 60, skill: 'hunting' },
 ]
+
+/** §7.2 -- every rung of this ladder belongs to the hunting line. */
+export const HUNT_SKILL_FOR_MATERIAL: Record<string, string> = {
+  pelt: 'hunting',
+  thick_pelt: 'hunting',
+  dire_pelt: 'hunting',
+  beastfang_hide: 'hunting',
+}
 
 /** §5.5 -- what a kill gives up beside the hide. */
 export const HUNT_PARTS = ['horn', 'sinew', 'bitterroot', 'yarrow', 'dustleveret'] as const

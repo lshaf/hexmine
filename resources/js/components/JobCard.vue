@@ -28,10 +28,12 @@ const made = computed(() =>
   props.job.kind === 'craft' ? ITEM_BY_KEY[props.job.output] : undefined,
 )
 
+// §5.5 -- a hunt names what it brought back exactly as a mine does. Left off
+// this list it fell through to `undefined` and the card read "Work".
 const def = computed(() =>
   props.job.kind === 'processing'
     ? MATERIALS[props.job.output]
-    : props.job.kind === 'mining'
+    : props.job.kind === 'mining' || props.job.kind === 'hunting'
       ? MATERIALS[props.job.material]
       : undefined,
 )

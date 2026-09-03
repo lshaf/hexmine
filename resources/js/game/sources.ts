@@ -119,7 +119,18 @@ export interface SourceLine {
 export type RawRole = 'ground' | 'reagent' | 'critter' | 'component' | 'spoil'
 
 const REAGENT_KEYS = new Set<string>(REAGENTS.map((m) => m.key))
-const COMPONENT_KEYS = new Set<string>(COMPONENTS.map((m) => m.key))
+/**
+ * §5.5 -- the hunt's graded part files with the components it stands beside.
+ *
+ * It is an animal part like the horn and the sinew, not a rung of the hide
+ * ladder, so leaving it to fall through to `ground` put it under a heading
+ * that says a variant of hex decides which one you get. It comes off a
+ * creature, and off no ladder at all.
+ */
+const COMPONENT_KEYS = new Set<string>([
+  ...COMPONENTS.map((m) => m.key),
+  HUNT_GRADED_PART,
+])
 const CRITTER_KEYS = new Set<string>(CRITTERS.map((m) => m.key))
 const SPOIL_KEYS = new Set<string>(SPOILS.map((m) => m.key))
 
@@ -150,8 +161,12 @@ const minutes = (seconds: number) => Math.round(seconds / 60)
 
 /**
  * Where a material comes from. More than one line where more than one road
- * leads to it -- pelt is the clearest case, since a herd is a genuine
- * alternative to working a plains hex (§5.5).
+ * leads to it.
+ *
+ * §5.5 -- it used to say pelt was the clearest case, "since a herd is a genuine
+ * alternative to working a plains hex". Both halves of that are gone: there is
+ * no plains hex and no herd, and pelt has exactly one road now -- an animal,
+ * worked with a bow.
  */
 /**
  * §5.2 -- how far in you have to walk before this ground turns up. Silent for
@@ -304,6 +319,24 @@ export function materialSources(mat: Material): SourceLine[] {
         break
       }
 
+      // §5.5 -- the one part the grade alone pays for. It files with the
+      // components because it is an animal part like the horn and the sinew,
+      // but it feeds no bench, so it has to answer before the line below
+      // promises one.
+      if (mat.key === HUNT_GRADED_PART) {
+        const rungs = HUNT_GRADES.map((g) => g.grade)
+        const carrying = rungs.slice(rungs.indexOf(HUNT_GRADED_FROM))
+
+        lines.push({
+          kind: 'mine',
+          where: `A hunt · ${carrying.join(', ')}`,
+          note:
+            'Never off a common animal, and a bow is what brings it home. The rung ' +
+            'pays in a kind of drop as well as in a rung of hide.',
+        })
+        break
+      }
+
       // §4 -- the herbs and the craft components come off the ground, but not
       // off the same verb: a herb turns up whether or not you brought a tool,
       // a component only if you did.
@@ -339,23 +372,6 @@ export function materialSources(mat: Material): SourceLine[] {
       // §5.5 -- the hunting line has no ground under it. Its four rungs come
       // off the animal's own grade, so the card names the creature's country
       // and the rung rather than a kind of hex.
-      // §5.5 -- the one part the grade alone pays for. It is not a rung of
-      // hide, so no animal's `material` names it: which animals carry it is
-      // read off the ladder, and saying "needs a bow" is only half of it.
-      if (mat.key === HUNT_GRADED_PART) {
-        const rungs = HUNT_GRADES.map((g) => g.grade)
-        const carrying = rungs.slice(rungs.indexOf(HUNT_GRADED_FROM))
-
-        lines.push({
-          kind: 'mine',
-          where: `A hunt · ${carrying.join(', ')}`,
-          note:
-            'Never off a common animal, and a bow is what brings it home. The rung ' +
-            'pays in a kind of drop as well as in a rung of hide.',
-        })
-        break
-      }
-
       if (mat.source === 'hunt') {
         const animal = Object.values(ANIMALS).find((a) => a.material === mat.key)
 
@@ -415,6 +431,26 @@ export function materialSources(mat: Material): SourceLine[] {
     }
 
     case 3: {
+      // §5.5 -- four of the five come off a variant of hex and the fifth comes
+      // off an animal, so there is no variant to name. Both animals that carry
+      // it are named instead, which is the same answer in the units this rung
+      // is actually found in.
+      if (mat.source === 'hunt') {
+        const carriers = Object.values(ANIMALS)
+          .filter((a) => a.material === mat.key)
+          .map((a) => a.name)
+
+        lines.push({
+          kind: 'mine',
+          where: `${carriers.join(' · ')}, contested ring only`,
+          note:
+            'Needs a bow, like every rung of the hide ladder. Capped per wallet ' +
+            'like the other four, because this is the gate every mintable recipe ' +
+            'in the line stands behind.',
+        })
+        break
+      }
+
       // The cap and the contest are true of all five rares, so the section note
       // carries them. `where` already says the only thing that differs.
       lines.push({

@@ -27,6 +27,8 @@ import {
   waterAt,
 } from '../resources/js/game/worldgen.ts'
 import type { WorldConfig } from '../resources/js/game/worldgen.ts'
+import { MATERIALS, SKILL_LIST, skillForMaterial } from '../resources/js/game/catalog.ts'
+import { HUNT_SKILL_FOR_MATERIAL } from '../resources/js/game/hunts.ts'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const fixtures = resolve(here, '../tests/Fixtures')
@@ -216,6 +218,44 @@ for (const box of BOXES) {
 }
 
 console.log(`settlements: ${boxed} found by brute force, all matched by lattice walk`)
+
+// ------------------------------------------------------- who owns a material
+//
+// §7.2 -- skillForMaterial() has a `woodcutting` fallback, which is a fine
+// default and a terrible silent failure: a material nothing claims is credited
+// to the wrong line, and the only symptom is the almanac telling a hunter to
+// bring an axe.
+//
+// This is self-consistency rather than cross-language, and it catches the bug
+// that motivated it: the client had no mirror of the hunt ladder, so the two
+// middle rungs of pelt fell through to the default while the server said
+// hunting. Any raw material whose own line is knowable must resolve to it.
+{
+  let mismatched = 0
+
+  for (const mat of Object.values(MATERIALS)) {
+    // Only the raws have a line to get wrong; a refined material or a spoil is
+    // claimed by its recipe or by a monster, not by a hex.
+    if (mat.tier !== 1 && mat.tier !== 3) continue
+
+    const owner = skillForMaterial(mat.key)
+
+    // The hunting line is the whole point: everything it produces is hunted.
+    if (mat.source === 'hunt' && HUNT_SKILL_FOR_MATERIAL[mat.key] && owner !== 'hunting') {
+      fail(`skillForMaterial(${mat.key})`, 'hunting', owner)
+      mismatched++
+    }
+
+    // And a biome's own raw belongs to that biome's line.
+    const biomeLine = mat.biome ? SKILL_LIST.find((s) => s.biome === mat.biome)?.key : undefined
+    if (biomeLine && owner !== biomeLine) {
+      fail(`skillForMaterial(${mat.key})`, biomeLine, owner)
+      mismatched++
+    }
+  }
+
+  console.log(`materials: every raw resolves to its own line${mismatched ? ` (${mismatched} did not)` : ''}`)
+}
 
 if (failures) {
   console.error(`\n${failures} mismatch(es). The client and server disagree about the world.`)

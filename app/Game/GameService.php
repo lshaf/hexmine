@@ -2007,9 +2007,9 @@ class GameService
         // Two counts, because a hex is busy and shut for two different reasons.
         //
         // BODIES is everybody at work on the hex, whatever the verb: a mine, a
-        // gather (the same job with hands in the tool's place, §4.0) and a
-        // fight. That is what the map draws, because a hex somebody is standing
-        // on is not an empty one.
+        // gather (the same job with hands in the tool's place, §4.0), a hunt
+        // (§5.5) and a fight. That is what the map draws, because a hex
+        // somebody is standing on is not an empty one.
         //
         // SEATS is mining alone, exactly as occupiedSlots() counts it, and it is
         // the only number that can refuse you: a fight takes no seat, because
@@ -2018,7 +2018,7 @@ class GameService
         // Keeping them apart is what lets the map say "busy" without ever
         // saying "shut" about ground that is open. One count did both jobs and
         // got one of them wrong whichever kind it filtered on.
-        $occupied = GameJob::whereIn('kind', ['mining', 'battle'])
+        $occupied = GameJob::whereIn('kind', ['mining', Drops::HUNTING, 'battle'])
             ->where('status', 'active')
             ->whereNotNull('col')
             ->whereBetween('col', [$minCol, $maxCol])
@@ -3398,7 +3398,17 @@ class GameService
             ),
             'material' => $material,
             'bare' => $bare,
-            'drops' => Drops::tableFor(Drops::HUNTING, $tile, $material),
+            // §4 -- the KINDS, most likely first, exactly as the other two
+            // verbs answer. This sent the weighted table instead: an object
+            // where mine and gather send an array of keys, so the tile card's
+            // `.slice(0, DROPS_SHOWN)` had nothing to slice. Two shapes behind
+            // one field name is the sort of thing that only shows up on the one
+            // screen that reads all three.
+            //
+            // The odds stay off it for the reason WorkPreview gives: naming
+            // them turns a hex into a spreadsheet, and what a prospector is
+            // owed is what is here.
+            'drops' => Drops::kindsFor(Drops::HUNTING, $tile, $material),
             'activity' => Drops::HUNTING,
             'skill' => 'hunting',
             'scrap' => $bare,
@@ -6939,10 +6949,24 @@ class GameService
             ];
         }
 
-        if ($job->kind === 'mining') {
+        // §5.5 -- a hunt is a mine, so it is reported as one. It has a hex, a
+        // material and a clock and it has no settlement, which is the whole of
+        // what this branch is about.
+        //
+        // It fell through to the bench branch below and came back as a
+        // processing job standing at no settlement: no col, no row, no
+        // material, and a `settlementName` of null. The client filters a field
+        // job on `mining|battle` and a bench job on `processing|craft`, so a
+        // hunting job matched NEITHER -- you could start one and it was
+        // invisible from that moment on, with no way to claim it. Adding a
+        // third job kind without telling the two places that sort them is what
+        // did it.
+        if ($job->kind === 'mining' || $job->kind === Drops::HUNTING) {
             return $payload + [
                 'col' => $job->col,
                 'row' => $job->row,
+                // §5.5 -- a hunt takes no seat: the seats are the SEAM's, and
+                // an animal was never standing in one.
                 'slot' => $job->slot,
                 'material' => $job->material_key,
             ];

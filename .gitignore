@@ -6,9 +6,13 @@
 /storage/*.key
 /storage/pail
 /bootstrap/cache/*.php
+# Every local env file, whatever it is called. These carry real database and
+# Redis credentials, and naming them one at a time is how one eventually gets
+# committed -- a scratch env pointed at the test database is exactly the kind
+# nobody thinks to add.
 .env
-.env.backup
-.env.production
+.env.*
+!.env.example
 .phpunit.result.cache
 /.phpunit.cache
 _ide_helper.php

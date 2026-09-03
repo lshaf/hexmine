@@ -593,7 +593,15 @@ export type JobStatus = 'active' | 'ready'
  */
 export interface FieldJob {
   id: string
-  kind: 'mining'
+  /**
+   * §5.5 -- a hunt is a mine, and arrives here as one.
+   *
+   * Two kinds rather than one because the server keeps them apart (the haul
+   * table is the animal's, not the ground's) and because the dock names the
+   * verb. Everything else about them is identical: a hex, a material, a clock,
+   * and a claim taken where you are standing.
+   */
+  kind: 'mining' | 'hunting'
   status: JobStatus
   col: number
   row: number

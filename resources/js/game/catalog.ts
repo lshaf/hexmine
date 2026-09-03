@@ -9,7 +9,7 @@ import { COMPONENTS } from './components'
 import { TOP_TIER } from './toptier'
 import { CRITTERS } from './critters'
 import { SPOILS } from './spoils'
-import { HUNT_EXTRA, HUNT_RAW, HUNT_REFINED } from './hunts'
+import { HUNT_EXTRA, HUNT_RAW, HUNT_REFINED, HUNT_SKILL_FOR_MATERIAL } from './hunts'
 import { BATTLE_GEAR } from './battlegear'
 import {
   BIOME_VARIANTS,
@@ -212,11 +212,19 @@ export const MATERIALS: Record<MaterialKey, Material> = {
 }
 
 /** §5.2 -- what each concentric ring is called in the UI. */
+/**
+ * §5.2 -- what each band IS, named for the thing that stands on it.
+ *
+ * The center was called the "Capital ring", which is the one thing it is not:
+ * capitals stand in the contested ring, one band out, and §5.2 is explicit
+ * that no settlement of any tier stands in the center. What is there is the
+ * dungeon mouths, and that is the whole reason to walk the last step in.
+ */
 export const RING_LABEL: Record<Ring, string> = {
   outer: 'Outer rim',
   mid: 'Middle ring',
   inner: 'Contested ring',
-  center: 'Capital ring',
+  center: 'Dungeon ring',
 }
 
 // ---------------------------------------------------------------- skills §7.2
@@ -294,6 +302,14 @@ export const BIOME_RARE: Record<Biome, RareKey> = {
 }
 
 export const skillForMaterial = (key: MaterialKey): SkillKey => {
+  // §5.5 -- the hunting ladder first, exactly as Catalog::skillForMaterial()
+  // asks it first. The fallback below matches a line's base, rare and scrap
+  // material, which covers pelt, beastfang hide and torn hide and covers
+  // NEITHER middle rung -- so a thick pelt and a dire pelt were credited to
+  // woodcutting and the almanac told a hunter to bring an axe.
+  const hunted = HUNT_SKILL_FOR_MATERIAL[key]
+  if (hunted) return hunted as SkillKey
+
   // §5.3 -- a grade belongs to the same line its base raw does, or the fallback
   // below would credit a hematite haul to woodcutting.
   if (VARIANT_SKILL[key]) return VARIANT_SKILL[key]

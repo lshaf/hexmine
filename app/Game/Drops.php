@@ -657,6 +657,26 @@ final class Drops
         return array_keys($table);
     }
 
+    /**
+     * §5.5 -- the same list, for a verb that knows its own primary.
+     *
+     * A hunt does. `table()` reads the ground's grade against the tool's, which
+     * is the mine's question; what a hunt pays comes off the ANIMAL, so it is
+     * costed through `tableFor()` with the rung already decided. Handing
+     * HUNTING to `kinds()` fell through to the gather table and put chaff and
+     * thistle where the hide should have been.
+     *
+     * @param  array<string,mixed>  $tile
+     * @return list<string>
+     */
+    public static function kindsFor(string $activity, array $tile, string $primary, bool $rich = false): array
+    {
+        $table = self::tableFor($activity, $tile, $primary, $rich);
+        arsort($table);
+
+        return array_keys($table);
+    }
+
     /** @return list<string> */
     private static function herbsOf(string $biome): array
     {

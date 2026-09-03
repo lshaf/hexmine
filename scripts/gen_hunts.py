@@ -56,6 +56,21 @@ WEIGHTS = {
 
 GRADES = [(grade, raw[0], WEIGHTS[grade]) for grade, raw, _ in LINE]
 
+# §4 / §2 -- the contested rung is a TIER 3, and it is capped per wallet.
+#
+# The four biome ladders emit base/better/best at tier 1 and Catalog hand-lists
+# their Tier 3 separately (ironwood, mythril ore, obsidian shard, silkweave
+# fiber) with `walletCap`. This ladder emits all four rungs itself, and when it
+# moved out of gen_variants.py every rung came out tier 1 -- so Beastfang Hide
+# stopped being a capped rare while still being the gate on the Beastfang Bow,
+# the Beastfang Boots, Farshot and Leaguewalkers.
+#
+# That is exactly the hole §2 exists to close: a mintable epic with nothing
+# capped underneath it is a path from grind time to external value. The rung is
+# what says so, not a list.
+CONTESTED = 'contested'
+
+
 # §5.5 -- what a kill gives up BESIDE the hide, and it lives here for the same
 # reason the ladder does: it is the hunt's table, not a hex's.
 #
@@ -205,10 +220,12 @@ def emit_php():
     o.write('    public const RAW = [\n')
     for grade, raw, _ in LINE:
         key, name, price = raw
+        tier = 3 if grade == CONTESTED else 1
+        cap = "'walletCap' => Balance::RARE_WALLET_CAP, " if grade == CONTESTED else ''
         o.write(
-            f"        '{key}' => ['name' => {php_str(name)}, 'tier' => 1, "
+            f"        '{key}' => ['name' => {php_str(name)}, 'tier' => {tier}, "
             f"'source' => 'hunt', 'grade' => '{grade}', 'palette' => 'pelt', "
-            f"'npcPrice' => {price}, 'description' => {php_str(DESCRIPTIONS[key])}],\n"
+            f"'npcPrice' => {price}, {cap}'description' => {php_str(DESCRIPTIONS[key])}],\n"
         )
     o.write('    ];\n\n')
 
@@ -275,7 +292,8 @@ def emit_php():
 def emit_ts():
     o = io.StringIO()
     doc(o, HEADER)
-    o.write("import type { Animal, Material, Recipe } from './types'\n\n")
+    o.write("import type { Animal, Material, Recipe } from './types'\n")
+    o.write("import { ECONOMY } from './balance'\n\n")
     o.write('export const HUNT_BIOMES = [' + ', '.join(f"'{b}'" for b in BIOMES) + '] as const\n\n')
     o.write('export const HUNT_GRADES: Array<{ grade: string; material: string; weights: Record<string, number> }> = [\n')
     for grade, material, weights in GRADES:
@@ -294,9 +312,11 @@ def emit_ts():
     o.write('export const HUNT_RAW: Material[] = [\n')
     for grade, raw, _ in LINE:
         key, name, price = raw
+        tier = 3 if grade == CONTESTED else 1
+        cap = 'walletCap: ECONOMY.rareWalletCap, ' if grade == CONTESTED else ''
         o.write(
-            f"  {{ key: '{key}', name: {php_str(name)}, tier: 1, source: 'hunt', "
-            f"palette: 'pelt', npcPrice: {price}, "
+            f"  {{ key: '{key}', name: {php_str(name)}, tier: {tier}, source: 'hunt', "
+            f"palette: 'pelt', npcPrice: {price}, {cap}"
             f"description: {php_str(DESCRIPTIONS[key])} }},\n"
         )
     o.write(']\n\n')
@@ -320,6 +340,11 @@ def emit_ts():
             f"output: '{key}', outputQty: 1, baseSeconds: {minutes} * 60, skill: 'hunting' }},\n"
         )
     o.write(']\n\n')
+    o.write('/** §7.2 -- every rung of this ladder belongs to the hunting line. */\n')
+    o.write('export const HUNT_SKILL_FOR_MATERIAL: Record<string, string> = {\n')
+    for _, raw, _ in LINE:
+        o.write(f"  {raw[0]}: 'hunting',\n")
+    o.write('}\n\n')
     o.write('/** §5.5 -- what a kill gives up beside the hide. */\n')
     o.write('export const HUNT_PARTS = [' + ', '.join(f"'{k}'" for k in PARTS) + '] as const\n\n')
     o.write('/** §5.5 -- the part only an uncommon animal or better gives up. */\n')

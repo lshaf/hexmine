@@ -270,42 +270,42 @@ const BANDS: Band[] = [
     key: 'junk',
     tier: 0,
     name: 'Junk',
-    note: 'Sells for the same copper and feeds the same nothing, but it is not scrap: this is the rubbish carried out alongside a real haul, not what a missing tool costs you. Kept apart because that distinction is the whole of the argument above.',
+    note: 'Sells for the same copper and feeds the same nothing, but it is not scrap: this is the rubbish carried out alongside a real haul, not what a missing tool costs you. Kept apart because that distinction is the whole of the argument above. A fight and a hunt leave their own — one saying what you took, one saying where you were standing.',
     holds: () => true,
   },
   {
     key: 'ground',
     tier: 1,
     name: 'The ground',
-    note: `Four grades of every biome, and the variant of hex you are standing on decides which one you get. The base grade is everywhere; the better ones start at the middle ring and the best is contested. This is the bulk of what fills a bag — ${BAG.slots} straps is all a prospector carries, and a strap holds ${BAG.stackMaterial} of one material, so a big haul is several of them.`,
+    note: `Four grades apiece, and what you are standing on decides which one you get — a variant of hex for the four countries, and for hunting the ANIMAL, which carries the same ladder off a creature instead of off ground. The base grade is everywhere; the better ones start at the middle ring and the best is contested. This is the bulk of what fills a bag — ${BAG.slots} straps is all a prospector carries, and a strap holds ${BAG.stackMaterial} of one material, so a big haul is several of them.`,
     holds: (mat) => rawRole(mat.key) === 'ground',
   },
   {
     key: 'reagent',
     tier: 1,
     name: "The alchemist's stock",
-    note: 'Two per biome, and the consumable bench runs on these alone — no potion wants anything a smith would bid for. Biome-locked like every other raw, and worth more than scrap, which §4 makes a rule rather than a tuning value.',
+    note: 'Two apiece, and the consumable bench runs on these alone — no potion wants anything a smith would bid for. Eight grow on a kind of ground and two come off a hunt, which is the same split the whole hunting line has: four countries and a creature. Worth more than scrap, which §4 makes a rule rather than a tuning value.',
     holds: (mat) => rawRole(mat.key) === 'reagent',
   },
   {
     key: 'critter',
     tier: 1,
     name: "The alchemist's other stock",
-    note: 'Five small animals, one per biome, and the only ingredient a hunt brings back rather than a gather. The herbs say what grows on a kind of ground; these say what lives on it — and because a critter needs a bow and a live herd, the top three rungs of the potion shelf wait on an animal turning up rather than on an afternoon with a sickle.',
+    note: 'Five small animals — one on each of the four countries, and the hare off a hunt. The herbs say what grows on a kind of ground; these say what lives on it. Every one of them is taken with the line\'s tool and never picked up by hand, which is why the top rungs of the potion shelf wait on a tool you had to buy rather than on an afternoon with your hands.',
     holds: (mat) => rawRole(mat.key) === 'critter',
   },
   {
     key: 'spoil',
     tier: 1,
     name: 'Off a monster',
-    note: 'The only Tier 1 with no ground under it: two families of five, cut off a pack rather than out of a hex (§9.5). The plate line feeds the smith and the armorer, the ichor line feeds the consumable bench, and the grade you get is the tier of the thing that was carrying it — which is why the best of them are only found in the barren center. Combat feeds combat; none of this reaches the mining economy.',
+    note: 'Cut off a pack rather than out of a hex (§9.5). Two families of five graded by the tier of the thing carrying them — the plate line for the smith and the armorer, the ichor line for the consumable bench — so the best of them are only found in the center, where the worst things stand. Beside those, one stock per country, off that country\'s own five and nothing else: the one drop you cannot get by walking inward on ground you already know. Combat feeds combat; none of this reaches the mining economy.',
     holds: (mat) => rawRole(mat.key) === 'spoil',
   },
   {
     key: 'component',
     tier: 1,
     name: 'The smith and the armorer',
-    note: 'The same idea again, for the other two benches: two per biome, one named for each. Every crafted thing wants its line’s component, so these sit beside the raw and the refined in every recipe rather than replacing them.',
+    note: 'The same idea again, for the other two benches: two apiece, one named for each. Eight come off a kind of ground and two — the horn and the sinew — come off a hunt, because that is where the hunting line\'s stock has always come from. Every crafted thing wants its line’s component, so these sit beside the raw and the refined in every recipe rather than replacing them.',
     holds: (mat) => rawRole(mat.key) === 'component',
   },
   {
@@ -319,7 +319,7 @@ const BANDS: Band[] = [
     key: 'rare',
     tier: 3,
     name: 'Rare',
-    note: `Contested ring only, on ground that finally looks like itself, and capped at ${ECONOMY.rareWalletCap} per wallet. A thousand bot wallets get a thousand capped hauls, which is the point.`,
+    note: `Contested ring only — four off ground that finally looks like itself, and the fifth off an animal nothing has taken down in living memory. Capped at ${ECONOMY.rareWalletCap} per wallet, every one of them, because this is the gate every mintable recipe stands behind: a thousand bot wallets get a thousand capped hauls, which is the point.`,
     holds: () => true,
   },
   {
@@ -1391,9 +1391,10 @@ function nature(item: ItemDef): string {
         </template>
         <template v-else-if="half === 'monsters'">
           A pack stands on a hex for two hours and stops whoever walks onto it.
-          Density climbs every ring inward, and each ring runs all three reads —
-          so walking in you meet three you know how to fight and three you do
-          not. Clearing one removes it for everybody, win or lose, and there is
+          Five to a country, and a country's five stand on that country and
+          nowhere else. Density climbs every ring inward and a ring fields its
+          own tier and the one beyond it — so walking in you meet one you know
+          how to fight and one you do not, and every ring runs all three reads. Clearing one removes it for everybody, win or lose, and there is
           no second roll: supply is capped by hexes and hours rather than by
           patience. Nothing here drops a rare material, a raid material, or
           anything that can be minted. Game stands on the same buckets and is

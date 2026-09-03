@@ -478,6 +478,44 @@ animal rather than about a kind of dirt. What the fold genuinely cost is the
 five plains monsters, and that is a count following a rule rather than a loss:
 §9.5.2 puts five to a country, and there are four countries.
 
+**The contested rung is a Tier 3 and it is capped per wallet**, exactly as the
+four biome ladders' top rungs are. §4 has always listed Beastfang Hide among
+the five rares and §2 requires a per-wallet cap behind anything that can leave
+the game — it is the gate the Beastfang Bow, the Beastfang Boots, Farshot and
+Leaguewalkers all stand behind, and every one of those is mintable.
+
+It became a Tier 1 by accident, which is the shape of mistake worth writing
+down: the four biome ladders emit base/better/best at tier 1 and the catalog
+hand-lists their Tier 3 *separately*, so when the hunting ladder moved into its
+own generator it emitted all four of its own rungs — every one of them tier 1,
+with no cap. A capped rare that quietly stopped being one is precisely the
+grind→NFT path the threat model exists to close, arriving as a refactor nobody
+read as one. There is a test.
+
+**A hunt is reported as the mine it is.** The job payload branched on `battle`
+and `mining` and let everything else fall through to the bench branch, so a
+hunting job came back as a processing job standing at no settlement — no hex,
+no material, no bench. The client sorts a field job on `mining|battle` and a
+bench job on `processing|craft`, so a hunting job matched **neither** and a
+started hunt was invisible from the moment it began, with no way to claim it.
+Adding a third kind of job without telling the two places that sort them is
+what did it, and it is why §5.5 keeps saying a hunt is a mine: every list that
+sorts work has to have both words on it.
+
+**And the tile card owes the hunt its own reward list.** A hex answers to three
+verbs and the card prints a price list per verb, so the hunt gets a row beside
+Mine and Gather and the animal gets the lede the seam's material gets — which
+one is standing there is the whole of what decides the rung.
+
+All three answer `drops` in **one shape**: a list of keys, most likely first.
+The hunt answered with the weighted *table* — an object where the other two
+send an array — so the one screen that reads all three had nothing to slice.
+And a hunt is costed through its own primary rather than through the ground's
+grade, because what it pays comes off the animal: the first fix put it through
+the mine's costing and returned the *gather* table, chaff and thistle where the
+hide should have been. There is a test for both, because both looked right
+until the list was read.
+
 ### 5.6 Sight and travel — a fog, not a fence
 
 These were one number and are now two, and separating them is what makes the

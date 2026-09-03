@@ -448,14 +448,18 @@ export const useGame = defineStore('game', () => {
   /**
     * One mine out and one processing job at a time, so both of these are a
     * single job or nothing. A mine pins the character to its hex, whether it is
-    * a seam, a herd (§5.5) or a fight (§9.5.5); processing is the NPC's work,
-    * which the player only helps along by being there (§6.2).
+    * a seam, an animal (§5.5) or a fight (§9.5.5); processing is the NPC's
+    * work, which the player only helps along by being there (§6.2).
+    *
+    * §5.5 -- `hunting` is on this list because a hunt IS a mine: same hex, same
+    * clock, same claim. It was on neither list while it had a kind of its own,
+    * which made a started hunt invisible from the moment it began.
     */
   const fieldJob = computed<FieldJob | BattleJob | null>(
     () =>
       jobs.value.find(
         (j): j is FieldJob | BattleJob =>
-          j.kind === 'mining' || j.kind === 'battle',
+          j.kind === 'mining' || j.kind === 'hunting' || j.kind === 'battle',
       ) ?? null,
   )
 
