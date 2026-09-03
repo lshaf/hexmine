@@ -28,9 +28,9 @@ export interface CharacterDto {
   id: string
   name: string
   /**
-   * §7 -- whether `name` is a name this character claimed or the label every
-   * unnamed one is drawn with. The string alone cannot say: somebody could have
-   * been called Prospector, except that the one name nobody may claim is that.
+   * §7 -- whether `name` is a name this character claimed or the one it was
+   * given. Unnamed characters are drawn with a derived name of their own now,
+   * so the string alone cannot say which it is -- this can.
    */
   named: boolean
   /** Truncated for display; the backend keys everything off the full address. */

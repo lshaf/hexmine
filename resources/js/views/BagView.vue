@@ -873,12 +873,6 @@ async function mend(item: OwnedItem): Promise<void> {
                   ><i>{{ on }}</i></span>
                 </span>
               </div>
-              <p class="tiny muted room">
-                <template v-if="headroom > 0">
-                  <strong>{{ headroom }} more</strong> before it takes another strap.
-                </template>
-                <template v-else>Full — the next one takes another strap.</template>
-              </p>
             </section>
 
             <!-- Material: what it is worth, per unit and for the lot. -->
@@ -1009,14 +1003,15 @@ async function mend(item: OwnedItem): Promise<void> {
                   </div>
                 </form>
                 <div v-else class="acts">
-                  <button
-                    class="btn btn-sm btn-danger"
-                    type="button"
+                  <!-- §8.2 -- the four gear verbs are glyphs, and this is the
+                       fifth thing you can do to something in the bag. A word
+                       here beside four drawings was the odd one out. -->
+                  <GearAction
+                    action="scrap"
+                    label="Trash"
                     :disabled="game.busy"
                     @click="startTrash(picked.held)"
-                  >
-                    Trash
-                  </button>
+                  />
                 </div>
               </template>
 
@@ -1463,11 +1458,6 @@ async function mend(item: OwnedItem): Promise<void> {
 .comb-mini .s.part > i {
   background: #2b3830;
   color: var(--vellum);
-}
-
-.room {
-  margin: 8px 0 0;
-  line-height: 1.4;
 }
 
 /* -------------------------------------------------------------- fact rows */

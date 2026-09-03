@@ -105,17 +105,17 @@ function onConnected(): void {
 }
 
 const PANELS = {
-  bag: { title: 'Bag', component: BagView, wide: false },
+  bag: { title: 'Inventory', component: BagView, wide: false },
   craft: { title: 'Workshop', component: CraftView, wide: false },
   shop: { title: 'Trader', component: ShopView, wide: false },
-  hero: { title: 'Prospector', component: HeroView, wide: false },
+  hero: { title: 'Character', component: HeroView, wide: false },
   atlas: { title: 'Atlas', component: AtlasView, wide: true },
   // §7.4 -- six trees of thirty. Wide, because a seam of nodes needs room.
-  skills: { title: 'Jobs', component: SkillsView, wide: false },
+  skills: { title: 'Skill', component: SkillsView, wide: false },
   // §12.1 -- what is owed and what has been paid. Two tabs, no third.
-  quests: { title: 'Ledger', component: QuestView, wide: false },
+  quests: { title: 'Quest', component: QuestView, wide: false },
   // §8.4 -- what is on a bench somewhere, and how far away that bench is.
-  bench: { title: 'Benches', component: BenchView, wide: false },
+  bench: { title: 'Craft', component: BenchView, wide: false },
   // §10 -- who you are with, and the hall that makes legendary reachable.
   guild: { title: 'Guild', component: GuildView, wide: false },
 } as const
@@ -153,7 +153,7 @@ const screens = computed<Screen[]>(() => [
   {
     panel: 'bag',
     icon: 'bag',
-    label: 'Bag',
+    label: 'Inventory',
     alert: game.bagFull,
     hint: game.bagFull ? 'Full — no strap free for a new kind' : 'What you are carrying, and on how many straps',
   },
@@ -170,7 +170,7 @@ const screens = computed<Screen[]>(() => [
   {
     panel: 'bench',
     icon: 'craft',
-    label: 'Benches',
+    label: 'Craft',
     good: game.benchReady > 0,
     hint: game.benchHere > 0
       ? `${game.benchHere} finished here — take it off the bench`
@@ -183,14 +183,14 @@ const screens = computed<Screen[]>(() => [
   {
     panel: 'quests',
     icon: 'quest',
-    label: 'Ledger',
+    label: 'Quest',
     good: game.questsReady > 0,
     hint: game.questsReady > 0
       ? `${game.questsReady} finished — the gold is waiting`
       : 'What is owed, and what has been paid',
   },
-  { panel: 'skills', icon: 'skills', label: 'Jobs', hint: 'Seventeen trees, and the points to spend on them' },
-  { panel: 'hero', icon: 'hero', label: 'Prospector', hint: 'What you are wearing, and what is about to break' },
+  { panel: 'skills', icon: 'skills', label: 'Skill', hint: 'Seventeen trees, and the points to spend on them' },
+  { panel: 'hero', icon: 'hero', label: 'Character', hint: 'What you are wearing, and what is about to break' },
   // §10 -- the cell says when you have none, since a guild is the only thing
   // standing between a prospector and §8.0's top rung, and "you are not in one"
   // is a decision to make rather than a problem to fix.
@@ -408,7 +408,7 @@ onMounted(() => {
                      stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <path :d="ACTION_PATHS.leave" />
                 </svg>
-                <span class="grow">{{ leaving ? 'Disconnecting…' : 'Leave' }}</span>
+                <span class="grow">{{ leaving ? 'Disconnecting…' : 'Log Out' }}</span>
               </button>
             </div>
           </nav>

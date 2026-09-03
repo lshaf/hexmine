@@ -144,9 +144,10 @@ class GameService
      * for a different name -- a leading space, a zero-width joiner, two names
      * differing only by punctuation -- is a way to be somebody else.
      *
-     * "Prospector" is not claimable. It is the LABEL every unnamed character is
-     * drawn with (see the migration), so letting one player own it would make
-     * every other unnamed prospector look like them.
+     * "Prospector" is not claimable. It was the label every unnamed character
+     * was drawn with -- they get a derived one of their own now (Names) -- and
+     * it stays reserved because it is the word the whole game uses for the
+     * player, and one owning it would be one wearing everybody's noun.
      *
      * The unique index is the authority; this only gets to the refusal first so
      * the player is told which rule they broke instead of being handed a
@@ -4476,7 +4477,7 @@ class GameService
             ->get()
             ->map(fn (GuildApplication $a) => [
                 'characterId' => (string) $a->character_id,
-                'name' => $a->character?->name ?? 'Prospector',
+                'name' => $a->character?->name ?? Names::forCharacter((int) $a->character_id),
                 'level' => (int) ($a->character?->level ?? 1),
                 'appliedAt' => $a->applied_at,
             ])
@@ -4808,7 +4809,7 @@ class GameService
                 ->get()
                 ->map(fn (GuildMember $m) => [
                     'characterId' => (string) $m->character_id,
-                    'name' => $m->character?->name ?? 'Prospector',
+                    'name' => $m->character?->name ?? Names::forCharacter((int) $m->character_id),
                     'level' => (int) ($m->character?->level ?? 1),
                     'role' => $m->role,
                     'joinedAt' => $m->joined_at,
@@ -6969,7 +6970,7 @@ class GameService
                 // §7 -- NULL is unnamed, and the label is applied here, at the
                 // one place the client reads it from. Storing the label would
                 // make it a name somebody holds (see renameCharacter).
-                'name' => $character->name ?? 'Prospector',
+                'name' => $character->name ?? Names::forCharacter((int) $character->id),
                 // Whether that is a name or the label standing in for one --
                 // which is also whether the one naming is still owed (§7), so
                 // the cluster shows the control against false and nothing at

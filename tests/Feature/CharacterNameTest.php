@@ -7,6 +7,7 @@ namespace Tests\Feature;
 use App\Game\Balance;
 use App\Game\GameException;
 use App\Game\GameService;
+use App\Game\Names;
 use App\Models\Character;
 use App\Models\Player;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -33,15 +34,33 @@ final class CharacterNameTest extends TestCase
         $this->game = app(GameService::class);
     }
 
-    public function test_a_prospector_starts_unnamed_and_is_shown_the_label(): void
+    /**
+     * §7 -- unnamed, and drawn with a derived name of its own rather than one
+     * label every character in the game shares.
+     */
+    public function test_a_prospector_starts_unnamed_and_is_shown_a_derived_name(): void
     {
         $character = $this->character('wallet-one');
 
-        $this->assertNull($character->name);
+        $this->assertNull($character->name, 'the naming is still owed');
 
         $state = $this->game->playerState($character);
-        $this->assertSame('Prospector', $state['character']['name']);
+        $this->assertSame(Names::forCharacter((int) $character->id), $state['character']['name']);
         $this->assertFalse($state['character']['named']);
+        $this->assertNotSame('Prospector', $state['character']['name']);
+    }
+
+    /** Derived from the row, so it is stable and no two characters share one. */
+    public function test_the_derived_name_is_stable_and_unique(): void
+    {
+        $seen = [];
+
+        for ($id = 1; $id <= 400; $id++) {
+            $name = Names::forCharacter($id);
+            $this->assertSame($name, Names::forCharacter($id), 'the name moved');
+            $this->assertArrayNotHasKey($name, $seen, "two characters are called {$name}");
+            $seen[$name] = true;
+        }
     }
 
     public function test_a_name_is_claimed_and_then_shown(): void
