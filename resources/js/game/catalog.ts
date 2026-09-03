@@ -263,6 +263,15 @@ export const BIOME_MATERIAL: Record<Biome, RawKey> = {
  * line's tool, a hex yields this instead of its real material. Same haul size, a
  * fraction of the worth, and no recipe will take it.
  */
+/**
+ * §4.0/§5.5 -- what a hunt pays somebody with no bow.
+ *
+ * The hunting line's scrap. It sat in BIOME_SCRAP while the line was worked off
+ * plains ground; the line is an animal now, so its scrap is keyed to the hunt
+ * rather than to a country.
+ */
+export const HUNT_SCRAP = 'torn_hide' as const
+
 export const BIOME_SCRAP: Record<Biome, ScrapKey> = {
   forest: 'branch',
   mountain: 'ore_chips',
@@ -271,7 +280,7 @@ export const BIOME_SCRAP: Record<Biome, ScrapKey> = {
 }
 
 export const isScrap = (key: MaterialKey): boolean =>
-  (Object.values(BIOME_SCRAP) as MaterialKey[]).includes(key)
+  ([...Object.values(BIOME_SCRAP), HUNT_SCRAP] as MaterialKey[]).includes(key)
 
 /** Biome -> its rare variant, spawned in the contested inner ring, §5.3. */
 export const BIOME_RARE: Record<Biome, RareKey> = {

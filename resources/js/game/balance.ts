@@ -81,13 +81,15 @@ export const MINING = {
   abandonRefund: 0,
 } as const
 
-export const HUNTING = {
-  /** Herd markers decay after ~4h, §5.5. */
-  markerLifetimeMs: 4 * HOUR,
-  /** §7.3 -- a herd's HP. 4,500 is 25 minutes with a crude bow. */
-  herdHp: 4500,
-  peltYield: [2, 5] as const,
-} as const
+/*
+ * §5.5 -- HUNTING is gone, and nothing replaces it here.
+ *
+ * It described herd markers: their own four-hour clock, their own HP, their own
+ * pelt yield. The herd went when hunting folded back into mining, and the
+ * constants outlived it by describing a system with no call sites. What a hunt
+ * costs and pays is the mining arithmetic now (§7.3), read off the animal on
+ * the hex — server-side, like every other timer.
+ */
 
 export const PROCESSING = {
   /** Five open slots per feature, first-come-first-served, §6.1. */

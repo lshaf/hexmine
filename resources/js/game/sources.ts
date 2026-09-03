@@ -12,9 +12,10 @@
  * disagree. Everything below reads the catalog and the balance constants, so a
  * tuning pass moves this page without anyone editing it.
  */
-import { HUNTING, PROCESSING } from './balance'
+import { PROCESSING } from './balance'
 import {
   BIOME_SCRAP,
+  HUNT_SCRAP,
   DUNGEONS,
   isScrap,
   ITEMS,
@@ -32,7 +33,8 @@ import { REAGENTS } from './alchemy'
 import { COMPONENTS } from './components'
 import { CRITTERS } from './critters'
 import { SPOILS } from './spoils'
-import type { ItemDef, Material, MaterialKey, SettlementTier } from './types'
+import { ANIMALS, HUNT_BIOMES } from './hunts'
+import type { Biome, ItemDef, Material, MaterialKey, SettlementTier } from './types'
 
 /** The five roads. Nothing in the world arrives by a sixth. */
 export type SourceKind = 'mine' | 'process' | 'trade' | 'craft' | 'dungeon'
@@ -182,9 +184,25 @@ export function materialSources(mat: Material): SourceLine[] {
       // rubbish carried out alongside a real haul: no tool, nothing displaced,
       // and nothing on the map drops it yet either.
       if (!isScrap(mat.key)) {
+        // §9.5.8 -- a monster's trophy has no ground at all: it says WHAT you
+        // fought, one per tier, and every win drops it. The junk beside it is
+        // the biome's, and that one says where.
+        if (mat.biome === undefined && mat.source === undefined) {
+          lines.push({
+            kind: 'mine',
+            where: `Monster pack · tier ${mat.grade ?? 1}`,
+            note:
+              'Dropped by every win against a monster of its tier. Worth a gold, ' +
+              'wanted by no recipe — what a fight leaves that nobody wants.',
+          })
+          break
+        }
+
         lines.push({
           kind: 'mine',
-          where: `${BIOME_LABEL[mat.biome!]} hex, alongside the haul`,
+          where: mat.source === 'hunt'
+            ? 'A hunt, alongside the haul'
+            : `${BIOME_LABEL[mat.biome!]} hex, alongside the haul`,
           pending: true,
           note:
             'Not what a missing tool costs you — that is scrap. This is what ' +
@@ -198,11 +216,16 @@ export function materialSources(mat: Material): SourceLine[] {
       // Whatever is true of all five scrap lives in the tier note, not here.
       // Five cards repeating the same paragraph is noise, and the only thing
       // that actually differs is the tool and what it displaces.
+      //
+      // §5.5 -- the hunting line's scrap comes off an ANIMAL rather than off a
+      // country, so there is no biome to name. Four of the five say a hex and
+      // the fifth says the hunt.
       lines.push({
         kind: 'mine',
-        where: `${BIOME_LABEL[mat.biome!]} hex, bare-handed`,
+        where: mat.source === 'hunt' ? 'A hunt, bare-handed' : `${BIOME_LABEL[mat.biome!]} hex, bare-handed`,
         note:
-          `Without ${article(tool)} ${tool} equipped, a ${mat.biome} hex gives this ` +
+          `Without ${article(tool)} ${tool} equipped, ` +
+          (mat.source === 'hunt' ? 'a hunt gives this ' : `a ${mat.biome} hex gives this `) +
           `instead of ${MATERIALS[skill.material].name.toLowerCase()}.`,
       })
       break
@@ -215,6 +238,20 @@ export function materialSources(mat: Material): SourceLine[] {
       // thing that walked there, so the almanac names the ring it walked on
       // rather than a biome.
       if (role === 'spoil') {
+        // §9.5.8 -- a country's own stock says WHERE it lived rather than how
+        // hard it was, so it carries a biome and no grade. The graded ladders
+        // are the other way round.
+        if (mat.spoil === 'biome') {
+          lines.push({
+            kind: 'mine',
+            where: `Monster pack · ${BIOME_LABEL[mat.biome!]}`,
+            note:
+              `Off ${BIOME_LABEL[mat.biome!].toLowerCase()} monsters and nothing else — ` +
+              'the one drop you cannot get by walking inward on ground you know.',
+          })
+          break
+        }
+
         const ring = SPOIL_RING[mat.grade ?? 1] ?? 'the road'
         lines.push({
           kind: 'mine',
@@ -226,16 +263,16 @@ export function materialSources(mat: Material): SourceLine[] {
         break
       }
 
-      // §4 -- the alchemist's second stock, and the only ingredient that needs
-      // a bow. A herb is an errand; a critter waits on a herd, and §5.5 puts
-      // herds on a four-hour clock.
+      // §4 -- the alchemist's second stock: what LIVES on a kind of ground, as
+      // against what grows on it. Taken with the line's tool, never picked up
+      // by hand.
       if (role === 'critter') {
         lines.push({
           kind: 'mine',
-          where: `${BIOME_LABEL[mat.biome!]} herd · Hunting`,
-          note:
-            'Needs a bow and a live herd — the one activity bare hands cannot do ' +
-            'at all. Hunted, never gathered.',
+          where: mat.source === 'hunt'
+            ? 'A hunt · Hunting'
+            : `${BIOME_LABEL[mat.biome!]} hex · ${SKILL_BY_KEY[skillForMaterial(mat.key)].name}`,
+          note: 'Taken with the line\'s tool. Hunted, never gathered.',
         })
         break
       }
@@ -248,8 +285,12 @@ export function materialSources(mat: Material): SourceLine[] {
         const verb = role === 'reagent' ? 'Gathering or mining' : 'Mining';
         lines.push({
           kind: 'mine',
-          where: `${BIOME_LABEL[mat.biome!]} hex · ${verb}`,
-          note: `Stock for the ${bench} bench, alongside whatever the hex itself gives up.`,
+          where: mat.source === 'hunt'
+            ? `A hunt · ${verb}`
+            : `${BIOME_LABEL[mat.biome!]} hex · ${verb}`,
+          note: mat.source === 'hunt'
+            ? `Stock for the ${bench} bench, alongside whatever the animal gives up.`
+            : `Stock for the ${bench} bench, alongside whatever the hex itself gives up.`,
         })
         break
       }
@@ -259,6 +300,24 @@ export function materialSources(mat: Material): SourceLine[] {
       // §5.3 -- a grade names the ground it comes off, not just the biome. Four
       // kinds of forest give four different things, and which one you are
       // standing on is the whole question.
+      // §5.5 -- the hunting line has no ground under it. Its four rungs come
+      // off the animal's own grade, so the card names the creature's country
+      // and the rung rather than a kind of hex.
+      if (mat.source === 'hunt') {
+        const animal = Object.values(ANIMALS).find((a) => a.material === mat.key)
+
+        lines.push({
+          kind: 'mine',
+          where: animal
+            ? `${animal.name} · ${HUNT_BIOMES.map((b) => BIOME_LABEL[b as Biome]).join(' and ')}`
+            : 'A hunt',
+          note:
+            `Needs ${article(tool)} ${tool}. Without one a hunt gives ` +
+            `${MATERIALS[HUNT_SCRAP].name.toLowerCase()} instead.`,
+        })
+        break
+      }
+
       const variant = VARIANT_BY_MATERIAL[mat.key]
       lines.push({
         kind: 'mine',
@@ -269,17 +328,6 @@ export function materialSources(mat: Material): SourceLine[] {
           `Needs ${article(tool)} ${tool}. Without one the hex gives ` +
           `${MATERIALS[BIOME_SCRAP[mat.biome!]].name.toLowerCase()} instead.`,
       })
-      if (mat.key === 'pelt') {
-        lines.push({
-          kind: 'mine',
-          where: 'Herd markers, any biome',
-          pending: true,
-          note:
-            `Herds wander onto open hexes and move on after about ` +
-            `${Math.round(HUNTING.markerLifetimeMs / 3_600_000)} hours. A bow is required, ` +
-            'and they pay horn, sinew and bone alongside the pelt.',
-        })
-      }
       break
     }
 
