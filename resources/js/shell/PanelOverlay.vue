@@ -53,6 +53,14 @@ defineEmits<{ (e: 'close'): void }>()
 .panel {
   position: relative;
   width: min(580px, 100%);
+  /*
+   * A flex item will not shrink below its content's min-content width unless
+   * told to, so `width: min(580px, 100%)` was a suggestion any panel with an
+   * unbreakable line inside could ignore -- and one did, coming out 505px wide
+   * on a 390px phone with everything past the fold simply gone. The clamp binds
+   * now, and content that cannot fit scrolls instead of pushing the frame.
+   */
+  min-width: 0;
   max-height: min(78vh, 720px);
   display: flex;
   flex-direction: column;

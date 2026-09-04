@@ -872,12 +872,21 @@ async function learn(): Promise<void> {
   color: var(--vellum);
 }
 
+/*
+ * Two lines at most, and it WRAPS rather than running on.
+ *
+ * `white-space: nowrap` made the longest sentence in the list the min-content
+ * width of the whole panel, and `text-overflow` never got a chance because
+ * nothing upstream was ever narrow enough to clip against. Wrapping puts the
+ * floor back at the longest word; the clamp is what keeps a row from growing.
+ */
 .skill .what {
-  display: block;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   line-height: 1.35;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 /*
@@ -1535,23 +1544,55 @@ async function learn(): Promise<void> {
   line-height: 1.55;
 }
 
+/*
+ * On a phone the panel is 390px wide and every horizontal pixel is spent, so
+ * what gives way is the chrome rather than the figures: the trades drop to two
+ * across, the marks and the gutters come in, and the note goes -- it repeats
+ * what the big number above it already says.
+ *
+ * §13.2's rule about the artifact sandbox applies here too: the panel itself
+ * has `min-width: 0` now (PanelOverlay), without which none of this binds and
+ * the whole sheet simply ran off the right of the screen.
+ */
 @media (max-width: 560px) {
   .trades {
     grid-template-columns: repeat(2, 1fr);
   }
 
-  .band {
-    grid-template-columns: 44px 1fr;
-    gap: 8px;
+  .trade {
+    padding: 8px 7px;
+    gap: 6px;
   }
 
-  .gutter {
-    padding-right: 7px;
-  }
-
+  /* The mark comes in a little, because the name is what is being read. */
   .node .hex {
-    width: 42px;
-    height: 37px;
+    width: 36px;
+    height: 31px;
+  }
+
+  .skill {
+    gap: 9px;
+    padding: 8px 9px 8px 6px;
+  }
+
+  /* The figures still line up, but they stop reserving room they do not need. */
+  .skill .right {
+    min-width: 66px;
+  }
+
+  /*
+   * The label and the figure stack. Side by side, a 96px label against a
+   * 390px screen left "+1% woodcutting yield" and "at Woodcutting level 1"
+   * fighting over the same forty pixels.
+   */
+  .answer {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
+
+  .answer .label {
+    flex: none;
   }
 
   .purse .note {

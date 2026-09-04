@@ -1305,6 +1305,16 @@ The ranks draw as a **pip strip**, never a bar: an empty rank is the same shape
 as a full one, so what is left is seen rather than subtracted — which is §7.6's
 own argument about the bag comb.
 
+**On a phone the chrome gives way, never the figures**: the jobs drop to two
+across, the marks come in, and the label and the figure stack. What must not
+give way is the panel's width — a flex item will not shrink below its content's
+min-content size unless told to, so an unbreakable line inside one panel put it
+505px wide on a 390px screen with everything past the fold simply gone. **Every
+panel carries `min-width: 0`**, and a description that cannot fit wraps and
+clamps rather than setting the floor for the whole sheet. `nowrap` with
+`text-overflow: ellipsis` is the shape of that bug: the clip never happens,
+because nothing upstream is ever narrow enough to clip against.
+
 #### 7.4.3 What a node may do — and the ceiling, again
 
 This is the part that can break the game, so the rule is mechanical rather than
