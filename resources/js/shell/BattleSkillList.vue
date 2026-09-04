@@ -64,8 +64,8 @@ const rows = computed(() =>
   <div v-if="rows.length" class="skills">
     <p class="tiny muted lead">
       <template v-if="family">Your {{ family }} can know these.</template>
-      <template v-else>These are learned in the job's tree.</template>
-      One node each, at depths I, II and III.
+      <template v-else>These are learned on the job's own sheet.</template>
+      One skill each, one rank, at job levels 1, 5 and 12.
     </p>
 
     <div v-for="row in rows" :key="row.key" class="skill" :class="{ unknown: row.known === false }">

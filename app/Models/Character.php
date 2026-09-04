@@ -76,6 +76,11 @@ class Character extends Model
     }
 
     /** §7.4.2 -- the tree nodes bought. Spent points is the count of these. */
+    public function skillRanks(): HasMany
+    {
+        return $this->hasMany(CharacterSkillRank::class);
+    }
+
     public function nodes(): HasMany
     {
         return $this->hasMany(CharacterNode::class);

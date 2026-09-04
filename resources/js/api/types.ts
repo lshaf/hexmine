@@ -175,6 +175,13 @@ export interface PlayerState {
   skillPoints: SkillPoints
   /** §7.4 -- one row per job. A level here gates nodes and grants nothing. */
   jobLevels: JobLevel[]
+  /**
+   * §7.4 -- what this character holds, keyed by skill.
+   *
+   * `skillRanks`, not `skills`: that key is already §7.2's five gathering
+   * levels, which are a different number entirely.
+   */
+  skillRanks: Record<string, number>
   /** §7.4.2 -- node keys bought. Bought, never refunded. */
   nodes: string[]
   /**
@@ -332,7 +339,7 @@ export type NodeEffect =
    * §9.5.9 -- teaches one of the three a battle job carries.
    *
    * The only effect with no `value`: owning the node IS the effect. Three per
-   * battle job at depths I, II and III, bought with a point like every node
+   * battle job at levels 1, 5 and 12, bought with a point like every rank
    * beside them, which is what keeps a battle job at thirty.
    */
   | { kind: 'battleSkill'; skill: string }
@@ -401,11 +408,26 @@ export interface NodeDef {
  * identical for everyone, so it is fetched once when the panel first opens
  * instead of riding along with every state refresh.
  */
+/**
+ * §7.4 -- one skill, and the ranks it climbs.
+ *
+ * A rank names the node that carries its effect, which is what keeps the
+ * balance where it was: effects are still summed off nodes, so a skill at rank
+ * five is exactly the first five nodes it was made of.
+ */
+export interface SkillDef {
+  job: string
+  kind: NodeEffect['kind']
+  name: string
+  description: string
+  ranks: Array<{ node: string; level: number }>
+}
+
 export interface SkillTree {
   jobs: Record<string, JobDef>
+  /** §7.4 -- what the panel draws: a job's short list of levelled skills. */
+  skills: Record<string, SkillDef>
   nodes: Record<string, NodeDef>
-  tierJobLevel: Record<number, number>
-  tierSize: Record<number, number>
   /** §7.5 -- jobs whose nodes are granted by job level, never bought. */
   automatic: string[]
   jobMaxLevel: number
@@ -712,7 +734,7 @@ export interface ActionResult<T = unknown> {
 /** §9.5.9 -- a skill as the panel draws it: what it does, and its figures. */
 export interface BattleSkillRow {
   key: string
-  /** The key it is stored under once learned, and the one buyNode takes. */
+  /** The key it is stored under once learned, and the one buySkillRank takes. */
   node: string
   name: string
   glyph: string
@@ -986,7 +1008,9 @@ export interface GameApi {
   /** §7.4 -- the static tree. Fetched once, never per action. */
   getSkillTree(): Promise<SkillTree>
   /** §7.4 -- spend one point. Every gate is checked server-side. */
-  buyNode(nodeKey: string): Promise<ActionResult<{ node: string; points: SkillPoints }>>
+  buySkillRank(
+    skillKey: string,
+  ): Promise<ActionResult<{ skill: string; rank: number; points: SkillPoints }>>
 
   /** §12 -- both static catalogs, the chain and the day's pool. Fetched once. */
   getQuests(): Promise<LedgerCatalog>

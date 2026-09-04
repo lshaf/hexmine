@@ -249,10 +249,13 @@ export class HttpDriver implements GameApi {
     return request<SkillTree>('/jobs-tree')
   }
 
-  buyNode(nodeKey: string): Promise<ActionResult<{ node: string; points: SkillPoints }>> {
-    return post<ActionResult<{ node: string; points: SkillPoints }>>('/jobs-tree/nodes', {
-      node: nodeKey,
-    })
+  buySkillRank(
+    skillKey: string,
+  ): Promise<ActionResult<{ skill: string; rank: number; points: SkillPoints }>> {
+    return post<ActionResult<{ skill: string; rank: number; points: SkillPoints }>>(
+      '/jobs-tree/nodes',
+      { skill: skillKey },
+    )
   }
 
   sellScrap(): Promise<ActionResult<{ gold: number; rows: number }>> {

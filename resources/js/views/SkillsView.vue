@@ -2,26 +2,25 @@
 /**
  * The trades, §7.4.
  *
- * Eleven trees of thirty nodes, one of fifteen, and the panel's one job is to
+ * A job is a short list of levelled SKILLS, and the panel's one job is to
  * answer "what can I take right now" without the player counting anything.
  *
- * The short one is Explorer (§7.5). Same five depths as everything else -- three
- * to a row rather than 6/8/8/6/2 -- and it is the one sheet with no price on it:
- * its skills arrive as the job levels and cost no point. The panel says so
- * rather than drawing a Learn button that would only ever be refused.
+ * ── Why a list, and why not a tree ───────────────────────────────────────────
+ * It was thirty nodes drawn as five strata, and the thirty were never thirty
+ * ideas: they were a handful of effects repeated under different names.
+ * Explorer's fifteen were two -- straps thirteen times and sight twice -- and
+ * Deep Pockets, Second Strap, Rolled Blanket, Even Load, Side Pouch, Bindle,
+ * Sorted Kit, Tump Line, Packer's Knot, Outer Pockets and Long Haul were eleven
+ * different words for the same +2. A diagram of that is a diagram of a list.
  *
- * ── Why strata, and why no wires ─────────────────────────────────────────────
- * A skill tree is usually drawn as a graph of curved edges. That would be the
- * wrong drawing here twice over. First, this is a mining game and the tree
- * genuinely *is* layered: tiers gate on depth, each one needs the one above cut
- * first, and 30 nodes narrow to 2 at the bottom. Strata say that. Second, a
- * curved-edge graph collapses on a phone -- nodes become dots and the wires
- * become spaghetti the moment a row wraps.
+ * So a skill is one row that ranks up, and tapping it answers the three
+ * questions a player actually has, in the order they are asked: what you have
+ * now, when the next one comes, and the whole ladder underneath -- so "when can
+ * I take it" is answered for every rank at once rather than one at a time.
  *
- * So the structure is read from the strata, and lineage is shown *on demand*:
- * touch a node and its parents light up through the bands above. Parents are
- * always exactly one tier up (§7.4.2), so there is nothing a permanent wire
- * would tell you that the band above does not.
+ * The ranks draw as a pip strip rather than a bar. An empty rank is the same
+ * shape as a full one, so what is left is seen rather than subtracted, which is
+ * §7.6's own argument about the bag comb.
  *
  * Everything the server decides stays server-decided (§16): this draws state and
  * posts one key. It never computes affordability as truth, only as a hint about
@@ -33,14 +32,13 @@ import { ACTION_PATHS } from '@/icons/actions'
 import { MATERIAL_PALETTE } from '@/theme/palette'
 import { formatPercent, formatStat } from '@/game/formulas'
 import { STAT_LABEL } from '@/game/catalog'
-import type { NodeDef, NodeEffect } from '@/api/types'
+import type { NodeEffect, SkillDef } from '@/api/types'
 import type { StatKey } from '@/game/types'
 
 const game = useGame()
 
 /** Woodcutting first: it is the line the opening arc puts in your hands. */
 const job = ref<string>('woodcutting')
-const picked = ref<string | null>(null)
 
 onMounted(() => {
   void game.loadTree()
@@ -115,141 +113,159 @@ const accent = computed(() =>
   jobDef.value ? (MATERIAL_PALETTE[jobDef.value.palette as keyof typeof MATERIAL_PALETTE] ?? '#c1793f') : '#c1793f',
 )
 
-/** Roman numerals, because a stratum is named not counted. */
 /**
- * Depth in the gutter. Five bands everywhere today, but computed rather than
- * looked up: a fixed table is the kind of thing that renders a blank gutter the
- * first time a tree is reshaped, which has already happened once here.
+ * §7.4 -- this job's skills, each with what you hold and what comes next.
+ *
+ * Ordered by the level that opens the first rank, which is the order a player
+ * meets them in; the server already sends them that way and this only filters.
  */
-const NUMERALS: Array<[number, string]> = [
-  [10, 'X'],
-  [9, 'IX'],
-  [5, 'V'],
-  [4, 'IV'],
-  [1, 'I'],
-]
-
-function roman(n: number): string {
-  let left = n
-  let out = ''
-  for (const [value, glyph] of NUMERALS) {
-    while (left >= value) {
-      out += glyph
-      left -= value
-    }
-  }
-  return out
+interface Row {
+  key: string
+  def: SkillDef
+  rank: number
+  ranks: number
+  /** The level that opens the next rank, or null at the top. */
+  nextLevel: number | null
+  /** Reachable right now: the job level is there and, if bought, a point is. */
+  open: boolean
+  maxed: boolean
 }
 
-interface Band {
-  tier: number
-  /** The level the depth opens at -- its first node's. */
-  jobLevel: number
-  /**
-   * §7.5 -- what the gutter prints. A bought depth opens whole, so one number
-   * says everything; the wayfaring tree gates its three skills one level at a
-   * time, and a single "lv 2" over a row that runs to 6 would be a lie.
-   */
-  levels: string
-  nodes: Array<{ key: string; def: NodeDef }>
-  owned: number
-  reached: boolean
-}
-
-const bands = computed<Band[]>(() => {
+const rows = computed<Row[]>(() => {
   const t = tree.value
   if (!t) return []
 
-  const mine = Object.entries(t.nodes).filter(([, n]) => n.job === job.value)
-  const out: Band[] = []
+  const level = jobRow.value.level
+  const points = game.skillPoints.available
 
-  // Read the tiers off the nodes rather than assuming a range. Every tree has
-  // five today; a hardcoded list would silently drop anything past the fifth
-  // depth the next time one is reshaped.
-  const tiers = [...new Set(mine.map(([, n]) => n.tier))].sort((a, b) => a - b)
+  return Object.entries(t.skills)
+    .filter(([, def]) => def.job === job.value)
+    .map(([key, def]) => {
+      const rank = game.rankOf(key)
+      const next = def.ranks[rank] ?? null
 
-  for (const tier of tiers) {
-    const nodes = mine
-      .filter(([, n]) => n.tier === tier)
-      .map(([key, def]) => ({ key, def }))
-    if (!nodes.length) continue
-
-    const opens = nodes[0]!.def.jobLevel
-    const last = nodes[nodes.length - 1]!.def.jobLevel
-
-    out.push({
-      tier,
-      jobLevel: opens,
-      levels: last > opens ? `lv ${opens}–${last}` : `lv ${opens}`,
-      nodes,
-      owned: nodes.filter((n) => game.ownedNodes.has(n.key)).length,
-      reached: jobRow.value.level >= opens,
+      return {
+        key,
+        def,
+        rank,
+        ranks: def.ranks.length,
+        nextLevel: next?.level ?? null,
+        maxed: next === null,
+        open:
+          next !== null && level >= next.level && (automatic.value || points >= 1),
+      }
     })
-  }
-  return out
 })
 
-type NodeState = 'owned' | 'open' | 'no-points' | 'locked-level' | 'locked-parent'
-
-function stateOf(key: string, def: NodeDef): NodeState {
-  if (game.ownedNodes.has(key)) return 'owned'
-  if (jobRow.value.level < def.jobLevel) return 'locked-level'
-  if (!def.requires.every((r) => game.ownedNodes.has(r))) return 'locked-parent'
-  // §7.5 -- a wayfaring node reached but not owned cannot happen for long: the
-  // road claims it the moment it is paid for. It shows as open for the blink
-  // between arriving and the state coming back.
-  if (automatic.value) return 'open'
-  if (game.skillPoints.available < 1) return 'no-points'
-  return 'open'
-}
-
-/** Why a node is not takeable, in the player's terms. */
-function reasonFor(key: string, def: NodeDef): string {
-  switch (stateOf(key, def)) {
-    case 'owned':
-      return 'Learned.'
-    case 'locked-level':
-      return `Needs ${jobDef.value?.name} level ${def.jobLevel}. You are ${jobRow.value.level}.`
-    case 'locked-parent': {
-      const missing = def.requires
-        .filter((r) => !game.ownedNodes.has(r))
-        .map((r) => tree.value?.nodes[r]?.name ?? r)
-      return `Needs ${missing.join(' and ')} first.`
-    }
-    case 'no-points':
-      return 'No points left. Level up to earn one.'
-    default:
-      return automatic.value ? 'Walked for. Yours.' : 'Ready to learn.'
-  }
-}
-
-/** The selected node's lineage, so its parents glow through the bands above. */
-const lineage = computed(() => {
+/** What a skill is worth to you now: every rank you hold, added up. */
+function heldValue(row: Row): number {
   const t = tree.value
-  const out = new Set<string>()
-  if (!t || !picked.value) return out
+  if (!t) return 0
 
-  const walk = (key: string) => {
-    out.add(key)
-    for (const parent of t.nodes[key]?.requires ?? []) walk(parent)
+  let sum = 0
+  for (let i = 0; i < row.rank; i++) {
+    const node = t.nodes[row.def.ranks[i]!.node]
+    if (node && 'value' in node.effect) sum += node.effect.value
   }
-  walk(picked.value)
-  return out
-})
 
-const chosen = computed(() =>
-  picked.value && tree.value ? { key: picked.value, def: tree.value.nodes[picked.value]! } : null,
-)
+  return sum
+}
 
-/** §7.4.3 -- how much of this kind is already learned, and where it stops. */
-const total = computed(() =>
-  chosen.value ? effectTotal(chosen.value.key, chosen.value.def.effect) : null,
-)
+/**
+ * What every rank you hold adds up to, said as a phrase.
+ *
+ * A helper rather than a spread in the template: spreading a discriminated
+ * union widens `value` off the variant, and the compiler stops being able to
+ * see which effect it is holding.
+ */
+function heldPhrase(row: Row): string {
+  const effect = rankEffect(row, 1)
+  if (effect === null) return ''
 
-/** The node or nodes this one hangs off, by name rather than by key. */
-const needs = computed(() =>
-  (chosen.value?.def.requires ?? []).map((k) => tree.value?.nodes[k]?.name ?? k),
-)
+  const total = heldValue(row)
+
+  return effectPhrase(
+    'value' in effect ? ({ ...effect, value: total } as NodeEffect) : effect,
+    scopedName.value,
+  )
+}
+
+/** The effect one rank carries, read off the node that carries it. */
+function rankEffect(row: Row, rank: number): NodeEffect | null {
+  const entry = row.def.ranks[rank - 1]
+
+  return entry ? (tree.value?.nodes[entry.node]?.effect ?? null) : null
+}
+
+/** Why this rank is not takeable, in the player's terms. */
+function reasonFor(row: Row): string {
+  if (row.maxed) return 'Every rank taken.'
+  if (jobRow.value.level < row.nextLevel!) {
+    return `Needs ${jobDef.value?.name} level ${row.nextLevel}.`
+  }
+  if (!automatic.value && game.skillPoints.available < 1) return 'No points left.'
+
+  return automatic.value ? 'The road has paid for this.' : 'One point.'
+}
+
+const picked = ref<string | null>(null)
+
+const chosen = computed(() => rows.value.find((r) => r.key === picked.value) ?? null)
+
+/** §7.5 -- ranks the road has paid for and not yet handed over. */
+function claimable(jobKey: string): number {
+  const t = tree.value
+  if (!t || !(t.automatic ?? []).includes(jobKey)) return 0
+
+  const level = game.jobLevels.find((j) => j.key === jobKey)?.level ?? 1
+  let waiting = 0
+
+  for (const [key, def] of Object.entries(t.skills)) {
+    if (def.job !== jobKey) continue
+    const held = game.rankOf(key)
+    const earned = def.ranks.filter((r) => level >= r.level).length
+    waiting += Math.max(0, earned - held)
+  }
+
+  return waiting
+}
+
+/**
+ * §9.5.9 -- what a skill does, in its own words.
+ *
+ * A battle skill's sentence is the server's, built from this character's tree,
+ * so it is read off the battle-skill list rather than off the generated blurb:
+ * every one of the three would otherwise say "one of the three a Swordhand
+ * carries into a fight", which is true of all of them and useful about none.
+ */
+function describe(row: Row): string {
+  if (row.def.kind !== 'battleSkill') return row.def.description
+
+  const effect = rankEffect(row, 1)
+
+  return effect !== null && effect.kind === 'battleSkill'
+    ? skillLine(effect.skill)
+    : row.def.description
+}
+
+/** Ranks held in a job, for the picker's tally. */
+function learnedIn(jobKey: string): number {
+  const t = tree.value
+  if (!t) return 0
+
+  let held = 0
+  for (const [key, def] of Object.entries(t.skills)) {
+    if (def.job === jobKey) held += game.rankOf(key)
+  }
+
+  return held
+}
+
+/** How much of this job is learned, for the header. */
+const progress = computed(() => ({
+  owned: rows.value.reduce((n, r) => n + r.rank, 0),
+  total: rows.value.reduce((n, r) => n + r.ranks, 0),
+}))
 
 const EFFECT_ICON: Record<NodeEffect['kind'], string> = {
   // §9.5.9 -- the battle glyph, so a skill reads as a skill in the seam rather
@@ -443,82 +459,37 @@ function effectValue(effect: NodeEffect): string {
  * off owned nodes rather than asked for, because the tree and what you own are
  * both already here -- and clamped, because the server clamps.
  */
-function effectTotal(key: string, effect: NodeEffect): { now: string; cap: string } | null {
+function effectTotal(row: Row): { now: string; cap: string } | null {
   const t = tree.value
-  const cap = t?.caps?.[effect.kind]
-  if (!t || cap === undefined) return null
-
-  const job = t.nodes[key]!.job
-  let owned = 0
-
-  for (const [k, def] of Object.entries(t.nodes)) {
-    if (def.job !== job || def.effect.kind !== effect.kind) continue
-    if (def.effect.kind === 'pair' && def.effect.stat !== (effect as { stat?: string }).stat) continue
-    if (def.effect.kind === 'battleSkill') continue
-    if (game.ownedNodes.has(k)) owned += def.effect.value
-  }
+  const cap = t?.caps?.[row.def.kind]
+  const effect = rankEffect(row, 1)
+  if (!t || cap === undefined || effect === null) return null
 
   // Both sides bare, because this row is a progress figure against a ceiling
   // and neither half is a change: "2.5% of 15%" spared, not "-2.5% of -15%".
-  // The sentence above already says which direction the node pushes.
+  // The sentence above already says which direction the skill pushes.
   const shape = (v: number) =>
     effectValue({ ...effect, value: Math.min(v, cap) } as NodeEffect).replace(/^[+-]/, '')
 
-  return { now: shape(owned), cap: shape(cap) }
+  return { now: shape(heldValue(row)), cap: shape(cap) }
 }
-
-
-/**
- * §7.5 -- wayfaring skills the road has paid for and not yet handed over.
- *
- * All but always zero, because claiming happens on arrival. It survives as the
- * badge for the blink between the two, and as the honest answer for a character
- * whose last walk predates the tree claiming itself.
- *
- * Zero for every bought tree: an unspent point is a decision, and colouring it
- * as something waiting would nag a player for not having committed yet.
- */
-function claimable(key: string): number {
-  const t = tree.value
-  if (!t || !(t.automatic ?? []).includes(key)) return 0
-
-  const level = game.jobLevels.find((j) => j.key === key)?.level ?? 1
-
-  return Object.entries(t.nodes).filter(
-    ([nodeKey, n]) =>
-      n.job === key
-      && !game.ownedNodes.has(nodeKey)
-      && n.jobLevel <= level
-      && n.requires.every((r) => game.ownedNodes.has(r)),
-  ).length
-}
-
-/** Learned, and out of how many -- the trees are no longer all the same size. */
-const progress = computed(() => {
-  const t = tree.value
-  if (!t) return { owned: 0, total: 0 }
-
-  const mine = Object.keys(t.nodes).filter((k) => t.nodes[k]!.job === job.value)
-
-  return { owned: mine.filter((k) => game.ownedNodes.has(k)).length, total: mine.length }
-})
 
 /**
  * §7.4.3 -- the job's name, but only for the kinds that are locked to it.
  *
- * A gathering node's yield counts in its forest and nowhere else; a bag node
+ * A gathering skill's yield counts in its forest and nowhere else; a strap
  * counts everywhere. Naming the job on both would make the lock meaningless by
  * saying it about things that do not have one.
  */
 const SCOPED: ReadonlySet<string> = new Set(['stat', 'bite', 'toolWear', 'seamGrade', 'presence', 'runSlot'])
 
 const scopedName = computed(() =>
-  picked.value && SCOPED.has(chosen.value?.def.effect.kind ?? '') ? jobDef.value?.name : undefined,
+  chosen.value && SCOPED.has(chosen.value.def.kind) ? jobDef.value?.name : undefined,
 )
 
 async function learn(): Promise<void> {
   if (!picked.value) return
-  await game.buyNode(picked.value)
+  await game.buySkillRank(picked.value)
 }
 </script>
 
@@ -567,9 +538,7 @@ async function learn(): Promise<void> {
               be told it is there; the count is otherwise what you have learned.
             -->
             <span class="tally" :class="{ ready: claimable(key) > 0 }">{{
-              claimable(key) > 0
-                ? claimable(key)
-                : Object.keys(tree.nodes).filter((k) => tree!.nodes[k]!.job === key && game.ownedNodes.has(k)).length
+              claimable(key) > 0 ? claimable(key) : learnedIn(key)
             }}</span>
           </button>
         </div>
@@ -610,84 +579,122 @@ async function learn(): Promise<void> {
 
         </header>
 
-        <!-- The strata. Depth in the gutter, the seam beside it. -->
-        <div v-for="band in bands" :key="band.tier" class="band" :class="{ sealed: !band.reached }">
-          <div class="gutter">
-            <span class="depth">{{ roman(band.tier) }}</span>
-            <span class="label lv">{{ band.levels }}</span>
-            <span class="tiny cut">{{ band.owned }}/{{ band.nodes.length }}</span>
-          </div>
-
-          <div class="seam">
+        <!--
+          The list. One row per skill, and the pip strip is what a rank count
+          looks like: an empty rank is the same shape as a full one, so what is
+          left is seen rather than subtracted (§7.6's argument about the comb).
+        -->
+        <ul class="skills">
+          <li v-for="row in rows" :key="row.key">
             <button
-              v-for="n in band.nodes"
-              :key="n.key"
               type="button"
-              class="node"
-              :class="[stateOf(n.key, n.def), {
-                free: automatic,
-                picked: picked === n.key,
-                lineage: lineage.has(n.key) && picked !== n.key,
-              }]"
-              :title="`${n.def.name} — ${reasonFor(n.key, n.def)}`"
-              :aria-label="`${n.def.name}. ${reasonFor(n.key, n.def)}`"
-              @click="picked = picked === n.key ? null : n.key"
+              class="skill"
+              :class="{ on: picked === row.key, open: row.open, held: row.rank > 0 }"
+              :aria-label="`${row.def.name}, rank ${row.rank} of ${row.ranks}. ${reasonFor(row)}`"
+              @click="picked = picked === row.key ? null : row.key"
             >
-              <span class="hex">
-                <span class="face">
-                  <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
-                       stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path :d="ACTION_PATHS[EFFECT_ICON[n.def.effect.kind]]" />
-                  </svg>
+              <span class="node" :class="{ owned: row.rank > 0, free: automatic && row.open }">
+                <span class="hex">
+                  <span class="face">
+                    <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
+                         stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path :d="ACTION_PATHS[EFFECT_ICON[row.def.kind]]" />
+                    </svg>
+                  </span>
+                </span>
+              </span>
+
+              <span class="body">
+                <span class="name">{{ row.def.name }}</span>
+                <span class="tiny muted what">{{ describe(row) }}</span>
+              </span>
+
+              <span class="right">
+                <!-- The one number a list of skills is scanned for. -->
+                <span class="rank" :class="{ maxed: row.maxed && row.rank > 0 }">
+                  {{ row.rank }}<span class="muted"> / {{ row.ranks }}</span>
+                </span>
+                <span class="pips" aria-hidden="true">
+                  <i
+                    v-for="i in row.ranks"
+                    :key="i"
+                    :class="{ got: i <= row.rank, next: i === row.rank + 1 && row.open }"
+                  />
                 </span>
               </span>
             </button>
-          </div>
-        </div>
+          </li>
+        </ul>
       </section>
 
-      <!-- What you tapped, and the one button that acts on it. -->
+      <!-- What you tapped: what you have, what comes next, and the ladder. -->
       <div v-if="chosen" class="inset detail">
         <div class="row-between">
           <strong class="name">{{ chosen.def.name }}</strong>
-          <span class="label tier">Depth {{ roman(chosen.def.tier) }}</span>
+          <span class="label tier">Rank {{ chosen.rank }} of {{ chosen.ranks }}</span>
         </div>
-        <!-- §7.4.3 -- the genre's shape, and §9.5.9 already uses it on the
-             fight plate: a plain line saying what happens, then labelled rows
-             carrying every figure, then flavour last and quietest. It was one
-             sentence with the number buried in it, which is the hardest place
-             to compare two nodes from. -->
-        <p class="does">{{ effectPhrase(chosen.def.effect, scopedName) }}</p>
+        <p class="does">{{ describe(chosen) }}</p>
 
-        <div class="stats">
-          <div v-if="total" class="stat tiny">
-            <span class="muted">Learned so far</span>
-            <span class="readout" :class="{ capped: total.now === total.cap }">
-              {{ total.now }} of {{ total.cap }}
+        <!-- §7.4 -- the three questions, in the order they are asked. -->
+        <div class="answers">
+          <div class="answer now">
+            <span class="label">You have now</span>
+            <span v-if="chosen.def.kind === 'battleSkill'" class="figure">
+              {{ chosen.rank > 0 ? 'Learned' : 'Not learned' }}
+            </span>
+            <span v-else class="figure">{{ heldPhrase(chosen) }}</span>
+            <span v-if="chosen.rank > 0 && chosen.ranks > 1" class="tiny muted">
+              from {{ chosen.rank }} rank{{ chosen.rank === 1 ? '' : 's' }}
             </span>
           </div>
-          <div class="stat tiny">
-            <span class="muted">Opens at</span>
-            <span class="readout">
-              {{ jobDef?.name }} {{ chosen.def.jobLevel }}
+
+          <div v-if="!chosen.maxed" class="answer next">
+            <span class="label">Next rank</span>
+            <span class="figure">
+              <template v-if="chosen.def.kind === 'battleSkill'">Learn it</template>
+              <template v-else>
+                {{ effectPhrase(rankEffect(chosen, chosen.rank + 1)!, scopedName) }}
+              </template>
             </span>
+            <span class="tiny muted">at {{ jobDef?.name }} level {{ chosen.nextLevel }}</span>
           </div>
-          <div v-if="needs.length" class="stat tiny">
-            <span class="muted">Follows</span>
-            <span class="readout">{{ needs.join(' or ') }}</span>
+          <div v-else class="answer done">
+            <span class="label">Next rank</span>
+            <span class="figure">Maxed</span>
+            <span class="tiny muted">every rank taken</span>
+          </div>
+
+          <!-- §7.4.3 -- and where the kind itself stops, which is what keeps a
+               maxed specialist from switching off a §11 sink. -->
+          <div v-if="effectTotal(chosen)" class="answer cap">
+            <span class="label">Kind stops at</span>
+            <span class="figure" :class="{ capped: effectTotal(chosen)!.now === effectTotal(chosen)!.cap }">
+              {{ effectTotal(chosen)!.now }} of {{ effectTotal(chosen)!.cap }}
+            </span>
           </div>
         </div>
+
+        <!-- Every rank at once, so "when can I take it" is answered for all of
+             them rather than one at a time. -->
+        <ol v-if="chosen.ranks > 1" class="ladder">
+          <li
+            v-for="i in chosen.ranks"
+            :key="i"
+            :class="{ got: i <= chosen.rank, next: i === chosen.rank + 1 }"
+          >
+            <span class="lv">lv {{ chosen.def.ranks[i - 1]!.level }}</span>
+            <span class="gain">{{ effectValue(rankEffect(chosen, i)!) }}</span>
+          </li>
+        </ol>
 
         <div class="row-between foot">
-          <span class="tiny" :class="stateOf(chosen.key, chosen.def) === 'open' ? 'ready' : 'muted'">
-            {{ reasonFor(chosen.key, chosen.def) }}
-          </span>
+          <span class="tiny" :class="chosen.open ? 'ready' : 'muted'">{{ reasonFor(chosen) }}</span>
           <button
-            v-if="stateOf(chosen.key, chosen.def) !== 'owned'"
+            v-if="!chosen.maxed"
             class="btn btn-sm"
-            :class="{ 'btn-primary': stateOf(chosen.key, chosen.def) === 'open' }"
+            :class="{ 'btn-primary': chosen.open }"
             type="button"
-            :disabled="game.busy || stateOf(chosen.key, chosen.def) !== 'open'"
+            :disabled="game.busy || !chosen.open"
             @click="learn"
           >
             {{ automatic ? 'Take it' : 'Learn · 1 point' }}
@@ -701,6 +708,203 @@ async function learn(): Promise<void> {
 </template>
 
 <style scoped>
+/* ------------------------------------------------------------ the skill list */
+
+.skills {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.skill {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 6px 10px 6px 6px;
+  clip-path: var(--plate-clip);
+  background: var(--ink-raised);
+  border: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.skill.on {
+  background: var(--line);
+}
+
+.skill .body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.skill .name {
+  font-size: 13px;
+  color: var(--vellum);
+}
+
+.skill .what {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.skill .right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  flex: 0 0 auto;
+}
+
+.rank {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--vellum);
+}
+
+/* §13.3 -- sap for a thing finished, which is what a maxed skill is. */
+.rank.maxed {
+  color: var(--sap);
+}
+
+/*
+ * A rank strip rather than a bar. An empty rank is the same shape as a full
+ * one, so what is left is seen rather than subtracted -- §7.6 makes exactly
+ * that argument about the bag comb, and a rank count is the same question.
+ */
+.pips {
+  display: flex;
+  gap: 2px;
+}
+
+.pips i {
+  width: 4px;
+  height: 8px;
+  background: var(--line);
+  display: block;
+}
+
+.pips i.got {
+  background: var(--accent, var(--copper));
+}
+
+/* The one you could take right now, outlined rather than filled. */
+.pips i.next {
+  background: none;
+  box-shadow: inset 0 0 0 1px var(--vellum-dim);
+}
+
+/* ---------------------------------------------------------------- the answers */
+
+.answers {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  background: var(--line);
+  margin: 10px 0 0;
+}
+
+.answer {
+  background: var(--ink-panel);
+  padding: 6px 9px;
+  border-left: 2px solid var(--line);
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+/*
+ * Wide enough for "You have now" on one line. At 82px it wrapped, which put a
+ * two-line label beside a one-line figure and threw the row's baseline out.
+ */
+.answer .label {
+  flex: 0 0 96px;
+  white-space: nowrap;
+}
+
+.answer .figure {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: var(--vellum);
+}
+
+/* §13.3 -- sap for what you already hold, copper for the work still ahead. */
+.answer.now {
+  border-left-color: var(--sap);
+}
+
+.answer.now .figure {
+  color: var(--sap);
+}
+
+.answer.next {
+  border-left-color: var(--copper);
+}
+
+.answer.next .figure {
+  color: var(--copper);
+}
+
+.answer .figure.capped {
+  color: var(--sap);
+}
+
+/* ----------------------------------------------------------------- the ladder */
+
+.ladder {
+  list-style: none;
+  margin: 9px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.ladder li {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  padding: 3px 7px;
+  background: var(--ink-raised);
+  clip-path: var(--plate-clip);
+  color: #6d7770;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.ladder li.got {
+  color: var(--vellum);
+}
+
+.ladder li.got .gain {
+  color: var(--sap);
+}
+
+.ladder li.next {
+  color: var(--vellum);
+  background: var(--line);
+}
+
+.ladder li.next .lv {
+  color: var(--copper);
+}
+
+.ladder .lv {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 10px;
+}
+
 .page {
   padding: 0;
 }

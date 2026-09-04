@@ -15,7 +15,6 @@ export default defineConfig({
         'resources/js/almanac.ts',
         'resources/js/oddity.ts',
         'resources/js/battle.ts',
-        'resources/js/skilltree.ts',
       ],
       refresh: true,
     }),

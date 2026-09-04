@@ -13,7 +13,7 @@ use App\Models\CharacterDaily;
 use App\Models\CharacterItem;
 use App\Models\CharacterJob;
 use App\Models\CharacterMaterial;
-use App\Models\CharacterNode;
+use App\Models\CharacterSkillRank;
 use App\Models\CharacterQuest;
 use App\Models\CharacterSkill;
 use App\Models\GameJob;
@@ -6213,10 +6213,16 @@ class GameService
         // Counting every row was safe while those nodes were never written
         // down; now that they are claimed, the ledger has to tell the two kinds
         // apart or a long walk would quietly eat the hundred-point cap.
-        $spent = $character->nodes()
-            ->pluck('node_key')
-            ->reject(fn (string $key) => Jobs::isAutomatic(Jobs::node($key)['job'] ?? ''))
-            ->count();
+        // §7.5 -- SUM of the ranks bought, where it was COUNT of the nodes
+        // owned. Same arithmetic, since a rank is a node; still derived rather
+        // than stored, so there is nothing for a counter to drift from.
+        $spent = 0;
+        foreach ($this->skillRanks($character) as $key => $rank) {
+            $job = Skills::of($key)['job'] ?? '';
+            if (! Jobs::isAutomatic($job)) {
+                $spent += $rank;
+            }
+        }
 
         return [
             'total' => $total,
@@ -6368,29 +6374,39 @@ class GameService
     {
         $claimed = [];
         $levels = $this->jobLevels($character);
+        $held = $this->skillRanks($character);
 
-        do {
-            $again = false;
-            $owned = $character->nodes()->pluck('node_key')->all();
-
-            foreach (Jobs::NODES as $key => $node) {
-                if (! Jobs::isAutomatic($node['job']) || in_array($key, $owned, true)) {
-                    continue;
-                }
-                if (($levels[$node['job']] ?? 1) < $node['jobLevel']) {
-                    continue;
-                }
-                if (array_diff($node['requires'], $owned) !== []) {
-                    continue;
-                }
-
-                CharacterNode::create(['character_id' => $character->id, 'node_key' => $key]);
-                $claimed[] = $key;
-                $again = true;
+        foreach (Skills::ALL as $key => $skill) {
+            if (! Jobs::isAutomatic($skill['job'])) {
+                continue;
             }
 
-            $character->unsetRelation('nodes');
-        } while ($again);
+            $level = $levels[$skill['job']] ?? 1;
+            $rank = $held[$key] ?? 0;
+
+            // Every rank the walking has already paid for, in one step. The
+            // node loop had to run again and again because a parent had to
+            // land before its child could; a rank has no parent but the rank
+            // under it, so the answer is just "how many levels have I passed".
+            $earned = 0;
+            foreach ($skill['ranks'] as $entry) {
+                if ($level >= $entry['level']) {
+                    $earned++;
+                }
+            }
+
+            if ($earned <= $rank) {
+                continue;
+            }
+
+            $this->setRank($character, $key, $earned);
+
+            for ($i = $rank + 1; $i <= $earned; $i++) {
+                $claimed[] = $key;
+            }
+        }
+
+        $character->unsetRelation('skillRanks');
 
         return $claimed;
     }
@@ -6639,7 +6655,31 @@ class GameService
      */
     public function ownedNodes(Character $character): array
     {
-        return $character->nodes()->pluck('node_key')->all();
+        $out = [];
+
+        foreach ($this->skillRanks($character) as $key => $rank) {
+            foreach (Skills::nodesUpTo($key, $rank) as $node) {
+                $out[] = $node;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * §7.4 -- what this character holds, keyed by skill.
+     *
+     * The one thing stored. Everything else about a tree -- what it is worth,
+     * what it costs, what opens next -- is read off Skills::ALL against this.
+     *
+     * @return array<string,int>
+     */
+    public function skillRanks(Character $character): array
+    {
+        return $character->skillRanks()
+            ->pluck('rank', 'skill_key')
+            ->map(fn ($rank) => (int) $rank)
+            ->all();
     }
 
     /** One job's capped non-stat effects, or zeroes. */
@@ -6679,50 +6719,69 @@ class GameService
      * the tree, the server decides what may be bought (§16). The unique index on
      * (character, node) is the last line of defense against a doubled request.
      */
-    public function buyNode(Character $character, string $nodeKey): array
+    public function buyRank(Character $character, string $skillKey): array
     {
-        return DB::transaction(function () use ($character, $nodeKey) {
-            $node = Jobs::node($nodeKey);
-            if ($node === null) {
+        return DB::transaction(function () use ($character, $skillKey) {
+            $skill = Skills::of($skillKey);
+            if ($skill === null) {
                 throw new GameException('No such skill.', 'not_found');
             }
 
-            if ($character->nodes()->where('node_key', $nodeKey)->exists()) {
-                throw new GameException("You already have {$node['name']}.", 'owned');
+            $rank = $this->skillRanks($character)[$skillKey] ?? 0;
+            $next = $rank + 1;
+
+            // §7.4 -- the ladder is the whole prerequisite. There is nothing to
+            // check for a parent: rank 3 needs rank 2 by being rank 3.
+            $level = Skills::levelForRank($skillKey, $next);
+            if ($level === null) {
+                throw new GameException("{$skill['name']} is already at its last rank.", 'maxed');
             }
 
             // §7.5 -- a wayfaring skill costs no point: the walking is its price
-            // and the job level is the receipt. It is claimed by claimWayfaring()
-            // the moment the road pays for it, so this path is only ever reached
-            // by a client asking for one it already has -- which the `owned`
-            // check above has already refused.
-            if (! Jobs::isAutomatic($node['job'])) {
-                $points = $this->skillPoints($character);
-                if ($points['available'] < 1) {
+            // and the job level is the receipt. It is claimed by
+            // claimWayfaring() the moment the road pays for it, so this path is
+            // only ever reached by a client asking for one it already has.
+            if (! Jobs::isAutomatic($skill['job'])) {
+                if ($this->skillPoints($character)['available'] < 1) {
                     throw new GameException('No skill points left. Level up first.', 'no_points');
                 }
             }
 
-            $jobLevel = $this->jobLevels($character)[$node['job']] ?? 1;
-            if ($jobLevel < $node['jobLevel']) {
-                $name = Jobs::JOBS[$node['job']]['name'];
+            $jobLevel = $this->jobLevels($character)[$skill['job']] ?? 1;
+            if ($jobLevel < $level) {
+                $job = Jobs::JOBS[$skill['job']]['name'];
                 throw new GameException(
-                    "{$node['name']} needs {$name} level {$node['jobLevel']}. You are level {$jobLevel}.",
+                    "{$skill['name']} rank {$next} needs {$job} level {$level}. You are level {$jobLevel}.",
                     'job_level',
                 );
             }
 
-            foreach ($node['requires'] as $parentKey) {
-                if (! $character->nodes()->where('node_key', $parentKey)->exists()) {
-                    $parent = Jobs::node($parentKey);
-                    throw new GameException("{$node['name']} needs {$parent['name']} first.", 'requires');
-                }
-            }
+            $this->setRank($character, $skillKey, $next);
 
-            CharacterNode::create(['character_id' => $character->id, 'node_key' => $nodeKey]);
-
-            return ['node' => $nodeKey, 'points' => $this->skillPoints($character->fresh())];
+            return [
+                'skill' => $skillKey,
+                'rank' => $next,
+                'points' => $this->skillPoints($character->fresh()),
+            ];
         });
+    }
+
+    /**
+     * Write a holding down, creating the row the first time.
+     *
+     * `updateOrCreate` on the unique (character, skill) pair, so a doubled
+     * request cannot leave two opinions about one rank -- which is the same
+     * guarantee the old unique (character, node) gave, on a table that now
+     * holds one row per skill rather than one per point.
+     */
+    private function setRank(Character $character, string $skillKey, int $rank): void
+    {
+        CharacterSkillRank::updateOrCreate(
+            ['character_id' => $character->id, 'skill_key' => $skillKey],
+            ['rank' => $rank],
+        );
+
+        $character->unsetRelation('skillRanks');
     }
 
     // ------------------------------------------------------------- end jobs §7.4
@@ -7097,6 +7156,14 @@ class GameService
             // Not 'jobs': that key is already the running mining and processing
             // work above, and a duplicate here silently clobbered it.
             'jobLevels' => $this->jobLevelPayload($character),
+            // §7.4 -- what this character HOLDS, keyed by skill. The nodes
+            // behind it ride along because the battle-skill list and the
+            // battle bench still speak in nodes (a node is a rank), and
+            // deriving them twice would be two answers to one question.
+            // `skillRanks`, not `skills`: that key is already §7.2's five
+            // gathering levels, which are a different number entirely -- one is
+            // earned by working and the other is bought with a point (§7.4.1).
+            'skillRanks' => (object) $this->skillRanks($character),
             'nodes' => $this->ownedNodes($character),
             // §12 -- where every visible quest stands. In the state rather
             // than on the quests endpoint because it moves with almost every

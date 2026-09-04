@@ -12,7 +12,8 @@ use App\Game\GameService;
 use App\Game\Jobs;
 use App\Game\WorldGen;
 use App\Models\Character;
-use App\Models\CharacterNode;
+use App\Game\Skills;
+use App\Models\CharacterSkillRank;
 use App\Models\GameJob;
 use App\Models\Player;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -47,23 +48,31 @@ final class SkillEffectTest extends TestCase
         $this->character = $this->game->createCharacter($player);
     }
 
-    /** Every node of one kind in one tree, bought outright. */
+    /**
+     * One kind in one tree, taken to its last rank.
+     *
+     * §7.4 -- "every node of this kind in this job" IS a skill now, so maxing
+     * the skill is exactly what this always meant. It returns the rank for the
+     * same reason it used to return a count: several tests assert a cap binds,
+     * and a cap that binds at three ranks proves nothing if the tree only has
+     * two.
+     */
     private function grantKind(string $job, string $kind): int
     {
-        $granted = 0;
+        $key = "{$job}.{$kind}";
+        $ranks = Skills::rankCount($key);
 
-        foreach (Jobs::nodesFor($job) as $key => $node) {
-            if ($node['effect']['kind'] !== $kind) {
-                continue;
-            }
-
-            CharacterNode::create(['character_id' => $this->character->id, 'node_key' => $key]);
-            $granted++;
+        if ($ranks > 0) {
+            CharacterSkillRank::create([
+                'character_id' => $this->character->id,
+                'skill_key' => $key,
+                'rank' => $ranks,
+            ]);
         }
 
         $this->character = $this->character->fresh();
 
-        return $granted;
+        return $ranks;
     }
 
     private function give(array $stock): void

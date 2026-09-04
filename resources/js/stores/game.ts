@@ -354,6 +354,16 @@ export const useGame = defineStore('game', () => {
   const jobLevels = computed(() => state.value?.jobLevels ?? [])
   const ownedNodes = computed(() => new Set(state.value?.nodes ?? []))
 
+  /**
+   * §7.4 -- what this character holds, keyed by skill.
+   *
+   * The one thing the panel reads. `ownedNodes` is still here because the
+   * battle-skill list and the fight bench speak in nodes (a node is a rank),
+   * and it is the same fact seen from the other end.
+   */
+  const skillRanks = computed<Record<string, number>>(() => state.value?.skillRanks ?? {})
+  const rankOf = (key: string) => skillRanks.value[key] ?? 0
+
   async function loadTree(): Promise<void> {
     if (tree.value) return
     tree.value = await api.getSkillTree()
@@ -372,10 +382,10 @@ export const useGame = defineStore('game', () => {
     battleSkills.value = await api.getBattleSkills()
   }
 
-  async function buyNode(nodeKey: string): Promise<void> {
-    // Quiet: buying one already says so through act(), and the node landing in
-    // the owned list is the same event rather than a second one.
-    await act(() => api.buyNode(nodeKey), 'good', true)
+  async function buySkillRank(skillKey: string): Promise<void> {
+    // Quiet: buying one already says so through act(), and the rank landing in
+    // the holding is the same event rather than a second one.
+    await act(() => api.buySkillRank(skillKey), 'good', true)
 
     // §9.5.9 -- the battle skills are their own fetch, and buying a node moves
     // them twice over: learning one flips it to known, and a skillPower or
@@ -707,17 +717,25 @@ export const useGame = defineStore('game', () => {
     const fresh = next.nodes.filter((key) => !known.has(key))
     if (fresh.length === 0) return
 
+    // §7.4 -- named for the SKILL and its new rank, because a node's own name
+    // is not on any screen any more: eleven of Explorer's were different words
+    // for the same +2, and the panel says "Straps".
+    //
     // Named where the tree happens to be loaded, counted where it is not: the
     // catalog is fetched lazily when the skills panel first opens, and a toast
     // is not worth a round trip the player did not ask for.
-    const named = fresh
-      .map((key) => tree.value?.nodes[key]?.name)
-      .filter((name): name is string => Boolean(name))
+    const named: string[] = []
+    for (const [key, skill] of Object.entries(tree.value?.skills ?? {})) {
+      const now = next.skillRanks?.[key] ?? 0
+      if (now > 0 && fresh.some((node) => skill.ranks.some((r) => r.node === node))) {
+        named.push(skill.ranks.length > 1 ? `${skill.name} ${now}` : skill.name)
+      }
+    }
 
     note(
-      named.length === fresh.length
+      named.length > 0
         ? `The road paid: ${named.join(', ')}.`
-        : `The road paid: ${fresh.length} new Explorer ${fresh.length === 1 ? 'skill' : 'skills'}.`,
+        : `The road paid: ${fresh.length} new Explorer ${fresh.length === 1 ? 'rank' : 'ranks'}.`,
       'good',
     )
   }
@@ -1164,7 +1182,7 @@ export const useGame = defineStore('game', () => {
     // derived
     character, timeScale, bag, bagFull, inventory, equipment, skills, bonuses, toolYield, jobs, readyJobs,
     consumables, buffs,
-    tree, skillPoints, jobLevels, ownedNodes,
+    tree, skillPoints, jobLevels, ownedNodes, skillRanks, rankOf,
     rename,
     questDefs, quests, questsReady, questReward,
     dailyDefs, dailies, dailiesResetAt,
@@ -1186,7 +1204,7 @@ export const useGame = defineStore('game', () => {
     donateToGuild, upgradeGuildFacility,
     startMining, startGathering, startHunt, collect, abandon, travelTo, cancelTravel, startProcessing, buy,
     sell, sellAllScrap, sellItem, sellPotion, craft, equip, unequip, repair, discard, discardMaterial, drink, openPanel, closePanel,
-    battleSkills, loadTree, loadBattleSkills, buyNode,
+    battleSkills, loadTree, loadBattleSkills, buySkillRank,
     loadQuests, claimQuest, claimDaily, clearQuestReward,
     toggleSlate,
     openStation, closeStation, loadBench,

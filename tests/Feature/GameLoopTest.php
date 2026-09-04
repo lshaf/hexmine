@@ -30,7 +30,8 @@ use App\Models\Character;
 use App\Models\CharacterBuff;
 use App\Models\CharacterItem;
 use App\Models\CharacterMaterial;
-use App\Models\CharacterNode;
+use App\Game\Skills;
+use App\Models\CharacterSkillRank;
 use App\Models\GameJob;
 use App\Models\Player;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -1609,14 +1610,37 @@ final class GameLoopTest extends TestCase
     }
 
     /** Buy nodes directly, for tests that care about the effect not the gate. */
+    /**
+     * §7.4 -- grant the ranks that carry these nodes.
+     *
+     * A node is a rank, so "own this node" means "hold its skill at least that
+     * far". Ranks below it come with it, which is what a ladder means and is
+     * why several of these tests count points differently than they used to.
+     */
     private function grantNodes(array $keys): void
     {
+        $want = [];
         foreach ($keys as $key) {
-            CharacterNode::create([
-                'character_id' => $this->character->id,
-                'node_key' => $key,
-            ]);
+            $skill = Skills::skillForNode($key);
+            $rank = Skills::rankForNode($key);
+            $want[$skill] = max($want[$skill] ?? 0, $rank);
         }
+
+        foreach ($want as $skill => $rank) {
+            CharacterSkillRank::updateOrCreate(
+                ['character_id' => $this->character->id, 'skill_key' => $skill],
+                ['rank' => $rank],
+            );
+        }
+    }
+
+    /** Hold one skill at a rank outright. */
+    private function grantRank(string $skill, int $rank): void
+    {
+        CharacterSkillRank::updateOrCreate(
+            ['character_id' => $this->character->id, 'skill_key' => $skill],
+            ['rank' => $rank],
+        );
     }
 
     public function test_every_job_exists_from_the_start_at_level_one(): void
@@ -1703,104 +1727,114 @@ final class GameLoopTest extends TestCase
         $this->assertSame(10, $points['available']);
     }
 
-    public function test_a_tier_one_node_is_buyable_immediately(): void
+    public function test_a_first_rank_is_buyable_immediately(): void
     {
         $this->character->level = 3;
         $this->character->save();
 
-        $result = $this->game->buyNode($this->character->fresh(), 'smith.hammer_sense');
+        $result = $this->game->buyRank($this->character->fresh(), 'smith.stat');
 
-        $this->assertSame('smith.hammer_sense', $result['node']);
+        $this->assertSame('smith.stat', $result['skill']);
+        $this->assertSame(1, $result['rank']);
         $this->assertSame(1, $result['points']['spent']);
-        $this->assertTrue(
-            $this->character->fresh()->nodes()->where('node_key', 'smith.hammer_sense')->exists(),
-        );
+        $this->assertSame(1, $this->game->skillRanks($this->character->fresh())['smith.stat']);
     }
 
-    public function test_a_node_cannot_be_bought_twice(): void
+    /**
+     * §7.4 -- ranks climb one at a time, and the top one is the end of it.
+     *
+     * "You already own this" is gone as an error: a skill is never owned, it is
+     * held at a rank, and the only thing that can refuse a second purchase is
+     * running out of ranks.
+     */
+    public function test_a_skill_stops_at_its_last_rank(): void
     {
-        $this->character->level = 5;
+        $this->character->level = 100;
         $this->character->save();
-        $this->game->buyNode($this->character->fresh(), 'smith.hammer_sense');
+        $this->setJobLevel('smith', Balance::JOB_MAX_LEVEL);
+
+        $ranks = Skills::rankCount('smith.craftOption');
+        $this->grantRank('smith.craftOption', $ranks);
 
         try {
-            $this->game->buyNode($this->character->fresh(), 'smith.hammer_sense');
-            $this->fail('bought the same node twice');
+            $this->game->buyRank($this->character->fresh(), 'smith.craftOption');
+            $this->fail('bought past the last rank');
         } catch (GameException $e) {
-            $this->assertSame('owned', $e->errorCode);
+            $this->assertSame('maxed', $e->errorCode);
         }
     }
 
     public function test_buying_needs_a_point_to_spend(): void
     {
         // Level 1 grants exactly one point; spend it, then try again.
-        $this->game->buyNode($this->character->fresh(), 'smith.hammer_sense');
+        $this->game->buyRank($this->character->fresh(), 'smith.stat');
 
         try {
-            $this->game->buyNode($this->character->fresh(), 'smith.cold_shut_eye');
-            $this->fail('bought a node with no points left');
+            $this->game->buyRank($this->character->fresh(), 'smith.costReduction');
+            $this->fail('bought a rank with no points left');
         } catch (GameException $e) {
             $this->assertSame('no_points', $e->errorCode);
         }
     }
 
     /** §7.4.1 -- a job level is a gate, and it cannot be bought past. */
-    public function test_a_deep_node_needs_the_job_level(): void
+    public function test_a_deep_rank_needs_the_job_level(): void
     {
         $this->character->level = 60;
         $this->character->save();
-        $this->grantNodes(['smith.hammer_sense']);
+
+        // Take the skill as far as job level 1 allows, then run into the wall.
+        $key = 'smith.stat';
+        $atOne = 0;
+        foreach (Skills::of($key)['ranks'] as $rank) {
+            if ($rank['level'] <= 1) {
+                $atOne++;
+            }
+        }
+        $this->grantRank($key, $atOne);
 
         try {
-            $this->game->buyNode($this->character->fresh(), 'smith.anvil_song');
-            $this->fail('reached a tier 2 node at job level 1');
+            $this->game->buyRank($this->character->fresh(), $key);
+            $this->fail('reached a level-5 rank at job level 1');
         } catch (GameException $e) {
             $this->assertSame('job_level', $e->errorCode);
         }
 
         $this->setJobLevel('smith', 5);
-        $result = $this->game->buyNode($this->character->fresh(), 'smith.anvil_song');
-        $this->assertSame('smith.anvil_song', $result['node']);
+        $result = $this->game->buyRank($this->character->fresh(), $key);
+        $this->assertSame($atOne + 1, $result['rank']);
     }
 
-    /** §7.4.2 -- and the parent has to be owned, whatever the job level says. */
-    public function test_a_node_needs_its_parent_first(): void
-    {
-        $this->character->level = 60;
-        $this->character->save();
-        $this->setJobLevel('smith', Balance::JOB_MAX_LEVEL);
-
-        try {
-            $this->game->buyNode($this->character->fresh(), 'smith.anvil_song');
-            $this->fail('bought a tier 2 node with no parent');
-        } catch (GameException $e) {
-            $this->assertSame('requires', $e->errorCode);
-        }
-    }
-
-    /** §7.4.2 -- a capstone takes two parents, which is what makes it a tree. */
-    public function test_a_capstone_needs_both_of_its_parents(): void
+    /**
+     * §7.4 -- the ladder IS the prerequisite, and it cannot be skipped.
+     *
+     * The two tests this replaced asserted that a node named its parents and a
+     * capstone named two of them. Neither is a rule any more: rank 3 needs rank
+     * 2 by being rank 3, so there is nothing to check and nothing a request can
+     * get around. What is worth pinning is that ranks arrive in order and that
+     * the level on each one is the level that opens it.
+     */
+    public function test_ranks_arrive_in_order_and_cannot_be_skipped(): void
     {
         $this->character->level = 100;
         $this->character->save();
         $this->setJobLevel('smith', Balance::JOB_MAX_LEVEL);
 
-        $capstone = Jobs::node('smith.the_named_blade');
-        $this->assertCount(2, $capstone['requires']);
+        $key = 'smith.craftDurability';
+        $levels = array_column(Skills::of($key)['ranks'], 'level');
+        $sorted = $levels;
+        sort($sorted);
+        $this->assertSame($sorted, $levels, 'the ladder does not climb');
 
-        $this->grantNodes([$capstone['requires'][0]]);
-
-        try {
-            $this->game->buyNode($this->character->fresh(), 'smith.the_named_blade');
-            $this->fail('bought a capstone with only one parent');
-        } catch (GameException $e) {
-            $this->assertSame('requires', $e->errorCode);
+        foreach ($levels as $i => $_) {
+            $result = $this->game->buyRank($this->character->fresh(), $key);
+            $this->assertSame($i + 1, $result['rank'], 'a rank was skipped');
         }
 
-        $this->grantNodes([$capstone['requires'][1]]);
-        $this->game->buyNode($this->character->fresh(), 'smith.the_named_blade');
-        $this->assertTrue(
-            $this->character->fresh()->nodes()->where('node_key', 'smith.the_named_blade')->exists(),
+        // And the holding is one row, not one per point.
+        $this->assertSame(
+            1,
+            $this->character->fresh()->skillRanks()->where('skill_key', $key)->count(),
         );
     }
 
@@ -4456,7 +4490,7 @@ final class GameLoopTest extends TestCase
         );
 
         $this->expectException(GameException::class);
-        $this->game->buyNode($this->character->fresh(), 'explorer.deep_pockets');
+        $this->game->buyRank($this->character->fresh(), 'explorer.bagSlots');
     }
 
     /**

@@ -8,6 +8,7 @@ use App\Game\Balance;
 use App\Game\BattleSkills;
 use App\Game\Catalog;
 use App\Game\Jobs;
+use App\Game\Skills;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -59,9 +60,12 @@ class SkillTreeController extends GameController
     {
         return response()->json([
             'jobs' => Jobs::JOBS,
+            // §7.4 -- the SKILLS, which is what the panel draws now. A job used
+            // to be thirty nodes in five rows; it is a short list of levelled
+            // skills, and each rank still names the node that carries its
+            // effect so the balance is the same table it always was.
+            'skills' => Skills::ALL,
             'nodes' => Jobs::NODES,
-            'tierJobLevel' => Jobs::TIER_JOB_LEVEL,
-            'tierSize' => Jobs::TIER_SIZE,
             // §7.5 -- the jobs whose nodes are granted rather than bought. The
             // panel needs to know which trees have no price on them, and asking
             // the server beats mirroring the rule into the client, where it
@@ -151,12 +155,20 @@ class SkillTreeController extends GameController
         $character = $this->character($request);
 
         $validated = $request->validate([
-            'node' => ['required', 'string', 'max:120'],
+            'skill' => ['required', 'string', 'max:120'],
         ]);
 
-        $result = $this->game->buyNode($character, $validated['node']);
-        $name = Jobs::node($validated['node'])['name'];
+        $result = $this->game->buyRank($character, $validated['skill']);
+        $skill = Skills::of($validated['skill']);
 
-        return $this->respond($character, $result, "Learned {$name}.");
+        // A rank rather than a name, because the name has not changed and the
+        // rank is the thing that just did.
+        return $this->respond(
+            $character,
+            $result,
+            Skills::rankCount($validated['skill']) > 1
+                ? "{$skill['name']} is now rank {$result['rank']}."
+                : "Learned {$skill['name']}.",
+        );
     }
 }

@@ -403,7 +403,7 @@ final class BattleSkillTest extends TestCase
         $character->jobLevels()->updateOrCreate(['job_key' => 'runecaster'], ['level' => 5, 'xp' => 0]);
         $character->unsetRelation('jobLevels');
 
-        $game->buyNode($character->fresh(), BattleSkills::nodeKey('ember_bolt'));
+        $game->buyRank($character->fresh(), BattleSkills::nodeKey('ember_bolt'));
 
         $armed = $game->armedSkills($character->fresh(), 'focus');
         $this->assertCount(1, $armed);
@@ -414,7 +414,7 @@ final class BattleSkillTest extends TestCase
 
         // The gate is the battle job's level, not the character's.
         try {
-            $game->buyNode($character->fresh(), BattleSkills::nodeKey('rune_of_binding'));
+            $game->buyRank($character->fresh(), BattleSkills::nodeKey('rune_of_binding'));
             $this->fail('a skill was learned below its job level');
         } catch (GameException $e) {
             $this->assertSame('job_level', $e->errorCode);

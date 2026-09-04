@@ -411,7 +411,7 @@ system, a preview, a job kind and a button to say so.)*
 
 **What survives is everything the LINE was.** Hunting is still one of §7.2's
 five skills, still has its own slot and its own five-rung ladder of bows (§8.0),
-still levels a job with a thirty-node tree, and pelt is still what a hunt
+still levels a job that teaches its own skills, and pelt is still what a hunt
 gives up and what leather is tanned from. Nothing about the ladder moved; the
 second target standing on it went away.
 
@@ -1089,8 +1089,8 @@ never this.
 
 ### 7.4 Jobs and their skill trees
 
-**Sixteen jobs, four kinds.** Each has a tree of 30 nodes bought with skill
-points. What differs between the kinds is where the *job level* comes from.
+**Sixteen jobs, four kinds.** Each teaches a short list of skills, bought a
+rank at a time with skill points (§7.4.2). What differs between the kinds is where the *job level* comes from.
 
 There is a **seventeenth job that plays by none of these rules** — Explorer,
 §7.5. Everything below describes the sixteen bought trees; read §7.5 before
@@ -1231,23 +1231,57 @@ slow thing, and they are earned on *depth*. Neither substitutes for the other:
 you cannot buy your way past a job level, and grinding a job to 30 gives you
 nothing until you spend a point.
 
-#### 7.4.2 Tree shape — 30 nodes, five tiers
+#### 7.4.2 Shape — a short list of skills, each with ranks
 
-| Tier | Nodes | Job level | Prerequisite |
-|---|---|---|---|
-| 1 | 6 | 1 | none — open the moment the job exists |
-| 2 | 8 | 5 | one tier-1 node |
-| 3 | 8 | 12 | one tier-2 node |
-| 4 | 6 | 20 | one tier-3 node |
-| 5 | 2 | 28 | **two** tier-4 nodes |
+**A job teaches a handful of SKILLS, and a skill climbs ranks.** Explorer
+teaches two: Straps, thirteen ranks, and Horizon, two. Woodcutting teaches four.
+Swordhand eleven. Ninety-five skills across the seventeen jobs, and 495 ranks
+between them.
 
-The capstones needing two parents is what makes a tree a tree rather than a list:
-a full 30-point investment is forced through choices, and a partial one has to
-decide which branch it is actually committing to.
+**A rank carries its own level, and that is the whole gate.** Rank 3 of Straps
+opens at Explorer 6; rank 8 at Explorer 18. There is no separate prerequisite to
+check, because **rank 3 needs rank 2 by being rank 3** — the ladder is the
+structure, and it is enforced by arithmetic rather than by a rule.
 
-**Nodes are bought, never refunded.** A respec would turn the point cap into a
+**A one-rank skill behind a level of its own is what a battle skill is** — Sunder
+is one rank at Swordhand 5, and it sits in the same list as the levelled ones
+rather than in a system beside them.
+
+*(It was thirty discrete nodes a job, drawn as five strata of 6/8/8/6/2 gated at
+levels 1/5/12/20/28, each capstone naming two parents. The thirty were never
+thirty ideas: they were a handful of effects repeated under different names.
+Deep Pockets, Second Strap, Rolled Blanket, Even Load, Side Pouch, Bindle,
+Sorted Kit, Tump Line, Packer's Knot, Outer Pockets and Long Haul were eleven
+different words for the same **+2 straps**, and a diagram of that is a diagram of
+a list. What the forks bought was a shape to plan; what they cost was thirty rows
+nobody could hold in their head, and the branching is the part that went.)*
+
+**The balance did not move by a point.** A rank IS one of the old nodes: the node
+table survives as the effect ledger, every value and every level gate is exactly
+what it was, and effects are still summed off nodes — so a skill at rank five is
+the first five nodes it was made of and cannot be worth anything else. There is
+a test asserting every node is a rank of exactly one skill, and that a holding is
+always a **prefix** of its own ladder.
+
+**What is stored is the rank, and it is a count.** That is what makes the ladder
+structural: you cannot hold rank 3 without rank 2, because 3 *includes* 2. Spent
+points are `SUM(rank)` and still never written down, so there is nothing for a
+counter to drift from.
+
+**Ranks are bought, never refunded.** A respec would turn the point cap into a
 suggestion and let one character be every specialist in turn, which is exactly
 what §7.2's cap exists to prevent.
+
+**On screen it is a list, and tapping one answers three questions in the order
+they are asked**: what you have now (*+16 straps, from 8 ranks*), when the next
+one comes (*+2 more at Explorer level 20*), and the whole ladder underneath — so
+*when can I take it* is answered for every rank at once rather than one at a
+time. A fourth row says where the **kind** stops (§7.4.3), because a cap nobody
+is shown reads as a bug the day it binds.
+
+The ranks draw as a **pip strip**, never a bar: an empty rank is the same shape
+as a full one, so what is left is seen rather than subtracted — which is §7.6's
+own argument about the bag comb.
 
 #### 7.4.3 What a node may do — and the ceiling, again
 
@@ -1391,55 +1425,32 @@ a waiting room.
 
 | | Explorer | Every other job |
 |---|---|---|
-| Tree | **15 nodes, 3/3/3/3/3** | 30 nodes, 6/8/8/6/2 |
-| Cost | **No skill point — handed over at its job level** | 1 skill point each |
+| Teaches | **Two skills, 15 ranks between them** | Four to eleven skills |
+| Cost | **No skill point — handed over at its job level** | 1 skill point a rank |
 | Levels from | **Hexes crossed** | Bench work, or raiding |
 | Pays in | **Capability only — never a stat** | Stats, and the work of the job |
-| Gating | **One skill per level**, every 2nd level, 2 → 30 | A whole depth at once, at 1 / 5 / 12 / 20 / 28 |
+| Gating | **One rank per level**, every 2nd level, 2 → 30 | A rank's own level |
 
-**The shape is the same five depths as everything else**, and that is
-deliberate: a seventeenth job that is also a fifth kind of diagram is one thing
-too many to learn. Three to a row rather than 6/8/8/6/2, because fifteen free
-nodes is what a free tree may be worth.
+**Two skills, and it is the example that made §7.4.2's argument.** Explorer's
+whole tree is:
 
-**What is exceptional sits under the layout: the row does not arrive whole.** A
-bought depth opens all at once because its gate only says you may *start
-spending points* there — the point is the real price, paid per node. Nothing is
-bought here, so a row opening whole would be three rewards for one level. Each
-skill carries its own `jobLevel` instead, one every second level, and a row
-fills in across three of them.
+| Skill | Ranks | Opens at | Totals |
+|---|---|---|---|
+| **Straps** | 13 | 2 · 4 · 6 · 8 · 10 · 14 · 16 · 18 · 20 · 22 · 24 · 26 · 28 | +2 a rank, +4 on the last two — **50 → 80 straps** |
+| **Horizon** | 2 | 12 · 30 | +1 a rank — **1 → 3 hexes of sight** |
 
-| Depth | Levels | Left column | Middle column | Right column — the road |
-|---|---|---|---|---|
-| I | **2 · 4 · 6** | Deep Pockets **+2** | Second Strap **+2** | Rolled Blanket **+2** |
-| II | 8 · 10 · 12 | Even Load **+2** | Side Pouch **+2** | High Ground **+1 sight** |
-| III | 14 · 16 · 18 | Bindle **+2** | Sorted Kit **+2** | Tump Line **+2** |
-| IV | 20 · 22 · 24 | Packer's Knot **+2** | Outer Pockets **+2** | Long Haul **+2** |
-| V | 26 · 28 · **30** | Drover's Back **+4** | Tinker's Roll **+4** | Horizon Line **+1 sight** |
+It used to be fifteen separately named nodes in a five-row diagram, and eleven
+of them were different words for the same +2. What the names cost was a screen
+nobody could read; what they bought was nothing at all, since there was never
+anything to choose here — the two columns of "room" and "straps" had handed out
+the identical thing ever since §7.6 replaced its two limits with one.
 
-`Jobs::WAYFARING_TIER_JOB_LEVEL` holds the level each *row* opens at — 2, 8, 14,
-20, 26 — which is what the panel prints in the gutter as a span (`lv 8–12`).
-What a given skill needs is on the skill: read `NODES[$key]['jobLevel']`.
+**What is still exceptional is that a rank does not arrive for a point.** A
+bought rank opens at a level and is then *paid for*; a wayfaring one opens at a
+level and is *handed over*, one every second level from 2 to 30. The last rank
+of Horizon lands exactly on `JOB_MAX_LEVEL`.
 
-Totals: **50 → 80 straps, 1 → 3 hexes of sight.** Eleven nodes of two straps,
-two of four, two of one hex.
-
-**Two columns used to mean different things and now mean the same one.** The
-left was *room* and the middle was *straps*, back when §7.6 counted weight and
-kinds separately; one limit replaced the pair, so both columns hand out the
-same thing. That is a fork with nothing on either side of it, which in a
-granted tree is fine — there was never anything to choose here — and it is why
-the last row is worth double rather than the same: a node's value is read off
-its depth everywhere else (§7.4.3), and a free tree has no reason to be the
-exception.
-
-**It is wired down its columns, not across.** A bought tree forks so that thirty
-points have to be spent through choices; there is nothing to choose here,
-because nothing is bought. Each node hangs off the one directly above it, which
-makes the three columns readable as three strands — two of pack, and the mixed
-one that carries both hexes of sight.
-
-**Every node is the eye or the back, and not one of them is a stat.** This is
+**Both skills are the eye or the back, and neither is a stat.** This is
 the rule that makes a granted tree safe to exist, and it is stricter than the
 §8.1 clamp it replaced. Every other tree is paid for with a skill point, and the
 point is what keeps the hundred-point cap (§7.4.1) meaningful; this one is free,
@@ -1468,9 +1479,9 @@ Without the first, a map with no reach limit is a long wait; without the second,
 the cheapest XP in the game is pressing *travel* and going to bed — and §2's
 whole argument is that idle time must not be a faucet.
 
-**Its nodes cost no skill point, and that is only safe because there is exactly
-one such tree.** A second free tree would not be a new job, it would be a hole
-in the 100-point cap (§7.4.1).
+**Its ranks cost no skill point, and that is only safe because there is exactly
+one such job.** A second free one would not be a new job, it would be a hole in
+the 100-point cap (§7.4.1).
 
 **The road hands them over.** A wayfaring skill is claimed the moment the
 walking pays for it, without being asked — because there is nothing for a press
@@ -1489,10 +1500,10 @@ on the server has to remember what a client has been told.
 "automatic" really are different, and the thing that makes automatic safe is not
 the press — it is that something says so.)*
 
-A wayfaring node is still **a row like every other node**, and the point ledger
+A wayfaring rank is still **a row like every other rank**, and the point ledger
 stays honest by asking what KIND a row is rather than by keeping some rows out
-of the table. That is the one place this differs from every other tree: the
-`spent` count skips them.
+of the table. That is the one place this differs from every other job: the
+`spent` sum skips them.
 
 **Sight is the rarest thing the road pays in**, and it is capped for the reason
 in §7.4.3: it is a query radius, and cost goes as the square of it. It goes
@@ -3264,22 +3275,26 @@ its own problem:
 **The WEAPON decides which three; the TREE teaches them.** §9.5.4 makes the
 family in the slot your class, so carrying a sword is what makes you a
 Swordhand — but the three sword skills are then *learned*, and they are learned
-as **ordinary nodes of that battle job's tree**: one at depth I, one at II, one
-at III. A fighter who has spent nothing swings and does nothing else.
+as **ordinary skills on that battle job's sheet** — one-rank skills, at job
+levels 1, 5 and 12, sitting in the same list as the levelled ones (§7.4.2). A
+fighter who has spent nothing swings and does nothing else.
 
-Being nodes is the load-bearing part. A battle job still costs **thirty points
-like every other job** — the skills displaced three stat nodes rather than
-arriving beside them — so learning all three is a tenth of the tree, paid for
-out of the same hundred (§7.4.1) and against the same stat nodes. That is the
-choice: a Runecaster who takes all three has three fewer nodes of pair and wear
-than one who takes none.
+Being ordinary is the load-bearing part. A battle job still costs **thirty
+points like every other job** — the skills displaced three stat ranks rather
+than arriving beside them — so learning all three is a tenth of what the job
+teaches, paid for out of the same hundred (§7.4.1) and against the same stat
+ranks. That is the choice: a Runecaster who takes all three has three fewer
+ranks of pair and wear than one who takes none.
 
-**What the displaced nodes were worth was merged, not lost.** Each one's value
-went into a surviving sibling of the same kind, so a battle tree is worth
-exactly what it was before it taught anything — three of its nodes are simply
-larger. A skill may never be placed on a tree's *only* node of some kind, or the
-tree loses that kind outright; there is a test for it, because it happened
-twice.
+**What the displaced ranks were worth was merged, not lost.** Each one's value
+went into a surviving rank of the same kind, so a battle job is worth exactly
+what it was before it taught anything. A skill may never displace a job's *only*
+rank of some kind, or the job loses that kind outright; there is a test for it,
+because it happened twice.
+
+**One rank, never a ladder.** Owning it IS the effect (§7.4.3), so three of them
+are three skills rather than three ranks of one — a rank ladder would be saying
+Sunder is a better Onslaught, and they are different tricks.
 
 *(They used to arrive with the weapon, on the argument that the three simply
 **are** what a sword is. That made a Runecaster's whole kit free the moment they
