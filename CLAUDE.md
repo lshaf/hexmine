@@ -4059,6 +4059,13 @@ chip get, because a stretched hexagon is unreadable at a panel's aspect ratio
 and a chamfer is not. Nothing in the interface is round. If a new element wants
 a circle, it wants one of these two instead.
 
+**A `border` under a `clip-path` does not follow the cut.** The border is
+painted on the box and the clip then removes the corner along with it, so a
+chamfered element with a real border comes out with two bare diagonal edges —
+most obvious on a lit one, where a copper rule runs along the top and stops dead
+at the cut. The fix is the plate contract below, at whatever size: the element
+IS the line, and one child inset a pixel carries the fill. Both wear the clip.
+
 `.plate` draws its hairline border by being the border colour with **exactly
 one child** inset a pixel to carry the fill — so `.plate > *` styles every
 direct child as if it were that one. A plate handed five children draws five

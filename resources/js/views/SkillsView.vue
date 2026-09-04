@@ -628,20 +628,29 @@ async function learn(): Promise<void> {
           :title="tree.jobs[key]!.name"
           @click="job = key"
         >
-          <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
-               stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path :d="JOB_PATHS[key] ?? ACTION_PATHS.skills" />
-          </svg>
-          <span class="trade-name">{{ tree.jobs[key]!.name }}</span>
           <!--
-            §13.3 -- sap when something free is waiting on that job, the same
-            green the quest ledger lights with. A wayfaring rank costs no point,
-            so there is no reason not to take it and every reason to be told it
-            is there; the count is otherwise what you have learned.
+            §13 -- the line has to follow the cut, so the button IS the line and
+            this one child carries the fill, inset a pixel. A `border` is drawn
+            on the box and the clip then takes the corner away with it, which
+            left the two chamfered edges bare — most visible on the lit one,
+            where a copper rule stopped dead at each cut.
           -->
-          <span class="tally" :class="{ ready: claimable(key) > 0 }">{{
-            claimable(key) > 0 ? claimable(key) : learnedIn(key)
-          }}</span>
+          <span class="in">
+            <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
+                 stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path :d="JOB_PATHS[key] ?? ACTION_PATHS.skills" />
+            </svg>
+            <span class="trade-name">{{ tree.jobs[key]!.name }}</span>
+            <!--
+              §13.3 -- sap when something free is waiting on that job, the same
+              green the quest ledger lights with. A wayfaring rank costs no
+              point, so there is no reason not to take it and every reason to be
+              told it is there; the count is otherwise what you have learned.
+            -->
+            <span class="tally" :class="{ ready: claimable(key) > 0 }">{{
+              claimable(key) > 0 ? claimable(key) : learnedIn(key)
+            }}</span>
+          </span>
         </button>
       </div>
 
@@ -1176,18 +1185,33 @@ async function learn(): Promise<void> {
  * which is what makes a row of six readable at a glance rather than six words
  * that all start with a capital letter.
  */
+/*
+ * §13 -- the outer element IS the line, and its one child carries the fill.
+ *
+ * A `border` is painted on the box and the clip then removes the corner along
+ * with it, so the two chamfered edges came out bare — obvious on the selected
+ * one, where a copper rule ran along the top and stopped dead at the cut. This
+ * is the same contract `.plate` already keeps, at a button's size.
+ */
 .trade {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 8px 9px;
-  border: 1px solid var(--line);
-  background: var(--ink-panel);
+  display: block;
+  padding: 1px;
+  border: 0;
+  background: var(--line);
   color: var(--vellum-dim);
   font-family: inherit;
   font-size: 11.5px;
   font-weight: 600;
   cursor: pointer;
+  clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
+}
+
+.trade > .in {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 8px;
+  background: var(--ink-panel);
   clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
 }
 
@@ -1211,9 +1235,12 @@ async function learn(): Promise<void> {
 }
 
 .trade.on {
-  background: var(--ink-raised);
-  border-color: var(--accent);
+  background: var(--accent);
   color: var(--vellum);
+}
+
+.trade.on > .in {
+  background: var(--ink-raised);
 }
 
 .trade.on svg {
@@ -1567,8 +1594,10 @@ async function learn(): Promise<void> {
     grid-template-columns: repeat(2, 1fr);
   }
 
-  .trade {
-    padding: 8px 7px;
+  /* The padding lives on the fill now, not on the button: the button's own is
+     the hairline (§13). */
+  .trade > .in {
+    padding: 7px 6px;
     gap: 6px;
   }
 
