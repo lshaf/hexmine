@@ -984,7 +984,9 @@ export interface GameApi {
 
   equipItem(ownedId: string): Promise<ActionResult<null>>
   unequipItem(ownedId: string): Promise<ActionResult<null>>
-  repairItem(ownedId: string): Promise<ActionResult<null>>
+  repairItem(
+    ownedId: string,
+  ): Promise<ActionResult<{ jobXp: number; characterXp: number; job: string | null; levels: number }>>
   /**
    * §9.5.9 -- the three each battle job knows, keyed by job.
    *

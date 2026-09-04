@@ -2029,6 +2029,30 @@ the game, §11.1.)*
 
 - Repair costs refined + raid materials, scaled to rarity tier, and is only ever
   possible **above** zero. There is no resurrection.
+- **A mend teaches the bench that could have made it** (§7.1: every verb that
+  finishes work pays). A repair is real craft work — the same anvil, the same
+  job, a bill in the same materials — so the Smith learns from mending a blade
+  and the Armorer from mending a coat, and the character levels alongside.
+
+  **What it teaches depends on what was repaired, in both senses.** The rung,
+  through the same rarity rank a craft is paid on; and how badly it needed it,
+  through the fraction of the bar put back. A scratched common teaches almost
+  nothing and a legendary brought home from the edge teaches most of a craft.
+  Measured against the **piece's** own ceiling (§7.4.3), so a well-made copy is
+  not quietly worth less to mend.
+
+  **A mend is not a make**, and `REPAIR_XP_SHARE` keeps it well under one —
+  otherwise repairing would be a cheaper road to a job level than crafting, and
+  the bench would be the slow way to level the bench.
+
+  **It cannot be farmed, and the sink is the reason rather than a cooldown.**
+  Durability only comes off through work that already pays more than the mend
+  will, and the parts a mend costs scale with the same figure the XP does — so
+  XP per material spent is flat however it is split up.
+
+  **Paying the trader teaches nothing.** A trader is not a bench (§8.4), and
+  that branch is exactly the gear with no recipe: there is no craft job standing
+  behind it to learn.
 - **A piece carries its own ceiling, not its recipe's.** §7.4.3's
   `craftDurability` raises the max of what a Smith makes, and §8.0.1's rolled
   `durability` line raises it again — so two copies of one recipe can differ,

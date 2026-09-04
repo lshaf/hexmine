@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Game\Catalog;
+use App\Game\Jobs;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -29,9 +30,18 @@ class EquipmentController extends GameController
     public function repair(Request $request, int $item): JsonResponse
     {
         $character = $this->character($request);
-        $this->game->repairItem($character, $item);
+        $learned = $this->game->repairItem($character, $item);
 
-        return $this->respond($character, null, 'Repaired.');
+        // §8.2 -- and say what the mending taught, because it is the one part
+        // of a repair that is not a bill. Silent, it would be a number the
+        // player only found by watching a job level move on another screen.
+        $note = 'Repaired.';
+        if ($learned['jobXp'] > 0 && $learned['job'] !== null) {
+            $job = Jobs::JOBS[$learned['job']]['name'];
+            $note = "Repaired. {$job} +{$learned['jobXp']} xp.";
+        }
+
+        return $this->respond($character, $learned, $note);
     }
 
     /** §8.2 -- discard returns a small salvage, so obsolete gear has an exit. */

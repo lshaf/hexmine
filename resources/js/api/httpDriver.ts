@@ -305,8 +305,12 @@ export class HttpDriver implements GameApi {
     return post<ActionResult<null>>(`/equipment/${ownedId}/unequip`)
   }
 
-  repairItem(ownedId: string): Promise<ActionResult<null>> {
-    return post<ActionResult<null>>(`/equipment/${ownedId}/repair`)
+  repairItem(
+    ownedId: string,
+  ): Promise<ActionResult<{ jobXp: number; characterXp: number; job: string | null; levels: number }>> {
+    return post<
+      ActionResult<{ jobXp: number; characterXp: number; job: string | null; levels: number }>
+    >(`/equipment/${ownedId}/repair`)
   }
 
   getBattleSkills(): Promise<Record<string, BattleSkillRow[]>> {

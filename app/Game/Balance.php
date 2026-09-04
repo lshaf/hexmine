@@ -956,6 +956,28 @@ final class Balance
     public const CHARACTER_XP_PER_RARITY_RANK = 8;
 
     /**
+     * §8.2 -- what a mend teaches, as a share of what MAKING the thing teaches.
+     *
+     * A mend is not a make. The bench is the same bench and the job is the same
+     * job, so a repair is real craft work and §7.1's rule applies -- every verb
+     * that finishes work pays -- but putting an edge back on a blade is not the
+     * afternoon that forged it.
+     *
+     * Well under one, and it is a share rather than a flat figure so that both
+     * halves of "depends on what you repaired" fall out of one number: the
+     * RUNG, through the same rarity rank a craft is paid on, and HOW BADLY it
+     * needed it, through the fraction of the bar restored. A barely-scratched
+     * common teaches almost nothing; a legendary brought back from the edge
+     * teaches most of a craft.
+     *
+     * It cannot be farmed, and the reason is the sink rather than a cooldown:
+     * durability only comes off through work that already pays more XP than the
+     * mend will, and the parts a mend costs scale with the same `missing` this
+     * does -- so XP per material spent is flat however it is split up.
+     */
+    public const REPAIR_XP_SHARE = 0.4;
+
+    /**
      * §6 -- what one unit off a processing bench teaches its line's job.
      *
      * Per unit of output rather than per run, so a three-batch smelt is worth

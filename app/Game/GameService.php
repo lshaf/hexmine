@@ -6840,9 +6840,14 @@ class GameService
         $item->save();
     }
 
-    public function repairItem(Character $character, int $itemId): void
+    /**
+     * §8.2 -- mend it, and learn something for the mending.
+     *
+     * @return array{jobXp:int,characterXp:int,job:?string,levels:int}
+     */
+    public function repairItem(Character $character, int $itemId): array
     {
-        DB::transaction(function () use ($character, $itemId) {
+        return DB::transaction(function () use ($character, $itemId) {
             $item = $this->ownedItem($character, $itemId);
             $def = Catalog::item($item->item_key);
             // §7.4.3 -- the PIECE's ceiling, not the catalog's. A Smith's node
@@ -6876,10 +6881,50 @@ class GameService
                 }
                 $character->gold -= $gold;
                 $character->save();
+
+                $item->durability = $max;
+                $item->save();
+
+                // §8.4 -- a trader is not a bench. Paying somebody else to do
+                // it teaches you nothing, which is also why this branch exists
+                // at all: it is the gear that has no recipe, so there is no
+                // craft job standing behind it to learn.
+                return ['jobXp' => 0, 'characterXp' => 0, 'job' => null, 'levels' => 0];
             }
 
             $item->durability = $max;
             $item->save();
+
+            // §7.1 / §8.2 -- the bench that could have made it is the job that
+            // learns from mending it, and it learns in proportion to what the
+            // mend actually was: the rung through the same rarity rank a craft
+            // is paid on, and how badly it needed it through the share of the
+            // bar put back.
+            //
+            // §7.4.3 -- against the PIECE's own ceiling, not the catalog's, so
+            // a well-made copy is not quietly worth less to mend.
+            $rank = Balance::rarityRank($def['rarity']) + 1;
+            $share = min(1.0, $missing / max(1, $max));
+            $scale = Balance::REPAIR_XP_SHARE * $share * $rank;
+
+            $jobKey = $this->jobForItem($def);
+            $jobXp = $jobKey === null
+                ? 0
+                : $this->grantJobXp(
+                    $character,
+                    $jobKey,
+                    (int) max(1, round(Balance::JOB_XP_PER_RARITY_RANK * $scale)),
+                );
+
+            $characterXp = (int) max(1, round(Balance::CHARACTER_XP_PER_RARITY_RANK * $scale));
+            $levels = $this->grantCharacterXp($character, $characterXp);
+
+            return [
+                'jobXp' => $jobXp,
+                'characterXp' => $characterXp,
+                'job' => $jobKey,
+                'levels' => $levels,
+            ];
         });
     }
 
