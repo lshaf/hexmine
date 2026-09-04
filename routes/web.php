@@ -26,6 +26,12 @@ Route::view('/oddity', 'oddity');
 Route::view('/battle', 'battle');
 
 /*
+| §13 -- the chamfer proposals. The cut has only ever been on one diagonal;
+| this asks what the other one is for. A pitch like /oddity, not the rules.
+*/
+Route::view('/chamfer', 'chamfer');
+
+/*
 | The whole client is one Vue SPA. Every non-API path returns the same shell so
 | the app owns its own routing; /api/* is handled by routes/api.php and never
 | reaches this catch-all.
