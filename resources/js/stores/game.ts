@@ -887,6 +887,24 @@ export const useGame = defineStore('game', () => {
    * everything the player is owed -- what dropped, both XP ladders, tool wear,
    * what would not fit -- is read off the server's own response.
    */
+  /**
+   * §6.1 / §8.4 -- re-read whichever bank of slots this job was sitting in.
+   *
+   * Both banks are their own fetch rather than riding the player state, so a
+   * job leaving one is invisible to them: the queue bar went on drawing the
+   * slot that had just emptied, and went on refusing the next run because of
+   * it. `collect` learned that for the craft bench and never for the
+   * processing line, and `abandon` never learned it at all.
+   *
+   * The station is only re-read when it is already OPEN. Filling it otherwise
+   * would open a settlement panel nobody asked for, which is the same reason
+   * `loadBench` is a separate call in the first place.
+   */
+  async function refreshBankFor(job: Job | undefined): Promise<void> {
+    if (job?.kind === 'craft') await loadBench()
+    if (job?.kind === 'processing' && station.value !== null) await openStation()
+  }
+
   async function collect(jobId: string): Promise<void> {
     const job = jobs.value.find((j) => j.id === jobId)
     const result = await act(() => api.collectJob(jobId))
@@ -902,10 +920,7 @@ export const useGame = defineStore('game', () => {
     await refreshMutations()
     if (selected.value) await select(selected.value.col, selected.value.row)
 
-    // §8.4 -- the bench bank is its own fetch, so taking something off one has
-    // to re-read it. Without this the Workshop kept drawing the slot that was
-    // just emptied, and went on refusing the next craft because of it.
-    if (job?.kind === 'craft') await loadBench()
+    await refreshBankFor(job)
   }
 
   /** Dismiss the haul receipt. Nothing depends on it having been read. */
@@ -1068,8 +1083,13 @@ export const useGame = defineStore('game', () => {
   const atGuildHall = computed(() => Boolean(state.value?.atGuildHall))
 
   async function abandon(jobId: string): Promise<void> {
+    // Read before the call: the job is gone from the state afterwards, so
+    // there would be nothing left to ask which bank it was in.
+    const job = jobs.value.find((j) => j.id === jobId)
+
     await act(() => api.abandonJob(jobId), 'bad')
     await refreshMutations()
+    await refreshBankFor(job)
   }
 
   async function travelTo(col: number, row: number): Promise<void> {
