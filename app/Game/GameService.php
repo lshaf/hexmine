@@ -3705,7 +3705,17 @@ class GameService
             // §5.7 -- rich ground reorders this list as well as fattening the
             // haul: it widens the odds on the grade above your tool, and the
             // card lists kinds most-likely-first.
-            'drops' => Drops::kinds($activity, $tile, $gathering ? 0 : $reach, $pocketUntil !== null),
+            // §8.0.1 -- and a favoured grade moves up the list, because the
+            // list is ordered by likelihood and that is exactly what the line
+            // changes. A card that ignored it would be describing somebody
+            // else's axe.
+            'drops' => Drops::kinds(
+                $activity,
+                $tile,
+                $gathering ? 0 : $reach,
+                $pocketUntil !== null,
+                $gathering ? [] : $this->seamFavour($character, $skillKey),
+            ),
             'activity' => $activity,
             // The line stays the tile's own even on a gathered haul: swinging
             // at a tree by hand is still woodcutting practice, §4.0, just poor.
@@ -4079,6 +4089,11 @@ class GameService
             $tile,
             (string) $job->material_key,
             ($tile['pocketUntil'] ?? 0) > $started,
+            // §8.0.1 -- what the tool on this line favours. Read now rather
+            // than stored on the job, exactly as the pocket above is: the kit
+            // that took the mine is the kit that worked it, and this is the
+            // same character's same tool.
+            $this->seamFavour($character, $job->skill_key ? (string) $job->skill_key : null),
         );
 
         // Seeded from the job, so a haul is settled the moment it is claimed
@@ -6488,6 +6503,35 @@ class GameService
      *
      * @return array{stats:array<string,float>,byJob:array<string,array<string,float>>,sight:int,bagSlots:int}
      */
+    /**
+     * §8.0.1 -- which grades this character's tool favours, and by how much.
+     *
+     * Line-locked like everything on a tool (§8 rule 1): only the line being
+     * worked is asked, so an axe rolled for ironwood does nothing to a seam.
+     * Keyed by material because the option names one -- that is what makes
+     * "one line per stat" mean one line per material.
+     *
+     * @return array<string,float>
+     */
+    public function seamFavour(Character $character, ?string $line): array
+    {
+        if ($line === null) {
+            return [];
+        }
+
+        $slot = Catalog::slotForSkill($line);
+        $out = [];
+
+        foreach (Catalog::seamMaterialsForSlot($slot) as $material) {
+            $share = Formulas::optionGain($this->itemRows($character), $material, $line);
+            if ($share > 0) {
+                $out[$material] = $share;
+            }
+        }
+
+        return $out;
+    }
+
     public function nodeEffects(Character $character): array
     {
         return $this->effectsOf($this->ownedNodes($character));

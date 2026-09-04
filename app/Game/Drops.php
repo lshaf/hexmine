@@ -85,15 +85,20 @@ final class Drops
      * @param  array<string,mixed>  $tile
      * @return array<string,float>
      */
-    public static function table(string $activity, array $tile, int $toolGrade, bool $rich = false): array
-    {
+    public static function table(
+        string $activity,
+        array $tile,
+        int $toolGrade,
+        bool $rich = false,
+        array $seam = [],
+    ): array {
         $biome = $tile['biome'];
         $variants = Variants::BIOME_VARIANTS[$biome];
         $tileGrade = self::gradeOf($tile, $variants);
         $reach = min($toolGrade, $tileGrade);
 
         return $activity === self::MINING
-            ? self::mining($biome, $variants, $tileGrade, $reach, $rich)
+            ? self::mining($biome, $variants, $tileGrade, $reach, $rich, $seam)
             : self::gathering($biome);
     }
 
@@ -109,8 +114,13 @@ final class Drops
      * @param  array<string,mixed>  $tile
      * @return array<string,float>
      */
-    public static function tableFor(string $activity, array $tile, string $primary, bool $rich = false): array
-    {
+    public static function tableFor(
+        string $activity,
+        array $tile,
+        string $primary,
+        bool $rich = false,
+        array $seam = [],
+    ): array {
         $biome = $tile['biome'];
         $variants = Variants::BIOME_VARIANTS[$biome];
         $tileGrade = self::gradeOf($tile, $variants);
@@ -134,7 +144,7 @@ final class Drops
             }
         }
 
-        return self::mining($biome, $variants, $tileGrade, $reach, $rich);
+        return self::mining($biome, $variants, $tileGrade, $reach, $rich, $seam);
     }
 
     /**
@@ -266,12 +276,17 @@ final class Drops
      *
      * @return array<string,float>
      */
+    /**
+     * @param  array<string,float>  $seam  §8.0.1 -- material key -> the share more
+     *                                     of it a rolled line on the tool asks for.
+     */
     private static function mining(
         string $biome,
         array $variants,
         int $tileGrade,
         int $reach,
         bool $rich = false,
+        array $seam = [],
     ): array {
         $table = [$variants[$reach]['material'] => 60.0];
 
@@ -312,6 +327,20 @@ final class Drops
         $table[Critters::BY_BIOME[$biome]] = 4.0;
 
         $table[self::junkOf($biome)] = 9.0;
+
+        // §8.0.1 -- and a tool that favours a seam bends the weights toward it.
+        //
+        // Applied to the WEIGHT rather than to the roll, so the favour is worth
+        // what it says: a fifth more of a material that already turns up half
+        // the time is a fifth more of half, not of everything. It reaches only
+        // grades the ground actually holds -- a line for ironwood is worth
+        // nothing on plain forest, which is the same rule §5.3 gives the upward
+        // tail and the reason the option names a grade rather than a haul.
+        foreach ($seam as $material => $share) {
+            if (isset($table[$material]) && $share > 0) {
+                $table[$material] *= 1 + $share;
+            }
+        }
 
         return $table;
     }
@@ -649,9 +678,14 @@ final class Drops
      *
      * @return list<string>
      */
-    public static function kinds(string $activity, array $tile, int $toolGrade, bool $rich = false): array
-    {
-        $table = self::table($activity, $tile, $toolGrade, $rich);
+    public static function kinds(
+        string $activity,
+        array $tile,
+        int $toolGrade,
+        bool $rich = false,
+        array $seam = [],
+    ): array {
+        $table = self::table($activity, $tile, $toolGrade, $rich, $seam);
         arsort($table);
 
         return array_keys($table);

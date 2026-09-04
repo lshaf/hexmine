@@ -2859,9 +2859,15 @@ final class GameLoopTest extends TestCase
                     $this->assertContains($option['stat'], Catalog::optionStatsFor($def));
                     $this->assertArrayNotHasKey('scope', $option, "{$key} scoped a line");
 
-                    // §8.0.1 -- four kinds and four tables. None of them is a
+                    // §8.0.1 -- five kinds and five tables. None of them is a
                     // StatKey percentage and none meets STAT_CEILING.
                     [$floor, $roof] = match ($option['kind']) {
+                        // §5.3 -- the line that names a material, on a ladder
+                        // of three values rather than five.
+                        Catalog::OPTION_SEAM => [
+                            Balance::OPTION_SEAM_VALUE[$tiers[0]],
+                            Balance::OPTION_SEAM_VALUE[end($tiers)],
+                        ],
                         'gain' => [
                             min(
                                 Balance::OPTION_GAIN_VALUE_GLOVES[$tiers[0]],
@@ -3075,7 +3081,12 @@ final class GameLoopTest extends TestCase
     {
         $pool = fn (string $key) => Catalog::optionStatsFor(Catalog::item($key));
 
-        $this->assertSame(['attack', 'durability', 'haul'], $pool('ironwood_axe'));
+        // §5.3 -- a gathering tool also offers its line's three grades above
+        // the base, which is the only rolled line that names a material.
+        $this->assertSame(
+            ['attack', 'hardwood', 'heartoak', 'ironwood', 'durability', 'haul'],
+            $pool('ironwood_axe'),
+        );
         $this->assertSame(['attack', 'defense', 'durability', 'haul', 'travel'], $pool('marching_boots'));
         $this->assertSame(['attack', 'defense', 'durability', 'haul'], $pool('ironwood_armor'));
         $this->assertSame(['attack', 'durability', 'haul', 'cooldown'], $pool('knotted_rod'));
@@ -3565,7 +3576,15 @@ final class GameLoopTest extends TestCase
                 $checked['tool']++;
                 // A tool takes material out of a hex: there is nothing there
                 // for a guard to keep off you, and nothing to walk or fight.
-                $this->assertSame(['attack', 'durability', 'haul'], $stats, "{$key}");
+                //
+                // §5.3 -- and it is the only piece that may favour a GRADE, so
+                // its own line's three non-common materials sit in the pool
+                // beside the four fixed words.
+                $this->assertSame(
+                    ['attack', ...Catalog::seamMaterialsForSlot($slot), 'durability', 'haul'],
+                    $stats,
+                    "{$key}",
+                );
 
                 continue;
             }
@@ -3589,6 +3608,12 @@ final class GameLoopTest extends TestCase
             }
 
             $checked['worn']++;
+            // §5.3 -- nothing worn works a seam. Only the tool that swings at
+            // one may favour a grade.
+            $this->assertEmpty(
+                array_filter($pool, static fn (array $p) => $p['kind'] === Catalog::OPTION_SEAM),
+                "{$key} favours a seam",
+            );
             $this->assertContains('haul', $stats, "{$key} cannot roll a haul");
             $this->assertNotContains('cooldown', $stats, "{$key} shortens a cooldown");
             // Boots walk. A coat does not.

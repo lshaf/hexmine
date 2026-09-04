@@ -9,7 +9,13 @@ import { COMPONENTS } from './components'
 import { TOP_TIER } from './toptier'
 import { CRITTERS } from './critters'
 import { SPOILS } from './spoils'
-import { HUNT_EXTRA, HUNT_RAW, HUNT_REFINED, HUNT_SKILL_FOR_MATERIAL } from './hunts'
+import {
+  HUNT_EXTRA,
+  HUNT_GRADES,
+  HUNT_RAW,
+  HUNT_REFINED,
+  HUNT_SKILL_FOR_MATERIAL,
+} from './hunts'
 import { BATTLE_GEAR } from './battlegear'
 import {
   BIOME_VARIANTS,
@@ -481,7 +487,20 @@ export const skillForSlot = (slot: EquipSlot): SkillKey | null =>
  * is where a piece is read before it is owned, and what it *may* roll is part
  * of what it is.
  */
-export type OptionStat = 'attack' | 'defense' | 'durability' | 'haul' | 'travel' | 'cooldown'
+/**
+ * §5.3 -- a `seam` line's stat is a MATERIAL KEY rather than one of these
+ * words, which is what makes §8.0.1's "one line per stat" mean one line per
+ * material: an axe may favour hardwood and ironwood at once, never hardwood
+ * twice.
+ */
+export type OptionStat =
+  | 'attack'
+  | 'defense'
+  | 'durability'
+  | 'haul'
+  | 'travel'
+  | 'cooldown'
+  | MaterialKey
 
 export interface OptionRoll {
   stat: OptionStat
@@ -506,6 +525,12 @@ export function optionRollsFor(def: ItemDef): OptionRoll[] {
 
   if (skillForSlot(def.slot) !== null) {
     pool.push({ stat: OPTION_FLAT_TOOL[0]!, kind: 'flat' })
+
+    // §5.3 -- and a tool may favour one of the grades above the base, which is
+    // the only rolled line in the game that names a material.
+    for (const material of seamMaterialsForSlot(def.slot)) {
+      pool.push({ stat: material, kind: 'seam' })
+    }
   } else {
     for (const stat of OPTION_FLAT_WORN) {
       const noGuard =
@@ -523,6 +548,31 @@ export function optionRollsFor(def: ItemDef): OptionRoll[] {
   if (def.slot === 'weapon') pool.push({ stat: 'cooldown', kind: 'cooldown' })
 
   return pool
+}
+
+/**
+ * §5.3 -- the non-common materials a tool's own line can take out of the ground.
+ *
+ * Four grades a biome and the first is the base, so this is always the other
+ * three. The hunting line reads the same ladder off the creature rather than
+ * off a hex (§5.5), which is why it is asked for by SLOT.
+ *
+ * Mirrors `Catalog::seamMaterialsForSlot()`.
+ */
+export function seamMaterialsForSlot(slot: EquipSlot | undefined): MaterialKey[] {
+  const line = slot ? skillForSlot(slot) : null
+  if (line === null) return []
+
+  if (line === 'hunting') return HUNT_GRADES.slice(1).map((g) => g.material as MaterialKey)
+
+  for (const grades of Object.values(BIOME_VARIANTS)) {
+    const materials = grades.map((g) => g.material as MaterialKey)
+    // Asked of the SECOND grade: the base raws live on the skill itself and
+    // this map covers the grades above them.
+    if (VARIANT_SKILL[materials[1]!] === line) return materials.slice(1)
+  }
+
+  return []
 }
 
 /** The slot a skill line draws its tool from. */

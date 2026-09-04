@@ -1819,6 +1819,7 @@ to be legible.
 | **`cooldown`** | whole rounds off **every** skill the weapon's family carries (§9.5.9) | −1 · −1 · −1 · −2 · −2 |
 | **`haul`** | a share of what the work pays — a hex, or a pack | +10% · +15% · +20% · +25% · +30% — **on gloves** +5% · +10% · +15% · +20% · +20% |
 | **`travel`** | a share off the road clock | +10% · +15% · +20% · +25% · +30% |
+| **`seam`** | a share more of ONE named grade off the ground (§5.3) | +10% · +10% · +20% · +20% · +30% |
 
 **`haul` and `travel` are the only percentages left, and the tier IS the step.**
 Ten to thirty in fives, one value per tier and no roll inside it — so a player
@@ -1874,12 +1875,35 @@ One rule, and it is §8's usual one: **what is the piece FOR.**
 
 | Piece | May roll |
 |---|---|
-| **Gathering tool** | `attack` · `durability` · `haul` |
+| **Gathering tool** | `attack` · `durability` · `haul` · `seam` (one per grade) |
 | **Weapon** | `attack` · `defense` · `durability` · `haul` · `cooldown` |
 | **Armor · gloves** | `attack` · `defense` · `durability` · `haul` |
 | **Boots** | the same, plus `travel` |
 
 …and any of them may, rarely, come out unbreakable.
+
+**`seam` is the one line that names a MATERIAL**, and a gathering tool is the
+only piece that carries it. Its `stat` is the material key rather than a word,
+which is what makes "one line per stat" mean **one line per grade**: an axe may
+come out favouring hardwood and ironwood at once, and never hardwood twice.
+
+**Three grades a line, and never the base one** — §5.3 gives every line four
+and the first is what a hex mostly hands you anyway, so a line promising more
+of it would read as luck and would not be. Three grades × three values is nine
+ways an axe can favour a forest, and forty-five across the five lines.
+
+**Three values and not five**, which is why the ladder above pairs off the
+bottom: ten, twenty and thirty per cent. Deliberately flatter than the `haul`
+line beside it, because a haul makes every trip bigger while this bends **what
+comes out of the ground** — and §5.3's tails are the shape the whole grade
+ladder is read through, so a line that could double the top tail would make the
+ladder a suggestion.
+
+**It bends the WEIGHT, not the roll.** A fifth more of a material that already
+turns up half the time is a fifth more of half. And it is worth nothing on
+ground that does not hold the grade — a line for ironwood is a line for
+ironwood, not a line for wishing — which is the same rule §5.3 gives the upward
+tail, and the reason the option names a grade rather than a haul.
 
 **A tool rolls no guard.** There is nothing on a hex for one to keep off you.
 And **on a tool a rolled `attack` is MINING attack** (§7.3): it bites deeper

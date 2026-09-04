@@ -171,6 +171,15 @@ function rollBrief(def: ItemDef): RollBrief | null {
 
       return low === high ? `−${low}` : `−${low}–${high}`
     }
+    // §5.3 -- the line that names a material. Three values, so the band is a
+    // range from the lowest rung this rarity can roll to the highest.
+    if (entry.kind === 'seam') {
+      const low = EQUIPMENT.optionSeamValue[first]!
+      const high = EQUIPMENT.optionSeamValue[last]!
+
+      return low === high ? `+${pct(low)}` : `+${pct(low)}–${pct(high)}`
+    }
+
     if (entry.kind === 'gain') {
       // §8.0.1 -- gloves haul on a shorter ladder than everything else.
       const table =
@@ -200,12 +209,20 @@ function rollBrief(def: ItemDef): RollBrief | null {
     travel: 'travel',
   }
 
+  /**
+   * §5.3 -- a seam line is labelled with the MATERIAL it favours, because that
+   * is the whole of what it says: "+20% ironwood" is a fact about the ground,
+   * and a generic word for it would leave a reader asking which seam.
+   */
+  const nameOf = (entry: (typeof pool)[number]): string =>
+    entry.kind === 'seam' ? (MATERIALS[entry.stat as MaterialKey]?.name ?? entry.stat) : (LABEL[entry.stat] ?? entry.stat)
+
   return {
     // §8.0.1 -- one line per stat, so the POOL is a ceiling too. Quoting the
     // rung alone would promise a line the piece cannot carry.
     ceiling: Math.min(EQUIPMENT.optionRolls[def.rarity] ?? 0, pool.length),
     lines: [
-      ...pool.map((entry) => ({ label: LABEL[entry.stat] ?? entry.stat, value: band(entry) })),
+      ...pool.map((entry) => ({ label: nameOf(entry), value: band(entry) })),
       // §8.0.1 -- it belongs in this row, because this is the list a player
       // reads to find out what a bench can put on a thing and the rarest answer
       // is the one worth seeing. It carries NO value: every other pip's number
@@ -801,8 +818,13 @@ const groups = computed<Group[]>(() => {
     return {
       key: slot,
       title: SLOT_LABEL[slot],
+      // §5.5 -- four lines work a country and the fifth works an animal, so
+      // the hunting bow has no biome to name. It read "undefined hexes",
+      // which is what happens when a fifth line is added to a sentence written
+      // for four.
       sub: skill
-        ? `${skill.name} · ${BIOME_LABEL[biome!]} hexes. Pays out on this line and no other.`
+        ? `${skill.name} · ${biome ? `${BIOME_LABEL[biome]} hexes` : 'the hunt'}.`
+          + ' Pays out on this line and no other.'
         : (WORN_NOTE[slot] ?? ''),
       entries: ITEMS.filter((i) => i.slot === slot)
         .map(describe)

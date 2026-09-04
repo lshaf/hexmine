@@ -302,6 +302,57 @@ final class Catalog
     public const OPTION_INDESTRUCTIBLE = 'indestructible';
 
     /**
+     * §5.3 -- a share more of ONE material off the ground, and a gathering tool
+     * is the only piece that may carry it.
+     *
+     * Its `stat` is the material key rather than a word, which is what makes
+     * §8.0.1's "one line per stat" mean one line per MATERIAL: an axe may come
+     * out favouring hardwood and ironwood at once, and never hardwood twice.
+     *
+     * Only the three grades ABOVE the base one (§5.3), because the base grade
+     * is what a hex mostly gives anyway -- a line promising more of the thing
+     * you already get most of would be a line that reads as luck and is not.
+     */
+    public const OPTION_SEAM = 'seam';
+
+    /**
+     * The non-common materials a tool's own line can take out of the ground.
+     *
+     * Four grades a biome (§5.3) and the first is the base, so this is always
+     * the other three. The hunting line reads the same ladder off the creature
+     * rather than off a hex (§5.5), which is the whole reason it is asked for
+     * by SLOT rather than by biome.
+     *
+     * @return list<string>
+     */
+    public static function seamMaterialsForSlot(?string $slot): array
+    {
+        $line = self::skillForSlot((string) $slot);
+        if ($line === null) {
+            return [];
+        }
+
+        if ($line === 'hunting') {
+            return array_slice(array_column(Hunts::GRADES, 'material'), 1);
+        }
+
+        // Which country this line works is a fact the variant table already
+        // holds -- every grade of it names this skill -- so it is read off
+        // there rather than kept as a fifth copy of the same pairing.
+        foreach (Variants::BIOME_VARIANTS as $grades) {
+            $materials = array_column($grades, 'material');
+            // Asked of the SECOND grade rather than the base: the base raws
+            // are listed on the skill itself, and this map covers the grades
+            // above them -- which is exactly the three being returned.
+            if ((Variants::SKILL_FOR_MATERIAL[$materials[1] ?? ''] ?? null) === $line) {
+                return array_slice($materials, 1);
+            }
+        }
+
+        return [];
+    }
+
+    /**
      * §9.5.4 -- a focus keeps nothing off you, of either kind.
      *
      * "Defense belongs to armor, to the shield, and to the sword. A focus has
@@ -338,6 +389,12 @@ final class Catalog
         if (self::skillForSlot($slot) !== null) {
             // A tool guards nothing: there is no blow on a hex to keep off you.
             $pool[] = $line(self::OPTION_FLAT_TOOL[0]);
+
+            // §5.3 -- and a tool may favour ONE of the grades above the base,
+            // which is the only rolled line in the game that names a material.
+            foreach (self::seamMaterialsForSlot($slot) as $material) {
+                $pool[] = $line($material, self::OPTION_SEAM);
+            }
         } else {
             foreach (self::OPTION_FLAT_WORN as $stat) {
                 // §9.5.4 -- a focus keeps nothing off you, of either kind.

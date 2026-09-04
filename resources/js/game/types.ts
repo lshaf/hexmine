@@ -448,7 +448,14 @@ export interface ActiveBuff {
  * climbs toward §8.1's invisible ceiling, so a lucky roll and an unlucky one
  * read the same on the plate; a solid number simply adds, and is felt.
  */
-export type OptionKind = 'flat' | 'durability' | 'cooldown' | 'gain' | 'indestructible'
+/** §5.3 -- `seam` is the one whose stat is a material key rather than a word. */
+export type OptionKind =
+  | 'flat'
+  | 'durability'
+  | 'cooldown'
+  | 'gain'
+  | 'seam'
+  | 'indestructible'
 
 export interface ItemOption {
   stat: 'attack' | 'defense' | 'durability' | 'cooldown' | 'haul' | 'travel' | 'indestructible'

@@ -222,6 +222,11 @@ final class Formulas
             return $line(Balance::OPTION_COOLDOWN_VALUE[$tier]);
         }
 
+        // §5.3 -- a share more of one named material, on the tool's own line.
+        if ($pick['kind'] === Catalog::OPTION_SEAM) {
+            return $line(Balance::OPTION_SEAM_VALUE[$tier]);
+        }
+
         if ($pick['kind'] === 'gain') {
             // §8.0.1 -- a glove hauls on a shorter ladder. Hands are not what
             // takes material out of a hex; the tool is, and the coat and the

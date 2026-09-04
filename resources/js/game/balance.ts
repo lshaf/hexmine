@@ -363,6 +363,20 @@ export const EQUIPMENT = {
    * of durability, per station).
    */
   stationGoldPerDurability: { village: 0.43, city: 1.4 },
+  /**
+   * §5.3 / §8.0.1 -- how much likelier a favoured grade is to come up.
+   *
+   * Three values and not five: ten, twenty and thirty per cent, with the five
+   * rungs mapping onto them in pairs from the bottom.
+   */
+  optionSeamValue: {
+    common: 0.10,
+    uncommon: 0.10,
+    rare: 0.20,
+    epic: 0.20,
+    legendary: 0.30,
+  } as Record<string, number>,
+
   shopMaterialMarkup: 1.5,
   goldPerCraftMinute: 1,
 } as const

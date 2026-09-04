@@ -1384,6 +1384,27 @@ final class Balance
         'legendary' => 0.20,
     ];
 
+    /**
+     * §5.3 / §8.0.1 -- how much likelier a favoured grade is to come up.
+     *
+     * THREE values and not five, because three is what the line is: ten, twenty
+     * and thirty per cent. The five rungs map onto them in pairs from the
+     * bottom, so an uncommon axe and a rare one both favour a seam by a tenth
+     * and only a legendary reaches the third of it.
+     *
+     * That is deliberately flatter than the haul ladder next to it. A haul line
+     * makes every trip bigger; this one bends WHAT comes out of the ground, and
+     * §5.3's tails are the shape the whole grade ladder is read through -- a
+     * line that could double the top tail would make the ladder a suggestion.
+     */
+    public const OPTION_SEAM_VALUE = [
+        'common' => 0.10,
+        'uncommon' => 0.10,
+        'rare' => 0.20,
+        'epic' => 0.20,
+        'legendary' => 0.30,
+    ];
+
     /** The most a whole kit's haul or travel lines may come to together. */
     public const OPTION_GAIN_CAP = 0.30;
 
