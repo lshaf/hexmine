@@ -4063,8 +4063,14 @@ a circle, it wants one of these two instead.
 painted on the box and the clip then removes the corner along with it, so a
 chamfered element with a real border comes out with two bare diagonal edges —
 most obvious on a lit one, where a copper rule runs along the top and stops dead
-at the cut. The fix is the plate contract below, at whatever size: the element
-IS the line, and one child inset a pixel carries the fill. Both wear the clip.
+at the cut.
+
+There are two answers and the second is usually the better one. **Be the line**:
+the element is the border colour and one child inset a pixel carries the fill,
+both wearing the clip — the plate contract below, at whatever size. Or **drop
+the line** and let the fill say it, which is what a chamfered *control* should
+generally do: a 1px hairline is a fragile thing to hang on a 45° edge, and a
+lighter background is the idiom the tabs and the rows already use for "chosen".
 
 `.plate` draws its hairline border by being the border colour with **exactly
 one child** inset a pixel to carry the fill — so `.plate > *` styles every
