@@ -624,7 +624,7 @@ onMounted(() => {
   font-weight: 600;
   color: var(--vellum-dim);
   text-align: left;
-  clip-path: polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px);
+  clip-path: var(--plate-clip);
 }
 
 .menu .item:hover:not(:disabled) {

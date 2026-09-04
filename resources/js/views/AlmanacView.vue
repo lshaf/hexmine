@@ -1468,7 +1468,7 @@ function nature(item: ItemDef): string {
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  clip-path: polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px);
+  clip-path: var(--plate-clip);
 }
 
 .modes button:hover {
@@ -1504,7 +1504,7 @@ function nature(item: ItemDef): string {
   border: 1px solid var(--line);
   background: var(--ink-panel);
   color: #7b8580;
-  clip-path: polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px);
+  clip-path: var(--plate-clip);
 }
 
 .search:focus-within {
@@ -1635,14 +1635,7 @@ section + section {
   padding: 11px 12px 10px;
   background: var(--ink-panel);
   border: 1px solid var(--line);
-  clip-path: polygon(
-    10px 0,
-    100% 0,
-    100% calc(100% - 10px),
-    calc(100% - 10px) 100%,
-    0 100%,
-    0 10px
-  );
+  clip-path: var(--plate-clip);
 }
 
 .head {

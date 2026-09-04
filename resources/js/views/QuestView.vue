@@ -529,7 +529,7 @@ const earned = computed(() => completed.value.reduce((n, r) => n + r.gold, 0))
   color: var(--vellum-dim);
   background: rgba(0, 0, 0, 0.28);
   border: 1px solid transparent;
-  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+  clip-path: var(--plate-clip);
 }
 
 .tab.on {

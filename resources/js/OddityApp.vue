@@ -108,7 +108,7 @@ import { ACTION_PATHS } from '@/icons/actions'
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  clip-path: polygon(5px 0, 100% 0, 100% calc(100% - 5px), calc(100% - 5px) 100%, 0 100%, 0 5px);
+  clip-path: var(--plate-clip);
 }
 
 .strip p {
@@ -134,7 +134,7 @@ import { ACTION_PATHS } from '@/icons/actions'
   font-size: 11.5px;
   font-weight: 600;
   text-decoration: none;
-  clip-path: polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px);
+  clip-path: var(--plate-clip);
 }
 
 .back:hover {

@@ -1209,7 +1209,7 @@ async function learn(): Promise<void> {
   font-size: 11.5px;
   font-weight: 600;
   cursor: pointer;
-  clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
+  clip-path: var(--plate-clip);
   transition: background 0.12s ease, color 0.12s ease;
 }
 

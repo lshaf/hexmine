@@ -70,15 +70,28 @@
 
   /* Flat-top hexagon: points left and right, flat edges top and bottom. */
   --hex-clip: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
-  /* Panels are chamfered on two opposing corners -- cut from the same stone,
-     but readable at any aspect ratio, which a stretched hexagon is not. */
+  /*
+   * §13 -- the chamfer, cut on ALL FOUR corners at one standard radius.
+   *
+   * It cut two opposing corners and left two square, which read as a stone set
+   * down at an angle: the shape had a DIRECTION, and a leading corner. Cutting
+   * all four takes the direction away and leaves an octagon that reads the same
+   * whichever corner you meet first -- which is what the small things needed,
+   * because a diagonal across a 22px chip is too big a gesture to land.
+   *
+   * ONE radius, everywhere, is the whole point of it being standard: the cut
+   * lived in this token AND in seventeen hand-written polygons at five
+   * different radii, so a shape the section claims has one rule had eighteen.
+   */
   --plate-clip: polygon(
-    16px 0,
-    100% 0,
-    100% calc(100% - 16px),
-    calc(100% - 16px) 100%,
-    0 100%,
-    0 16px
+    8px 0,
+    calc(100% - 8px) 0,
+    100% 8px,
+    100% calc(100% - 8px),
+    calc(100% - 8px) 100%,
+    8px 100%,
+    0 calc(100% - 8px),
+    0 8px
   );
 }
 

@@ -1269,7 +1269,7 @@ async function mend(item: OwnedItem): Promise<void> {
   color: var(--vellum-dim);
   background: rgba(0, 0, 0, 0.28);
   border: 1px solid transparent;
-  clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
+  clip-path: var(--plate-clip);
 }
 
 .chip-btn:hover {

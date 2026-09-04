@@ -358,7 +358,7 @@ const slateReady = computed(() => slate.value.filter((l) => l.ready).length)
   color: var(--vellum-dim);
   background: rgba(0, 0, 0, 0.28);
   border: 1px solid transparent;
-  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+  clip-path: var(--plate-clip);
   cursor: pointer;
 }
 

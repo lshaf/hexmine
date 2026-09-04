@@ -648,7 +648,7 @@ onMounted(load)
   color: var(--vellum-dim);
   font-size: 11.5px;
   text-decoration: none;
-  clip-path: polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px);
+  clip-path: var(--plate-clip);
 }
 
 .back:hover {
@@ -731,7 +731,7 @@ onMounted(load)
   gap: 11px;
   padding: 7px 10px;
   background: rgba(0, 0, 0, 0.28);
-  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+  clip-path: var(--plate-clip);
   cursor: pointer;
 }
 
@@ -916,7 +916,7 @@ input {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   font-size: 12px;
-  clip-path: polygon(5px 0, 100% 0, 100% calc(100% - 5px), calc(100% - 5px) 100%, 0 100%, 0 5px);
+  clip-path: var(--plate-clip);
 }
 
 input:focus {
@@ -937,7 +937,7 @@ input:focus {
   gap: 9px;
   padding: 6px 9px;
   background: rgba(0, 0, 0, 0.28);
-  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+  clip-path: var(--plate-clip);
   color: var(--vellum);
   text-align: left;
 }
@@ -977,7 +977,7 @@ input:focus {
   gap: 10px;
   padding: 9px 11px;
   background: rgba(0, 0, 0, 0.28);
-  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+  clip-path: var(--plate-clip);
 }
 
 .verdict strong {

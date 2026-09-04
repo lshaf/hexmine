@@ -4054,10 +4054,26 @@ nothing else.
 
 **One shape, and two ways of cutting it.** A hexagon is what the map tiles
 with, what an icon is framed in and what a cooldown comes round; a **chamfer** —
-two opposing corners cut off the same stone — is what a panel, a button and a
-chip get, because a stretched hexagon is unreadable at a panel's aspect ratio
-and a chamfer is not. Nothing in the interface is round. If a new element wants
-a circle, it wants one of these two instead.
+**all four corners cut off the same stone, at one standard radius** — is what a
+panel, a button and a chip get, because a stretched hexagon is unreadable at a
+panel's aspect ratio and a chamfer is not. Nothing in the interface is round. If
+a new element wants a circle, it wants one of these two instead.
+
+**One radius, and it is 8px, and it lives in `--plate-clip` and nowhere else.**
+That is the whole of the rule: a panel seven hundred pixels wide and a chip
+twenty-two tall wear the same cut, so the shape is a property of the interface
+rather than of each thing in it.
+
+*(It cut two opposing corners and left two square, at sixteen pixels — and only
+in the token. Seventeen hand-written `polygon()`s carried the same idea at five
+different radii, so a shape this section claims has one rule had eighteen. Two
+corners also gave the shape a DIRECTION and a leading corner, which is a lot of
+gesture to spend on a 22px chip: a diagonal across one is most of the chip. Four
+corners read the same whichever you meet first.*
+
+*What it cost is the panels. At sixteen pixels a plate had a bold diagonal you
+could recognise across the screen; at eight it has a small bevel. One radius
+cannot be both, and the small things are the ones there are more of.)*
 
 **A `border` under a `clip-path` does not follow the cut.** The border is
 painted on the box and the clip then removes the corner along with it, so a
