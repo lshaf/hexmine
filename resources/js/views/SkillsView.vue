@@ -740,64 +740,75 @@ async function learn(): Promise<void> {
         </ul>
       </section>
 
-      <!-- What you tapped: what you have, what comes next, and the ladder. -->
+      <!--
+        §7.4 -- what you tapped, in as few lines as it can be said.
+
+        It was a heading, the description again, three labelled blocks stacked,
+        a ladder wrapping to three rows and a footer -- a dozen lines to answer
+        two questions. The description is on the row directly above it, so it is
+        gone; the three facts are one line; and the ladder scrolls rather than
+        wrapping, which is the only part whose height was ever unbounded.
+      -->
       <div v-if="chosen" class="inset detail">
-        <div class="row-between">
+        <!--
+          It has to say what it is about: the panel puts this at the foot of the
+          list rather than under the row, so with the name gone the facts were
+          about whichever skill you last tapped and no longer had on screen.
+          One line, name and rank, rather than the heading and the description
+          again -- the description is on the row itself.
+        -->
+        <div class="row-between title">
           <strong class="name">{{ chosen.def.name }}</strong>
-          <span class="label tier">Rank {{ chosen.rank }} of {{ chosen.ranks }}</span>
+          <span class="label" v-if="chosen.ranks > 1">rank {{ chosen.rank }}/{{ chosen.ranks }}</span>
         </div>
-        <p class="does">{{ describe(chosen) }}</p>
 
-        <!-- §7.4 -- the three questions, in the order they are asked. -->
-        <div class="answers">
-          <div class="answer now">
-            <span class="label">You have now</span>
-            <span v-if="chosen.def.kind === 'battleSkill'" class="figure">
+        <div class="facts">
+          <!-- §13.3 -- sap is what is worth crossing the screen for, so it is
+               for something you HAVE. Nothing held reads plain. -->
+          <span class="fact now" :class="{ empty: chosen.rank === 0 }">
+            <span class="key">now</span>
+            <template v-if="chosen.def.kind === 'battleSkill'">
               {{ chosen.rank > 0 ? 'Learned' : 'Not learned' }}
-            </span>
-            <span v-else class="figure">{{ heldPhrase(chosen) }}</span>
-            <span v-if="chosen.rank > 0 && chosen.ranks > 1" class="tiny muted">
-              from {{ chosen.rank }} rank{{ chosen.rank === 1 ? '' : 's' }}
-            </span>
-          </div>
+            </template>
+            <template v-else>{{ heldPhrase(chosen) }}</template>
+          </span>
 
-          <div v-if="!chosen.maxed" class="answer next">
-            <span class="label">Next rank</span>
-            <span class="figure">
-              <template v-if="chosen.def.kind === 'battleSkill'">Learn it</template>
-              <template v-else>
-                {{ effectPhrase(rankEffect(chosen, chosen.rank + 1)!, scopedName) }}
-              </template>
-            </span>
-            <span class="tiny muted">at {{ jobDef?.name }} level {{ chosen.nextLevel }}</span>
-          </div>
-          <div v-else class="answer done">
-            <span class="label">Next rank</span>
-            <span class="figure">Maxed</span>
-            <span class="tiny muted">every rank taken</span>
-          </div>
+          <span v-if="!chosen.maxed" class="fact next">
+            <span class="key">next</span>
+            <template v-if="chosen.def.kind === 'battleSkill'">
+              <span class="at">at {{ jobDef?.name }} {{ chosen.nextLevel }}</span>
+            </template>
+            <template v-else>
+              {{ effectValue(rankEffect(chosen, chosen.rank + 1)!) }}
+              <span class="at">at {{ jobDef?.name }} {{ chosen.nextLevel }}</span>
+            </template>
+          </span>
+          <span v-else class="fact done"><span class="key">next</span>Maxed</span>
 
-          <!-- §7.4.3 -- and where the kind itself stops, which is what keeps a
+          <!-- §7.4.3 -- where the kind itself stops, which is what keeps a
                maxed specialist from switching off a §11 sink. -->
-          <div v-if="effectTotal(chosen)" class="answer cap">
-            <span class="label">Kind stops at</span>
-            <span class="figure" :class="{ capped: effectTotal(chosen)!.now === effectTotal(chosen)!.cap }">
-              {{ effectTotal(chosen)!.now }} of {{ effectTotal(chosen)!.cap }}
+          <span v-if="effectTotal(chosen)" class="fact cap">
+            <span class="key">cap</span>
+            <span :class="{ capped: effectTotal(chosen)!.now === effectTotal(chosen)!.cap }">
+              {{ effectTotal(chosen)!.now }}/{{ effectTotal(chosen)!.cap }}
             </span>
-          </div>
+          </span>
         </div>
 
-        <!-- Every rank at once, so "when can I take it" is answered for all of
-             them rather than one at a time. -->
+        <!--
+          Every rank at once, so "when can I take it" is answered for all of
+          them rather than one at a time -- on ONE line that scrolls, because
+          thirteen ranks wrapping was most of the height of the panel.
+        -->
         <ol v-if="chosen.ranks > 1" class="ladder">
           <li
             v-for="i in chosen.ranks"
             :key="i"
             :class="{ got: i <= chosen.rank, next: i === chosen.rank + 1 }"
           >
-            <span class="lv">lv {{ chosen.def.ranks[i - 1]!.level }}</span>
+            <span class="lv">{{ chosen.def.ranks[i - 1]!.level }}</span>
             <!-- What you would HAVE at this rank, not what the rank adds:
-                 "+2, +2, +2" down a column says nothing about where it ends. -->
+                 "+2, +2, +2" along a row says nothing about where it ends. -->
             <span class="run">{{ totalAt(chosen, i) }}</span>
           </li>
         </ol>
@@ -960,113 +971,108 @@ async function learn(): Promise<void> {
   box-shadow: inset 0 0 0 1px var(--vellum-dim);
 }
 
-/* ---------------------------------------------------------------- the answers */
-
-.answers {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  background: var(--line);
-  margin: 10px 0 0;
+.detail .title {
+  margin-bottom: 6px;
 }
 
-.answer {
-  background: var(--ink-panel);
-  padding: 6px 9px;
-  border-left: 2px solid var(--line);
-  display: flex;
-  align-items: baseline;
-  gap: 7px;
-  flex-wrap: wrap;
+.detail .name {
+  font-size: 13px;
+  color: var(--vellum);
 }
+
+/* ------------------------------------------------------------- the facts */
 
 /*
- * Wide enough for "You have now" on one line. At 82px it wrapped, which put a
- * two-line label beside a one-line figure and threw the row's baseline out.
+ * §7.4 -- three facts on one line, because they are read together: what you
+ * have, what one more point buys, and where the kind stops. They were three
+ * labelled blocks stacked, which is three lines and two borders to say what
+ * fits in one.
  */
-.answer .label {
-  flex: 0 0 96px;
-  white-space: nowrap;
+.facts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 14px;
+  padding: 7px 10px;
+  background: var(--ink-panel);
+  clip-path: var(--plate-clip);
 }
 
-.answer .figure {
+.fact {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
   font-size: 13px;
   font-variant-numeric: tabular-nums;
   color: var(--vellum);
+  white-space: nowrap;
+}
+
+.fact .key {
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #6d7770;
 }
 
 /* §13.3 -- sap for what you already hold, copper for the work still ahead. */
-.answer.now {
-  border-left-color: var(--sap);
+.fact.now { color: var(--sap); }
+.fact.now.empty { color: #6d7770; }
+.fact.next { color: var(--copper); }
+.fact.done { color: var(--sap); }
+.fact.cap { color: var(--vellum-dim); }
+
+.fact .at {
+  font-size: 11px;
+  color: var(--vellum-dim);
 }
 
-.answer.now .figure {
-  color: var(--sap);
-}
-
-.answer.next {
-  border-left-color: var(--copper);
-}
-
-.answer.next .figure {
-  color: var(--copper);
-}
-
-.answer .figure.capped {
-  color: var(--sap);
-}
+.fact .capped { color: var(--sap); }
 
 /* ----------------------------------------------------------------- the ladder */
 
+/*
+ * §13.2 -- one line, and it scrolls. Thirteen ranks wrapping to three rows was
+ * most of the height of the panel, and a ladder is scanned along rather than
+ * read down.
+ */
 .ladder {
   list-style: none;
-  margin: 11px 0 0;
-  padding: 0;
+  margin: 6px 0 0;
+  padding: 0 0 3px;
   display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
+  gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: thin;
 }
 
-/*
- * §13 -- a chamfer cuts two opposing corners off the stone, so the corners are
- * exactly where a chip has least room. At 3px/7px the level and the total sat
- * against the cut edge; the padding has to clear the chamfer, not just the
- * bounding box.
- */
 .ladder li {
   display: flex;
   align-items: baseline;
-  gap: 6px;
-  padding: 5px 11px;
-  background: var(--ink-raised);
+  gap: 5px;
+  flex: 0 0 auto;
+  padding: 4px 9px;
+  background: var(--ink-panel);
   clip-path: var(--plate-clip);
   color: #6d7770;
   font-size: 11px;
-  line-height: 1.4;
   font-variant-numeric: tabular-nums;
 }
 
-.ladder li.got {
-  color: var(--vellum);
-}
-
-.ladder li.got .gain {
-  color: var(--sap);
-}
+.ladder li.got { color: var(--vellum); }
+.ladder li.got .run { color: var(--sap); }
 
 .ladder li.next {
   color: var(--vellum);
   background: var(--line);
 }
 
-.ladder li.next .lv {
-  color: var(--copper);
-}
+.ladder li.next .lv { color: var(--copper); }
 
+/* A bare number reads as a level here, because every chip carries one. */
 .ladder .lv {
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
   font-size: 10px;
+  opacity: 0.75;
 }
 
 .page {

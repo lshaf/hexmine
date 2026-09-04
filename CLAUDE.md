@@ -1291,10 +1291,20 @@ claim can hide.
 count, and a rank is a fact about the ladder: what a player wants off a row is
 what the row is paying them.
 
-Tapping one answers three questions in the order they are asked: what you have
-now (*+20 straps, from 10 ranks*), when the next one comes (*+2 more at Explorer
-level 24*), and the whole ladder underneath. A fourth row says where the **kind**
-stops (§7.4.3), because a cap nobody is shown reads as a bug the day it binds.
+Tapping one answers three questions **on one line** — *now +20 straps · next +2
+at Explorer 24 · cap 20/30* — with the whole ladder under it. The cap is
+§7.4.3's, and it is shown because a cap nobody is shown reads as a bug the day
+it binds.
+
+**The detail is four lines, and it was twelve.** A heading, the description
+again, three labelled blocks stacked, a ladder wrapping to three rows and a
+footer, to answer two questions. The description is on the row directly above
+it, so it is gone; the facts are one line; and **the ladder scrolls rather than
+wrapping**, which is the only part whose height was ever unbounded — thirteen
+ranks wrapping was most of the panel. What the heading keeps is the **name**,
+because the detail sits at the foot of the list rather than under the row: with
+it gone the facts were about whichever skill you last tapped and no longer had
+on screen.
 
 **The ladder prints running totals, not each rank's own gain.** "+2, +2, +2"
 down a column says nothing about where you end up, and where you end up is the
