@@ -765,7 +765,7 @@ async function learn(): Promise<void> {
         <div class="facts">
           <!-- §13.3 -- sap is what is worth crossing the screen for, so it is
                for something you HAVE. Nothing held reads plain. -->
-          <span class="fact now" :class="{ empty: chosen.rank === 0 }">
+          <span class="fact now" :class="{ none: chosen.rank === 0 }">
             <span class="key">now</span>
             <template v-if="chosen.def.kind === 'battleSkill'">
               {{ chosen.rank > 0 ? 'Learned' : 'Not learned' }}
@@ -1017,7 +1017,9 @@ async function learn(): Promise<void> {
 
 /* §13.3 -- sap for what you already hold, copper for the work still ahead. */
 .fact.now { color: var(--sap); }
-.fact.now.empty { color: #6d7770; }
+/* `none`, not `empty`: .empty is the panel's own placeholder and carries
+   22px of padding, which a fact inherited whole. */
+.fact.now.none { color: #6d7770; }
 .fact.next { color: var(--copper); }
 .fact.done { color: var(--sap); }
 .fact.cap { color: var(--vellum-dim); }
