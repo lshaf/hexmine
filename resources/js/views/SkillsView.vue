@@ -28,7 +28,7 @@
  */
 import { computed, onMounted, ref, watch } from 'vue'
 import { useGame } from '@/stores/game'
-import { ACTION_PATHS } from '@/icons/actions'
+import { ACTION_PATHS, JOB_PATHS } from '@/icons/actions'
 import { MATERIAL_PALETTE } from '@/theme/palette'
 import { formatPercent, formatStat } from '@/game/formulas'
 import { STAT_LABEL } from '@/game/catalog'
@@ -40,6 +40,17 @@ const game = useGame()
 /** Woodcutting first: it is the line the opening arc puts in your hands. */
 const job = ref<string>('woodcutting')
 
+/**
+ * §7.4 -- which band of jobs is open.
+ *
+ * The four used to stack; they are tabs now, so one is showing at a time and
+ * the picker is two rows instead of eight. It follows the selected job rather
+ * than being independent, because picking a job in another band and finding the
+ * tab still on this one would be the two disagreeing about what you are looking
+ * at.
+ */
+const band = ref<string>('gathering')
+
 onMounted(() => {
   void game.loadTree()
   void game.loadBattleSkills()
@@ -47,8 +58,13 @@ onMounted(() => {
 
 
 /** A different job is a different sheet; keep nothing selected across it. */
-watch(job, () => {
+watch(job, (key) => {
   picked.value = null
+
+  // Follow the job into its own band, so the tab and the sheet never disagree
+  // about what is being looked at.
+  const kind = tree.value?.jobs[key]?.kind
+  if (kind) band.value = bandOf(kind)
 })
 
 const tree = computed(() => game.tree)
@@ -284,6 +300,24 @@ function iconFor(row: Row): string {
   return effect !== null && effect.kind === 'pair' && effect.stat === 'defense'
     ? 'effectDefense'
     : 'effectAttack'
+}
+
+/** The jobs on the open tab. */
+const shownJobs = computed<string[]>(
+  () => groups.value.find((g) => g.kind === band.value)?.keys ?? [],
+)
+
+/**
+ * §7.5 -- free ranks waiting anywhere behind a tab.
+ *
+ * A closed tab is the one place a claim can hide, and the whole reason the
+ * count is coloured is that a wayfaring rank costs nothing and is worth being
+ * told about.
+ */
+function waitingIn(kind: string): number {
+  const keys = groups.value.find((g) => g.kind === kind)?.keys ?? []
+
+  return keys.reduce((n, key) => n + claimable(key), 0)
 }
 
 /** Ranks held in a job, for the picker's tally. */
@@ -558,32 +592,57 @@ async function learn(): Promise<void> {
         </div>
       </div>
 
-      <!-- Eleven jobs in three bands. Count on each so an untouched tree is
-           obvious before you open it. -->
-      <div v-for="group in groups" :key="group.kind" class="band-of-jobs">
-        <span class="label kind">{{ group.label }}</span>
-        <div class="trades">
-          <button
-            v-for="key in group.keys"
-            :key="key"
-            type="button"
-            class="trade"
-            :class="{ on: job === key }"
-            :style="{ '--accent': MATERIAL_PALETTE[(tree.jobs[key]!.palette) as keyof typeof MATERIAL_PALETTE] }"
-            @click="job = key"
-          >
-            {{ tree.jobs[key]!.name }}
-            <!--
-              §13.3 -- sap when something free is waiting on that tree, the same
-              green the quest ledger lights with. A wayfaring skill costs no
-              point, so there is no reason not to take it and every reason to
-              be told it is there; the count is otherwise what you have learned.
-            -->
-            <span class="tally" :class="{ ready: claimable(key) > 0 }">{{
-              claimable(key) > 0 ? claimable(key) : learnedIn(key)
-            }}</span>
-          </button>
-        </div>
+      <!--
+        §7.4 -- a band is a tab and a job is a mark.
+        
+        It was four labelled bands stacked, seventeen text buttons between them,
+        which is most of a phone spent saying what you could be looking at
+        rather than showing it. Two rows now: which kind of work, then which job.
+      -->
+      <div class="bands" role="tablist">
+        <button
+          v-for="group in groups"
+          :key="group.kind"
+          type="button"
+          role="tab"
+          class="band-tab"
+          :class="{ on: band === group.kind }"
+          :aria-selected="band === group.kind"
+          @click="band = group.kind"
+        >
+          {{ group.label }}
+          <!-- §13.3 -- sap when something free is waiting behind this tab,
+               because a closed tab is the one place a claim can hide. -->
+          <span v-if="waitingIn(group.kind) > 0" class="dot" aria-hidden="true" />
+        </button>
+      </div>
+
+      <div class="trades">
+        <button
+          v-for="key in shownJobs"
+          :key="key"
+          type="button"
+          class="trade"
+          :class="{ on: job === key }"
+          :style="{ '--accent': MATERIAL_PALETTE[(tree.jobs[key]!.palette) as keyof typeof MATERIAL_PALETTE] }"
+          :title="tree.jobs[key]!.name"
+          @click="job = key"
+        >
+          <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
+               stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path :d="JOB_PATHS[key] ?? ACTION_PATHS.skills" />
+          </svg>
+          <span class="trade-name">{{ tree.jobs[key]!.name }}</span>
+          <!--
+            §13.3 -- sap when something free is waiting on that job, the same
+            green the quest ledger lights with. A wayfaring rank costs no point,
+            so there is no reason not to take it and every reason to be told it
+            is there; the count is otherwise what you have learned.
+          -->
+          <span class="tally" :class="{ ready: claimable(key) > 0 }">{{
+            claimable(key) > 0 ? claimable(key) : learnedIn(key)
+          }}</span>
+        </button>
       </div>
 
       <section v-if="jobDef" class="sheet" :style="{ '--accent': accent }">
@@ -1037,15 +1096,56 @@ async function learn(): Promise<void> {
 
 /* ------------------------------------------------------------------ trades */
 
-.band-of-jobs + .band-of-jobs {
-  margin-top: 9px;
+/* -------------------------------------------------------- the band tabs */
+
+/*
+ * §7.4 -- four bands, one open. They stacked, which put four headings and
+ * seventeen buttons above every sheet; a tab row is the same choice in one
+ * line, and it is the choice you make once rather than the one you re-read
+ * every time the panel opens.
+ */
+.bands {
+  display: flex;
+  gap: 3px;
+  margin-bottom: 7px;
 }
 
-.kind {
-  display: block;
-  margin-bottom: 4px;
+.band-tab {
+  position: relative;
+  flex: 1;
+  padding: 7px 4px;
+  border: 0;
+  background: var(--ink-panel);
   color: #6d7770;
+  font-family: inherit;
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  clip-path: var(--plate-clip);
+  transition: color 0.12s ease, background 0.12s ease;
 }
+
+.band-tab:hover {
+  color: var(--vellum-dim);
+}
+
+.band-tab.on {
+  background: var(--line);
+  color: var(--vellum);
+}
+
+/* §13.3 -- something free is waiting behind a tab you cannot see into. */
+.band-tab .dot {
+  position: absolute;
+  top: 5px;
+  right: 7px;
+  width: 5px;
+  height: 5px;
+  background: var(--sap);
+  clip-path: var(--hex-clip);
+}
+
+/* ------------------------------------------------------------ the jobs */
 
 .trades {
   display: grid;
@@ -1054,12 +1154,16 @@ async function learn(): Promise<void> {
   margin-bottom: 0;
 }
 
+/*
+ * A mark and a name. The mark is the implement the job is about (JOB_PATHS),
+ * which is what makes a row of six readable at a glance rather than six words
+ * that all start with a capital letter.
+ */
 .trade {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 7px 6px;
+  gap: 7px;
+  padding: 8px 9px;
   border: 1px solid var(--line);
   background: var(--ink-panel);
   color: var(--vellum-dim);
@@ -1068,6 +1172,21 @@ async function learn(): Promise<void> {
   font-weight: 600;
   cursor: pointer;
   clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
+}
+
+.trade svg {
+  flex: 0 0 auto;
+  color: #6d7770;
+  transition: color 0.12s ease;
+}
+
+.trade-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
 }
 
 .trade:hover {
@@ -1080,7 +1199,12 @@ async function learn(): Promise<void> {
   color: var(--vellum);
 }
 
+.trade.on svg {
+  color: var(--accent);
+}
+
 .tally {
+  flex: 0 0 auto;
   font-size: 10px;
   font-weight: 700;
   color: #7b8580;

@@ -1278,6 +1278,14 @@ counter to drift from.
 suggestion and let one character be every specialist in turn, which is exactly
 what §7.2's cap exists to prevent.
 
+**The picker is a tab row and a mark.** Four bands used to stack — four
+headings and seventeen text buttons above every sheet, which is most of a phone
+spent saying what you could be looking at rather than showing it. A band is a
+tab now and a job is its own implement (an axe, a saw, a crucible, a shield),
+so the choice is two rows instead of eight. A tab carries a sap pip when
+something free is waiting behind it, because a closed tab is the one place a
+claim can hide.
+
 **On screen it is a list, and every row leads with what it is WORTH to you** —
 *+20 straps*, *+4 attack* — with the rank count under it, quiet. It led with the
 count, and a rank is a fact about the ladder: what a player wants off a row is

@@ -185,3 +185,47 @@ export const SCOPE_PATHS: Record<string, string> = {
   /* Everywhere: the hex itself, because that is the whole of the ground. */
   global: 'M8.5 4h7L19.5 12 15.5 20h-7L4.5 12Z',
 }
+
+/**
+ * §7.4 -- one glyph per job, drawn as the implement the job is about.
+ *
+ * The picker was seventeen text buttons in four stacked bands, which is most of
+ * a phone screen spent saying what you could be looking at rather than showing
+ * it. A band is a tab now and a job is a mark, so the whole thing is two rows.
+ *
+ * The five gathering lines reuse SCOPE_PATHS, because those already ARE the
+ * five tools (§8.0) and a second drawing of an axe would be a second axe. The
+ * three craft jobs and the three battle families borrow the mark their own work
+ * already carries -- an anvil, a coat, a flask; a blade, a shield, a rune --
+ * and the five processing benches are the only ones that needed drawing, since
+ * a saw pit and a tannery had never been told apart anywhere.
+ */
+export const JOB_PATHS: Record<string, string> = {
+  explorer: ACTION_PATHS.travel!,
+
+  woodcutting: SCOPE_PATHS.woodcutting!,
+  mining: SCOPE_PATHS.mining!,
+  hunting: SCOPE_PATHS.hunting!,
+  quarrying: SCOPE_PATHS.quarrying!,
+  harvesting: SCOPE_PATHS.harvesting!,
+
+  /* A saw: the teeth are the whole tell, so the blade takes most of the grid. */
+  sawyer: 'M4 8.5h13l3 3-3 3H4Z M4 8.5v6 M7 14.5v2.5 M10 14.5v2.5 M13 14.5v2.5 M16 14.5v2.5',
+  /* A crucible pouring: a tilted vessel and the stream out of it. */
+  smelter: 'M6 6.5h9l-1.5 7.5h-6Z M15 8.5c2.5.4 3.5 2 3 3.5 M12 17.5v3 M8 20.5h8',
+  /* A hide stretched on a frame, which is the one thing a tannery looks like. */
+  tanner: 'M4.5 4.5h15v15h-15Z M12 7c3 0 4.5 2 4.5 5s-1.5 5-4.5 5-4.5-2-4.5-5 1.5-5 4.5-5Z',
+  /* A chisel to the stone: the blade at an angle, the block under it. */
+  mason: 'M17.5 3.5 20.5 6.5 12 15l-3-3Z M4 20.5h13 M4 17.5h5',
+  /* A loom: warp threads down, the shuttle across them. */
+  weaver: 'M5 4v16 M9.5 4v16 M14.5 4v16 M19 4v16 M3.5 12.5h17 M20.5 12.5l-2-2 M20.5 12.5l-2 2',
+
+  smith: ACTION_PATHS.repair!,
+  armorer: ACTION_PATHS.effectKitWear!,
+  alchemist: ACTION_PATHS.effectBrew!,
+
+  shieldbearer: ACTION_PATHS.effectDefense!,
+  swordhand: ACTION_PATHS.effectAttack!,
+  /* A focus: the rune cut on the head of a wand (§9.5.4's glass cannon). */
+  runecaster: 'M4 20.5 11 13.5 M15 4.5a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9Z M15 6.8v4.4 M13 9h4',
+}
