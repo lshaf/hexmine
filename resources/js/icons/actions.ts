@@ -59,6 +59,27 @@ export const ACTION_PATHS: Record<string, string> = {
   /* §7.4.3 -- one glyph per effect kind. What a node *does* is the only thing
      worth encoding on 180 nodes; drawing 180 pictures would say less. */
   effectStat: 'M4 18h16 M7 14.5l4-5 3 3 4.5-6.5',
+  /*
+   * §9.5.4 -- the two solid numbers, and they are two glyphs.
+   *
+   * A blade point-up for attack and a shield for defense. They shared the
+   * generic stat chart while `pair` was one skill; once it split, two rows a
+   * line apart carried the same drawing and the same word shape, which is the
+   * one place a list stops being scannable.
+   */
+  effectAttack: 'M12 3.5 15 10v7.5H9V10Z M12 17.5V21 M9.5 21h5',
+  /*
+   * §9.5.6 -- the two wear streams, and they are two things: what hit YOU comes
+   * off the worn kit, what you hit comes off the blade. They both used the
+   * generic durability shield, which put three shields in a row the moment
+   * Defense claimed that shape for itself.
+   *
+   * A coat for the kit -- shoulders and a hem, which nothing else here draws --
+   * and an edge over a whetstone for the blade.
+   */
+  effectKitWear: 'M8.5 4 5 6v5h2.5v9h9v-9H19V6l-3.5-2Z M8.5 4a3.5 3.5 0 0 0 7 0',
+  effectBladeWear: 'M15.5 3.5 18 6l-8.5 8.5L7 12Z M4 19.5h16 M6 17h12',
+  effectDefense: 'M12 3.5 5.5 6.5v6c0 4 2.8 6.7 6.5 8 3.7-1.3 6.5-4 6.5-8v-6Z',
   /* §5.1 -- knowing the ground: two leaves off a cut stem. */
   effectSeam: 'M4 20h16 M12 20v-7 M12 13c-3 0-4.5-1.8-4.5-4.4C10.3 8.6 12 10.5 12 13Z M12 13c3 0 4.5-1.8 4.5-4.4C13.7 8.6 12 10.5 12 13Z',
   /* §6.2 -- somebody standing at a bench, which is the whole of presence. */

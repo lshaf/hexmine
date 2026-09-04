@@ -1247,6 +1247,12 @@ structure, and it is enforced by arithmetic rather than by a rule.
 is one rank at Swordhand 5, and it sits in the same list as the levelled ones
 rather than in a system beside them.
 
+**Attack and defense are two skills, never one** (§9.5.4). They were a single
+`pair` skill, which made a Shieldbearer at rank 5 an unknown blend of the two —
+and those are the solid numbers a fight is decided by. Each battle job teaches
+both, each with its own ladder and its own glyph, and a rank of one moves only
+its own stat. There is a test.
+
 *(It was thirty discrete nodes a job, drawn as five strata of 6/8/8/6/2 gated at
 levels 1/5/12/20/28, each capstone naming two parents. The thirty were never
 thirty ideas: they were a handful of effects repeated under different names.
@@ -1272,12 +1278,20 @@ counter to drift from.
 suggestion and let one character be every specialist in turn, which is exactly
 what §7.2's cap exists to prevent.
 
-**On screen it is a list, and tapping one answers three questions in the order
-they are asked**: what you have now (*+16 straps, from 8 ranks*), when the next
-one comes (*+2 more at Explorer level 20*), and the whole ladder underneath — so
-*when can I take it* is answered for every rank at once rather than one at a
-time. A fourth row says where the **kind** stops (§7.4.3), because a cap nobody
-is shown reads as a bug the day it binds.
+**On screen it is a list, and every row leads with what it is WORTH to you** —
+*+20 straps*, *+4 attack* — with the rank count under it, quiet. It led with the
+count, and a rank is a fact about the ladder: what a player wants off a row is
+what the row is paying them.
+
+Tapping one answers three questions in the order they are asked: what you have
+now (*+20 straps, from 10 ranks*), when the next one comes (*+2 more at Explorer
+level 24*), and the whole ladder underneath. A fourth row says where the **kind**
+stops (§7.4.3), because a cap nobody is shown reads as a bug the day it binds.
+
+**The ladder prints running totals, not each rank's own gain.** "+2, +2, +2"
+down a column says nothing about where you end up, and where you end up is the
+question a ladder is read for — so it reads +2, +4, +6 … +30, and the rank you
+could take next is lit.
 
 The ranks draw as a **pip strip**, never a bar: an empty rank is the same shape
 as a full one, so what is left is seen rather than subtracted — which is §7.6's

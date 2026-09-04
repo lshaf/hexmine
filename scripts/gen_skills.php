@@ -49,7 +49,11 @@ $NAMES = [
     'optionTier' => ['Deep Draw', 'Chance a rolled line is drawn a grade deeper.'],
     'stackCap' => ['Cellar', 'A deeper shelf for each draft carried.'],
     'brewExtra' => ['Extra Flask', 'Chance of an extra flask off a brew.'],
-    'pair' => ['Guard and Edge', 'Solid points of attack and defense.'],
+    // §9.5.4 -- attack and defense are two solid numbers, never one. A single
+    // skill mixing both would make a Shieldbearer at rank 5 an unknown blend of
+    // the two, which is exactly the number a fight is decided by.
+    'pair:attack' => ['Attack', 'Solid points of attack, added to what your kit carries.'],
+    'pair:defense' => ['Defense', 'Solid points of defense, added to what your kit carries.'],
     'battleWear' => ['Kit Care', 'A share of what a fight takes off the worn kit, spared.'],
     'weaponWear' => ['Blade Care', 'The same for the blade, which pays its own stream.'],
     'skillPower' => ['Skill Power', 'More of the extra on your family\'s three skills.'],
@@ -86,14 +90,19 @@ foreach (Jobs::NODES as $key => $node) {
 
     // §9.5.9 -- a battle skill is its own one-rank entry: owning it IS the
     // effect, so three of them are three skills and never three ranks of one.
-    $skillKey = $kind === 'battleSkill' ? $key : "{$node['job']}.{$kind}";
+    //
+    // §9.5.4 -- and `pair` splits on its stat, because attack and defense are
+    // two solid numbers. One skill holding both would make a rank an unknown
+    // blend of the two.
+    $suffix = $kind === 'pair' ? "{$kind}:{$node['effect']['stat']}" : $kind;
+    $skillKey = $kind === 'battleSkill' ? $key : "{$node['job']}.{$suffix}";
 
     if ($kind === 'battleSkill') {
         $name = $node['name'];
         $blurb = $node['description'];
     } else {
-        [$name, $blurb] = $OVERRIDES[$kind][$node['job']] ?? $NAMES[$kind]
-            ?? throw new RuntimeException("no name for {$kind}");
+        [$name, $blurb] = $OVERRIDES[$suffix][$node['job']] ?? $NAMES[$suffix]
+            ?? throw new RuntimeException("no name for {$suffix}");
     }
 
     $skills[$skillKey] ??= [

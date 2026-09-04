@@ -69,6 +69,40 @@ final class SkillLadderTest extends TestCase
     }
 
     /**
+     * §9.5.4 -- attack and defense are two skills, never one.
+     *
+     * They were one `pair` skill, which made a Shieldbearer at rank 5 an unknown
+     * blend of the two -- and those are the numbers a fight is decided by. Each
+     * battle job carries both, and every rank of one moves only its own stat.
+     */
+    public function test_the_pair_is_two_skills_and_each_moves_one_stat(): void
+    {
+        $jobs = [];
+
+        foreach (Skills::ALL as $key => $skill) {
+            if ($skill['kind'] !== 'pair') {
+                continue;
+            }
+
+            $stat = str_ends_with($key, ':defense') ? 'defense' : 'attack';
+            $jobs[$skill['job']][$stat] = true;
+
+            foreach ($skill['ranks'] as $rank) {
+                $this->assertSame(
+                    $stat,
+                    Jobs::NODES[$rank['node']]['effect']['stat'],
+                    "{$key} holds a rank of the other stat",
+                );
+            }
+        }
+
+        $this->assertCount(3, $jobs, 'a battle job lost its pair');
+        foreach ($jobs as $job => $stats) {
+            $this->assertCount(2, $stats, "{$job} does not teach both halves of the pair");
+        }
+    }
+
+    /**
      * §9.5.9 -- a battle skill is one rank, because owning it IS the effect.
      *
      * Three of them are three entries and never three ranks of one: they are

@@ -190,6 +190,27 @@ function heldPhrase(row: Row): string {
   )
 }
 
+/**
+ * What you would hold at a given rank: every rank up to it, added up.
+ *
+ * The ladder used to print each rank's own gain, which is the wrong number to
+ * read down a column -- "+2, +2, +2" says nothing about where you end up, and
+ * where you end up is the question a ladder is read for.
+ */
+function totalAt(row: Row, rank: number): string {
+  const effect = rankEffect(row, 1)
+  if (effect === null || !('value' in effect)) return ''
+
+  const t = tree.value
+  let sum = 0
+  for (let i = 0; i < rank; i++) {
+    const node = t?.nodes[row.def.ranks[i]!.node]
+    if (node && 'value' in node.effect) sum += node.effect.value
+  }
+
+  return effectValue({ ...effect, value: sum } as NodeEffect)
+}
+
 /** The effect one rank carries, read off the node that carries it. */
 function rankEffect(row: Row, rank: number): NodeEffect | null {
   const entry = row.def.ranks[rank - 1]
@@ -248,6 +269,23 @@ function describe(row: Row): string {
     : row.def.description
 }
 
+/**
+ * The glyph for a skill, which is its kind except where the kind holds two.
+ *
+ * §9.5.4 -- a `pair` skill is attack or defense, and two rows a line apart
+ * carrying the same drawing is the one thing that stops a list being
+ * scannable.
+ */
+function iconFor(row: Row): string {
+  if (row.def.kind !== 'pair') return EFFECT_ICON[row.def.kind]
+
+  const effect = rankEffect(row, 1)
+
+  return effect !== null && effect.kind === 'pair' && effect.stat === 'defense'
+    ? 'effectDefense'
+    : 'effectAttack'
+}
+
 /** Ranks held in a job, for the picker's tally. */
 function learnedIn(jobKey: string): number {
   const t = tree.value
@@ -273,9 +311,13 @@ const EFFECT_ICON: Record<NodeEffect['kind'], string> = {
   battleSkill: 'battle',
   sight: 'effectSight',
   stat: 'effectStat',
+  // §9.5.4 -- attack and defense are two skills now, so they are two glyphs.
+  // The kind alone cannot tell them apart; iconFor() reads the stat.
   pair: 'effectStat',
-  battleWear: 'effectCraftDurability',
-  weaponWear: 'effectCraftDurability',
+  // §9.5.6 -- two streams, two marks. They shared the durability shield, which
+  // put three shields in a row once Defense took that shape (§9.5.4).
+  battleWear: 'effectKitWear',
+  weaponWear: 'effectBladeWear',
   toolWear: 'effectCraftDurability',
   bite: 'effectStat',
   skillPower: 'effectSkillPower',
@@ -598,7 +640,7 @@ async function learn(): Promise<void> {
                   <span class="face">
                     <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
                          stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                      <path :d="ACTION_PATHS[EFFECT_ICON[row.def.kind]]" />
+                      <path :d="ACTION_PATHS[iconFor(row)]" />
                     </svg>
                   </span>
                 </span>
@@ -610,9 +652,18 @@ async function learn(): Promise<void> {
               </span>
 
               <span class="right">
-                <!-- The one number a list of skills is scanned for. -->
-                <span class="rank" :class="{ maxed: row.maxed && row.rank > 0 }">
-                  {{ row.rank }}<span class="muted"> / {{ row.ranks }}</span>
+                <!--
+                  What you are GETTING, which is the number a list of skills is
+                  actually scanned for. It read "5 / 13" -- a rank is a fact
+                  about the ladder, and what a player wants off a row is what
+                  the row is worth to them. The count moves under it, quiet.
+                -->
+                <span class="gain" :class="{ none: row.rank === 0 }">
+                  <template v-if="row.def.kind === 'battleSkill'">
+                    {{ row.rank > 0 ? 'Learned' : '—' }}
+                  </template>
+                  <template v-else-if="row.rank > 0">{{ totalAt(row, row.rank) }}</template>
+                  <template v-else>—</template>
                 </span>
                 <span class="pips" aria-hidden="true">
                   <i
@@ -620,6 +671,9 @@ async function learn(): Promise<void> {
                     :key="i"
                     :class="{ got: i <= row.rank, next: i === row.rank + 1 && row.open }"
                   />
+                </span>
+                <span v-if="row.ranks > 1" class="count" :class="{ maxed: row.maxed }">
+                  {{ row.rank }}/{{ row.ranks }}
                 </span>
               </span>
             </button>
@@ -683,7 +737,9 @@ async function learn(): Promise<void> {
             :class="{ got: i <= chosen.rank, next: i === chosen.rank + 1 }"
           >
             <span class="lv">lv {{ chosen.def.ranks[i - 1]!.level }}</span>
-            <span class="gain">{{ effectValue(rankEffect(chosen, i)!) }}</span>
+            <!-- What you would HAVE at this rank, not what the rank adds:
+                 "+2, +2, +2" down a column says nothing about where it ends. -->
+            <span class="run">{{ totalAt(chosen, i) }}</span>
           </li>
         </ol>
 
@@ -722,9 +778,9 @@ async function learn(): Promise<void> {
 .skill {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 11px;
   width: 100%;
-  padding: 6px 10px 6px 6px;
+  padding: 9px 12px 9px 8px;
   clip-path: var(--plate-clip);
   background: var(--ink-raised);
   border: 0;
@@ -732,6 +788,11 @@ async function learn(): Promise<void> {
   font: inherit;
   text-align: left;
   cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.skill:hover {
+  background: #232d28;
 }
 
 .skill.on {
@@ -741,38 +802,66 @@ async function learn(): Promise<void> {
 .skill .body {
   display: flex;
   flex-direction: column;
+  gap: 2px;
   flex: 1;
   min-width: 0;
 }
 
 .skill .name {
   font-size: 13px;
+  line-height: 1.25;
   color: var(--vellum);
 }
 
 .skill .what {
   display: block;
+  line-height: 1.35;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+/*
+ * The right-hand column is one reading, top to bottom: what you have, how much
+ * of the ladder that is, and the count. Right-aligned so the figures line up
+ * down the list -- they are compared against each other, not against the names.
+ */
 .skill .right {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 3px;
+  justify-content: center;
+  gap: 4px;
   flex: 0 0 auto;
+  min-width: 84px;
+  /* A one-rank skill has no count under it, and a row that is a line shorter
+     than the ones around it breaks the column the figures are read down. */
+  min-height: 44px;
 }
 
-.rank {
-  font-size: 12px;
+.skill .gain {
+  font-size: 13px;
+  line-height: 1.2;
   font-variant-numeric: tabular-nums;
-  color: var(--vellum);
+  color: var(--sap);
+  white-space: nowrap;
+}
+
+/* Nothing held yet: an em dash rather than a zero, which would read as a
+   figure worth comparing. */
+.skill .gain.none {
+  color: #5c655f;
+}
+
+.count {
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+  color: #6d7770;
 }
 
 /* §13.3 -- sap for a thing finished, which is what a maxed skill is. */
-.rank.maxed {
+.count.maxed {
   color: var(--sap);
 }
 
@@ -787,9 +876,9 @@ async function learn(): Promise<void> {
 }
 
 .pips i {
-  width: 4px;
-  height: 8px;
-  background: var(--line);
+  width: 5px;
+  height: 7px;
+  background: #2b352f;
   display: block;
 }
 
