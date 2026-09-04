@@ -952,22 +952,29 @@ async function learn(): Promise<void> {
 
 .ladder {
   list-style: none;
-  margin: 9px 0 0;
+  margin: 11px 0 0;
   padding: 0;
   display: flex;
   flex-wrap: wrap;
-  gap: 3px;
+  gap: 5px;
 }
 
+/*
+ * §13 -- a chamfer cuts two opposing corners off the stone, so the corners are
+ * exactly where a chip has least room. At 3px/7px the level and the total sat
+ * against the cut edge; the padding has to clear the chamfer, not just the
+ * bounding box.
+ */
 .ladder li {
   display: flex;
   align-items: baseline;
-  gap: 5px;
-  padding: 3px 7px;
+  gap: 6px;
+  padding: 5px 11px;
   background: var(--ink-raised);
   clip-path: var(--plate-clip);
   color: #6d7770;
   font-size: 11px;
+  line-height: 1.4;
   font-variant-numeric: tabular-nums;
 }
 
