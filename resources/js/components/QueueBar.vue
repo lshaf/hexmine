@@ -52,9 +52,11 @@ const free = computed(() => props.slots.filter((s) => s.owner === null).length)
 <style scoped>
 .queue {
   padding: 9px 11px;
-  border-radius: var(--radius-sm);
+  /* §13 -- the standard cut, and no line: a border under a clip-path paints on
+     the box and the clip takes the corner with it. The darker fill separates
+     this from the panel on its own. */
+  clip-path: var(--plate-clip);
   background: var(--ink);
-  border: 1px solid var(--line);
 }
 
 .slots {
@@ -64,7 +66,7 @@ const free = computed(() => props.slots.filter((s) => s.owner === null).length)
 
 .slot {
   height: 8px;
-  border-radius: 3px;
+  /* §13 -- nothing is round, and this is smaller than the standard cut. */
   background: #0f1512;
   border: 1px solid var(--line);
 }

@@ -570,8 +570,10 @@ const emptyNote = computed(() => {
   justify-content: center;
   gap: 6px;
   padding: 9px 6px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--line);
+  /* §13 -- the standard cut, and no line: a border under a clip-path paints on
+     the box and the clip takes the corner with it. The darker fill separates
+     this from the panel on its own. */
+  clip-path: var(--plate-clip);
   background: var(--ink-panel);
   color: var(--vellum-dim);
   font-weight: 700;
@@ -643,8 +645,9 @@ const emptyNote = computed(() => {
 .recipe {
   position: relative;
   padding: 10px 12px 10px 14px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--line);
+  /* §13 -- the standard cut, and no line: a border under a clip-path paints on
+     the box and the clip takes the corner with it. The fill separates it. */
+  clip-path: var(--plate-clip);
   background: var(--ink-panel);
   overflow: hidden;
 }
@@ -736,9 +739,10 @@ const emptyNote = computed(() => {
   align-items: center;
   gap: 5px;
   padding: 4px 8px 4px 5px;
-  border-radius: var(--radius-sm);
+  /* §13 -- the standard cut, and no line: a border under a clip-path paints on
+     the box and the clip takes the corner with it. The fill separates it. */
+  clip-path: var(--plate-clip);
   background: var(--ink);
-  border: 1px solid var(--line);
 }
 
 .input.short {

@@ -698,7 +698,9 @@ onBeforeUnmount(() => {
 .dot {
   width: 7px;
   height: 7px;
-  border-radius: 50%;
+  /* §13 -- nothing in the interface is round, and a seven-pixel marker is too
+     small for the standard cut. It takes the shape the map itself is made of. */
+  clip-path: var(--hex-clip);
 }
 
 .dot.cap {

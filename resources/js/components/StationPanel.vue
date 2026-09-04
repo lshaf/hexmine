@@ -301,9 +301,11 @@ watch(() => props.settlement.id, () => { batches.value = 1 })
   align-items: center;
   gap: 10px;
   padding: 9px 11px;
-  border-radius: var(--radius-sm);
+  /* §13 -- the standard cut, and no line: a border under a clip-path paints on
+     the box and the clip takes the corner with it. The darker fill separates
+     this from the panel on its own. */
+  clip-path: var(--plate-clip);
   background: var(--ink);
-  border: 1px solid var(--line);
 }
 
 .presence.on {
@@ -316,9 +318,10 @@ watch(() => props.settlement.id, () => { batches.value = 1 })
   align-items: center;
   gap: 10px;
   padding: 8px 10px;
-  border-radius: var(--radius-sm);
+  /* §13 -- the standard cut, and no line: a border under a clip-path paints on
+     the box and the clip takes the corner with it. The fill separates it. */
+  clip-path: var(--plate-clip);
   background: var(--ink);
-  border: 1px solid var(--line);
 }
 
 .recipe + .recipe {
@@ -327,9 +330,10 @@ watch(() => props.settlement.id, () => { batches.value = 1 })
 
 .notice {
   padding: 7px 10px;
-  border-radius: var(--radius-sm);
+  /* §13 -- the standard cut, and no line: a border under a clip-path paints on
+     the box and the clip takes the corner with it. The fill separates it. */
+  clip-path: var(--plate-clip);
   background: var(--ink);
-  border: 1px solid var(--line);
   color: var(--vellum-dim);
   margin-bottom: 7px;
 }
@@ -350,8 +354,9 @@ watch(() => props.settlement.id, () => { batches.value = 1 })
 .stepper button {
   width: 26px;
   height: 26px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--line);
+  /* §13 -- the standard cut, and no line: a border under a clip-path paints on
+     the box and the clip takes the corner with it. The fill separates it. */
+  clip-path: var(--plate-clip);
   background: var(--ink);
   color: var(--vellum);
   font-size: 15px;

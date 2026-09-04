@@ -1181,7 +1181,7 @@ async function mend(item: OwnedItem): Promise<void> {
   line-height: 1.4;
   color: var(--vellum);
   background: rgba(8, 11, 10, 0.72);
-  border-radius: 3px;
+  /* §13 -- nothing is round, and this is smaller than the standard cut. */
   pointer-events: none;
 }
 

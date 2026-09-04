@@ -1735,7 +1735,7 @@ section + section {
 
 .pip.roll {
   padding: 1px 6px;
-  border-radius: var(--radius-sm);
+  /* §13 -- nothing is round, and this is smaller than the standard cut. */
   background: #1c2519;
   color: #b7d6a4;
 }
