@@ -26,6 +26,13 @@ Route::view('/oddity', 'oddity');
 Route::view('/battle', 'battle');
 
 /*
+| §7.4 -- the skill-tree proposals. Four candidate shapes for one screen, drawn
+| side by side so the choice is made by looking. A pitch like /oddity, not the
+| rules: nothing here is implemented, and the page says so at the top.
+*/
+Route::view('/skilltree', 'skilltree');
+
+/*
 | The whole client is one Vue SPA. Every non-API path returns the same shell so
 | the app owns its own routing; /api/* is handled by routes/api.php and never
 | reaches this catch-all.
