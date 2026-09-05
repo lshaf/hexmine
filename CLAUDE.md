@@ -598,13 +598,21 @@ Three consequences, all deliberate:
 
 1. **The live-state query is a disc of seven tiles** — the hex underfoot and
    its six neighbors — rather than the several hundred that reach-as-sight
-   scanned, and thirty-seven at the very most. Sight is the one number in the
+   scanned, and thirty-seven at the very most. **It is re-asked on a slow timer
+   while you are standing still**, because a pack somebody else fought, an
+   animal somebody else took and a hex somebody else worked out are the three
+   things the clock cannot derive — and a prospector who is not moving would
+   otherwise watch a stale disc until they did. Everything that *is* derivable
+   costs no request at all: the client knows when the soonest pack, animal,
+   pocket or regrowth in view stops being true, and rebuilds on that moment. Sight is the one number in the
    game no amount of play widens past `SIGHT_RADIUS + SKILL_SIGHT_CAP`, and
    that ceiling is a query budget rather than a balance one — cost goes as the
    square of the radius.
 2. **A journey costs no queries at all.** Sight closes to zero when the road
    starts and opens when it ends, so a walk of two hundred hexes and a walk of
-   one both cost exactly two requests.
+   one both cost exactly two requests. The timer above is off on the road for
+   that reason and not as an optimisation: there is nothing out there to
+   refresh, and this promise is the one it would break.
 3. **Costing a hex is bounded by the same disc.** The per-tile preview endpoint
    refuses anything unscouted — otherwise it would be the map query in a slower
    form: one tile per request, and nothing stopping a client from asking about

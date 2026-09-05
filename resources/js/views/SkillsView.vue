@@ -320,6 +320,20 @@ function waitingIn(kind: string): number {
   return keys.reduce((n, key) => n + claimable(key), 0)
 }
 
+/**
+ * §7.4.1 -- what is still owed before this job's next level.
+ *
+ * The figure a player actually wants off the bar: "how much further" rather
+ * than "how far along". Zero at the ceiling, where there is no next level to
+ * count toward.
+ */
+const toLevel = computed(() => {
+  const row = jobRow.value
+  if (row.level >= (tree.value?.jobMaxLevel ?? row.level)) return 0
+
+  return Math.max(0, row.xpToNext - row.xp)
+})
+
 /** Ranks held in a job, for the picker's tally. */
 function learnedIn(jobKey: string): number {
   const t = tree.value
@@ -667,7 +681,20 @@ async function learn(): Promise<void> {
             </span>
             <span class="tiny muted">{{ progress.owned }} of {{ progress.total }} learned</span>
           </div>
-          <div class="bar" :title="`${jobRow.xp} / ${jobRow.xpToNext} xp`">
+
+          <!--
+            §7.4.1 -- what the bar under it is measuring, said in figures.
+            
+            It was a `title` on the bar, which is a tooltip nobody opens on a
+            phone: the one question the bar is read for is how much further,
+            and a fill has no number in it.
+          -->
+          <div class="row-between xp">
+            <span class="tiny muted">{{ jobRow.xp }} / {{ jobRow.xpToNext }} xp</span>
+            <span v-if="toLevel > 0" class="tiny">{{ toLevel }} to go</span>
+            <span v-else class="tiny muted">maxed</span>
+          </div>
+          <div class="bar">
             <span :style="{ width: `${Math.min(100, (jobRow.xp / Math.max(1, jobRow.xpToNext)) * 100)}%` }" />
           </div>
           <!--
@@ -969,6 +996,11 @@ async function learn(): Promise<void> {
 .pips i.next {
   background: none;
   box-shadow: inset 0 0 0 1px var(--vellum-dim);
+}
+
+.xp {
+  margin-top: 4px;
+  margin-bottom: 3px;
 }
 
 .detail .title {

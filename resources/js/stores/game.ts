@@ -110,6 +110,16 @@ export const useGame = defineStore('game', () => {
   /** Bumped once a second purely to re-run countdown computeds. */
   const tick = ref(0)
 
+  /**
+   * §5.6 -- how often a standing prospector re-asks about the disc in sight.
+   *
+   * Generous on purpose. The things it is watching for are on two-, four- and
+   * nine-hour clocks (§5.1, §5.7, §9.5.1), so this is not a race -- it is the
+   * difference between finding out on your own and finding out because you
+   * happened to move.
+   */
+  const LIVE_POLL_MS = 30_000
+
   const now = computed(() => {
     void tick.value
     return Date.now() + clockOffset.value
@@ -161,6 +171,20 @@ export const useGame = defineStore('game', () => {
    */
   const tiles = shallowRef<Tile[]>([])
 
+  /**
+   * §5.6 -- the next moment anything in view stops being true.
+   *
+   * A pack's bucket ending, an animal's, a pocket closing, a worked-out hex
+   * regrowing: all of them are derived from `(col, row, now)` and the held
+   * mutations, so none of them needs a request -- what they need is for the
+   * tiles to be built again on the far side of the moment.
+   *
+   * Kept as one timestamp rather than a poll because it is exactly knowable:
+   * rebuilding on a timer would redraw several hundred tiles a second to catch
+   * something that happens twice an hour.
+   */
+  const nextTileChange = ref(Number.POSITIVE_INFINITY)
+
   function rebuildTiles(): void {
     const { col, row, w, h } = view.value
     const depleted = new Map(mutations.value.depleted.map(([c, r, at]) => [key(c, r), at]))
@@ -193,7 +217,26 @@ export const useGame = defineStore('game', () => {
       )
     }
     tiles.value = built
+
+    // The soonest of everything in view that is on a clock. Read off the tiles
+    // that were just built, so it can never disagree with what is drawn.
+    let soonest = Number.POSITIVE_INFINITY
+    for (const tile of built) {
+      for (const at of [tile.pack?.until, tile.hunt?.until, tile.pocketUntil, tile.regrowsAt]) {
+        if (at !== undefined && at > now.value && at < soonest) soonest = at
+      }
+    }
+    nextTileChange.value = soonest
   }
+
+  /*
+   * §5.6 -- and the moment arrives on the clock the rest of the app already
+   * runs on. Nothing here asks the server: what expired was derived in the
+   * first place, so re-deriving it is the whole of the update.
+   */
+  watch(now, (at) => {
+    if (at >= nextTileChange.value) rebuildTiles()
+  })
 
   /**
    * Move the camera. Local only -- tiles are generated, never fetched.
@@ -776,6 +819,28 @@ export const useGame = defineStore('game', () => {
     setInterval(() => {
       tick.value++
     }, 1000)
+
+    /*
+     * §5.6 -- and the half of the live state the clock cannot derive.
+     *
+     * A pack somebody else fought, an animal somebody else took, a hex somebody
+     * else worked out: those are the three things `cleared`, `hunted` and
+     * `depleted` carry, and none of them falls out of `(col, row, now)`. The
+     * map only asked on an edge -- arriving, setting off, finishing something
+     * -- so a prospector standing still watched a stale disc until they moved.
+     *
+     * NOT while traveling, and that is the load-bearing half: sight is zero on
+     * the road, so there is nothing out there to refresh, and §5.6's promise
+     * that "a journey costs no queries at all, however far it is" has to
+     * survive this. Nor while a request is already in flight.
+     *
+     * The disc is at most thirty-seven hexes and answers in one MGET, so the
+     * cost of this is two of those a minute for somebody stood still.
+     */
+    setInterval(() => {
+      if (busy.value || travel.value !== null || !booted.value) return
+      void refreshMutations()
+    }, LIVE_POLL_MS)
   }
 
   async function refreshState(): Promise<void> {
