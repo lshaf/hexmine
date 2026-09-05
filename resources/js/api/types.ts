@@ -560,6 +560,16 @@ export interface MapMutations {
   hunted: Array<[number, number]>
   /** §9.5.7 -- other people's corpses, inside sight like everything else here. */
   carriers: Carrier[]
+  /**
+   * §5.6 -- when to ask again, decided by the side that owns the clocks.
+   *
+   * The soonest moment anything in this disc stops being what it is on its own:
+   * a pack or animal bucket ending, a pocket closing, a worked-out seam coming
+   * back. Null when nothing in sight is on a clock, which is a real answer --
+   * there is then nothing to come back for until the character moves or does
+   * something, and both of those already refresh.
+   */
+  nextChangeAt: number | null
 }
 
 /**

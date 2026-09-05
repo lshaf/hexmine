@@ -1968,7 +1968,7 @@ class GameService
      * is which of them somebody has already fought. One MGET over the disc
      * answers that for every hex at once.
      *
-     * @return array{depleted:array<int,array{0:int,1:int,2:int}>,occupied:array<int,array{0:int,1:int,2:int}>,cleared:array<int,array{0:int,1:int}>,hunted:array<int,array{0:int,1:int}>}
+     * @return array{depleted:array<int,array{0:int,1:int,2:int}>,occupied:array<int,array{0:int,1:int,2:int}>,cleared:array<int,array{0:int,1:int}>,hunted:array<int,array{0:int,1:int}>,nextChangeAt:?int}
      */
     public function mapMutations(Character $character): array
     {
@@ -2002,6 +2002,11 @@ class GameService
             }
             [$col, $row] = array_map('intval', explode(',', $at));
             $depleted[] = [$col, $row, $state['regrowsAt']];
+
+            // §5.1 -- and a seam coming back is the fourth thing on a clock.
+            if ($state['regrowsAt'] < $nextChange) {
+                $nextChange = (int) $state['regrowsAt'];
+            }
         }
 
         // Two counts, because a hex is busy and shut for two different reasons.
@@ -2044,6 +2049,7 @@ class GameService
         // them the hash put a pack on this bucket.
         $packs = [];
         $hunts = [];
+        $nextChange = PHP_INT_MAX;
         for ($col = $minCol; $col <= $maxCol; $col++) {
             for ($row = $minRow; $row <= $maxRow; $row++) {
                 if (! $inSight($col, $row)) {
@@ -2051,6 +2057,21 @@ class GameService
                 }
 
                 $tile = WorldGen::generateTile($col, $row, $now);
+
+                // §5.6 -- when this hex next stops being what it is, on its
+                // own. Collected here because the disc is already being walked
+                // and every one of these is a fact the SERVER holds the clock
+                // for: a client guessing at it would be a second opinion about
+                // the same bucket.
+                foreach ([
+                    $tile['pack']['until'] ?? null,
+                    $tile['hunt']['until'] ?? null,
+                    $tile['pocketUntil'] ?? null,
+                ] as $at) {
+                    if ($at !== null && $at > $now && $at < $nextChange) {
+                        $nextChange = (int) $at;
+                    }
+                }
 
                 $pack = $tile['pack'] ?? null;
                 if ($pack !== null) {
@@ -2084,6 +2105,22 @@ class GameService
             // everything else here. Your own ride the player state instead:
             // they are yours and the fog does not apply to them.
             'carriers' => $this->carriersInSight($character),
+            /*
+             * §5.6 -- when to ask again, decided by the side that owns the
+             * clocks.
+             *
+             * The client used to re-ask on a fixed timer, which is a guess in
+             * both directions: too often for a two-hour bucket, and still late
+             * for one about to turn. Every one of these moments is exactly
+             * knowable here -- the pack and animal buckets, the pockets and
+             * the regrowths in this very disc -- so the answer carries the
+             * soonest of them and the client schedules one call for it.
+             *
+             * Null when nothing in sight is on a clock, which is a real answer:
+             * there is then nothing to come back for until the character moves
+             * or does something, and both of those already refresh.
+             */
+            'nextChangeAt' => $nextChange === PHP_INT_MAX ? null : $nextChange,
         ];
     }
 

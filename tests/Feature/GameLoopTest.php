@@ -4223,7 +4223,7 @@ final class GameLoopTest extends TestCase
         $empty = $this->game->mapMutations($this->character);
 
         $this->assertSame(
-            ['depleted', 'occupied', 'cleared', 'hunted', 'carriers'],
+            ['depleted', 'occupied', 'cleared', 'hunted', 'carriers', 'nextChangeAt'],
             array_keys($empty),
         );
         $this->assertSame([], $empty['depleted']);
@@ -4233,6 +4233,14 @@ final class GameLoopTest extends TestCase
         // §5.5 -- and nothing has been hunted, which is a separate subtraction
         // because a pack and an animal stand on one hex independently.
         $this->assertSame([], $empty['hunted']);
+
+        // §5.6 -- and the answer says when to come back, so the client needs no
+        // interval of its own. Null is a real answer: nothing in sight is on a
+        // clock, so there is nothing to return for until something happens.
+        $this->assertTrue(
+            $empty['nextChangeAt'] === null || $empty['nextChangeAt'] > $this->game->now(),
+            'the map named a moment that has already passed',
+        );
 
         // A live mine is the one thing that has to show up.
         $this->game->startMining($this->character, $this->character->col, $this->character->row, Drops::GATHERING);

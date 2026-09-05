@@ -598,13 +598,19 @@ Three consequences, all deliberate:
 
 1. **The live-state query is a disc of seven tiles** — the hex underfoot and
    its six neighbors — rather than the several hundred that reach-as-sight
-   scanned, and thirty-seven at the very most. **It is re-asked on a slow timer
-   while you are standing still**, because a pack somebody else fought, an
-   animal somebody else took and a hex somebody else worked out are the three
-   things the clock cannot derive — and a prospector who is not moving would
-   otherwise watch a stale disc until they did. Everything that *is* derivable
-   costs no request at all: the client knows when the soonest pack, animal,
-   pocket or regrowth in view stops being true, and rebuilds on that moment. Sight is the one number in the
+   scanned, and thirty-seven at the very most. **The answer says when to ask
+   for the next one.** Every moment worth coming back for is exactly knowable
+   on the server — the pack and animal buckets, the pockets and the regrowths
+   in that very disc — so the reply carries the soonest of them as
+   `nextChangeAt` and the client schedules **one** call for it. A fixed poll
+   was a guess in both directions: too often for a two-hour bucket, and still
+   late for one about to turn. `null` is a real answer and means nothing in
+   sight is on a clock, so there is nothing to come back for until the
+   character moves or acts — and both of those already refresh.
+
+   Everything the client can derive costs no request at all on top of that: it
+   knows the same moments for what it has already been told, and redraws on
+   them without asking. Sight is the one number in the
    game no amount of play widens past `SIGHT_RADIUS + SKILL_SIGHT_CAP`, and
    that ceiling is a query budget rather than a balance one — cost goes as the
    square of the radius.

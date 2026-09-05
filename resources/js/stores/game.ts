@@ -111,14 +111,13 @@ export const useGame = defineStore('game', () => {
   const tick = ref(0)
 
   /**
-   * §5.6 -- how often a standing prospector re-asks about the disc in sight.
+   * §5.6 -- the floor under a scheduled refresh, and nothing else.
    *
-   * Generous on purpose. The things it is watching for are on two-, four- and
-   * nine-hour clocks (§5.1, §5.7, §9.5.1), so this is not a race -- it is the
-   * difference between finding out on your own and finding out because you
-   * happened to move.
+   * The server says WHEN to come back (`nextChangeAt`), so there is no interval
+   * to pick. This only stops a moment that has already passed -- a stale clock,
+   * a tab woken from sleep -- from turning into a tight loop of requests.
    */
-  const LIVE_POLL_MS = 30_000
+  const LIVE_MIN_GAP_MS = 5_000
 
   const now = computed(() => {
     void tick.value
@@ -146,6 +145,7 @@ export const useGame = defineStore('game', () => {
     cleared: [],
     hunted: [],
     carriers: [],
+    nextChangeAt: null,
   })
 
   /**
@@ -337,9 +337,42 @@ export const useGame = defineStore('game', () => {
    * the base radius. Panning never calls
    * this, and neither does walking -- only arriving and setting off do.
    */
+  /**
+   * §5.6 -- and the answer says when to ask for the next one.
+   *
+   * A fixed poll was a guess in both directions: too often for a two-hour
+   * bucket, and still late for one about to turn. Every moment worth coming
+   * back for is exactly knowable on the server -- the buckets, the pockets and
+   * the regrowths in this very disc -- so it hands one over and this schedules
+   * a single call for it.
+   */
+  let liveTimer: ReturnType<typeof setTimeout> | null = null
+
   async function refreshMutations(): Promise<void> {
     mutations.value = await api.getMap()
     rebuildTiles()
+    scheduleLiveRefresh()
+  }
+
+  function scheduleLiveRefresh(): void {
+    if (liveTimer !== null) {
+      clearTimeout(liveTimer)
+      liveTimer = null
+    }
+
+    const at = mutations.value.nextChangeAt
+    if (at === null || at === undefined) return
+
+    // §5.6 -- never on the road: sight is zero out there, so there is nothing
+    // to refresh, and "a journey costs no queries at all" is the promise this
+    // would break. Setting off and arriving both refresh on their own.
+    if (travel.value !== null) return
+
+    liveTimer = setTimeout(() => {
+      liveTimer = null
+      if (busy.value || travel.value !== null) return
+      void refreshMutations()
+    }, Math.max(LIVE_MIN_GAP_MS, at - now.value))
   }
 
   const tileAt = (col: number, row: number): Tile | undefined =>
@@ -819,28 +852,6 @@ export const useGame = defineStore('game', () => {
     setInterval(() => {
       tick.value++
     }, 1000)
-
-    /*
-     * §5.6 -- and the half of the live state the clock cannot derive.
-     *
-     * A pack somebody else fought, an animal somebody else took, a hex somebody
-     * else worked out: those are the three things `cleared`, `hunted` and
-     * `depleted` carry, and none of them falls out of `(col, row, now)`. The
-     * map only asked on an edge -- arriving, setting off, finishing something
-     * -- so a prospector standing still watched a stale disc until they moved.
-     *
-     * NOT while traveling, and that is the load-bearing half: sight is zero on
-     * the road, so there is nothing out there to refresh, and §5.6's promise
-     * that "a journey costs no queries at all, however far it is" has to
-     * survive this. Nor while a request is already in flight.
-     *
-     * The disc is at most thirty-seven hexes and answers in one MGET, so the
-     * cost of this is two of those a minute for somebody stood still.
-     */
-    setInterval(() => {
-      if (busy.value || travel.value !== null || !booted.value) return
-      void refreshMutations()
-    }, LIVE_POLL_MS)
   }
 
   async function refreshState(): Promise<void> {
