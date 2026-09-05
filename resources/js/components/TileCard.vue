@@ -337,11 +337,22 @@ const title = computed(() => {
   return t.settlement?.name ?? t.dungeon?.name ?? groundLabel(t)
 })
 
-// A new hex is a fresh question; do not carry the previous one's expansion.
-watch(tile, () => {
-  open.value = false
-  openVerb.value = null
-})
+/*
+ * A new HEX is a fresh question; do not carry the previous one's expansion.
+ *
+ * Keyed on the coordinates rather than on the tile object, and that is the
+ * whole of it: §5.6's scheduled refresh rebuilds every tile in view, so the
+ * same hex arrives as a new object several times an hour. Watching the object
+ * shut an open card each time the map came back -- the reader was told to look
+ * again at the very moment something they were reading had changed.
+ */
+watch(
+  () => (tile.value ? `${tile.value.col},${tile.value.row}` : null),
+  () => {
+    open.value = false
+    openVerb.value = null
+  },
+)
 
 // Closing the card closes what was open inside it, so reopening is the same
 // glance every time rather than whatever was left showing.
