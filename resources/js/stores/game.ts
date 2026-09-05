@@ -145,6 +145,7 @@ export const useGame = defineStore('game', () => {
     cleared: [],
     hunted: [],
     carriers: [],
+    roaming: [],
     nextChangeAt: null,
   })
 
@@ -196,6 +197,12 @@ export const useGame = defineStore('game', () => {
     // §5.5 -- and the animal's own, which is the same subtraction: the seed
     // says where one stands and only the server knows it has been taken.
     const hunted = new Set((mutations.value.hunted ?? []).map(([c, r]) => key(c, r)))
+    // §5.5 -- and where one walked to, which is a value rather than a
+    // subtraction: the seed says the hex is empty and the server is the only
+    // thing that knows something is standing on it.
+    const roaming = new Map(
+      (mutations.value.roaming ?? []).map(([c, r, k, grade]) => [key(c, r), { key: k, grade }]),
+    )
 
     const built: Tile[] = []
     for (const coord of visibleTiles(col, row, w, h)) {
@@ -213,6 +220,7 @@ export const useGame = defineStore('game', () => {
           workers: occupied.get(k)?.bodies ?? 0,
           packCleared: cleared.has(k),
           huntCleared: hunted.has(k),
+          roaming: roaming.get(k),
         }),
       )
     }

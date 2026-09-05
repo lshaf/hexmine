@@ -40,6 +40,20 @@ final class Packs
 
     public const HUNT = 'hunt';
 
+    /**
+     * §5.5 -- where an animal went when it was disturbed.
+     *
+     * The third thing the hash cannot know, and the only one of them that is a
+     * VALUE rather than a bit: a cleared pack is gone and needs no description,
+     * but an animal that walked onto the next hex is standing somewhere the
+     * seed says nothing is. What it is has to be written down with where.
+     *
+     * Same machinery for the same reason the hunt flag shares it -- one file of
+     * TTL arithmetic rather than three -- and the same expiry, since a roamer is
+     * worthless the moment the bucket it walked in ends.
+     */
+    public const ROAM = 'roam';
+
     public static function key(int $col, int $row, int $bucket, string $kind = self::PACK): string
     {
         return "{$kind}:{$col}:{$row}:{$bucket}";
@@ -55,6 +69,74 @@ final class Packs
     public static function clear(int $col, int $row, int $bucket, int $until, int $now, string $kind = self::PACK): void
     {
         Cache::put(self::key($col, $row, $bucket, $kind), true, self::ttl($until, $now));
+    }
+
+    /**
+     * §5.5 -- park an animal on a hex the seed did not put one on.
+     *
+     * The key is the DESTINATION's own bucket, not the hex it came from: every
+     * hex runs its animal on its own offset (WorldGen::huntAt), so writing
+     * under the source's bucket number would file it where nobody reads.
+     */
+    public static function settle(
+        int $col,
+        int $row,
+        int $bucket,
+        int $until,
+        int $now,
+        string $animal,
+        string $grade,
+    ): void {
+        Cache::put(
+            self::key($col, $row, $bucket, self::ROAM),
+            ['key' => $animal, 'grade' => $grade],
+            self::ttl($until, $now),
+        );
+    }
+
+    /**
+     * What walked onto this hex this bucket, if anything.
+     *
+     * @return array{key:string,grade:string}|null
+     */
+    public static function roamer(int $col, int $row, int $bucket): ?array
+    {
+        $found = Cache::get(self::key($col, $row, $bucket, self::ROAM));
+
+        return is_array($found) ? $found : null;
+    }
+
+    /**
+     * The roamers among these hexes, in one round trip.
+     *
+     * Same shape and same reason as clearedAmong(): the disc is at most
+     * thirty-seven hexes and one MGET is the whole of the query.
+     *
+     * @param  list<array{col:int,row:int,bucket:int}>  $hexes
+     * @return list<array{0:int,1:int,2:string,3:string}>
+     */
+    public static function roamersAmong(array $hexes): array
+    {
+        if ($hexes === []) {
+            return [];
+        }
+
+        $keys = array_map(
+            static fn (array $h) => self::key($h['col'], $h['row'], $h['bucket'], self::ROAM),
+            $hexes,
+        );
+
+        $found = Cache::many($keys);
+
+        $out = [];
+        foreach ($hexes as $i => $hex) {
+            $at = $found[$keys[$i]] ?? null;
+            if (is_array($at)) {
+                $out[] = [$hex['col'], $hex['row'], $at['key'], $at['grade']];
+            }
+        }
+
+        return $out;
     }
 
     public static function isCleared(int $col, int $row, int $bucket, string $kind = self::PACK): bool

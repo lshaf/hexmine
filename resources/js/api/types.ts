@@ -561,6 +561,16 @@ export interface MapMutations {
   /** §9.5.7 -- other people's corpses, inside sight like everything else here. */
   carriers: Carrier[]
   /**
+   * §5.5 -- an animal that walked onto a hex the seed left empty.
+   *
+   * The other half of a kill. Hunting one does not delete it, it moves it to
+   * the next hex along -- so the hex just taken cannot be taken again and the
+   * country still holds what it held. Unlike everything else here this carries
+   * a value rather than a subtraction, because the seed says nothing is there:
+   * `[col, row, animal, grade]`.
+   */
+  roaming: [number, number, string, string][]
+  /**
    * §5.6 -- when to ask again, decided by the side that owns the clocks.
    *
    * The soonest moment anything in this disc stops being what it is on its own:

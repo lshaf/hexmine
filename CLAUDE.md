@@ -395,6 +395,43 @@ hook on a hex that otherwise works normally — and a pack standing on the same
 hex *does* stop the hunt, because you are not working while something is
 looking at you.
 
+**A kill does not delete an animal, it disturbs one.** The hex is spent — it
+cannot be hunted again until its bucket rolls, which is a pack's own rule
+(§9.5.1) and the whole anti-farm argument — and the creature is standing on
+**the next hex along**. So a country worked hard does not empty out behind you,
+and the thing you were hunting is still out there to be found.
+
+*(It simply vanished for the bucket at first. That satisfied "hunted once" and
+made the other half a shortage nobody asked for: a morning's work left a
+stretch of forest with nothing living on it and nothing arriving to replace
+it.)*
+
+**It keeps its own identity across the move.** The retreat only offers hexes of
+its **own country** for exactly that reason — an elk that crossed into
+grassland would arrive as an auroch, which is a different animal — and the
+grade travels with it. It is the same creature on new ground, not a fresh roll
+of what that ground would have carried.
+
+**Where it went is the one thing the seed cannot produce**, because the seed
+says the destination is empty. So unlike every other live fact on the map it is
+stored as a **value** rather than as a subtraction: what walked in, and which
+rung it is. Same machinery as the cleared flag, same expiry, and sight-bounded
+like the rest of it (§5.6) — watching a country empty out from four days away
+was never on offer, and neither is watching one refill.
+
+**One flag per hex, over whichever animal is standing there.** A roamer keeps
+the clock of the **ground it is standing on** rather than the ground it left,
+which is what lets a single hunted flag cover both cases with nothing to keep
+in step. Reading the flag against the seed's animal alone was the mistake worth
+writing down: a creature that had walked in was never checked against it, so
+the hex it fled to could be hunted again and again — a faucet with a walk in
+front of it. There is a test.
+
+**The first free hex, and none is a real answer.** Nothing walks onto ground
+already holding an animal, and a creature ringed by water, a settlement or
+other game is simply gone. That is what keeps this from being a conveyor
+guaranteeing a target forever.
+
 *(Plains was a biome for a long time, and pelt came out of the ground on it.
 That was the odd one of the five: four lines took a material out of a hex and
 one took it off an animal that was not modelled. Removing the country and
@@ -4231,10 +4268,14 @@ The working approach, after several failed attempts:
   A pack (ember) and a pocket's critter (sap) are drawn last and in front; the
   hunt's animal (§5.5) is drawn first, unhaloed, because it is the hunting
   line's seam rather than something looking at you. All three obey the fog.
-- **A hunted hex stops drawing its animal at once.** Where one stands is a hash
-  and whether somebody has taken it is not, so the live-state query answers
-  both — `cleared` for packs and `hunted` for animals, kept apart because the
-  two stand on one hex independently and one flag could never speak for both.
+- **A hunted hex stops drawing its animal at once, and the hex it ran to
+  starts.** Where one stands is a hash and whether somebody has taken it is
+  not, so the live-state query answers both — `cleared` for packs and `hunted`
+  for animals, kept apart because the two stand on one hex independently and
+  one flag could never speak for both. `roaming` is the other half of a kill
+  (§5.5) and the one entry in that payload which **adds** rather than
+  subtracts: the seed says the destination is empty, so what walked in has to
+  be named.
 - Tiling: flat-top hexes, `colStep = W * 0.75`, `rowStep = H`, odd columns offset by `H/2`.
 - **Layout with inline styles, not Tailwind arbitrary values** (`w-[390px]` etc. silently
   failed in the artifact sandbox and collapsed the viewport to zero height). Use a flex

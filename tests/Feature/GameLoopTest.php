@@ -4223,7 +4223,7 @@ final class GameLoopTest extends TestCase
         $empty = $this->game->mapMutations($this->character);
 
         $this->assertSame(
-            ['depleted', 'occupied', 'cleared', 'hunted', 'carriers', 'nextChangeAt'],
+            ['depleted', 'occupied', 'cleared', 'hunted', 'roaming', 'carriers', 'nextChangeAt'],
             array_keys($empty),
         );
         $this->assertSame([], $empty['depleted']);

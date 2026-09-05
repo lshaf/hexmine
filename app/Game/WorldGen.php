@@ -846,6 +846,119 @@ final class WorldGen
      * plains hex used to carry is the ladder the animal carries — and Beastfang
      * Hide stays contested-only without a rule of its own (§2).
      */
+    /**
+     * §5.5 -- which hex an animal walks to when it is disturbed, in order.
+     *
+     * The six neighbours, in a seeded rotation, filtered down to ground the
+     * creature could actually stand on: its OWN country -- an elk that crossed
+     * into grassland would arrive as an auroch, which is a different animal --
+     * and nothing the hunt is kept off anyway (water, a settlement, a dungeon
+     * mouth, dead ground).
+     *
+     * Ordering only. Whether a candidate is free is a question about the cache
+     * rather than about the seed, and this file does not read the cache: the
+     * caller walks the list and takes the first hex nothing is already standing
+     * on. Returning an ordered list rather than one hex is what lets that check
+     * live where the state does without the choice becoming arbitrary.
+     *
+     * Seeded on the hex and the bucket, so where it went is the same answer for
+     * everybody and stays the same answer when it is asked twice.
+     *
+     * @return list<array{0:int,1:int}>
+     */
+    public static function huntRetreat(int $col, int $row, string $biome, int $bucket): array
+    {
+        $odd = ($col & 1) !== 0;
+        $neighbors = [
+            [$col, $row - 1],
+            [$col, $row + 1],
+            [$col - 1, $row + ($odd ? 0 : -1)],
+            [$col - 1, $row + ($odd ? 1 : 0)],
+            [$col + 1, $row + ($odd ? 0 : -1)],
+            [$col + 1, $row + ($odd ? 1 : 0)],
+        ];
+
+        // A rotation rather than a shuffle: it is one seeded number, it is the
+        // same for everybody, and six neighbours have no arrangement a rotation
+        // cannot reach that matters here.
+        $turn = Hash::randInt(
+            Hash::hash2($col * 17 + $bucket, $row * 23 + $bucket, Balance::mapSeed() ^ 0x11AB),
+            0,
+            5,
+        );
+
+        $out = [];
+        for ($i = 0; $i < 6; $i++) {
+            [$c, $r] = $neighbors[($i + $turn) % 6];
+
+            if (! self::inBounds($c, $r)) {
+                continue;
+            }
+
+            $tile = self::generateTile($c, $r, 0);
+
+            // Its own country, and ground a hunt is allowed on at all.
+            if ($tile['biome'] !== $biome || ! self::huntableGround($tile)) {
+                continue;
+            }
+
+            $out[] = [$c, $r];
+        }
+
+        return $out;
+    }
+
+    /**
+     * §5.5 -- can an animal stand here at all, whatever put it there.
+     *
+     * The same list the seed's own roll is kept off, said once so the three
+     * readers of it cannot drift: where a disturbed animal may retreat to,
+     * where one may be found standing, and which hexes the map has to ask the
+     * hunted flag about. `dead` is on it for the reason §5.5 gives -- there is
+     * nothing out there for one to feed on.
+     *
+     * @param  array<string,mixed>  $tile
+     */
+    public static function huntableGround(array $tile): bool
+    {
+        return ! $tile['water']
+            && ! $tile['dead']
+            && $tile['settlement'] === null
+            && $tile['dungeon'] === null;
+    }
+
+    /**
+     * §5.5 -- the bucket a given hex's animal is on, offset and all.
+     *
+     * A hex's animal runs on its own offset (see huntAt), so a neighbour's
+     * bucket number is not this one's. Anything writing to a hex it is not
+     * standing on has to ask, or it writes under a key nobody will read.
+     */
+    public static function huntBucket(int $col, int $row, int $now): int
+    {
+        $lifetime = Balance::scaled(Balance::PACK_LIFETIME_MS);
+        $offset = Hash::randInt(
+            Hash::hash2($col, $row, Balance::mapSeed() ^ 0x11A7),
+            0,
+            max(0, $lifetime - 1),
+        );
+
+        return intdiv($now + $offset, $lifetime);
+    }
+
+    /** The moment that bucket ends on that hex, which is its flag's TTL. */
+    public static function huntBucketEnd(int $col, int $row, int $bucket): int
+    {
+        $lifetime = Balance::scaled(Balance::PACK_LIFETIME_MS);
+        $offset = Hash::randInt(
+            Hash::hash2($col, $row, Balance::mapSeed() ^ 0x11A7),
+            0,
+            max(0, $lifetime - 1),
+        );
+
+        return ($bucket + 1) * $lifetime - $offset;
+    }
+
     private static function huntAt(int $col, int $row, string $biome, string $ring, int $now): ?array
     {
         if (! in_array($biome, Hunts::BIOMES, true)) {

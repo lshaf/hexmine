@@ -8,6 +8,7 @@ use App\Game\Catalog;
 use App\Game\Drops;
 use App\Game\GameException;
 use App\Game\GameService;
+use App\Game\HexGeometry;
 use App\Game\Hunts;
 use App\Game\Packs;
 use App\Game\WorldGen;
@@ -203,6 +204,83 @@ final class HuntTest extends TestCase
         );
         // And the pack list is untouched: nothing was fought here.
         $this->assertSame([], $after['cleared']);
+    }
+
+    /**
+     * §5.5 -- a kill does not delete an animal, it disturbs one.
+     *
+     * The hex it was standing on is spent, and the creature is on the next hex
+     * along -- so a country worked hard does not empty out, and the hex just
+     * taken still cannot be taken again. It used to simply vanish until the
+     * bucket rolled, which satisfied half of that and made the other half a
+     * shortage nobody asked for.
+     */
+    public function test_a_disturbed_animal_walks_to_the_next_hex(): void
+    {
+        [$character, $hunt] = $this->standOnAnimal();
+        $from = [(int) $character->col, (int) $character->row];
+
+        $this->takeIt($character);
+
+        $moved = $this->game->mapMutations($character->fresh())['roaming'];
+
+        $this->assertCount(1, $moved, 'the animal did not go anywhere');
+        [$col, $row, $key, $grade] = $moved[0];
+
+        $this->assertNotSame($from, [$col, $row], 'it walked onto the hex it died on');
+        $this->assertSame(1, HexGeometry::distance($from[0], $from[1], $col, $row));
+
+        // It is the SAME animal on new ground, not a fresh roll of what that
+        // ground would have carried: the retreat only offers its own country
+        // for exactly this reason.
+        $this->assertSame($hunt['key'], $key);
+        $this->assertSame($hunt['grade'], $grade);
+    }
+
+    /** And it can be hunted where it ran to, which is the point of it moving. */
+    public function test_the_animal_is_huntable_where_it_ran_to(): void
+    {
+        [$character] = $this->standOnAnimal();
+        $this->takeIt($character);
+
+        [$col, $row] = $this->game->mapMutations($character->fresh())['roaming'][0];
+
+        $character->update(['col' => $col, 'row' => $row]);
+        $there = $character->fresh();
+
+        $this->assertNotNull($this->game->huntHere($there), 'nothing was standing where it ran to');
+        $this->assertTrue($this->game->previewTile($there, $col, $row, Drops::HUNTING)['canMine']);
+    }
+
+    /**
+     * §5.5 -- and once it is taken THERE it is taken, which is the rule the
+     * move is in service of.
+     *
+     * The flag used to be read against the SEED's animal alone, so a creature
+     * that had walked in was never checked against it: it could be taken again
+     * and again on the hex it had fled to, which is a faucet with a walk in
+     * front of it. A roamer keeps the ground's own bucket so one flag covers
+     * whichever of the two is standing there.
+     */
+    public function test_a_hex_it_ran_to_is_still_hunted_only_once(): void
+    {
+        [$character] = $this->standOnAnimal();
+        $this->takeIt($character);
+
+        [$col, $row] = $this->game->mapMutations($character->fresh())['roaming'][0];
+        $character->update(['col' => $col, 'row' => $row]);
+
+        $this->takeIt($character->fresh());
+
+        $there = $character->fresh();
+        $this->assertNull($this->game->huntHere($there), 'it was still standing after a second kill');
+        $this->assertFalse($this->game->previewTile($there, $col, $row, Drops::HUNTING)['canMine']);
+
+        // And the map says so, rather than leaving a roamer on the wire that
+        // the client would have to know to ignore.
+        $after = $this->game->mapMutations($there);
+        $this->assertContains([$col, $row], $after['hunted']);
+        $this->assertNotContains($col, array_column($after['roaming'], 0));
     }
 
     /** §5.5 -- and a hex with nothing on it refuses rather than paying. */

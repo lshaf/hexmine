@@ -1839,9 +1839,40 @@ class GameService
             $tile['pack'] = null;
         }
 
-        // §5.5 -- and the same for the animal. Its own flag, because a pack and
-        // an animal can stand on one hex at once and settling one says nothing
-        // about the other.
+        // §5.5 -- an animal that walked here off the hex next door.
+        //
+        // Read only where the seed left the hex empty, which is the whole of
+        // the rule: a hex that already has its own animal is not somewhere
+        // another one moved to, and two on one hex would make a kill worth
+        // twice what it says. That is also why the retreat picker skips an
+        // occupied neighbour in the first place -- this is the same question
+        // asked at the reading end, so a bucket rolling under a stored roamer
+        // can never stack one on top of a fresh one.
+        if ($tile['hunt'] === null && WorldGen::huntableGround($tile)) {
+            $bucket = WorldGen::huntBucket($col, $row, $now);
+            $moved = Packs::roamer($col, $row, $bucket);
+
+            if ($moved !== null) {
+                $tile['hunt'] = [
+                    'key' => $moved['key'],
+                    'grade' => $moved['grade'],
+                    'bucket' => $bucket,
+                    'until' => WorldGen::huntBucketEnd($col, $row, $bucket),
+                ];
+            }
+        }
+
+        // §5.5 -- and then the flag, over whichever of the two is standing
+        // there. Its own flag, because a pack and an animal can stand on one
+        // hex at once and settling one says nothing about the other.
+        //
+        // AFTER the roamer rather than before it, and that ordering is the
+        // whole of the rule that a hex is hunted once. It ran the other way
+        // first, which read the flag against the SEED's animal only -- so a
+        // creature that had walked in was never checked against it and could
+        // be taken again and again on the hex it had fled to. One clock and one
+        // flag per hex, whatever is standing on it: a roamer keeps the ground's
+        // own bucket for exactly this reason.
         if ($tile['hunt'] !== null
             && Packs::isCleared($col, $row, $tile['hunt']['bucket'], Packs::HUNT)) {
             $tile['hunt'] = null;
@@ -1968,7 +1999,7 @@ class GameService
      * is which of them somebody has already fought. One MGET over the disc
      * answers that for every hex at once.
      *
-     * @return array{depleted:array<int,array{0:int,1:int,2:int}>,occupied:array<int,array{0:int,1:int,2:int}>,cleared:array<int,array{0:int,1:int}>,hunted:array<int,array{0:int,1:int}>,nextChangeAt:?int}
+     * @return array{depleted:array<int,array{0:int,1:int,2:int}>,occupied:array<int,array{0:int,1:int,2:int}>,cleared:array<int,array{0:int,1:int}>,hunted:array<int,array{0:int,1:int}>,roaming:array<int,array{0:int,1:int,2:string,3:string}>,nextChangeAt:?int}
      */
     public function mapMutations(Character $character): array
     {
@@ -2049,6 +2080,7 @@ class GameService
         // them the hash put a pack on this bucket.
         $packs = [];
         $hunts = [];
+        $roamers = [];
         $nextChange = PHP_INT_MAX;
         for ($col = $minCol; $col <= $maxCol; $col++) {
             for ($row = $minRow; $row <= $maxRow; $row++) {
@@ -2082,14 +2114,52 @@ class GameService
                 // the other thing standing on a hex: the seed says where one
                 // is, and only the cache knows whether it has been taken.
                 $hunt = $tile['hunt'] ?? null;
-                if ($hunt !== null) {
+
+                // §5.5 -- the flag is asked of every hex an animal COULD be
+                // standing on, not only the ones the seed put one on.
+                //
+                // A hex the seed left empty can still be holding a creature
+                // that walked in, and that one is hunted once like any other.
+                // Asking only where the seed had something meant a roamer was
+                // never checked against the flag and went on being drawn --
+                // and being huntable -- after it had been taken.
+                //
+                // The bucket is the ground's own either way: a roamer keeps
+                // the clock of the hex it is standing on, so one flag per hex
+                // covers both cases and there is nothing to keep in step.
+                if ($hunt !== null || WorldGen::huntableGround($tile)) {
                     $hunts[] = [
                         'col' => $col, 'row' => $row,
-                        'bucket' => $hunt['bucket'], 'kind' => Packs::HUNT,
+                        'bucket' => $hunt['bucket'] ?? WorldGen::huntBucket($col, $row, $now),
+                        'kind' => Packs::HUNT,
+                    ];
+                }
+
+                // And where the seed left the hex empty, whether something
+                // walked onto it. Only there: a hex with its own animal is not
+                // somewhere another one moved to, and asking both questions of
+                // one hex would be asking whether two are standing on it.
+                if ($hunt === null && WorldGen::huntableGround($tile)) {
+                    $roamers[] = [
+                        'col' => $col, 'row' => $row,
+                        'bucket' => WorldGen::huntBucket($col, $row, $now),
                     ];
                 }
             }
         }
+
+        $hunted = Packs::clearedAmong($hunts);
+
+        // §5.5 -- a roamer that has since been taken is not standing there, so
+        // it does not go on the wire. The client would hide it anyway -- the
+        // flag wins over the arrival on its side too -- but a payload that says
+        // an animal is somewhere it is not is a second opinion waiting to be
+        // read by something that trusts it.
+        $taken = array_flip(array_map(static fn (array $h) => $h[0].','.$h[1], $hunted));
+        $roamers = array_values(array_filter(
+            $roamers,
+            static fn (array $h) => ! isset($taken[$h['col'].','.$h['row']]),
+        ));
 
         return [
             'depleted' => $depleted,
@@ -2100,7 +2170,23 @@ class GameService
             // because a pack and an animal stand on one hex independently:
             // folding them into one list would take an animal off a hex
             // somebody had merely fought on.
-            'hunted' => Packs::clearedAmong($hunts),
+            'hunted' => $hunted,
+            /*
+             * §5.5 -- and where one walked to, which is the other half of the
+             * same event.
+             *
+             * A kill does not delete an animal, it disturbs one: the hex you
+             * took cannot be taken again, and the creature is standing on the
+             * next hex along. That destination is the one thing here the seed
+             * genuinely cannot produce -- it says nothing is there -- so unlike
+             * every other entry in this payload it carries a VALUE rather than
+             * a subtraction: what walked in, and which rung it is.
+             *
+             * Sight-bounded like the rest of it (§5.6). Watching a country
+             * empty out from four days away was never on offer, and neither is
+             * watching one refill.
+             */
+            'roaming' => Packs::roamersAmong($roamers),
             // §9.5.7 -- other people's corpses, and only inside sight like
             // everything else here. Your own ride the player state instead:
             // they are yours and the fog does not apply to them.
@@ -2176,6 +2262,53 @@ class GameService
         }
 
         return $hunt + ['animal' => Hunts::ROSTER[$hunt['key']]];
+    }
+
+    /**
+     * §5.5 -- the animal does not die here twice, it walks.
+     *
+     * A cleared hex used to be the whole of it: the animal was simply gone
+     * until the bucket rolled, so a country worked hard emptied out and nothing
+     * arrived to replace it. Hunting one hex now moves the creature to the next
+     * one along -- so the hex you took cannot be taken again, and the country
+     * still holds what it held.
+     *
+     * It keeps its own identity across the move. The retreat picker only offers
+     * hexes of its own country for that reason (WorldGen::huntRetreat), and the
+     * grade travels with it: it is the same animal on new ground, not a fresh
+     * roll of what that ground would have carried.
+     *
+     * The first free hex on the list, and none is a real answer -- ringed by
+     * water, a settlement or other game, the animal is simply gone, which keeps
+     * this from being a conveyor that guarantees a target forever.
+     */
+    private function drive(array $hunt, int $col, int $row, int $now): void
+    {
+        $biome = WorldGen::generateTile($col, $row, $now)['biome'];
+
+        foreach (WorldGen::huntRetreat($col, $row, $biome, $hunt['bucket']) as [$c, $r]) {
+            // Nothing walks onto a hex something is already standing on. Read
+            // through buildTile so this asks the same question every other
+            // reader asks -- the seed's animal, a cleared flag and a roamer that
+            // got there first, all folded in.
+            if (($this->buildTile($c, $r, $now)['hunt'] ?? null) !== null) {
+                continue;
+            }
+
+            $bucket = WorldGen::huntBucket($c, $r, $now);
+
+            Packs::settle(
+                $c,
+                $r,
+                $bucket,
+                WorldGen::huntBucketEnd($c, $r, $bucket),
+                $now,
+                (string) $hunt['key'],
+                (string) $hunt['grade'],
+            );
+
+            return;
+        }
     }
 
     /**
@@ -3982,7 +4115,7 @@ class GameService
                     // Cleared on the CLAIM rather than at the start, so a hunt
                     // walked away from leaves the animal standing — the same
                     // bargain §11.1 strikes with an abandoned mine.
-                    $hunt = WorldGen::generateTile((int) $job->col, (int) $job->row, $now)['hunt'] ?? null;
+                    $hunt = $this->buildTile((int) $job->col, (int) $job->row, $now)['hunt'] ?? null;
                     if ($hunt !== null) {
                         Packs::clear(
                             (int) $job->col,
@@ -3992,6 +4125,8 @@ class GameService
                             $now,
                             Packs::HUNT,
                         );
+
+                        $this->drive($hunt, (int) $job->col, (int) $job->row, $now);
                     }
                 } else {
                     // §5.1 -- one haul off a hex that holds a known number of

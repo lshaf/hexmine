@@ -768,6 +768,36 @@ function packAt(col: number, row: number, biome: string, ring: Ring, now: number
  * per-hex offset as a pack, so the two share one rhythm rather than teaching a
  * player two.
  */
+/**
+ * §5.5 -- an animal standing where the seed put none, because it walked here.
+ *
+ * The bucket and its end are the DESTINATION hex's own: every hex runs its
+ * animal on its own offset, so the arriving creature keeps the clock of the
+ * ground it is standing on rather than the clock of the ground it left. That is
+ * the same arithmetic the server writes the flag under, and it has to be, or
+ * the two would disagree about when it leaves.
+ */
+function roamedIn(
+  col: number,
+  row: number,
+  now: number,
+  roaming: { key: string; grade: string } | undefined,
+): Hunt | undefined {
+  if (!roaming) return undefined
+
+  const c = cfg()
+  const lifetime = c.packLifetimeMs
+  const offset = randInt(hash2(col, row, c.seed ^ 0x11a7), 0, Math.max(0, lifetime - 1))
+  const bucket = Math.floor((now + offset) / lifetime)
+
+  return {
+    key: roaming.key,
+    grade: roaming.grade,
+    bucket,
+    until: (bucket + 1) * lifetime - offset,
+  }
+}
+
 function huntAt(col: number, row: number, biome: string, ring: Ring, now: number): Hunt | undefined {
   if (!(HUNT_BIOMES as readonly string[]).includes(biome)) return undefined
 
@@ -819,6 +849,15 @@ export interface TileMutation {
   packCleared?: boolean
   /** §5.5 -- this hex's animal has been hunted this bucket. */
   huntCleared?: boolean
+  /**
+   * §5.5 -- and an animal that walked here off the hex next door.
+   *
+   * The one mutation that ADDS rather than subtracts, because it is the one
+   * thing the seed genuinely cannot produce: it says this hex is empty. Only
+   * ever set where that is true -- a hex with its own animal is not somewhere
+   * another one moved to.
+   */
+  roaming?: { key: string; grade: string }
 }
 
 /**
@@ -974,9 +1013,11 @@ export function generateTile(
     // §5.5 -- and the animal, on the same ground a pack is kept off, plus dead
     // ground: there is nothing out there for one to feed on.
     hunt:
-      water || settlement || dungeon || mutation?.huntCleared || barren
+      water || settlement || dungeon || barren
         ? undefined
-        : huntAt(col, row, biome, ring, now),
+        : mutation?.huntCleared
+          ? undefined
+          : (huntAt(col, row, biome, ring, now) ?? roamedIn(col, row, now, mutation?.roaming)),
     propSeed: hash2(col, row, c.seed ^ 0xf00d),
   }
 }
