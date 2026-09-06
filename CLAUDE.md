@@ -2974,13 +2974,42 @@ gives the crest, the profile, the three solid numbers, the rings it stands on
 drop drawn with its own glyph rather than spelled. Static like the rest of that
 screen: it talks to nothing and is correct with no character at all.
 
-**Studying one costs nothing** (§9.5.3's pin has two exits and this is neither).
-A `Study` plate beside the Fight button gives the name, the profile, the tier,
-**the level**, the three solid numbers, what the profile *means*, where its wear
-lands, and what it pays — read straight off the catalog the client already mirrors, so it
-needs no request and cannot be stale. It deliberately says nothing about your
-side: whether you win and what it costs are the preview's, thirty pixels away,
-and saying them twice would make two answers out of one.
+**What a monster IS lives on the tile card**, with everything else that is true
+of the hex. The name, the profile, the tier, **the level**, the three solid
+numbers, what the profile *means*, where its wear lands, and what it pays — read
+straight off the catalog the client already mirrors, so it needs no request and
+cannot be stale.
+
+**It is read where the hex is read, and that is the whole of the argument.** A
+card answers *what am I pointing at*; a pack is part of the answer. It was a
+`Study` plate opened from the dock — a modal over a card that was already open,
+saying the same kind of thing in two places, and the two are one question.
+
+Two things fall out of putting it there rather than in a plate, and neither was
+arranged. It reaches **any hex in sight**, where the plate only ever reached the
+one under your feet — so a pack two hexes off can be read before you walk into
+it, which is exactly what a card is for. And it is **sight-bounded** for free,
+by the same rule the map draws a pack under (§13.2): live state is read by
+standing near it, and a monster legible from four days away is the scanner §5.6
+exists to refuse.
+
+**What is standing here comes before what is under it.** The block sits above
+the price list, because nothing on that list matters while something is looking
+at you — §9.5.3 refuses every verb on a pinned hex — so reading the seam first
+would be reading it in the wrong order.
+
+**It says nothing about your side.** Whether you win and what it costs are the
+preview's; when it leaves and what a loss costs are the pin's. What the card
+holds is the half that is true of the creature whoever is reading it, which is
+the half a card is for — and it is why the level's *comparison* is drawn on the
+pin and only the number here.
+
+**The ground says it is different, not a line around it.** §13 is explicit that
+a border under a `clip-path` does not follow the cut, and an inset is clipped —
+so the block carries a trace of ember in its own fill instead. A trace, because
+§13.3 spends ember on a state to deal with and a pack is one, while a filled
+ember panel would be an alarm over a card the player opened on purpose. The
+block already holds the loudest mark on the card: the creature.
 
 #### 9.5.3 The pin — the road stops, and so does everything else
 

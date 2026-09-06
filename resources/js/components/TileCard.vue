@@ -16,6 +16,9 @@
 import { computed, ref, watch } from 'vue'
 import { useGame } from '@/stores/game'
 import { MATERIALS, RING_LABEL, SKILL_BY_KEY, skillForMaterial } from '@/game/catalog'
+import { MONSTERS } from '@/game/monsters'
+import { TROPHY_BY_TIER } from '@/game/spoils'
+import { monsterSpecimen } from '@/map/props'
 import { formatDuration, formatSpan } from '@/game/formulas'
 import { MINING } from '@/game/balance'
 import { groundLabel } from '@/game/ground'
@@ -188,6 +191,72 @@ const huntDrops = computed(() => shown(preview.value?.hunt?.drops))
  * hunt is this, not the costing.
  */
 const animal = computed(() => preview.value?.hunt?.animal ?? null)
+
+/**
+ * §9.5.2 -- the pack standing here, and everything known about it.
+ *
+ * It used to be a `Study` plate opened from the dock, which put what a hex
+ * HOLDS in a modal while what a hex IS sat on the card underneath it. They are
+ * one question -- *what am I pointing at* -- and this is the card that answers
+ * it, so a monster is a row on it like the seam and the animal are.
+ *
+ * Two things fall out of the move rather than being arranged. It reaches **any
+ * hex in sight** where the plate only ever reached the one under your feet, so
+ * a pack two hexes off can be read before walking into it -- which is what a
+ * card is for. And it costs nothing at all: the pack is already derived on this
+ * device and the roster is already mirrored, so there is no request and nothing
+ * to be stale.
+ *
+ * Gated on sight for the same reason the map gates the drawing (§13.2): a pack
+ * is live state, and reading one from four days away is the scanner §5.6 exists
+ * to refuse.
+ */
+const pack = computed(() =>
+  !unseen.value && tile.value?.pack ? (MONSTERS[tile.value.pack.key] ?? null) : null,
+)
+
+/** §9.5.2 -- the profile is what a player reads to know HOW to fight it. */
+const PROFILE_NOTE: Record<string, string> = {
+  brute: 'Hits hard, guards badly. It empties your kit fast and empties fast in turn.',
+  carapace: 'Guards hard, hits badly. Getting through the front is the whole fight.',
+  swift: 'Middling at both, and it wears a weapon harder than its numbers suggest.',
+}
+
+/**
+ * §9.5.6 -- and the one number a profile does not explain.
+ *
+ * `wearBias` moves where the bill lands, never how big it is, so it is said as
+ * a sentence rather than as a figure: "1.5" means nothing at the moment you are
+ * deciding whether to swing at something.
+ */
+const wearNote = computed(() =>
+  pack.value && pack.value.wearBias > 1
+    ? 'Blunts what it is hit with — more of the bill lands on your weapon and gloves.'
+    : null,
+)
+
+/**
+ * §9.5.8 -- what it pays, as pips like every other price list on this card.
+ *
+ * Named, never with odds: odds would be a spreadsheet, and the words in front
+ * of them (always, often, rarely) are the whole of what a player can act on.
+ * Gold leads because it is the one drop that needs no strap (§7.6).
+ */
+const packPays = computed(() => {
+  const d = pack.value
+  if (!d) return []
+
+  const mat = (key: string) => MATERIALS[key as MaterialKey] ?? null
+
+  return [
+    { when: 'Always', mats: [mat(d.plate)] },
+    { when: 'Often', mats: [mat(d.ichor)] },
+    ...(d.rareSpoil ? [{ when: 'Rarely', mats: [mat(d.rareSpoil)] }] : []),
+    { when: 'Leavings', mats: [mat(TROPHY_BY_TIER[d.tier] ?? '')] },
+  ]
+    .map((r) => ({ ...r, mats: r.mats.filter(Boolean) }))
+    .filter((r) => r.mats.length)
+})
 
 /**
  * One entry per verb the dock offers here, in the order the dock offers them.
@@ -470,7 +539,56 @@ watch(open, (isOpen) => {
         />
         </div>
 
-        <div v-if="open && (tables.length || (mine && mat))" class="detail">
+        <div v-if="open && (tables.length || (mine && mat) || pack)" class="detail">
+          <!--
+            §9.5.2 -- what is STANDING here comes before what is under it.
+            A seam is what the hex is worth and a pack is what the hex is
+            about: nothing on the price list below matters while something is
+            looking at you (§9.5.3 refuses every verb on a pinned hex), so
+            reading it second would be reading it in the wrong order.
+
+            It carries no verdict and no clock. Whether you win is the
+            preview's (§9.5.5) and when it leaves is the pin's -- this is the
+            half that is true of the creature whoever is reading it, which is
+            exactly the half a card is for.
+          -->
+          <div v-if="pack" class="inset foe">
+            <div class="quarry">
+              <span class="mark" aria-hidden="true" v-html="monsterSpecimen(pack.key, 34)" />
+              <div class="grow">
+                <span class="label eyebrow">
+                  {{ pack.profile }} · tier {{ pack.tier }} · level {{ pack.level }}
+                </span>
+                <strong class="tiny name">{{ pack.name }}</strong>
+              </div>
+            </div>
+
+            <!-- §9.5.4/§9.5.5 -- the three solid numbers a fight is decided by,
+                 and the pool is one of them: durability IS the health bar on
+                 both sides of the exchange. -->
+            <div class="figures">
+              <span class="fig"><span class="label muted">Attack</span><strong class="readout">{{ pack.attack }}</strong></span>
+              <span class="fig"><span class="label muted">Defense</span><strong class="readout">{{ pack.defense }}</strong></span>
+              <span class="fig"><span class="label muted">Pool</span><strong class="readout">{{ pack.hp }}</strong></span>
+            </div>
+
+            <p class="note">{{ PROFILE_NOTE[pack.profile] }}</p>
+            <p v-if="wearNote" class="note wear">{{ wearNote }}</p>
+
+            <!-- The same pips the verbs use, because it is the same kind of
+                 thing: a list of what this hex can give up. Gold is not among
+                 them -- it needs no strap (§7.6), which is what makes it the
+                 one drop worth saying in words. -->
+            <p class="tiny muted coin">Pays {{ pack.gold[0] }}–{{ pack.gold[1] }} gold, which costs no strap.</p>
+
+            <div v-for="row in packPays" :key="row.when" class="pips">
+              <span class="label muted when">{{ row.when }}</span>
+              <span v-for="d in row.mats" :key="d.key" class="pip" :title="d.name">
+                <SvgIcon :svg="materialIcon(d, 18)" />{{ d.name }}
+              </span>
+            </div>
+          </div>
+
           <!-- The line comes from the server, not from the material: a scrap
                haul still belongs to the hex's own line, §4.0. -->
           <p v-if="mine && mat" class="tiny muted lede">
@@ -891,6 +1009,73 @@ watch(open, (isOpen) => {
 /* §4.0 -- the floor under the ladder, and it says so by being the quiet one. */
 .verb.gather .label {
   color: #7b8580;
+}
+
+/* §9.5.2 -- the pack, and the one block on this card that is not a price list.
+ *
+ * The FILL says so rather than a line: §13 is explicit that a border under a
+ * clip-path does not follow the cut, and `.inset` is clipped -- a hairline here
+ * comes out with two bare diagonal edges, which is the exact bug that section
+ * exists to warn about. Dropping the line and letting the ground carry it is
+ * the answer that section recommends, and it is the one already used everywhere
+ * a chamfered thing needs to read as chosen.
+ *
+ * A trace of ember and no more. §13.3 spends ember on a state to deal with and
+ * something standing on the hex is the only thing on this card that is one --
+ * but a filled ember panel would be an alarm over a card the player opened on
+ * purpose, and the block already holds the loudest mark here: the creature. */
+.foe {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-bottom: 10px;
+  background: color-mix(in srgb, var(--ember) 13%, rgba(0, 0, 0, 0.28));
+}
+
+.foe .quarry {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.foe .mark :deep(svg) {
+  display: block;
+}
+
+.foe .name {
+  display: block;
+  color: var(--vellum);
+}
+
+/* The three that decide a fight, on one line and evenly spaced, because they
+   are read against each other rather than one at a time. */
+.figures {
+  display: flex;
+  gap: 14px;
+}
+
+.fig {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.foe .note {
+  margin: 0;
+}
+
+.foe .coin {
+  margin: 0;
+}
+
+/* §9.5.8 -- the odds word rides the row rather than heading it: four rows of
+   one pip each under four headings would be a table where a list belongs. */
+.foe .pips {
+  align-items: center;
+}
+
+.when {
+  min-width: 52px;
 }
 
 /* §5.5 -- the animal's lede carries its drawing, so the mark rides the text
