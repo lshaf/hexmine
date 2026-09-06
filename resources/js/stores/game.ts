@@ -670,8 +670,7 @@ export const useGame = defineStore('game', () => {
   const shopStock = computed<string[]>(() => state.value?.shopStock ?? [])
 
   /**
-   * §5.6 -- how far the character can see. Zero while walking, which is what
-   * darkens the map for the length of a journey.
+   * §5.6 -- how far the character can see, and the road no longer closes it.
    *
    * There is no companion "how far can I go": every hex on the map is walkable
    * and the only cost is the clock, so the map has a fog boundary where it used

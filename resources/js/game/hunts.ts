@@ -63,8 +63,14 @@ export const HUNT_REFINED: Material[] = [
   { key: 'lacquered_hide', name: 'Lacquered Hide', tier: 2, palette: 'pelt', npcPrice: 30, description: 'Layered, lacquered, and left in the dark to cure. Turns a blade.' },
 ]
 
+/**
+ * §6 -- the Tanner's line, one recipe per rung ABOVE the base one.
+ *
+ * The base rung is `leather` and it lives with the other four base lines in
+ * RECIPES, exactly as VARIANT_PROCESSING is the grades over the four biome
+ * ladders. Mirrors Hunts::PROCESSING.
+ */
 export const HUNT_PROCESSING: Recipe[] = [
-  { key: 'tan_leather', name: 'Tan Leather', input: 'pelt', inputQty: 3, output: 'leather', outputQty: 1, baseSeconds: 13 * 60, skill: 'hunting' },
   { key: 'tan_boiled_leather', name: 'Tan Boiled Leather', input: 'thick_pelt', inputQty: 3, output: 'boiled_leather', outputQty: 1, baseSeconds: 17 * 60, skill: 'hunting' },
   { key: 'tan_lacquered_hide', name: 'Tan Lacquered Hide', input: 'dire_pelt', inputQty: 3, output: 'lacquered_hide', outputQty: 1, baseSeconds: 24 * 60, skill: 'hunting' },
 ]

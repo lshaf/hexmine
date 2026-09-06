@@ -80,9 +80,17 @@ final class Hunts
         'lacquered_hide' => ['name' => 'Lacquered Hide', 'tier' => 2, 'palette' => 'pelt', 'npcPrice' => 30, 'description' => 'Layered, lacquered, and left in the dark to cure. Turns a blade.'],
     ];
 
-    /** §6 -- the Tanner's line, one recipe per rung. */
+    /**
+     * §6 -- the Tanner's line, one recipe per rung ABOVE the base one.
+     *
+     * The base rung is `leather`, and it lives with the other four base lines
+     * in Catalog::recipes() -- this list is the grades over it, exactly as
+     * Variants::PROCESSING is for the four biome ladders. It carried its own
+     * `tan_leather` as well for a while, which was the same three pelt into the
+     * same one leather under a second key: two rows at every tannery, and a
+     * §12 quest or a slate bookmark could name either one.
+     */
     public const PROCESSING = [
-        'tan_leather' => ['name' => 'Tan Leather', 'input' => 'pelt', 'inputQty' => 3, 'output' => 'leather', 'outputQty' => 1, 'baseSeconds' => 13 * 60, 'skill' => 'hunting'],
         'tan_boiled_leather' => ['name' => 'Tan Boiled Leather', 'input' => 'thick_pelt', 'inputQty' => 3, 'output' => 'boiled_leather', 'outputQty' => 1, 'baseSeconds' => 17 * 60, 'skill' => 'hunting'],
         'tan_lacquered_hide' => ['name' => 'Tan Lacquered Hide', 'input' => 'dire_pelt', 'inputQty' => 3, 'output' => 'lacquered_hide', 'outputQty' => 1, 'baseSeconds' => 24 * 60, 'skill' => 'hunting'],
     ];

@@ -872,6 +872,19 @@ small lattice scan, and only for a candidate that has already earned its place.
 Because village/city players are always missing process lines, they stay dependent on
 dungeon loot and the NPC gold shop. This keeps every system relevant at every tier.
 
+**On screen a settlement's lines are TABS, one each.** A tier is a count of
+lines — a village runs one of the five, a city two, a capital all five — so the
+lines are the one axis this panel has, and merging them threw it away: at a
+capital that was five ladders in one column with nothing between them. Drawn
+only where there is a choice, since a single tab is a label pretending to be a
+control.
+
+**A run is named for what comes OFF it**, never for what is done to make it.
+"Saw Planks" put a verb where every other list in the game puts the thing — the
+icon beside it is the output's, the arrow under it ends on the output, and the
+material that lands in the bag is the output, so the row was the one part of it
+naming something else.
+
 ### 6.1 Processing queue
 - **5 open slots** per feature, first-come-first-served, any player
 - Guilds that own a feature get their **own separate 5-slot line** (parallel, not competing
@@ -2575,9 +2588,24 @@ buried the axe rungs among the shield rungs. So the panel filters Tools ·
 Weapons · Armor · Drafts, and inside each the axis is the thing actually being
 chosen between: the **line** for a tool (§8 rule 4 promises all five the same
 ladder), the **family** for a weapon (§9.5.4), the **slot** for worn gear, and
-the **action** a draft arms (§8.5). Rarity is never the axis; it is a rung drawn
-down the edge of each card, and how far the bench itself reaches (§8.0) is the
-one row of six caps at the top of the panel.
+the **action** a draft arms (§8.5). Rarity is never the axis *of a list* — it is
+a rung drawn down the edge of each card, and a **filter of its own** on the row
+below — and how far the bench itself reaches (§8.0) is the one row of caps at
+the top of the panel.
+
+**And a second row for the RUNG.** Two rows because they are two questions, the
+way the bag's sort and filter are (§7.6): *what am I making* and *how good*. A
+capital reaching epic carries something like a hundred and fifteen recipes, and
+"show me the rare ones" is a cut a player actually squints for — it was answered
+before by reading the rung down the edge of every card in a long column.
+
+It is a **filter over the lists, never the axis of them**. §8 rule 4 promises
+every line the same ladder, so a tool is still grouped by its line and a weapon
+by its family; this only decides how much of each ladder is on screen. Rarity as
+the axis would say the rungs are the thing being chosen between, and they are
+not — they are the thing every group already has one of. Only the rungs this
+bench reaches, for the same reason the caps row carries only those: a tab whose
+whole answer is "nothing" is not a control.
 
 **A bench takes time, and it hands over where it was left.** Crafting used to be
 instant, which made a capital a vending machine: carry the materials in, walk

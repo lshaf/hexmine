@@ -153,8 +153,33 @@ interface Group {
   items: ItemDef[]
 }
 
+/**
+ * §8.0 -- and which RUNG, which is a second question about the same shelf.
+ *
+ * Two rows because they are two questions, the way the bag's sort and filter
+ * are (§7.6): what am I making, and how good. A capital reaching epic carries
+ * something like a hundred and fifteen recipes, and "show me the rare ones" is
+ * a cut a player actually squints for -- it was answered before by reading the
+ * rung down the edge of every card in a long column.
+ *
+ * It is a FILTER over the lists rather than the axis of them. §8 rule 4
+ * promises every line the same ladder, so what a tool is grouped by is still
+ * its line and what a weapon is grouped by is still its family; this only
+ * decides how much of each ladder is on screen. Rarity as the axis would say
+ * the rungs are the thing being chosen between, and they are not -- they are
+ * the thing every group already has one of.
+ *
+ * Only the rungs this bench reaches, for the same reason the caps row above
+ * carries only those: a tab for a rung that cannot be made here is a control
+ * whose whole answer is "nothing".
+ */
+const shownRung = ref<Rarity | 'all'>('all')
+
+const atRung = (items: ItemDef[]) =>
+  shownRung.value === 'all' ? items : items.filter((i) => i.rarity === shownRung.value)
+
 const groups = computed<Group[]>(() => {
-  const items = byTab.value[tab.value]
+  const items = atRung(byTab.value[tab.value])
 
   if (tab.value === 'tool') {
     return SKILL_LIST.map((skill) => {
@@ -225,6 +250,23 @@ const reaches = (rarity: Rarity) =>
 
 /** Everything up to and including the top rung this bench makes. */
 const rungs = computed(() => RARITIES.filter(reaches))
+
+// The bench changes when the settlement does, and a rung it does not reach is
+// a tab with nothing behind it. Fall back to the whole shelf rather than to
+// some other rung, which would be this panel choosing for you.
+watch(rungs, (open) => {
+  if (shownRung.value !== 'all' && !open.includes(shownRung.value)) shownRung.value = 'all'
+})
+
+/** How many of the tab in view sit on each rung, for the row's own counts. */
+const rungCounts = computed<Record<string, number>>(() => {
+  const out: Record<string, number> = { all: byTab.value[tab.value].length }
+  for (const r of rungs.value) {
+    out[r] = byTab.value[tab.value].filter((i) => i.rarity === r).length
+  }
+
+  return out
+})
 
 /** The next rung up, and the smallest place that makes it. Null at the top. */
 const nextStep = computed(() => {
@@ -394,6 +436,25 @@ const emptyNote = computed(() => {
       >
         <span>{{ TAB_LABEL[t] }}</span>
         <span class="count mono">{{ byTab[t].length }}</span>
+      </button>
+    </nav>
+
+    <!-- §8.0 -- and the rung, which is the second question about the same
+         shelf. A row of its own because it composes with the one above rather
+         than replacing it: Tools AND rare, not Tools OR rare. Only the rungs
+         this bench reaches, so no tab here can answer "nothing". -->
+    <nav v-if="!nothingHere && rungs.length > 1" class="tabs rung-row" role="tablist">
+      <button
+        v-for="r in (['all', ...rungs] as const)"
+        :key="r"
+        type="button"
+        role="tab"
+        :class="[{ on: shownRung === r }, r === 'all' ? '' : `rarity-${r}`]"
+        :aria-selected="shownRung === r"
+        @click="shownRung = r"
+      >
+        <span>{{ r === 'all' ? 'Every rung' : RARITY_LABEL[r as Rarity] }}</span>
+        <span class="count mono">{{ rungCounts[r] ?? 0 }}</span>
       </button>
     </nav>
 
@@ -587,6 +648,29 @@ const emptyNote = computed(() => {
   background: var(--ink-raised);
   border-color: var(--copper);
   color: var(--vellum);
+}
+
+/* §8.0 -- the rung row. Its own line under the tabs, and its own shape: the
+   four above are a fixed grid because there are always exactly four of them,
+   and this one is however many rungs the bench reaches plus the whole shelf. */
+.tabs.rung-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: -8px;
+}
+
+.tabs.rung-row button {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 7px 10px;
+}
+
+/* The rung's own colour on the mark, never on the ground: §13.1 gives rarity
+   the frame and the glow, and a whole tab filled violet would be the loudest
+   thing on a screen full of items that each carry the same six colours. */
+.tabs.rung-row button.on {
+  color: currentColor;
 }
 
 .tabs .count {

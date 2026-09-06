@@ -423,7 +423,10 @@ export function materialSources(mat: Material): SourceLine[] {
 
       lines.push({
         kind: 'process',
-        where: `${SKILL_BY_KEY[recipe.skill].name} line, ${recipe.name.toLowerCase()}`,
+        // §6 -- the line, and nothing else. It named the recipe's verb as well
+        // ("woodcutting line, saw planks"), which on an entry that is already
+        // about the output was the same word twice with a verb between them.
+        where: `${SKILL_BY_KEY[recipe.skill].name} line`,
         cost,
         note: timings,
       })

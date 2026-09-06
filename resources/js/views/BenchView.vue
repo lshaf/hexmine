@@ -13,7 +13,7 @@
  */
 import { computed, ref } from 'vue'
 import { useGame } from '@/stores/game'
-import { ITEM_BY_KEY, MATERIALS, RARITY_LABEL, RECIPE_BY_KEY, stationForRarity } from '@/game/catalog'
+import { ITEM_BY_KEY, MATERIALS, RARITY_LABEL, RECIPE_BY_KEY, SKILL_BY_KEY, stationForRarity } from '@/game/catalog'
 import { formatDuration, placeLabel } from '@/game/formulas'
 import { hexDistance } from '@/map/hexGeometry'
 import { SLATE_CAP } from '@/game/balance'
@@ -118,9 +118,12 @@ const slate = computed<SlateLine[]>(() =>
     if (recipe) {
       return [{
         key,
-        name: recipe.name,
+        // §6 -- named for what comes off it. The row already draws the
+        // output's icon and lists its inputs, so a verb here was the one part
+        // of it pointing somewhere else.
+        name: MATERIALS[recipe.output].name,
         icon: materialIcon(MATERIALS[recipe.output], 26),
-        makes: `${recipe.outputQty} ${MATERIALS[recipe.output].name} · processing line`,
+        makes: `${recipe.outputQty} at a time · ${SKILL_BY_KEY[recipe.skill].name} line`,
         inputs,
         ready: inputs.every((i) => i.have >= i.need),
       }]

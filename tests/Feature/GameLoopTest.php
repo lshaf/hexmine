@@ -1195,9 +1195,13 @@ final class GameLoopTest extends TestCase
      */
     public function test_grade_processing_matches_the_base_ratio(): void
     {
-        // §5.5 -- eight off the ground, and the Tanner's three are the hunt's.
+        // Two grades above the base rung on every one of the five ladders:
+        // eight off the ground, and the Tanner's two off the animal. It was
+        // three, because the hunt carried its own copy of the base rung as
+        // well -- the same three pelt into the same one leather under a second
+        // key, so a tannery listed Leather twice.
         $this->assertCount(8, Variants::PROCESSING);
-        $this->assertCount(3, Hunts::PROCESSING);
+        $this->assertCount(2, Hunts::PROCESSING);
 
         foreach (Variants::PROCESSING + Hunts::PROCESSING as $key => $recipe) {
             $this->assertSame(3, $recipe['inputQty'], "{$key} does not cost three raw");
@@ -1282,6 +1286,55 @@ final class GameLoopTest extends TestCase
         foreach (array_keys(Components::CRAFT) as $key) {
             $this->assertArrayHasKey($key, $wanted, "{$key} feeds no recipe at all");
         }
+    }
+
+    /**
+     * §6 -- the two sides offer the same processing runs.
+     *
+     * The five ladders are assembled by hand on both sides -- base rungs in one
+     * list, the biome grades merged from another, the hunt's from a third --
+     * and a mirror that merges four of the five is a bench offering rungs the
+     * screen cannot queue. That is exactly what happened: the client carried
+     * one hunting recipe against the server's three, so Boiled Leather and
+     * Lacquered Hide were unreachable from the panel that exists to reach them.
+     *
+     * Compared as KEYS PER LINE rather than as a total, because the shape of
+     * the failure is a whole ladder missing from one line while the count
+     * elsewhere covers for it.
+     */
+    public function test_the_two_sides_offer_the_same_processing_runs(): void
+    {
+        $ts = file_get_contents(base_path('resources/js/game/catalog.ts'))
+            .file_get_contents(base_path('resources/js/game/variants.ts'))
+            .file_get_contents(base_path('resources/js/game/hunts.ts'));
+
+        $byLine = [];
+        foreach (Catalog::recipes() as $key => $recipe) {
+            $byLine[$recipe['skill']][] = $key;
+
+            $this->assertMatchesRegularExpression(
+                "/key: '".preg_quote($key, '/')."'/",
+                $ts,
+                "{$key} is a processing run the client does not mirror",
+            );
+        }
+
+        // And every line has one, so a settlement that runs it has something to
+        // offer -- §6 makes the tier a count of lines, and a line with no
+        // recipe would be a tab with nothing behind it.
+        foreach (Catalog::SKILLS as $line) {
+            $this->assertNotEmpty($byLine[$line] ?? [], "the {$line} line has no run at all");
+        }
+
+        // A run per OUTPUT, and never two. `leather` and `tan_leather` were the
+        // same three pelt into the same one leather under two keys: two rows at
+        // every tannery, and a quest or a slate bookmark could name either.
+        $outputs = array_column(Catalog::recipes(), 'output');
+        $this->assertSame(
+            array_unique($outputs),
+            $outputs,
+            'two recipes make the same material',
+        );
     }
 
     /**

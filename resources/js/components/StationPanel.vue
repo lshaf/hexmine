@@ -8,7 +8,7 @@
  */
 import { computed, ref, watch } from 'vue'
 import { useGame } from '@/stores/game'
-import { MATERIALS, RECIPES, SKILL_BY_KEY, recipesForLines } from '@/game/catalog'
+import { MATERIALS, RECIPES, SKILL_BY_KEY, SKILL_LIST, recipesForLines } from '@/game/catalog'
 import { formatSpan, processingTime } from '@/game/formulas'
 import { PROCESSING } from '@/game/balance'
 import { materialIcon } from '@/icons/procedural'
@@ -16,7 +16,7 @@ import SvgIcon from './SvgIcon.vue'
 import QueueBar from './QueueBar.vue'
 import JobCard from './JobCard.vue'
 import SlateMark from './SlateMark.vue'
-import type { Recipe, Settlement } from '@/game/types'
+import type { MaterialKey, Recipe, Settlement, SkillKey } from '@/game/types'
 
 const props = defineProps<{ settlement: Settlement }>()
 const game = useGame()
@@ -33,6 +33,37 @@ const onSite = computed(() => {
 const present = computed(() => game.state?.presenceAt === props.settlement.id)
 
 const available = computed(() => recipesForLines(props.settlement.lines))
+
+/**
+ * §6 -- one tab per line this settlement runs.
+ *
+ * A settlement's tier IS a count of lines -- a village runs one of the five, a
+ * city two, a capital all five -- so the lines are the one axis this panel has,
+ * and merging them threw it away. At a capital that was five ladders in one
+ * column with nothing between them: the saw pit, the smelter, the tannery, the
+ * masons and the loom, read as a single list of fifteen rows.
+ *
+ * Ordered by SKILL_LIST rather than by the settlement's own array, so the same
+ * two lines sit in the same order at every city that runs them.
+ */
+const lines = computed(() =>
+  SKILL_LIST.filter((s) => props.settlement.lines.includes(s.key)),
+)
+
+const line = ref<SkillKey>(lines.value[0]?.key ?? 'woodcutting')
+
+// Walking into a different settlement can land on a tab that does not exist
+// here -- a Sawyer's town after a Weaver's. The first line it runs is the one
+// that is always there.
+watch(
+  lines,
+  (open) => {
+    if (!open.some((s) => s.key === line.value)) line.value = open[0]?.key ?? 'woodcutting'
+  },
+  { immediate: true },
+)
+
+const shown = computed(() => available.value.filter((r) => r.skill === line.value))
 
 /** Lines this settlement does NOT run. Deduped by skill: several recipes can
  *  share one line (ingots and reinforced frames are both Mining), and listing
@@ -198,11 +229,36 @@ watch(() => props.settlement.id, () => { batches.value = 1 })
         Collect one before leaving another behind.
       </div>
 
-      <div v-for="recipe in available" :key="recipe.key" class="recipe">
+      <!-- §6 -- one tab a line, because a settlement's tier IS a count of
+           lines. Drawn only where there is a choice: a village runs one of the
+           five, and a single tab is a label pretending to be a control. -->
+      <nav v-if="lines.length > 1" class="lines" role="tablist">
+        <button
+          v-for="s in lines"
+          :key="s.key"
+          class="line"
+          type="button"
+          role="tab"
+          :class="{ on: line === s.key }"
+          :aria-selected="line === s.key"
+          @click="line = s.key"
+        >
+          <SvgIcon :svg="materialIcon(MATERIALS[s.material as MaterialKey]!, 16)" />
+          {{ s.name }}
+        </button>
+      </nav>
+
+      <div v-for="recipe in shown" :key="recipe.key" class="recipe">
         <SvgIcon :svg="materialIcon(MATERIALS[recipe.output], 26)" boxed :size="26" />
         <div class="grow">
           <div class="row-between">
-            <strong class="tiny">{{ recipe.name }}</strong>
+            <!-- §6 -- a run is named for what comes OFF it, not for what is
+                 done to make it. "Saw Planks" put a verb where every other
+                 list in the game puts the thing: the icon beside it is the
+                 output's, the arrow under it ends on the output, and the
+                 material that lands in the bag is the output -- so the row
+                 was the one part of it naming something else. -->
+            <strong class="tiny">{{ MATERIALS[recipe.output].name }}</strong>
             <span class="tiny mono muted">{{ duration(recipe, batches) }}</span>
           </div>
           <div class="tiny muted">
@@ -235,7 +291,7 @@ watch(() => props.settlement.id, () => { batches.value = 1 })
         </button>
       </div>
 
-      <div v-if="onSite && available.length" class="batch">
+      <div v-if="onSite && shown.length" class="batch">
         <span class="tiny muted">Batches</span>
         <div class="stepper">
           <button type="button" :disabled="batches <= 1" @click="batches--">−</button>
@@ -311,6 +367,43 @@ watch(() => props.settlement.id, () => { batches.value = 1 })
 .presence.on {
   border-color: #6b5a26;
   background: #221e14;
+}
+
+/* §6 -- the lines this settlement runs, as a row of tabs.
+ *
+ * Chamfered and quiet like every other preference control (§13): choosing a
+ * line changes nothing about the world, so it is drawn the way the bag's sort
+ * chips are rather than as something that acts. The chosen one is lit by its
+ * ground, never by a border -- §13 is explicit that a border under a clip-path
+ * does not follow the cut. */
+.lines {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.line {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  background: rgba(0, 0, 0, 0.28);
+  clip-path: var(--plate-clip);
+  border: 0;
+  color: var(--vellum-dim);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.line.on {
+  background: var(--line);
+  color: var(--vellum);
+}
+
+.line :deep(svg) {
+  display: block;
 }
 
 .recipe {

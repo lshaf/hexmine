@@ -14,6 +14,7 @@ import {
   HUNT_GRADED_PART,
   HUNT_GRADES,
   HUNT_PARTS,
+  HUNT_PROCESSING,
   HUNT_RAW,
   HUNT_REFINED,
   HUNT_SKILL_FOR_MATERIAL,
@@ -360,6 +361,14 @@ export const RECIPES: Recipe[] = [
   // §5.3 -- one line per grade, generated alongside the variants themselves so
   // the bench list and the ground it comes off cannot disagree.
   ...VARIANT_PROCESSING,
+
+  // §5.5 -- and the hunt's, which is the fifth ladder. It was missing here
+  // outright: the server offered a tannery three rungs and this list carried
+  // one, so Boiled Leather and Lacquered Hide were unqueueable from the
+  // screen that queues them. Merging the four biome ladders and forgetting
+  // the fifth is what a hand-kept mirror does, and it stayed invisible until
+  // the lines got a tab each and Hunting came up one row against three.
+  ...HUNT_PROCESSING,
 ]
 
 export const RECIPE_BY_KEY: Record<string, Recipe> = Object.fromEntries(
