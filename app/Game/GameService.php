@@ -2070,6 +2070,16 @@ class GameService
             }
         }
 
+        // §5.6 -- the soonest moment anything in this disc stops being what it
+        // is, which is what tells the client when to come back.
+        //
+        // Declared HERE rather than beside the pack list below, because the
+        // regrowths are folded in first and PHP does not mind reading a
+        // variable into existence until it does: an undefined $nextChange only
+        // errored on a disc that actually held a worked-out tile, so it shipped
+        // and sat quiet until somebody stood next to one.
+        $nextChange = PHP_INT_MAX;
+
         $depleted = [];
         foreach (Tiles::statesAmong($disc) as $at => $state) {
             if ($state['regrowsAt'] <= $now) {
@@ -2125,7 +2135,6 @@ class GameService
         $packs = [];
         $hunts = [];
         $roamers = [];
-        $nextChange = PHP_INT_MAX;
         for ($col = $minCol; $col <= $maxCol; $col++) {
             for ($row = $minRow; $row <= $maxRow; $row++) {
                 if (! $inSight($col, $row)) {
@@ -7503,18 +7512,25 @@ class GameService
             // The hex under the character's feet, costed. The dock acts on this
             // rather than on whatever is selected, because selecting is aiming
             // and the dock is only ever about here.
-            'underfoot' => [
-                ...$this->previewTile($character, $character->col, $character->row),
-                'gather' => $this->previewGather($character, $character->col, $character->row),
-                // §5.5 -- and the animal, costed the same way. Null on a hex
-                // that carries none, which is most of the map.
-                'hunt' => $this->previewTile(
-                    $character,
-                    (int) $character->col,
-                    (int) $character->row,
-                    Drops::HUNTING,
-                ),
-            ],
+            //
+            // §5.6 -- and UNDER THE FEET means it, so it is `hereOf` rather
+            // than the column: on the road the column names the hex you set
+            // off from, which is not somewhere you are standing. It changed
+            // nothing about what may be done -- every verb is refused out
+            // there either way -- but it made the client's "is what I am
+            // drawing what the dock is describing" a question with a permanent
+            // wrong answer while walking, and therefore a refetch a hex.
+            'underfoot' => (function () use ($character) {
+                [$col, $row] = $this->hereOf($character);
+
+                return [
+                    ...$this->previewTile($character, $col, $row),
+                    'gather' => $this->previewGather($character, $col, $row),
+                    // §5.5 -- and the animal, costed the same way. Null on a
+                    // hex that carries none, which is most of the map.
+                    'hunt' => $this->previewTile($character, $col, $row, Drops::HUNTING),
+                ];
+            })(),
             'shopStock' => $this->shopStock($character),
             // §7.4 -- what the tree panel needs about *this* character. The tree
             // itself is static and comes from GET /api/jobs instead, so it is

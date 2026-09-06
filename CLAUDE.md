@@ -638,6 +638,28 @@ is drawn in vellum and an unscouted one dim, so the ring still means something;
 what it means is *how much of the live half you are being told*, which is the
 only half the server owns.
 
+**What is standing on your hex and what you may do about it are two payloads,
+and they have to agree.** Which animal, pack or pocket is on a hex is *map*
+state; the costed verbs under your feet ride the *player* state. The dock offers
+Hunt off the second, and that only moved when the whole character was refetched
+— so an animal that walked in while you stood still (§5.5), or a bucket that
+simply rolled one onto your hex, was **drawn on the map with no verb under it**,
+and a reload was the only way to tell the dock.
+
+It is reconciled by **comparison, not by refetching**. The character payload is
+the big one — bag, jobs, quests, skills — and the map is re-asked at every
+`nextChangeAt` and, on the road, at every hex; fetching the whole prospector on
+that schedule would be paying for a wardrobe to find out about a deer. Three
+things can arrive on or leave the hex underfoot, and if the drawing and the
+payload disagree about any of them, the payload is the stale one and only then
+is it re-asked.
+
+**Under the feet means it.** `underfoot` is costed from where the walker *is*
+rather than from the column, for the same reason §5.6's disc is: on the road the
+column names the hex you set off from. It changes nothing about what may be done
+— every verb is refused out there either way — but a dock describing a hex three
+days behind you is a question the comparison above could only ever answer wrong.
+
 **The lines are on the card, never on the hex.** A tile is a shape on a map,
 and a row of marks on it would be a legend to decode at a glance nobody asked
 for. Tapping a hex is the question being asked, and the card is where it is

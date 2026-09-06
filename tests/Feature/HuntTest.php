@@ -278,9 +278,18 @@ final class HuntTest extends TestCase
 
         // And the map says so, rather than leaving a roamer on the wire that
         // the client would have to know to ignore.
+        //
+        // Compared as a PAIR. It checked the column alone at first, which is
+        // not a hex: the animal walks on from here when it is taken (§5.5), and
+        // the hex it walks to is usually in the same column -- so the assertion
+        // was reading the creature's NEXT stop as proof it had not left this
+        // one.
         $after = $this->game->mapMutations($there);
         $this->assertContains([$col, $row], $after['hunted']);
-        $this->assertNotContains($col, array_column($after['roaming'], 0));
+        $this->assertNotContains(
+            [$col, $row],
+            array_map(static fn (array $r) => [$r[0], $r[1]], $after['roaming']),
+        );
     }
 
     /** §5.5 -- and a hex with nothing on it refuses rather than paying. */

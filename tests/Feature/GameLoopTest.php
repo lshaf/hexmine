@@ -4344,6 +4344,40 @@ final class GameLoopTest extends TestCase
     }
 
     /**
+     * §5.6 -- a worked-out seam is one of the clocks the answer counts.
+     *
+     * It is also the one that shipped broken. `nextChangeAt` folds four kinds
+     * of clock together and the regrowths are folded FIRST, above where the
+     * running minimum was declared -- so the whole endpoint threw the moment a
+     * disc actually held a worked-out tile, and every test that asked about the
+     * map happened to ask from ground nobody had worked. Standing next to one
+     * is all it took.
+     */
+    public function test_a_regrowing_seam_is_one_of_the_clocks(): void
+    {
+        $col = (int) $this->character->col;
+        $row = (int) $this->character->row;
+
+        // Work the hex underfoot out, so the disc holds a real regrowth.
+        Tiles::take($col, $row, 1, $this->game->now());
+        Tiles::take($col, $row, 999, $this->game->now());
+
+        $map = $this->game->mapMutations($this->character->fresh());
+
+        $this->assertNotSame([], $map['depleted'], 'nothing was worked out');
+        $this->assertNotNull($map['nextChangeAt'], 'a regrowing seam named no moment');
+        // At or before it, never after: the answer is the soonest of FOUR kinds
+        // of clock, and a two-hour pack bucket beats a nine-hour regrowth most
+        // of the time. What matters is that the regrowth was counted at all.
+        $this->assertGreaterThan($this->game->now(), $map['nextChangeAt']);
+        $this->assertLessThanOrEqual(
+            min(array_column($map['depleted'], 2)),
+            $map['nextChangeAt'],
+            'the map named a moment after a seam it can see comes back',
+        );
+    }
+
+    /**
      * §5.6 -- the road does not close the eye, and the disc goes with you.
      *
      * It used to close it: sight went to zero the moment a journey started, on

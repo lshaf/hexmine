@@ -359,7 +359,40 @@ export const useGame = defineStore('game', () => {
   async function refreshMutations(): Promise<void> {
     mutations.value = await api.getMap()
     rebuildTiles()
+    await reconcileUnderfoot()
     scheduleLiveRefresh()
+  }
+
+  /**
+   * §5.5/§5.7/§9.5.3 -- what is STANDING on your hex is map state, and what you
+   * may DO about it is player state. They have to agree.
+   *
+   * The dock offers Hunt when `state.underfoot.hunt.animal` is there, and that
+   * field only moves when the whole state payload is refetched -- which happens
+   * on arriving, on acting, and on nothing else. So an animal that walked in
+   * while you stood still (§5.5) or a bucket that simply rolled one onto your
+   * hex was DRAWN on the map and had no verb under it: the map knew and the
+   * dock did not, and a reload was the only way to tell it.
+   *
+   * Asked as a comparison rather than fixed with an unconditional refetch. The
+   * state payload is the big one -- bag, jobs, quests, skills, the lot -- and
+   * the map is re-asked at every `nextChangeAt` and, on the road, at every hex.
+   * Fetching it on that schedule would be paying for the whole character to
+   * find out about a deer. So: three things can appear on or leave the hex you
+   * are standing on, and if the drawing and the payload disagree about any of
+   * them, the payload is the stale one.
+   */
+  async function reconcileUnderfoot(): Promise<void> {
+    const said = state.value?.underfoot
+    const tile = tileAt(hereCol.value, hereRow.value)
+    if (!said || !tile) return
+
+    const stale =
+      Boolean(tile.hunt) !== Boolean(said.hunt?.animal)
+      || Boolean(tile.pack) !== Boolean(said.pinned)
+      || Boolean(tile.pocketUntil) !== Boolean(said.pocketUntil)
+
+    if (stale) await refreshState()
   }
 
   function scheduleLiveRefresh(): void {
