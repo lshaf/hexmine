@@ -97,8 +97,16 @@ const unseen = computed(() => distance.value > game.sight)
  * worth reading. Two seats are a fact about the GROUND, shared with everybody,
  * and they hold whether the belt is ready or not -- so the plate keeps saying
  * how many are free and the dock keeps saying what you may do about it.
+ *
+ * Read off the TILE rather than off the preview, and that is the fix for a
+ * flicker rather than a shortcut. Whether a hex holds a seam is a pure
+ * function of (col, row, seed) -- the client runs the same one the server does
+ * -- so waiting on a request to find out made the plate say one thing and then
+ * another: the walk, and then the slots, half a second apart, every time a hex
+ * was tapped. The fog is still respected, because `unseen` is the gate: out of
+ * sight the client is not allowed to answer this and does not.
  */
-const seam = computed(() => Boolean(!unseen.value && preview.value?.material))
+const seam = computed(() => Boolean(!unseen.value && tile.value?.material))
 
 
 /**
@@ -515,16 +523,17 @@ watch(open, (isOpen) => {
               <span class="readout">{{ tile.workers }}</span>
             </span>
           </span>
-          <!-- §5.6 -- the walk, on any hex that is not the one underfoot.
-               Distance is the whole cost of going anywhere, so the card owes it
-               wherever it can be answered: a settlement two hexes off and one
-               four days away are the same tap and very different decisions,
-               and hours are what says which. -->
+          <!-- §5.6 -- what the walk COSTS, on a hex that is not the one
+               underfoot. Distance is the whole price of going anywhere, so the
+               card owes it wherever it can be answered: a settlement two hexes
+               off and one four days away are the same tap and very different
+               decisions.
+
+               The hex COUNT is gone from beside it. Two readouts for one
+               journey, and the one that decides anything is the clock -- five
+               minutes a hex means the count is the same fact in a unit nobody
+               plans in. The Travel button under this row still names both. -->
           <span v-else-if="distance > 0" class="stats">
-            <span class="stat">
-              <span class="label">Walk</span>
-              <span class="readout">{{ distance }} hex</span>
-            </span>
             <span class="stat">
               <span class="label">Takes</span>
               <span class="readout">{{ formatSpan(eta) }}</span>

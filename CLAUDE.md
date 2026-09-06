@@ -617,6 +617,20 @@ argument that the tint had already said it. Both were true readings of a map
 where every hex had something in it; neither survives half a rim of dead ground
 that wears the same fill as the living country beside it.
 
+**What the card can derive, it must not wait for.** Whether a hex holds a seam
+falls out of `(col, row, seed)` and the client runs that function itself — so
+reading it off a *costing* made the plate say one thing and then another: the
+walk, then the slots, half a second apart, on every tap. It is read off the tile
+now, gated on sight exactly as before, and lands in one frame. A costing still
+answers what the seed cannot — the rate off your gear, the pocket, the animal,
+the warnings — and it is dropped the moment the selection moves, so the last
+hex's refusal never sits over this hex's name while a request is in flight.
+
+**The clock is on the card and the hex count is not.** Two readouts for one
+journey, and the one that decides anything is the clock: at five minutes a hex
+the count is the same fact in a unit nobody plans in. The Travel button beside
+it still names both.
+
 **The biome is the one answer that is true at any distance**, which is why it is
 the one the card gives. You can see that there is forest over the hill; you
 cannot see whether the stand is worth cutting, and you cannot see whether it is

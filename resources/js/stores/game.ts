@@ -909,7 +909,13 @@ export const useGame = defineStore('game', () => {
    * on this device.
    */
   async function select(col: number, row: number): Promise<void> {
+    // A costing belongs to ONE hex, so pointing somewhere new drops the old
+    // one rather than leaving it on screen until the next answer lands. It is
+    // what made the plate show the last hex's refusal over this hex's name for
+    // as long as a request takes.
+    const moved = selected.value?.col !== col || selected.value?.row !== row
     selected.value = { col, row }
+    if (moved) preview.value = null
 
     // §5.6 -- from where the walker IS, and this guard exists to ask exactly
     // the question the server will ask, so a hex it would refuse costs no
