@@ -3081,15 +3081,39 @@ final class GameLoopTest extends TestCase
     {
         $pool = fn (string $key) => Catalog::optionStatsFor(Catalog::item($key));
 
-        // §5.3 -- a gathering tool also offers its line's three grades above
-        // the base, which is the only rolled line that names a material.
+        // §8.0.1 -- a gathering tool also offers everything its own ground gives
+        // up bar the commonest: the grades above the base, the two herbs, the
+        // two components and the critter. The only rolled line naming a
+        // material, and never the base grade or anything at tier 0.
         $this->assertSame(
-            ['attack', 'hardwood', 'heartoak', 'ironwood', 'durability', 'haul'],
+            [
+                'attack',
+                'hardwood', 'heartoak', 'ironwood',
+                'toadstool', 'birch_sap',
+                'heartknot', 'pine_pitch',
+                'glimmermoth',
+                'durability', 'haul',
+            ],
             $pool('ironwood_axe'),
         );
         $this->assertSame(['attack', 'defense', 'durability', 'haul', 'travel'], $pool('marching_boots'));
         $this->assertSame(['attack', 'defense', 'durability', 'haul'], $pool('ironwood_armor'));
         $this->assertSame(['attack', 'durability', 'haul', 'cooldown'], $pool('knotted_rod'));
+
+        // §4.0 -- and the glove is the fifth odd one, because gathering has no
+        // tool for a seam line to sit on. What it offers is the GATHER table's
+        // own list, which is why the base raws are on it and the grades above
+        // them are not.
+        $this->assertSame(
+            [
+                'wood', 'toadstool', 'birch_sap',
+                'iron_ore', 'lichen', 'stonewort',
+                'stone', 'ashcap', 'sagebrush',
+                'fiber', 'blue_nettle', 'clover',
+                'attack', 'defense', 'durability', 'haul',
+            ],
+            $pool('tanners_gloves'),
+        );
     }
 
     /**
@@ -3550,7 +3574,7 @@ final class GameLoopTest extends TestCase
      */
     public function test_a_rolled_line_belongs_to_the_piece_it_is_on(): void
     {
-        $checked = ['tool' => 0, 'weapon' => 0, 'worn' => 0];
+        $checked = ['tool' => 0, 'weapon' => 0, 'worn' => 0, 'gloves' => 0];
 
         foreach (Catalog::items() as $key => $def) {
             $slot = $def['slot'] ?? null;
@@ -3577,9 +3601,9 @@ final class GameLoopTest extends TestCase
                 // A tool takes material out of a hex: there is nothing there
                 // for a guard to keep off you, and nothing to walk or fight.
                 //
-                // §5.3 -- and it is the only piece that may favour a GRADE, so
-                // its own line's three non-common materials sit in the pool
-                // beside the four fixed words.
+                // §8.0.1 -- and it may favour anything its own ground gives up
+                // bar the commonest, so that whole list sits in the pool beside
+                // the three fixed words.
                 $this->assertSame(
                     ['attack', ...Catalog::seamMaterialsForSlot($slot), 'durability', 'haul'],
                     $stats,
@@ -3608,12 +3632,29 @@ final class GameLoopTest extends TestCase
             }
 
             $checked['worn']++;
-            // §5.3 -- nothing worn works a seam. Only the tool that swings at
-            // one may favour a grade.
-            $this->assertEmpty(
+
+            $seams = array_column(
                 array_filter($pool, static fn (array $p) => $p['kind'] === Catalog::OPTION_SEAM),
-                "{$key} favours a seam",
+                'stat',
             );
+
+            if ($slot === 'gloves') {
+                $checked['gloves']++;
+                // §4.0 -- the one worn piece that favours a seam, because
+                // gathering has no tool for the line to sit on: §7.3 works it
+                // with the hands in the tool's place, so the glove IS the tool.
+                //
+                // The gather table's own list, which is a different list: the
+                // base raws are on it because bare-handed they are the rare
+                // find, and the grades above them are not because hands never
+                // reach them.
+                $this->assertSame(Catalog::gatherSeamMaterials(), $seams, "{$key}");
+            } else {
+                // Nothing else worn works a seam. A coat takes nothing out of
+                // the ground and a boot takes nothing out of it either.
+                $this->assertSame([], $seams, "{$key} favours a seam");
+            }
+
             $this->assertContains('haul', $stats, "{$key} cannot roll a haul");
             $this->assertNotContains('cooldown', $stats, "{$key} shortens a cooldown");
             // Boots walk. A coat does not.
@@ -3625,6 +3666,7 @@ final class GameLoopTest extends TestCase
         $this->assertGreaterThan(0, $checked['tool']);
         $this->assertGreaterThan(0, $checked['weapon']);
         $this->assertGreaterThan(0, $checked['worn']);
+        $this->assertGreaterThan(0, $checked['gloves']);
     }
 
     /**

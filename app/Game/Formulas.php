@@ -305,8 +305,16 @@ final class Formulas
      *
      * @param  array<int,array{key:string,durability:int,equipped:bool,options?:array}>  $items
      */
-    public static function optionGain(array $items, string $stat, ?string $line = null): float
-    {
+    /**
+     * @param  list<string>|null  $onlySlots  restrict to these slots, or every
+     *                                        slot the rules below allow.
+     */
+    public static function optionGain(
+        array $items,
+        string $stat,
+        ?string $line = null,
+        ?array $onlySlots = null,
+    ): float {
         $values = [];
 
         foreach ($items as $item) {
@@ -316,6 +324,13 @@ final class Formulas
 
             $def = Catalog::item($item['key']);
             if ($def === null) {
+                continue;
+            }
+
+            // §4.0 -- one caller narrows this to a single slot, and it is the
+            // gather: the hands are the tool there (§7.3), so the glove counts
+            // and nothing on the belt does.
+            if ($onlySlots !== null && ! in_array((string) ($def['slot'] ?? ''), $onlySlots, true)) {
                 continue;
             }
 

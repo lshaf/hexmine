@@ -333,23 +333,123 @@ final class Catalog
         }
 
         if ($line === 'hunting') {
-            return array_slice(array_column(Hunts::GRADES, 'material'), 1);
+            // §5.5 -- the rungs above the common hide, and everything else a
+            // kill gives up. The parts are on the list for the same reason the
+            // herbs are on the mining one: they are what the line actually
+            // brings home, and a bow that favours sinew is as real a piece of
+            // luck as one that favours a better hide.
+            return array_values(array_diff(
+                array_merge(
+                    array_slice(array_column(Hunts::GRADES, 'material'), 1),
+                    Hunts::PARTS,
+                    [Hunts::GRADED_PART],
+                ),
+                self::SEAM_NEVER,
+            ));
         }
 
         // Which country this line works is a fact the variant table already
         // holds -- every grade of it names this skill -- so it is read off
         // there rather than kept as a fifth copy of the same pairing.
-        foreach (Variants::BIOME_VARIANTS as $grades) {
+        foreach (Variants::BIOME_VARIANTS as $biome => $grades) {
             $materials = array_column($grades, 'material');
             // Asked of the SECOND grade rather than the base: the base raws
             // are listed on the skill itself, and this map covers the grades
-            // above them -- which is exactly the three being returned.
+            // above them.
             if ((Variants::SKILL_FOR_MATERIAL[$materials[1] ?? ''] ?? null) === $line) {
-                return array_slice($materials, 1);
+                return self::seamSet(array_slice($materials, 1), $biome);
             }
         }
 
         return [];
+    }
+
+    /**
+     * §8.0.1 -- what a rolled seam line may never name.
+     *
+     * Junk and scrap. §4 gives both the same sentence -- a gold apiece, no
+     * recipe anywhere takes them, they reach no tier -- so a line promising
+     * more of one is a bonus to nothing. That is not an unlucky roll, which is
+     * a thing this pool is meant to have; it is a dud, and a rung of luck a
+     * player can read as broken is worse than no rung.
+     *
+     * Kept as a rule rather than a filter on price, because §4.0 fixes scrap at
+     * a gold and a raw above it: the two lists are the same list.
+     */
+    public const SEAM_NEVER = [
+        'deadfall', 'slag', 'bone_splinter', 'cinder', 'thistle',
+        'branch', 'ore_chips', 'torn_hide', 'gravel', 'chaff',
+        'matted_turf',
+    ];
+
+    /**
+     * §8.0.1 -- every material a line's ground gives up, bar the commonest.
+     *
+     * The grades above the base one, the two herbs, the two components and the
+     * critter -- which is the whole of what Drops::mining() puts on the table
+     * beside the seam itself.
+     *
+     * **Never the base grade**, which is the one rule that survived the pool
+     * widening: it is what a hex mostly hands you anyway, so a line promising
+     * more of it would read as luck and would not be. That is the same
+     * sentence as "except the commonest thing on the table", and it stays true
+     * of every one of the five lines.
+     *
+     * *(It was the three grades and nothing else. That made a tool's luck a
+     * fact about the ladder alone, when most of what a mine actually brings
+     * home is the bench stock standing beside the seam -- and an axe that runs
+     * to toadstool is a thing a player has a use for.)*
+     *
+     * @param  list<string>  $grades
+     * @return list<string>
+     */
+    private static function seamSet(array $grades, string $biome): array
+    {
+        return array_values(array_diff(
+            array_merge(
+                $grades,
+                Drops::herbsOf($biome),
+                Drops::componentsOf($biome),
+                [Critters::BY_BIOME[$biome] ?? ''],
+            ),
+            self::SEAM_NEVER,
+            [''],
+        ));
+    }
+
+    /**
+     * §4.0/§8.0.1 -- what a GLOVE may favour, which is what hands pick up.
+     *
+     * Gathering has no tool: §7.3 works it "with your hands in the tool's
+     * place", so there is nothing on the belt for a seam line to sit on. The
+     * glove is the tool, and this is the only place in the game where a worn
+     * piece answers a question a tool answers everywhere else.
+     *
+     * The gather table is scrap, junk, a little of the base raw and the two
+     * herbs (Drops::gathering). Scrap is both the commonest thing on it and on
+     * SEAM_NEVER, so it goes twice over; junk goes with it. What is left is the
+     * three worth having -- and the base raw is on this list where it is off
+     * the mining one, because bare-handed it is the rare find rather than the
+     * usual one.
+     *
+     * Not line-locked, because a glove is not a tool (§8 rule 1 binds tools).
+     * A glove favouring toadstool favours it wherever toadstool is picked up.
+     *
+     * @return list<string>
+     */
+    public static function gatherSeamMaterials(): array
+    {
+        $out = [];
+
+        foreach (Variants::BIOME_VARIANTS as $biome => $grades) {
+            $out = array_merge(
+                $out,
+                [$grades[0]['material']],
+                Drops::herbsOf($biome),
+            );
+        }
+
+        return array_values(array_diff(array_unique($out), self::SEAM_NEVER));
     }
 
     /**
@@ -390,12 +490,24 @@ final class Catalog
             // A tool guards nothing: there is no blow on a hex to keep off you.
             $pool[] = $line(self::OPTION_FLAT_TOOL[0]);
 
-            // §5.3 -- and a tool may favour ONE of the grades above the base,
-            // which is the only rolled line in the game that names a material.
+            // §5.3 -- and a tool may favour any material its own ground gives
+            // up bar the commonest, which is the only rolled line in the game
+            // that names a material.
             foreach (self::seamMaterialsForSlot($slot) as $material) {
                 $pool[] = $line($material, self::OPTION_SEAM);
             }
         } else {
+            // §4.0 -- and the glove is the gatherer's tool, so it carries the
+            // same kind of line for the one verb that has no tool at all
+            // (§7.3: hands in the tool's place). Not line-locked, because a
+            // glove is worn rather than held: one favouring toadstool favours
+            // it wherever toadstool is picked up.
+            if ($slot === 'gloves') {
+                foreach (self::gatherSeamMaterials() as $material) {
+                    $pool[] = $line($material, self::OPTION_SEAM);
+                }
+            }
+
             foreach (self::OPTION_FLAT_WORN as $stat) {
                 // §9.5.4 -- a focus keeps nothing off you, of either kind.
                 if ($stat === 'defense' && $slot === 'weapon'

@@ -3884,7 +3884,7 @@ class GameService
                 $tile,
                 $gathering ? 0 : $reach,
                 $pocketUntil !== null,
-                $gathering ? [] : $this->seamFavour($character, $skillKey),
+                $this->seamFavour($character, $skillKey, $gathering),
             ),
             'activity' => $activity,
             // The line stays the tile's own even on a gathered haul: swinging
@@ -4265,7 +4265,11 @@ class GameService
             // than stored on the job, exactly as the pocket above is: the kit
             // that took the mine is the kit that worked it, and this is the
             // same character's same tool.
-            $this->seamFavour($character, $job->skill_key ? (string) $job->skill_key : null),
+            $this->seamFavour(
+                $character,
+                $job->skill_key ? (string) $job->skill_key : null,
+                $activity === Drops::GATHERING,
+            ),
         );
 
         // Seeded from the job, so a haul is settled the moment it is claimed
@@ -6685,17 +6689,36 @@ class GameService
      *
      * @return array<string,float>
      */
-    public function seamFavour(Character $character, ?string $line): array
+    public function seamFavour(Character $character, ?string $line, bool $gathering = false): array
     {
         if ($line === null) {
             return [];
         }
 
+        // §4.0/§7.3 -- on a gather the HANDS are the tool, so the glove is what
+        // counts and the tool on the belt does not. That is the same sentence
+        // §8.0 rule 1 makes about a mine pointed the other way: a hex is worked
+        // with the tool or with the hands and never with both, so a lucky axe
+        // has no more business in a bare-handed haul than a sword has in a
+        // mine. The list is the gather table's own, which is a different list.
         $slot = Catalog::slotForSkill($line);
+
+        $materials = $gathering
+            ? Catalog::gatherSeamMaterials()
+            : Catalog::seamMaterialsForSlot($slot);
+
+        // ONE slot either way, and that is what keeps the glove from being a
+        // second seam slot on every line. It carries this line only because
+        // gathering has no tool to carry it; letting it pay out down a mine as
+        // well would make the hands argument decoration and put a lucky glove
+        // ahead of a lucky tool on the five materials the two lists share.
+        $only = $gathering ? ['gloves'] : [(string) $slot];
+
+        $rows = $this->itemRows($character);
         $out = [];
 
-        foreach (Catalog::seamMaterialsForSlot($slot) as $material) {
-            $share = Formulas::optionGain($this->itemRows($character), $material, $line);
+        foreach ($materials as $material) {
+            $share = Formulas::optionGain($rows, $material, $line, $only);
             if ($share > 0) {
                 $out[$material] = $share;
             }

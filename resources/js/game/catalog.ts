@@ -7,11 +7,13 @@ import { ECONOMY, EQUIPMENT } from './balance'
 import { CONSUMABLES, JUNK, REAGENTS } from './alchemy'
 import { COMPONENTS } from './components'
 import { TOP_TIER } from './toptier'
-import { CRITTERS } from './critters'
+import { CRITTERS, CRITTER_BY_BIOME } from './critters'
 import { SPOILS } from './spoils'
 import {
   HUNT_EXTRA,
+  HUNT_GRADED_PART,
   HUNT_GRADES,
+  HUNT_PARTS,
   HUNT_RAW,
   HUNT_REFINED,
   HUNT_SKILL_FOR_MATERIAL,
@@ -526,12 +528,20 @@ export function optionRollsFor(def: ItemDef): OptionRoll[] {
   if (skillForSlot(def.slot) !== null) {
     pool.push({ stat: OPTION_FLAT_TOOL[0]!, kind: 'flat' })
 
-    // §5.3 -- and a tool may favour one of the grades above the base, which is
-    // the only rolled line in the game that names a material.
+    // §5.3 -- and a tool may favour any material its own ground gives up bar
+    // the commonest, which is the only rolled line in the game naming one.
     for (const material of seamMaterialsForSlot(def.slot)) {
       pool.push({ stat: material, kind: 'seam' })
     }
   } else {
+    // §4.0 -- and the glove is the gatherer's tool, so it carries the same kind
+    // of line for the one verb that has no tool at all.
+    if (def.slot === 'gloves') {
+      for (const material of gatherSeamMaterials()) {
+        pool.push({ stat: material, kind: 'seam' })
+      }
+    }
+
     for (const stat of OPTION_FLAT_WORN) {
       const noGuard =
         stat === 'defense' &&
@@ -551,11 +561,33 @@ export function optionRollsFor(def: ItemDef): OptionRoll[] {
 }
 
 /**
- * §5.3 -- the non-common materials a tool's own line can take out of the ground.
+ * §8.0.1 -- what a rolled seam line may never name.
  *
- * Four grades a biome and the first is the base, so this is always the other
- * three. The hunting line reads the same ladder off the creature rather than
- * off a hex (§5.5), which is why it is asked for by SLOT.
+ * Junk and scrap. §4 gives both the same sentence -- a gold apiece, no recipe
+ * anywhere takes them -- so a line promising more of one is a bonus to nothing:
+ * not an unlucky roll, which this pool is meant to have, but a dud.
+ *
+ * Mirrors `Catalog::SEAM_NEVER`.
+ */
+const SEAM_NEVER: string[] = [
+  'deadfall', 'slag', 'bone_splinter', 'cinder', 'thistle',
+  'branch', 'ore_chips', 'torn_hide', 'gravel', 'chaff',
+  'matted_turf',
+]
+
+const ofBiome = (rows: { key: string; biome?: string }[], biome: string): string[] =>
+  rows.filter((r) => r.biome === biome).map((r) => r.key)
+
+/**
+ * §8.0.1 -- every material a line's ground gives up, bar the commonest.
+ *
+ * The grades above the base one, the two herbs, the two components and the
+ * critter -- which is the whole of what a mine puts on the table beside the
+ * seam. Never the base grade: it is what a hex mostly hands you anyway, so a
+ * line promising more of it would read as luck and would not be.
+ *
+ * The hunting line reads its ladder off the creature rather than off a hex
+ * (§5.5), which is why this is asked for by SLOT.
  *
  * Mirrors `Catalog::seamMaterialsForSlot()`.
  */
@@ -563,16 +595,56 @@ export function seamMaterialsForSlot(slot: EquipSlot | undefined): MaterialKey[]
   const line = slot ? skillForSlot(slot) : null
   if (line === null) return []
 
-  if (line === 'hunting') return HUNT_GRADES.slice(1).map((g) => g.material as MaterialKey)
+  const keep = (keys: string[]) =>
+    keys.filter((k) => !SEAM_NEVER.includes(k)) as MaterialKey[]
 
-  for (const grades of Object.values(BIOME_VARIANTS)) {
-    const materials = grades.map((g) => g.material as MaterialKey)
+  if (line === 'hunting') {
+    return keep([
+      ...HUNT_GRADES.slice(1).map((g) => g.material),
+      ...HUNT_PARTS,
+      HUNT_GRADED_PART,
+    ])
+  }
+
+  for (const [biome, grades] of Object.entries(BIOME_VARIANTS)) {
+    const materials = grades.map((g) => g.material)
     // Asked of the SECOND grade: the base raws live on the skill itself and
     // this map covers the grades above them.
-    if (VARIANT_SKILL[materials[1]!] === line) return materials.slice(1)
+    if (VARIANT_SKILL[materials[1]!] !== line) continue
+
+    return keep([
+      ...materials.slice(1),
+      ...ofBiome(REAGENTS, biome),
+      ...ofBiome(COMPONENTS, biome),
+      CRITTER_BY_BIOME[biome as Biome],
+    ])
   }
 
   return []
+}
+
+/**
+ * §4.0/§8.0.1 -- what a GLOVE may favour, which is what hands pick up.
+ *
+ * Gathering has no tool: §7.3 works it with the hands in the tool's place, so
+ * there is nothing on the belt for a seam line to sit on and the glove is the
+ * tool. The gather table is scrap, junk, a little of the base raw and the two
+ * herbs -- scrap is both the commonest thing on it and forbidden outright, junk
+ * goes with it, and what is left is the three worth having.
+ *
+ * The base raw IS on this list where it is off the mining one, because
+ * bare-handed it is the rare find rather than the usual one.
+ *
+ * Mirrors `Catalog::gatherSeamMaterials()`.
+ */
+export function gatherSeamMaterials(): MaterialKey[] {
+  const out: string[] = []
+
+  for (const [biome, grades] of Object.entries(BIOME_VARIANTS)) {
+    out.push(grades[0]!.material, ...ofBiome(REAGENTS, biome))
+  }
+
+  return [...new Set(out)].filter((k) => !SEAM_NEVER.includes(k)) as MaterialKey[]
 }
 
 /** The slot a skill line draws its tool from. */

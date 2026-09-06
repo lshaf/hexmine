@@ -99,7 +99,7 @@ final class Drops
 
         return $activity === self::MINING
             ? self::mining($biome, $variants, $tileGrade, $reach, $rich, $seam)
-            : self::gathering($biome);
+            : self::gathering($biome, $seam);
     }
 
     /**
@@ -126,7 +126,7 @@ final class Drops
         $tileGrade = self::gradeOf($tile, $variants);
 
         if ($activity === self::GATHERING) {
-            return self::gathering($biome);
+            return self::gathering($biome, $seam);
         }
 
         // §5.5 -- the animal's own table. It does not read the ground's grade:
@@ -243,7 +243,11 @@ final class Drops
      *
      * @return array<string,float>
      */
-    private static function gathering(string $biome): array
+    /**
+     * @param  array<string,float>  $seam  §8.0.1 -- material key -> the share more
+     *                                     of it a rolled line on the GLOVE asks for.
+     */
+    private static function gathering(string $biome, array $seam = []): array
     {
         $table = [
             Catalog::BIOME_SCRAP[$biome] => 48.0,
@@ -253,6 +257,22 @@ final class Drops
 
         foreach (self::herbsOf($biome) as $herb) {
             $table[$herb] = 8.5;
+        }
+
+        // §4.0/§8.0.1 -- and a glove that favours something bends the weights
+        // toward it, exactly as a tool's line does on the mining table.
+        //
+        // The GLOVE and not a tool, because gathering has none: §7.3 works it
+        // with the hands in the tool's place, so the piece on the hands is the
+        // only thing there is for a line like this to sit on.
+        //
+        // Applied to the weight rather than the roll, and it can never reach
+        // what is not on the table -- both the same rules the mining seam
+        // keeps, said once here because the two tables are two tables.
+        foreach ($seam as $material => $share) {
+            if (isset($table[$material]) && $share > 0) {
+                $table[$material] *= 1 + $share;
+            }
         }
 
         return $table;
@@ -712,7 +732,7 @@ final class Drops
     }
 
     /** @return list<string> */
-    private static function herbsOf(string $biome): array
+    public static function herbsOf(string $biome): array
     {
         $out = [];
         foreach (Alchemy::REAGENTS as $key => $def) {
@@ -742,7 +762,7 @@ final class Drops
     private const HUNT_JUNK = Hunts::JUNK;
 
     /** @return list<string> */
-    private static function componentsOf(string $biome): array
+    public static function componentsOf(string $biome): array
     {
         $out = [];
         foreach (Components::CRAFT as $key => $def) {

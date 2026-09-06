@@ -1965,22 +1965,67 @@ One rule, and it is §8's usual one: **what is the piece FOR.**
 
 | Piece | May roll |
 |---|---|
-| **Gathering tool** | `attack` · `durability` · `haul` · `seam` (one per grade) |
+| **Gathering tool** | `attack` · `durability` · `haul` · `seam` (one per material) |
 | **Weapon** | `attack` · `defense` · `durability` · `haul` · `cooldown` |
-| **Armor · gloves** | `attack` · `defense` · `durability` · `haul` |
+| **Armor** | `attack` · `defense` · `durability` · `haul` |
+| **Gloves** | the same, plus `seam` — the gather table's own (§4.0) |
 | **Boots** | the same, plus `travel` |
 
 …and any of them may, rarely, come out unbreakable.
 
-**`seam` is the one line that names a MATERIAL**, and a gathering tool is the
-only piece that carries it. Its `stat` is the material key rather than a word,
-which is what makes "one line per stat" mean **one line per grade**: an axe may
-come out favouring hardwood and ironwood at once, and never hardwood twice.
+**`seam` is the one line that names a MATERIAL.** Its `stat` is the material key
+rather than a word, which is what makes "one line per stat" mean **one line per
+material**: an axe may come out favouring hardwood and toadstool at once, and
+never hardwood twice.
 
-**Three grades a line, and never the base one** — §5.3 gives every line four
-and the first is what a hex mostly hands you anyway, so a line promising more
-of it would read as luck and would not be. Three grades × three values is nine
-ways an axe can favour a forest, and forty-five across the five lines.
+**Everything a line's ground gives up, bar the commonest.** The grades above the
+base one, the two herbs, the two components and the critter — which is the whole
+of what a mine puts on the table beside the seam itself. Eight materials a line,
+nine on the hunt, and 41 across the five.
+
+*(It was the three grades and nothing else. That made a tool's luck a fact about
+the ladder alone, when most of what a mine actually brings home is the bench
+stock standing beside the seam — and an axe that runs to toadstool is a thing a
+player has a use for.)*
+
+**Never the base grade**, which is the one rule the widening did not touch:
+§5.3's first grade is what a hex mostly hands you anyway, so a line promising
+more of it would read as luck and would not be. Said the other way, and it is
+the same sentence: never the commonest thing on the table.
+
+**And never junk or scrap.** §4 gives both the same sentence — a gold apiece, no
+recipe anywhere takes them, they reach no tier — so a line promising more of one
+is a bonus to *nothing*. That is not an unlucky roll, which this pool is meant to
+have; it is a dud, and a rung of luck a player can read as broken is worse than
+no rung at all. There is a test, and it checks the data as well as the list:
+tier 0 is exactly junk and scrap.
+
+**A widened pool is a deeper bag, and that is felt.** With eight seams beside
+`attack`, `durability` and `haul`, a tool's luck is now mostly about the ground —
+which is what a tool is for. `attack` and `haul` get rarer on a tool in exchange;
+that is the pool doing what §8.0.1 already says a pool does, and it is a weight
+if it ever needs to be one.
+
+**The GLOVE carries the same line for the one verb that has no tool.** Gathering
+is worked with the hands in the tool's place (§7.3), so there is nothing on the
+belt for a seam line to sit on — the glove is the gatherer's tool, and this is
+the only place in the game where a worn piece answers a question a tool answers
+everywhere else.
+
+What it offers is the **gather table's** own list, which is a different list:
+scrap is both the commonest thing on it and forbidden outright, junk goes with
+it, and what is left is the base raw and the two herbs — three a country, twelve
+in all. **The base raw is on this list where it is off the mining one**, because
+bare-handed it is the rare find rather than the usual one.
+
+**One slot pays out either way, and that is what keeps the glove honest.** On a
+mine the line's own tool counts and the glove does not; on a gather the glove
+counts and the tool does not. That is §8.0 rule 1 pointed both ways — a hex is
+worked with the tool or with the hands and never with both — and without it a
+glove would be a second seam slot on every line, which would make the hands
+argument decoration and put a lucky glove ahead of a lucky tool on the five
+materials the two lists share. A glove is otherwise **not** line-locked: one
+favouring toadstool favours it wherever toadstool is picked up.
 
 **Three values and not five**, which is why the ladder above pairs off the
 bottom: ten, twenty and thirty per cent. Deliberately flatter than the `haul`

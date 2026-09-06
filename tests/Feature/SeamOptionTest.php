@@ -28,39 +28,151 @@ final class SeamOptionTest extends TestCase
 {
     use RefreshDatabase;
 
-    /** §5.3 -- three grades above the base, per line, and never the base. */
-    public function test_every_line_offers_its_three_non_common_grades(): void
+    /**
+     * §8.0.1 -- everything a line's ground gives up, bar the commonest.
+     *
+     * Not the three grades alone. Most of what a mine actually brings home is
+     * the bench stock standing beside the seam -- the herbs, the components,
+     * the critter -- and an axe that runs to toadstool is a thing a player has
+     * a use for.
+     */
+    public function test_a_line_offers_everything_its_ground_gives_up(): void
     {
         foreach (Catalog::TOOL_SLOT_SKILL as $slot => $line) {
             $materials = Catalog::seamMaterialsForSlot($slot);
 
-            $this->assertCount(3, $materials, "{$line} does not offer three grades");
+            $this->assertGreaterThanOrEqual(8, count($materials), "{$line} offers too little");
 
             foreach ($materials as $key) {
                 $this->assertArrayHasKey($key, Catalog::materials(), "{$key} is not a material");
             }
 
             // The base grade is what a hex mostly gives anyway; a line
-            // promising more of it would read as luck and would not be.
+            // promising more of it would read as luck and would not be. That
+            // is the one rule the widening did not touch.
             $base = Catalog::SKILLS[$line]['material'] ?? null;
             $this->assertNotContains($base, $materials, "{$line} offers its own base grade");
         }
     }
 
-    /** Only a gathering tool carries it: nothing worn works a seam. */
-    public function test_only_a_gathering_tool_may_roll_one(): void
+    /**
+     * §8.0.1 -- and never junk or scrap, which is the other half of that rule.
+     *
+     * §4 gives both the same sentence: a gold apiece, no recipe takes them,
+     * they reach no tier. A line promising more of one is a bonus to nothing --
+     * not an unlucky roll, which this pool is meant to have, but a dud.
+     */
+    public function test_no_line_may_favour_rubbish(): void
+    {
+        $offered = Catalog::gatherSeamMaterials();
+        foreach (Catalog::TOOL_SLOT_SKILL as $slot => $line) {
+            $offered = array_merge($offered, Catalog::seamMaterialsForSlot($slot));
+        }
+
+        foreach (array_unique($offered) as $key) {
+            $this->assertNotContains($key, Catalog::SEAM_NEVER, "{$key} is rubbish and is on offer");
+
+            // Checked off the DATA as well as off the list, so the two have to
+            // agree: §4 puts junk and scrap at tier 0 and nothing else there.
+            // A Tier 3 prices at zero because the trader will not touch a
+            // capped rare (§3.2), which is the opposite of worthless.
+            $this->assertGreaterThan(
+                0,
+                Catalog::materials()[$key]['tier'] ?? 0,
+                "{$key} is tier 0, which is what rubbish is",
+            );
+        }
+    }
+
+    /**
+     * §4.0/§7.3 -- a tool or a glove, and nothing else.
+     *
+     * Gathering has no tool: it is worked with the hands in the tool's place,
+     * so there is nothing on the belt for a line like this to sit on and the
+     * glove is what carries it. Every other worn piece works no ground at all.
+     */
+    public function test_only_a_tool_or_a_glove_may_roll_one(): void
     {
         foreach (Catalog::items() as $key => $def) {
-            $slot = $def['slot'] ?? null;
-            $stats = array_column(Catalog::optionRollsFor($def), 'kind');
-            $has = in_array(Catalog::OPTION_SEAM, $stats, true);
+            $slot = (string) ($def['slot'] ?? '');
+            $kinds = array_column(Catalog::optionRollsFor($def), 'kind');
+            $has = in_array(Catalog::OPTION_SEAM, $kinds, true);
 
             $this->assertSame(
-                $slot !== null && Catalog::skillForSlot((string) $slot) !== null,
+                $slot !== '' && (Catalog::skillForSlot($slot) !== null || $slot === 'gloves'),
                 $has,
                 "{$key} disagrees about whether it can favour a seam",
             );
         }
+    }
+
+    /**
+     * §4.0 -- and what a glove offers is the GATHER table, which is a different
+     * list: the base raw is on it (bare-handed that is the rare find, not the
+     * usual one) and the grades above it are not (hands never reach them).
+     */
+    public function test_a_glove_offers_what_hands_pick_up(): void
+    {
+        $glove = Catalog::gatherSeamMaterials();
+
+        foreach (Variants::BIOME_VARIANTS as $grades) {
+            $materials = array_column($grades, 'material');
+
+            $this->assertContains($materials[0], $glove, 'a glove cannot favour the base raw');
+            foreach (array_slice($materials, 1) as $above) {
+                $this->assertNotContains($above, $glove, "{$above} is not reachable bare-handed");
+            }
+        }
+    }
+
+    /** And the glove's line bends the gather table, exactly as a tool's does. */
+    public function test_a_glove_bends_the_gather_table(): void
+    {
+        $tile = ['biome' => 'forest', 'variant' => 'forest'];
+
+        $plain = Drops::table(Drops::GATHERING, $tile, 0);
+        $lucky = Drops::table(Drops::GATHERING, $tile, 0, false, ['birch_sap' => 0.30]);
+
+        $this->assertEqualsWithDelta($plain['birch_sap'] * 1.30, $lucky['birch_sap'], 0.001);
+        // And nothing else on the table moved.
+        $this->assertSame($plain['toadstool'], $lucky['toadstool']);
+        $this->assertSame($plain['branch'], $lucky['branch']);
+    }
+
+    /**
+     * §4.0/§7.3 -- on a gather the HANDS are the tool, so a lucky axe counts
+     * for nothing.
+     *
+     * The same sentence §8.0 rule 1 makes about a mine, pointed the other way:
+     * a hex is worked with the tool or with the hands and never with both.
+     */
+    public function test_a_lucky_axe_does_nothing_bare_handed(): void
+    {
+        $game = app(GameService::class);
+        $character = $game->createCharacter(Player::create(['wallet' => '0xhands', 'session_id' => 'hands']));
+
+        CharacterItem::create([
+            'character_id' => $character->id,
+            'item_key' => 'hewn_axe',
+            'durability' => 40,
+            'equipped' => true,
+            'options' => [['stat' => 'toadstool', 'value' => 0.30, 'kind' => Catalog::OPTION_SEAM]],
+        ]);
+        CharacterItem::create([
+            'character_id' => $character->id,
+            'item_key' => 'work_gloves',
+            'durability' => 90,
+            'equipped' => true,
+            'options' => [['stat' => 'birch_sap', 'value' => 0.20, 'kind' => Catalog::OPTION_SEAM]],
+        ]);
+
+        $character = $character->fresh();
+
+        // Mining reads the axe and not the glove's gather line...
+        $this->assertSame(['toadstool' => 0.30], $game->seamFavour($character, 'woodcutting'));
+
+        // ...and gathering reads the glove and not the axe.
+        $this->assertSame(['birch_sap' => 0.20], $game->seamFavour($character, 'woodcutting', true));
     }
 
     /** §8.0.1 -- three values and not five: ten, twenty, thirty. */
