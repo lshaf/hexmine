@@ -28,10 +28,12 @@ const heading = computed(() => {
 /**
  * The whole road, as asked for.
  *
- * NOT the hex a pack ahead will stop you on. §5.6 puts sight at zero while
- * traveling -- you are between hexes, watching your feet -- and a journey that
- * announces its own ambush by counting down to it is that fog leaking. Being
- * stopped is meant to be the moment you find out.
+ * NOT the hex a pack ahead will stop you on. A clock that counted to the cut
+ * would announce the ambush the instant the road started -- a whole journey
+ * early, from any distance. The eye is open on the road now (§5.6), so a pack
+ * IS discovered before you reach it: by coming within sight of it, a hex or
+ * three out. That is a warning earned by getting close, which is the opposite
+ * of a clock that knew all along.
  *
  * The marker still stops where the road really ends: travelProgress clamps to
  * `stopHex`, which is what keeps a walker from visibly arriving at the village

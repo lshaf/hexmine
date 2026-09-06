@@ -1610,14 +1610,6 @@ final class Balance
     public const SIGHT_RADIUS = 1;
 
     /**
-     * §5.6 -- sight on the road. You are between hexes, watching your feet.
-     *
-     * Zero is also what makes the whole journey free of queries: a moving
-     * character asks the server nothing until it stops.
-     */
-    public const SIGHT_TRAVELING = 0;
-
-    /**
      * §5.4 + §12 -- how far a fresh spawn may be from the village whose
      * woodcutting line its opening arc needs.
      *

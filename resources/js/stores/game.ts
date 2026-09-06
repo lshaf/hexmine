@@ -313,20 +313,20 @@ export const useGame = defineStore('game', () => {
   )
 
   /*
-   * Two things change what is knowable: where you stand, and whether you are
-   * standing at all. Setting off drops sight to zero (§5.6) without moving you
-   * a hex, so the position watcher above would miss it and the map would keep
-   * drawing a scouting report the server has stopped vouching for.
+   * §5.6 -- what is knowable changes when the ground under you does, and on
+   * the road that is every hex rather than only at the ends of it.
    *
-   * Fetching on the edge rather than on a timer is what makes the walk free:
-   * one call when the road starts, one when it ends, and nothing in between
-   * however far it is.
+   * Keyed on `here` rather than on the character's column: the column sits on
+   * the departure hex for the whole journey, so a walk used to look motionless
+   * from in here. Setting off and arriving are still edges worth catching, and
+   * the road/still flag is what catches them -- a journey of one hex begins and
+   * ends without the position ever changing.
    */
   watch(
     () => {
       const char = state.value?.character
       if (!char) return ''
-      return `${char.col},${char.row},${state.value?.travel ? 'road' : 'still'}`
+      return `${hereCol.value},${hereRow.value},${state.value?.travel ? 'road' : 'still'}`
     },
     async (key, previous) => {
       if (!key || !previous) return
@@ -371,16 +371,14 @@ export const useGame = defineStore('game', () => {
     const at = mutations.value.nextChangeAt
     if (at === null || at === undefined) return
 
-    // §5.6 -- never on the road: sight is zero out there, so there is nothing
-    // to refresh, and "a journey costs no queries at all" is the promise this
-    // would break. Setting off and arriving both refresh on their own.
-    if (travel.value !== null) return
-
-    liveTimer = setTimeout(() => {
-      liveTimer = null
-      if (busy.value || travel.value !== null) return
-      void refreshMutations()
-    }, Math.max(LIVE_MIN_GAP_MS, at - now.value))
+    liveTimer = setTimeout(
+      () => {
+        liveTimer = null
+        if (busy.value) return
+        void refreshMutations()
+      },
+      Math.max(LIVE_MIN_GAP_MS, at - now.value),
+    )
   }
 
   const tileAt = (col: number, row: number): Tile | undefined =>
@@ -699,11 +697,12 @@ export const useGame = defineStore('game', () => {
    * about where it is -- it is the number the server will agree with the
    * instant you stop, drawn a few minutes early.
    *
-   * It is a READOUT and never a key. Every verb is refused on the road by the
-   * server anyway (§5.6), sight is zero out there, and the live-state query
-   * stays centred on the server's own position -- so nothing here can ask for
-   * ground the fog is holding back. What it fixes is the map telling you where
-   * you were.
+   * It is what the SERVER derives too, and that is what makes it safe to key
+   * on. §5.6's eye no longer closes on the road, so the disc has to follow the
+   * walker -- and both sides run the identical arithmetic to decide where the
+   * walker is, so the client can never ask about ground the server would
+   * refuse. Every verb is still refused out there; this decides what is
+   * *scouted*, not what may be done.
    */
   const here = computed(() => {
     const char = state.value?.character
@@ -725,10 +724,11 @@ export const useGame = defineStore('game', () => {
    * Time to the DESTINATION, which is the journey the player asked for.
    *
    * Not to `stopAt`. A pack ahead cuts the road short (§9.5.3), and counting to
-   * the cut told the walker something §5.6 says they cannot know: sight on the
-   * road is zero, because you are between hexes watching your feet. A shortened
-   * clock is that fog leaking -- the walk quietly announcing an ambush several
-   * minutes before it happens.
+   * the cut announces the ambush the moment the road starts -- a whole journey
+   * early, from any distance. The eye is open on the road now (§5.6), so one IS
+   * discovered ahead of walking into it: by coming within sight of it, a hex or
+   * three out. That is a warning you earned by getting close, which is the
+   * opposite of a clock that knew all along.
    */
   const travelRemainingMs = computed(() =>
     travel.value ? Math.max(0, travel.value.endsAt - now.value) : 0,
@@ -879,17 +879,17 @@ export const useGame = defineStore('game', () => {
   async function select(col: number, row: number): Promise<void> {
     selected.value = { col, row }
 
-    // §5.6 -- the SERVER's position, deliberately, and not `here`.
+    // §5.6 -- from where the walker IS, and this guard exists to ask exactly
+    // the question the server will ask, so a hex it would refuse costs no
+    // round trip.
     //
-    // This guard exists to ask the same question the server will ask, so that a
-    // hex it would refuse costs no round trip. The server costs against
-    // `character.col/row`, which sits on the departure hex for the whole
-    // journey; pointing this at the walker's derived hex would send requests
-    // the server answers with a refusal. `here` is what the map SAYS, this is
-    // what the server KNOWS, and the two are only the same when you are stood
-    // still.
-    const char = state.value?.character
-    if (char && hexDistance(char.col, char.row, col, row) > sight.value) {
+    // It read the character's own column deliberately for a while, because
+    // that is what the server costed against and the column sits on the
+    // departure hex for the whole journey. The server derives the walking
+    // position now -- it has to, since the eye no longer closes on the road --
+    // so pointing this anywhere else would skip hexes the server would answer
+    // about.
+    if (hexDistance(hereCol.value, hereRow.value, col, row) > sight.value) {
       preview.value = null
       return
     }

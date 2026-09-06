@@ -45,7 +45,7 @@ const props = defineProps<{
   centerRow: number
   characterCol: number
   characterRow: number
-  /** §5.6 -- hexes of sight. Two standing still, zero on the road. */
+  /** §5.6 -- hexes of sight. One to start with, three at the top of the tree. */
   sight: number
   selected: { col: number; row: number } | null
   jobs: Job[]
@@ -90,8 +90,11 @@ const emit = defineEmits<{
  * boundary, and it is a fog line, not a fence: every hex on the map is walkable
  * whether or not it has been scouted.
  *
- * On the road sight is zero and the ring disappears with it -- the whole world
- * goes to glyphs until the walking stops.
+ * It travels WITH the walker: the disc is centred on where the prospector
+ * actually is (§5.6), which on the road is not the hex they set off from. The
+ * eye used to close entirely out there -- the whole world went to glyphs until
+ * the walking stopped -- and what that bought was a promise about queries at
+ * the cost of the walk itself.
  */
 const viewport = ref({ w: 900, h: 620 })
 const pan = ref({ x: 0, y: 0 })
@@ -383,8 +386,9 @@ const renderTiles = computed<RenderTile[]>(() =>
       corpseLabel: corpse ? `${corpse.owner}'s corpse` : null,
       depleted,
       inSight,
-      // No ring at all when sight is zero: on the road the boundary would be
-      // the hex you just left, which is not a boundary, it is a memory.
+      // The guard survives a sight of zero, which nothing produces any more --
+      // the road used to, and a ring drawn then would have circled the hex you
+      // just left, which is not a boundary but a memory.
       onBoundary: props.sight > 0 && distance === props.sight,
       isSelected,
       slots: slotMarks(tile, inSight),

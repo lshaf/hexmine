@@ -561,8 +561,20 @@ map worth walking.
 | | Rule |
 |---|---|
 | **Sight** | **1 hex.** Base `Balance::SIGHT_RADIUS`, up to 3 through the Explorer tree (§7.5). |
-| **Sight while traveling** | **0.** You are between hexes, watching your feet — and it is the hex under *those* feet, not the one you set off from. |
+| **Sight while traveling** | **The same, and it follows you.** The disc is centred on the hex under your feet right now, not the one you set off from. |
 | **Travel range** | **None.** Any hex on the map is walkable from any other. |
+
+**The road does not close the eye.** It used to — sight went to zero the moment
+a journey started, on the reasoning that you are between hexes watching your
+feet. What that actually bought was a promise about *queries*; what it cost was
+the walk. A two-hundred-hex road was four days of a blank map, which is the
+least interesting thing this game can do with its own distance. A prospector
+crossing a country now sees the country they are crossing.
+
+**Seeing is not doing, and the split is the whole of why this is safe.** Every
+verb is still refused on the road — *you are on the road; stop the journey, or
+wait until you arrive* — so what the open eye buys is a **scouting report**,
+never an action. A hex you pass is read, not worked.
 
 **Travel has no reach limit and must not grow one.** Distance already costs the
 one currency an idle game cannot inflate — hours, at five minutes a hex — so a
@@ -651,15 +663,20 @@ Three consequences, all deliberate:
    game no amount of play widens past `SIGHT_RADIUS + SKILL_SIGHT_CAP`, and
    that ceiling is a query budget rather than a balance one — cost goes as the
    square of the radius.
-2. **A journey costs no queries at all.** Sight closes to zero when the road
-   starts and opens when it ends, so a walk of two hundred hexes and a walk of
-   one both cost exactly two requests. The timer above is off on the road for
-   that reason and not as an optimisation: there is nothing out there to
-   refresh, and this promise is the one it would break.
-3. **Costing a hex is bounded by the same disc.** The per-tile preview endpoint
-   refuses anything unscouted — otherwise it would be the map query in a slower
-   form: one tile per request, and nothing stopping a client from asking about
-   every hex on the map.
+2. **A journey costs one query a hex**, and that is the bill for the paragraph
+   above. It used to cost two in total however far it went, because the eye
+   was shut — the disc moves with the walker now, so it is re-asked as each hex
+   is crossed. Five minutes of game time apart, which is cheaper per hour than
+   the fixed poll this codebase ran until recently, and it is bounded by the
+   same thirty-seven-tile disc as everything else. The saving was real and it
+   was paid for with the most interesting thing about a long walk.
+3. **Costing a hex is bounded by the same disc**, and by the same *centre*. The
+   per-tile preview endpoint refuses anything unscouted — otherwise it would be
+   the map query in a slower form: one tile per request, and nothing stopping a
+   client from asking about every hex on the map. It measures from where the
+   walker **is**, because that is the question the map query answered when it
+   decided the hex was scouted, and two different answers to one question is a
+   client that can see a hex the server will not price.
 
 The glyphs are what keep a fog navigable: you can always see *that* there is a
 capital over there, which is what makes deciding to walk to it possible, and
@@ -680,12 +697,13 @@ so it is the answer the server will agree with the instant you do, drawn a few
 minutes early. It is the same derivation the marker has always been
 interpolated against; what changed is that the words now agree with the drawing.
 
-**It is a readout and never a key.** Every verb is refused on the road by the
-server anyway, and the live-state query stays centred on the server's own
-position — the per-tile costing endpoint is guarded against *that* hex, not
-this one, because its whole job is to ask the question the server will ask.
-`here` is what the map says; the character's own column is what the server
-knows; the two are the same only when you are stood still.
+**Both sides derive it, and that is what makes it a key rather than a readout.**
+It began as a readout — the server costed against the column, so pointing
+anything at the walking position would have asked for refusals. The eye staying
+open on the road changed that: the disc *has* to follow the walker, so the
+server derives the same position with the same arithmetic, and the client's
+answer and the server's cannot disagree. What it decides is what is **scouted**;
+what may be *done* is still refused out there whatever it says.
 
 ### 5.7 Pockets — ground that is briefly worth more
 
@@ -3502,8 +3520,9 @@ What it costs:
      death on the server, live, with the rich ones worth racing to. Finding one
      is the interesting part.
 
-   On the road sight is zero, so strangers' corpses wink out and your own does
-   not. That asymmetry is the rule working.
+   The disc follows the walker, so a stranger's corpse comes into view on the
+   road exactly as it would on foot. Your own is the one that needs no disc at
+   all.
 4. **You** kill it and the row comes home, on top of its ordinary drops.
 
 **A corpse stands, but it does not pin.** A pack owns the hex it is on for two
@@ -4468,9 +4487,9 @@ The working approach, after several failed attempts:
   Transparency causes ghost-hex artifacts through neighbors. Unscouted ground
   (§5.6) is the same rule: a darker **solid** fill, never opacity.
 - **The dashed ring is the sight boundary, not a fence.** It marks where the
-  scouting report stops, and it vanishes entirely on the road, where sight is
-  zero. Every hex outside it is still walkable — the map must never imply
-  otherwise.
+  scouting report stops, and it **travels with the walker** — centred on the hex
+  underfoot right now (§5.6), not the one they set off from. Every hex outside
+  it is still walkable, and the map must never imply otherwise.
 - **Beyond sight a tile gets its terrain color and, if anybody lives there, its
   settlement glyph and its name** — the name dimmed, because it is derived
   rather than scouted (§5.6). Nothing else: no props, no slot pips, no live

@@ -4344,13 +4344,15 @@ final class GameLoopTest extends TestCase
     }
 
     /**
-     * §5.6 -- on the road you are watching your feet.
+     * §5.6 -- the road does not close the eye, and the disc goes with you.
      *
-     * This is also what makes a long walk free: sight of zero means the map
-     * query has nothing to scan, so a journey of two hundred hexes costs the
-     * same two requests as a journey of one.
+     * It used to close it: sight went to zero the moment a journey started, on
+     * the reasoning that you are between hexes watching your feet. What that
+     * bought was a promise about queries and what it cost was the walk -- two
+     * hundred hexes of blank map, which is the least interesting thing this
+     * game can do with its own distance.
      */
-    public function test_sight_closes_to_nothing_while_traveling(): void
+    public function test_the_road_does_not_close_the_eye(): void
     {
         // Somebody working the hex right next to you -- plainly in sight.
         $near = $this->game->createCharacter(Player::create(['wallet' => '0xnear']));
@@ -4359,17 +4361,71 @@ final class GameLoopTest extends TestCase
 
         $this->assertCount(1, $this->game->mapMutations($this->character)['occupied']);
 
-        $this->game->travelTo($this->character, (int) $this->character->col + 4, (int) $this->character->row);
+        $this->game->travelTo($this->character, (int) $this->character->col, (int) $this->character->row + 6);
 
-        $this->assertSame(0, $this->game->sightRadius($this->character));
-        $this->assertSame([], $this->game->mapMutations($this->character)['occupied']);
-
-        // And it comes back the moment the walking stops.
-        $this->arrive($this->character);
+        // Setting off changes nothing about how far you can see.
         $this->assertSame(
             Balance::SIGHT_RADIUS,
             $this->game->sightRadius($this->character->fresh()),
         );
+    }
+
+    /**
+     * §5.6 -- and the disc is centred on where the walker IS.
+     *
+     * `col`/`row` sit on the departure hex for the whole journey, so a disc
+     * taken off the column would report the country behind them -- which is
+     * worse than reporting nothing, because it is wrong rather than absent.
+     */
+    public function test_the_disc_follows_the_walker(): void
+    {
+        $from = [(int) $this->character->col, (int) $this->character->row];
+        $to = [$from[0], $from[1] + 6];
+
+        $this->game->travelTo($this->character, $to[0], $to[1]);
+        $character = $this->character->fresh();
+
+        // The column has not moved, and that is the point of the derivation.
+        $this->assertSame($from, [(int) $character->col, (int) $character->row]);
+        $this->assertSame($from, $this->game->hereOf($character));
+
+        // Wind the whole journey back so the walker is most of the way along.
+        $span = (int) $character->travel_ends_at - (int) $character->travel_started_at;
+        $step = intdiv($span, 6);
+        $character->update([
+            'travel_started_at' => (int) $character->travel_started_at - 4 * $step,
+            'travel_ends_at' => (int) $character->travel_ends_at - 4 * $step,
+        ]);
+        $character = $character->fresh();
+
+        $this->assertSame([$from[0], $from[1] + 4], $this->game->hereOf($character));
+        $this->assertSame($from, [(int) $character->col, (int) $character->row]);
+    }
+
+    /**
+     * §5.6 -- seeing is not doing, and that split is why the open eye is safe.
+     *
+     * A hex the road passes is SCOUTED -- it costs, it reports, it is drawn --
+     * and every verb on it is still refused until the walking stops. What the
+     * eye buys is a scouting report, never an action.
+     */
+    public function test_the_road_scouts_but_refuses(): void
+    {
+        $this->game->travelTo($this->character, (int) $this->character->col, (int) $this->character->row + 6);
+        $character = $this->character->fresh();
+
+        [$col, $row] = $this->game->hereOf($character);
+        $preview = $this->game->previewTile($character, $col, $row, Drops::GATHERING);
+
+        $this->assertFalse($preview['unseen'], 'the hex underfoot was not scouted');
+        $this->assertFalse($preview['canMine'], 'a verb was offered on the road');
+
+        try {
+            $this->game->startMining($character, $col, $row, Drops::GATHERING);
+            $this->fail('work started while traveling');
+        } catch (GameException $e) {
+            $this->assertStringContainsString('on the road', $e->getMessage());
+        }
     }
 
     /**

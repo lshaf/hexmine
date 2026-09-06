@@ -36,12 +36,11 @@ export const MAP = {
   rings: { center: 0.08, inner: 0.34, mid: 0.64 },
   /**
    * §5.6 -- documentation only, and pointedly so. Sight is published per
-   * character in the state payload (`character.sight`) because it changes with
-   * the Explorer tree and drops to zero on the road; reading these numbers
-   * instead of that field is how the fog and the server end up disagreeing.
+   * character in the state payload (`character.sight`) because the Explorer
+   * tree widens it; reading this number instead of that field is how the fog
+   * and the server end up disagreeing.
    */
   sightRadius: 1,
-  sightTraveling: 0,
   /** §5 -- five minutes of ground per hex, before travelSpeed divides it. */
   travelMsPerHex: 5 * MINUTE,
 } as const

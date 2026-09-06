@@ -1128,20 +1128,62 @@ class GameService
     /**
      * §5.6 -- how far this character can see, right now.
      *
-     * Two hexes standing still, nothing at all on the road, and up to four for
-     * an Explorer deep enough into the tree (§7.5). Deliberately untouched by
-     * level or gear: the only thing that widens the eye is having walked, which
-     * is the one behavior worth paying for here and the only one whose reward
-     * cannot be bought.
+     * One hex to start with, up to three for an Explorer deep enough into the
+     * tree (§7.5). Deliberately untouched by level or gear: the only thing that
+     * widens the eye is having walked, which is the one behavior worth paying
+     * for here and the only one whose reward cannot be bought.
+     *
+     * **The road does not close it.** It used to -- sight went to zero the
+     * moment a journey started, on the reasoning that you are between hexes
+     * watching your feet. What that actually bought was a promise about
+     * QUERIES ("a journey costs no queries at all"), and what it cost was the
+     * walk: a two-hundred-hex road was four days of a blank map, which is the
+     * least interesting thing this game can do with its own distance. A
+     * prospector crossing a country now sees the country they are crossing.
+     *
+     * The query budget is paid where it was always going to be paid instead:
+     * the disc follows the walker, so it is re-asked as each hex is crossed --
+     * five minutes apart, and cheaper per hour than the fixed poll this
+     * codebase ran until recently.
      */
     public function sightRadius(Character $character): int
     {
-        if ($this->isTraveling($character)) {
-            return Balance::SIGHT_TRAVELING;
-        }
-
         // §7.5 -- the one thing that widens it, already capped.
         return Balance::SIGHT_RADIUS + $this->nodeEffects($character)['sight'];
+    }
+
+    /**
+     * §5.6 -- where this character IS, which on the road is not where they set
+     * off from.
+     *
+     * `col`/`row` sit on the departure hex for the whole journey and are only
+     * written when you land or stop, so every sight-bounded read has to ask
+     * this rather than the column. It is the same arithmetic the client draws
+     * the marker with and the same one `arrive()` runs when the road ends --
+     * the answer the server will agree with the instant you stop, computed a
+     * few minutes early.
+     *
+     * It became load-bearing when the road stopped closing the eye: a disc
+     * centred on the departure hex would have shown a walker the country
+     * behind them for four days, which is worse than showing them nothing.
+     *
+     * @return array{0:int,1:int}
+     */
+    public function hereOf(Character $character): array
+    {
+        if (! $this->isTraveling($character)) {
+            return [(int) $character->col, (int) $character->row];
+        }
+
+        $path = $this->travelPath($character);
+        $perHex = max(1, $this->journeyPerHex($character));
+        $step = intdiv(max(0, $this->now() - (int) $character->travel_started_at), $perHex);
+
+        $at = $path[min($step, count($path) - 1)] ?? null;
+
+        return $at === null
+            ? [(int) $character->col, (int) $character->row]
+            : [(int) $at['col'], (int) $at['row']];
     }
 
     /** §8.3 -- the character's own walking pace, in wall-clock ms per hex. */
@@ -2005,8 +2047,10 @@ class GameService
     {
         $now = $this->now();
         $range = $this->sightRadius($character);
-        $centerCol = (int) $character->col;
-        $centerRow = (int) $character->row;
+        // §5.6 -- where the walker IS. On the road the column still holds the
+        // hex they set off from, so a disc taken off it would report the
+        // country behind them.
+        [$centerCol, $centerRow] = $this->hereOf($character);
 
         [$minCol, $maxCol] = [$centerCol - $range, $centerCol + $range];
         [$minRow, $maxRow] = [$centerRow - $range, $centerRow + $range];
@@ -3207,8 +3251,11 @@ class GameService
      * racing to. Finding one is the interesting part, and §5.6's disc is what
      * keeps it that way.
      *
-     * On the road sight is zero, so these wink out and your own does not. That
-     * asymmetry is the two rules working, not a hole in either.
+     * The disc follows the walker (§5.6), so a stranger's corpse comes into
+     * view on the road exactly as it would on foot -- which is the two rules
+     * still working rather than a hole in either. Your own is the one that
+     * needs no disc at all: it holds a row of yours on a clock, and a debt you
+     * cannot find is a fine with extra steps.
      *
      * @return list<array<string,mixed>>
      */
@@ -3611,14 +3658,16 @@ class GameService
     ): array {
         $now = $this->now();
 
-        $distance = HexGeometry::distance((int) $character->col, (int) $character->row, $col, $row);
+        // §5.6 -- measured from where the walker IS, which on the road is not
+        // the hex the column still names. Costing a hex you can see has to ask
+        // the same question the map query asked when it decided you could.
+        [$hereCol, $hereRow] = $this->hereOf($character);
+        $distance = HexGeometry::distance($hereCol, $hereRow, $col, $row);
 
         if ($distance > $this->sightRadius($character)) {
             return [
                 'canMine' => false,
-                'reason' => $this->isTraveling($character)
-                    ? 'You are watching your feet. Nothing is scouted until you stop.'
-                    : 'Too far to make out. Walk there and see for yourself.',
+                'reason' => 'Too far to make out. Walk there and see for yourself.',
                 'seconds' => 0,
                 'hp' => 0,
                 'toolAttack' => 0,
@@ -7418,7 +7467,7 @@ class GameService
                 // publish any more: every hex is walkable. Sight is published
                 // rather than mirrored client-side so the fog on the map and
                 // the endpoints that refuse to cost an unscouted hex are always
-                // the same number, and so it can drop to zero on the road.
+                // the same number, whatever the Explorer tree has widened it to.
                 'sight' => $this->sightRadius($character),
                 // §8.3 -- the character's pace, for costing a walk before it is
                 // taken. Already wall-clock: the dev clock is applied here.
