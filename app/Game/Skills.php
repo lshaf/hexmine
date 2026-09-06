@@ -72,20 +72,20 @@ final class Skills
                 ['node' => 'swordhand.no_wasted_swing', 'level' => 20],
             ],
         ],
-        'runecaster.pair:attack' => [
-            'job' => 'runecaster',
+        'knifedancer.pair:attack' => [
+            'job' => 'knifedancer',
             'kind' => 'pair',
             'name' => 'Attack',
             'description' => 'Solid points of attack, added to what your kit carries.',
             'ranks' => [
-                ['node' => 'runecaster.cut_sigil', 'level' => 1],
-                ['node' => 'runecaster.ore_ink', 'level' => 1],
-                ['node' => 'runecaster.layered_mark', 'level' => 5],
-                ['node' => 'runecaster.resonance', 'level' => 5],
-                ['node' => 'runecaster.silence_before', 'level' => 12],
-                ['node' => 'runecaster.long_burn', 'level' => 12],
-                ['node' => 'runecaster.measured_draw', 'level' => 20],
-                ['node' => 'runecaster.rest_the_rod', 'level' => 20],
+                ['node' => 'knifedancer.keen_edge', 'level' => 1],
+                ['node' => 'knifedancer.weighted_grip', 'level' => 1],
+                ['node' => 'knifedancer.off_hand_work', 'level' => 5],
+                ['node' => 'knifedancer.read_the_feet', 'level' => 5],
+                ['node' => 'knifedancer.both_at_once', 'level' => 12],
+                ['node' => 'knifedancer.pressed_advantage', 'level' => 12],
+                ['node' => 'knifedancer.economy_of_motion', 'level' => 20],
+                ['node' => 'knifedancer.both_edges', 'level' => 20],
             ],
         ],
         'sawyer.presence' => [
@@ -236,6 +236,15 @@ final class Skills
                 ['node' => 'harvesting.cool_hours', 'level' => 20],
             ],
         ],
+        'knifedancer.bleeding_cut' => [
+            'job' => 'knifedancer',
+            'kind' => 'battleSkill',
+            'name' => 'Bleeding Cut',
+            'description' => 'One of the three a Knifedancer carries into a fight.',
+            'ranks' => [
+                ['node' => 'knifedancer.bleeding_cut', 'level' => 1],
+            ],
+        ],
         'alchemist.stat' => [
             'job' => 'alchemist',
             'kind' => 'stat',
@@ -315,26 +324,17 @@ final class Skills
                 ['node' => 'swordhand.flat_of_the_blade', 'level' => 20],
             ],
         ],
-        'runecaster.pair:defense' => [
-            'job' => 'runecaster',
+        'knifedancer.pair:defense' => [
+            'job' => 'knifedancer',
             'kind' => 'pair',
             'name' => 'Defense',
             'description' => 'Solid points of defense, added to what your kit carries.',
             'ranks' => [
-                ['node' => 'runecaster.breath_line', 'level' => 1],
-                ['node' => 'runecaster.sight_beyond', 'level' => 5],
-                ['node' => 'runecaster.null_stroke', 'level' => 5],
-                ['node' => 'runecaster.warding_ring', 'level' => 12],
-                ['node' => 'runecaster.clean_the_groove', 'level' => 20],
-            ],
-        ],
-        'runecaster.ember_bolt' => [
-            'job' => 'runecaster',
-            'kind' => 'battleSkill',
-            'name' => 'Ember Bolt',
-            'description' => 'One of the three a Runecaster carries into a fight.',
-            'ranks' => [
-                ['node' => 'runecaster.ember_bolt', 'level' => 1],
+                ['node' => 'knifedancer.crossed_guard', 'level' => 1],
+                ['node' => 'knifedancer.the_opening', 'level' => 5],
+                ['node' => 'knifedancer.beat_aside', 'level' => 5],
+                ['node' => 'knifedancer.low_stance', 'level' => 12],
+                ['node' => 'knifedancer.the_seated_grip', 'level' => 20],
             ],
         ],
         'alchemist.brewExtra' => [
@@ -443,13 +443,13 @@ final class Skills
                 ['node' => 'swordhand.pommel_seat', 'level' => 28],
             ],
         ],
-        'runecaster.battleWear' => [
-            'job' => 'runecaster',
+        'knifedancer.battleWear' => [
+            'job' => 'knifedancer',
             'kind' => 'battleWear',
             'name' => 'Kit Care',
             'description' => 'A share of what a fight takes off the worn kit, spared.',
             'ranks' => [
-                ['node' => 'runecaster.grounding_rod', 'level' => 1],
+                ['node' => 'knifedancer.turned_shoulder', 'level' => 1],
             ],
         ],
         'weaver.stat' => [
@@ -654,15 +654,15 @@ final class Skills
                 ['node' => 'shieldbearer.shield_bash', 'level' => 1],
             ],
         ],
-        'runecaster.skillPower' => [
-            'job' => 'runecaster',
+        'knifedancer.skillPower' => [
+            'job' => 'knifedancer',
             'kind' => 'skillPower',
             'name' => 'Skill Power',
             'description' => 'More of the extra on your family\'s three skills.',
             'ranks' => [
-                ['node' => 'runecaster.ember_draw', 'level' => 1],
-                ['node' => 'runecaster.overdraw', 'level' => 20],
-                ['node' => 'runecaster.unspent_charge', 'level' => 20],
+                ['node' => 'knifedancer.wrist_snap', 'level' => 1],
+                ['node' => 'knifedancer.full_extension', 'level' => 20],
+                ['node' => 'knifedancer.committed_step', 'level' => 20],
             ],
         ],
         'quarrying.stat' => [
@@ -986,26 +986,17 @@ final class Skills
                 ['node' => 'swordhand.sword_care', 'level' => 12],
             ],
         ],
-        'runecaster.weaponWear' => [
-            'job' => 'runecaster',
+        'knifedancer.weaponWear' => [
+            'job' => 'knifedancer',
             'kind' => 'weaponWear',
             'name' => 'Blade Care',
             'description' => 'The same for the blade, which pays its own stream.',
             'ranks' => [
-                ['node' => 'runecaster.slow_charge', 'level' => 5],
-                ['node' => 'runecaster.cinder_hand', 'level' => 5],
-                ['node' => 'runecaster.echo_carve', 'level' => 12],
-                ['node' => 'runecaster.steady_channel', 'level' => 12],
-                ['node' => 'runecaster.true_bedding', 'level' => 28],
-            ],
-        ],
-        'runecaster.chain_arc' => [
-            'job' => 'runecaster',
-            'kind' => 'battleSkill',
-            'name' => 'Chain Arc',
-            'description' => 'One of the three a Runecaster carries into a fight.',
-            'ranks' => [
-                ['node' => 'runecaster.chain_arc', 'level' => 5],
+                ['node' => 'knifedancer.stropped_daily', 'level' => 5],
+                ['node' => 'knifedancer.dry_blade', 'level' => 5],
+                ['node' => 'knifedancer.no_wasted_cut', 'level' => 12],
+                ['node' => 'knifedancer.between_the_ribs', 'level' => 12],
+                ['node' => 'knifedancer.true_tang', 'level' => 28],
             ],
         ],
         'smith.optionTier' => [
@@ -1055,6 +1046,15 @@ final class Skills
                 ['node' => 'alchemist.rack_brewing', 'level' => 12],
             ],
         ],
+        'knifedancer.rising_flurry' => [
+            'job' => 'knifedancer',
+            'kind' => 'battleSkill',
+            'name' => 'Rising Flurry',
+            'description' => 'One of the three a Knifedancer carries into a fight.',
+            'ranks' => [
+                ['node' => 'knifedancer.rising_flurry', 'level' => 5],
+            ],
+        ],
         'shieldbearer.skillPower' => [
             'job' => 'shieldbearer',
             'kind' => 'skillPower',
@@ -1074,14 +1074,14 @@ final class Skills
                 ['node' => 'swordhand.duelist_calm', 'level' => 12],
             ],
         ],
-        'runecaster.skillCooldown' => [
-            'job' => 'runecaster',
+        'knifedancer.skillCooldown' => [
+            'job' => 'knifedancer',
             'kind' => 'skillCooldown',
             'name' => 'Skill Tempo',
             'description' => 'Whole rounds off every one of their cooldowns.',
             'ranks' => [
-                ['node' => 'runecaster.deep_vein', 'level' => 5],
-                ['node' => 'runecaster.open_channel', 'level' => 12],
+                ['node' => 'knifedancer.short_recovery', 'level' => 5],
+                ['node' => 'knifedancer.never_set', 'level' => 12],
             ],
         ],
         'swordhand.sunder' => [
@@ -1143,6 +1143,15 @@ final class Skills
                 ['node' => 'weaver.two_beam_warp', 'level' => 12],
             ],
         ],
+        'knifedancer.hamstring' => [
+            'job' => 'knifedancer',
+            'kind' => 'battleSkill',
+            'name' => 'Hamstring',
+            'description' => 'One of the three a Knifedancer carries into a fight.',
+            'ranks' => [
+                ['node' => 'knifedancer.hamstring', 'level' => 12],
+            ],
+        ],
         'explorer.sight' => [
             'job' => 'explorer',
             'kind' => 'sight',
@@ -1153,13 +1162,13 @@ final class Skills
                 ['node' => 'explorer.horizon_line', 'level' => 30],
             ],
         ],
-        'runecaster.goldFind' => [
-            'job' => 'runecaster',
+        'knifedancer.goldFind' => [
+            'job' => 'knifedancer',
             'kind' => 'goldFind',
             'name' => 'Purse',
             'description' => 'More of what a pack pays.',
             'ranks' => [
-                ['node' => 'runecaster.ash_reading', 'level' => 12],
+                ['node' => 'knifedancer.quick_hands', 'level' => 12],
             ],
         ],
         'swordhand.riposte' => [
@@ -1169,15 +1178,6 @@ final class Skills
             'description' => 'One of the three a Swordhand carries into a fight.',
             'ranks' => [
                 ['node' => 'swordhand.riposte', 'level' => 12],
-            ],
-        ],
-        'runecaster.rune_of_binding' => [
-            'job' => 'runecaster',
-            'kind' => 'battleSkill',
-            'name' => 'Rune of Binding',
-            'description' => 'One of the three a Runecaster carries into a fight.',
-            'ranks' => [
-                ['node' => 'runecaster.rune_of_binding', 'level' => 12],
             ],
         ],
         'swordhand.lootOption' => [
@@ -1236,13 +1236,13 @@ final class Skills
                 ['node' => 'swordhand.pommel_strike', 'level' => 20],
             ],
         ],
-        'runecaster.skillStun' => [
-            'job' => 'runecaster',
+        'knifedancer.skillStun' => [
+            'job' => 'knifedancer',
             'kind' => 'skillStun',
             'name' => 'Heavy Hand',
             'description' => 'A round longer on a stun.',
             'ranks' => [
-                ['node' => 'runecaster.stilling_word', 'level' => 20],
+                ['node' => 'knifedancer.behind_the_knee', 'level' => 20],
             ],
         ],
         'shieldbearer.goldFind' => [
@@ -1263,13 +1263,13 @@ final class Skills
                 ['node' => 'shieldbearer.the_long_watch', 'level' => 28],
             ],
         ],
-        'runecaster.lootOption' => [
-            'job' => 'runecaster',
+        'knifedancer.lootOption' => [
+            'job' => 'knifedancer',
             'kind' => 'lootOption',
             'name' => 'Scavenger',
             'description' => 'Chance of an extra rolled line on looted gear.',
             'ranks' => [
-                ['node' => 'runecaster.the_kept_word', 'level' => 28],
+                ['node' => 'knifedancer.the_kept_edge', 'level' => 28],
             ],
         ],
         'sawyer.runSlot' => [

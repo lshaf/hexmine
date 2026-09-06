@@ -44,7 +44,7 @@ final class BattleSkillTest extends TestCase
      *
      * `stun` is the one verb two of them carry, and it is deliberate: taking a
      * turn away is the most legible thing a fight can do, and the shield's is
-     * two rounds against the focus's one on a cooldown half again as long. Same
+     * two rounds against the daggers' one on a cooldown half again as long. Same
      * mechanic, opposite prices. Nothing else may be shared at all.
      */
     public function test_every_family_has_three_and_owns_its_own_tricks(): void
@@ -52,7 +52,7 @@ final class BattleSkillTest extends TestCase
         $effects = ['power', 'pierce', 'stun', 'burn', 'strikes', 'riposte', 'sunder', 'stance', 'toll'];
         $carriedBy = [];
 
-        foreach (['shield', 'sword', 'focus'] as $family) {
+        foreach (['shield', 'sword', 'dagger'] as $family) {
             $three = BattleSkills::forFamily($family);
             $this->assertCount(3, $three, "{$family} does not carry three skills");
 
@@ -84,7 +84,7 @@ final class BattleSkillTest extends TestCase
         $shared = array_keys(array_filter($carriedBy, static fn (array $f): bool => count($f) > 1));
         $this->assertSame(['stun'], $shared, 'a second verb is being carried by more than one family');
 
-        foreach (['shield', 'sword', 'focus'] as $family) {
+        foreach (['shield', 'sword', 'dagger'] as $family) {
             $own = array_filter(
                 $carriedBy,
                 static fn (array $f): bool => count($f) === 1 && isset($f[$family]),
@@ -107,7 +107,7 @@ final class BattleSkillTest extends TestCase
      */
     public function test_every_skill_starts_a_fight_on_cooldown(): void
     {
-        foreach (['shield', 'sword', 'focus'] as $family) {
+        foreach (['shield', 'sword', 'dagger'] as $family) {
             $armed = BattleSkills::armed($family);
             $soonest = min(array_column($armed, 'cooldown'));
 
@@ -143,7 +143,7 @@ final class BattleSkillTest extends TestCase
     /** §9.5.9 -- one a round at most, whatever is off cooldown. */
     public function test_at_most_one_skill_a_round(): void
     {
-        foreach (['shield', 'sword', 'focus'] as $family) {
+        foreach (['shield', 'sword', 'dagger'] as $family) {
             $armed = BattleSkills::armed($family);
 
             for ($seed = 1; $seed <= 60; $seed++) {
@@ -175,7 +175,7 @@ final class BattleSkillTest extends TestCase
      */
     public function test_a_long_fight_rotates_through_all_three(): void
     {
-        foreach (['shield', 'sword', 'focus'] as $family) {
+        foreach (['shield', 'sword', 'dagger'] as $family) {
             $armed = BattleSkills::armed($family);
 
             $seen = [];
@@ -283,7 +283,7 @@ final class BattleSkillTest extends TestCase
      */
     public function test_a_tooltip_reads_the_way_the_genre_writes_one(): void
     {
-        foreach (['shield', 'sword', 'focus'] as $family) {
+        foreach (['shield', 'sword', 'dagger'] as $family) {
             foreach (BattleSkills::armed($family) as $skill) {
                 $card = BattleSkills::summary($skill);
 
@@ -395,26 +395,26 @@ final class BattleSkillTest extends TestCase
 
         $this->assertSame(
             [],
-            $game->armedSkills($character->fresh(), 'focus'),
+            $game->armedSkills($character->fresh(), 'dagger'),
             'a fighter who has learned nothing walked in carrying skills',
         );
 
-        // Runecaster 5 opens the first two; the third waits for 12.
-        $character->jobLevels()->updateOrCreate(['job_key' => 'runecaster'], ['level' => 5, 'xp' => 0]);
+        // Knifedancer 5 opens the first two; the third waits for 12.
+        $character->jobLevels()->updateOrCreate(['job_key' => 'knifedancer'], ['level' => 5, 'xp' => 0]);
         $character->unsetRelation('jobLevels');
 
-        $game->buyRank($character->fresh(), BattleSkills::nodeKey('ember_bolt'));
+        $game->buyRank($character->fresh(), BattleSkills::nodeKey('bleeding_cut'));
 
-        $armed = $game->armedSkills($character->fresh(), 'focus');
+        $armed = $game->armedSkills($character->fresh(), 'dagger');
         $this->assertCount(1, $armed);
-        $this->assertSame('ember_bolt', $armed[0]['key']);
+        $this->assertSame('bleeding_cut', $armed[0]['key']);
 
         // And it is a point, like any other thing bought in that panel.
         $this->assertSame(1, $game->skillPoints($character->fresh())['spent']);
 
         // The gate is the battle job's level, not the character's.
         try {
-            $game->buyRank($character->fresh(), BattleSkills::nodeKey('rune_of_binding'));
+            $game->buyRank($character->fresh(), BattleSkills::nodeKey('hamstring'));
             $this->fail('a skill was learned below its job level');
         } catch (GameException $e) {
             $this->assertSame('job_level', $e->errorCode);

@@ -513,11 +513,11 @@ const OPTION_FLAT_TOOL: OptionStat[] = ['attack']
 const OPTION_FLAT_WORN: OptionStat[] = ['attack', 'defense']
 
 /**
- * §9.5.4 -- a focus keeps nothing off you, of either kind. "A focus that also
+ * §9.5.4 -- a pair of knives keeps nothing off you, of either kind. "A pair that also
  * held a little of it would be the balanced one twice, and the glass cannon is
  * the point."
  */
-const OPTION_FAMILY_NO_DEFENSE = ['focus']
+const OPTION_FAMILY_NO_DEFENSE = ['dagger']
 
 export function optionRollsFor(def: ItemDef): OptionRoll[] {
   // §8.5 -- no slot is a consumable, and a potion has no rolled line at all.
@@ -694,10 +694,24 @@ export const slotForSkill = (skill: SkillKey): GatherSlot =>
  * §9.5.4 -- which battle job a weapon family levels. Mirrors
  * Catalog::BATTLE_JOB_FOR_FAMILY.
  */
+/**
+ * §9.5.4 -- what to CALL a family in a sentence.
+ *
+ * The key is singular so it sits beside `shield` and `sword` as one word, and
+ * a pair of knives is two things -- so anything writing "your ___" needs the
+ * plural. One map rather than a plural per screen, which is how the almanac and
+ * the bench came to disagree about the old family's name.
+ */
+export const FAMILY_LABEL: Record<string, string> = {
+  shield: 'shield',
+  sword: 'sword',
+  dagger: 'daggers',
+}
+
 export const BATTLE_JOB_FOR_FAMILY: Record<string, string> = {
   shield: 'shieldbearer',
   sword: 'swordhand',
-  focus: 'runecaster',
+  dagger: 'knifedancer',
 }
 
 export const RARITIES: Rarity[] = [

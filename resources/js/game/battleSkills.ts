@@ -14,7 +14,7 @@
  */
 export interface BattleSkillDef {
   key: string
-  family: 'shield' | 'sword' | 'focus'
+  family: 'shield' | 'sword' | 'dagger'
   name: string
   glyph: string
   cooldown: number
@@ -38,9 +38,9 @@ export const BATTLE_SKILLS: Record<string, BattleSkillDef> = {
   onslaught: { key: "onslaught", family: "sword", name: "Onslaught", glyph: "onslaught", cooldown: 10, description: "Never give it a round to think in." },
   sunder: { key: "sunder", family: "sword", name: "Sunder", glyph: "sunder", cooldown: 12, description: "Armor was only ever a delay." },
   riposte: { key: "riposte", family: "sword", name: "Riposte", glyph: "riposte", cooldown: 13, description: "The blade was already going back before you decided to send it." },
-  ember_bolt: { key: "ember_bolt", family: "focus", name: "Ember Bolt", glyph: "ember", cooldown: 11, description: "It goes in cold and it does not come out." },
-  chain_arc: { key: "chain_arc", family: "focus", name: "Chain Arc", glyph: "arc", cooldown: 10, description: "You have been holding this since the first round." },
-  rune_of_binding: { key: "rune_of_binding", family: "focus", name: "Rune of Binding", glyph: "bind", cooldown: 15, description: "One syllable, and it forgets what it was doing." },
+  bleeding_cut: { key: "bleeding_cut", family: "dagger", name: "Bleeding Cut", glyph: "bleed", cooldown: 11, description: "It goes in narrow and it does not close." },
+  rising_flurry: { key: "rising_flurry", family: "dagger", name: "Rising Flurry", glyph: "flurry", cooldown: 10, description: "You have been reading it since the first round." },
+  hamstring: { key: "hamstring", family: "dagger", name: "Hamstring", glyph: "hamstring", cooldown: 15, description: "One cut behind the knee, and it forgets what it was doing." },
 }
 
 /*

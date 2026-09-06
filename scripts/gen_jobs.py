@@ -660,41 +660,41 @@ SWORD_NAMES = [
  ('the_kept_edge','The Kept Edge','The blade you brought home is the blade you keep.'),
 ]
 
-RUNE_NAMES = [
- ('cut_sigil','Cut Sigil','A rune cut clean carries further than one scratched.'),
- ('ore_ink','Ore Ink','Ground mythril holds a charge that ink will not.'),
- ('breath_line','Breath Line','Say it on the out-breath or not at all.'),
- ('slate_focus','Slate Focus','Flat stone takes a mark better than anything living.'),
- ('ember_draw','Ember Draw','Heat is the easiest thing to ask for.'),
- ('grounding_rod','Grounding Rod','What you call up has to go somewhere after.'),
+KNIFE_NAMES = [
+ ('keen_edge','Keen Edge','A blade honed thin goes where a sharp one stops.'),
+ ('weighted_grip','Weighted Grip','Lead in the pommel, so the point leads the hand.'),
+ ('crossed_guard','Crossed Guard','Two blades will stop one, if you get them there.'),
+ ('paired_draw','Paired Draw','Both clear the belt on the same movement.'),
+ ('wrist_snap','Wrist Snap','The cut is in the wrist and never in the arm.'),
+ ('turned_shoulder','Turned Shoulder','Stand narrow and most of it goes past.'),
 
- ('layered_mark','Layered Mark','Two runes on one stone, in order.'),
- ('slow_charge','Slow Charge','Fill it overnight and spend it in a second.'),
- ('resonance','Resonance','Find the note the stone already wants to make.'),
- ('sight_beyond','Sight Beyond','You see the shape of it before it arrives.'),
- ('cinder_hand','Cinder Hand','The heat leaves your palm without burning it.'),
- ('null_stroke','Null Stroke','A mark that unmakes the mark beside it.'),
- ('deep_vein','Deep Vein','Draw from the seam, not from yourself.'),
- ('shard_lens','Shard Lens','Obsidian narrows it to a point.'),
+ ('off_hand_work','Off-Hand Work','The second knife is not a spare.'),
+ ('stropped_daily','Stropped Daily','A minute on the leather is an hour off the stone.'),
+ ('read_the_feet','Read the Feet','It tells you where it is going before it goes.'),
+ ('the_opening','The Opening','Everything guarding is guarding something else.'),
+ ('dry_blade','Dry Blade','Wipe it before it sits. Blood eats steel.'),
+ ('beat_aside','Beat Aside','Not a block. A push, at the right moment.'),
+ ('short_recovery','Short Recovery','Back on guard before the swing has finished.'),
+ ('inside_the_reach','Inside the Reach','Past the point is the safest place on the field.'),
 
- ('echo_carve','Echo Carve','The second casting is cheaper than the first.'),
- ('warding_ring','Warding Ring','A circle is the oldest instruction there is.'),
- ('ash_reading','Ash Reading','What burned tells you what will, and what it is worth.'),
- ('steady_channel','Steady Channel','Held open, not opened repeatedly.'),
- ('silence_before','Silence Before','Nothing works if you are still talking.'),
- ('open_channel','Open Channel','Never quite closed, so never quite cold.'),
- ('long_burn','Long Burn','Less at once, for much longer.'),
- ('the_quiet_word','The Quiet Word','Loud is amateur.'),
+ ('no_wasted_cut','No Wasted Cut','Steel spent on armor is steel spent on nothing.'),
+ ('low_stance','Low Stance','Under the arc of most things that swing.'),
+ ('quick_hands','Quick Hands','Off the body before it has finished falling.'),
+ ('between_the_ribs','Between the Ribs','Between them, never through them. Bone is what blunts a knife.'),
+ ('both_at_once','Both at Once','It can answer one knife.'),
+ ('never_set','Never Set','Standing still is the only thing that costs you.'),
+ ('pressed_advantage','Pressed Advantage','Give it nothing to recover in.'),
+ ('the_quiet_kill','The Quiet Kill','Loud is amateur.'),
 
- ('overdraw','Overdraw','More than the focus was meant to hold.'),
- ('unspent_charge','Unspent Charge','Nothing left in it afterwards, which is the point.'),
- ('stilling_word','Stilling Word','One syllable, and it forgets what it was doing.'),
- ('measured_draw','Measured Draw','Ask for what the work needs and not a spark more.'),
- ('rest_the_rod','Rest the Rod','Between marks, put it down.'),
- ('clean_the_groove','Clean the Groove','Ash in the cut is what widens the cut.'),
+ ('full_extension','Full Extension','Everything behind it, and nothing held back.'),
+ ('committed_step','Committed Step','Weight through the front foot, or do not throw it.'),
+ ('behind_the_knee','Behind the Knee','One cut there, and it forgets what it was doing.'),
+ ('economy_of_motion','Economy of Motion','The shortest line to the gap, and no line at all to anywhere else.'),
+ ('both_edges','Both Edges','Sharpened the whole way round, so the draw cuts as well as the thrust.'),
+ ('the_seated_grip','Seated Grip','It sits in the palm, not in the fingers.'),
 
- ('true_bedding','True Bedding','Bedded straight, so nothing levers against the grain.'),
- ('the_kept_word','The Kept Word','A focus lasts as long as the care taken over it.'),
+ ('true_tang','True Tang','Full through the handle, so nothing levers against the grain.'),
+ ('the_kept_edge','The Kept Edge','A knife lasts exactly as long as the care taken over it.'),
 ]
 
 # ------------------------------------------------------------- wayfaring tree
@@ -751,7 +751,7 @@ CODES = {
 
  'shieldbearer': 'FAFWAP FFWAPVAG FAFCWVFP WWCFAS GL',
  'swordhand':    'AFAFWP FAFAGCVW FPFVAACL FPWASG WG',
- 'runecaster':   'AAFFPW AVAFVFCW VFGVACAL PPSAAF VL',
+ 'knifedancer':  'AAFFPW AVAFVFCW VFGVACAL PPSAAF VL',
 }
 
 TIER_OF = [1] * 6 + [2] * 8 + [3] * 8 + [4] * 6 + [5] * 2
@@ -815,7 +815,7 @@ TREES = {
 
     'shieldbearer': build('shieldbearer', SHIELD_NAMES, CODES['shieldbearer'], 'battle'),
     'swordhand': build('swordhand', SWORD_NAMES, CODES['swordhand'], 'battle'),
-    'runecaster': build('runecaster', RUNE_NAMES, CODES['runecaster'], 'battle'),
+    'knifedancer': build('knifedancer', KNIFE_NAMES, CODES['knifedancer'], 'battle'),
 }
 
 JOBS = [
@@ -839,7 +839,7 @@ JOBS = [
 
     ('shieldbearer', 'Shieldbearer', 'battle', 'defense', 'stone', 'Stands in front, and levels by standing there with a shield on the arm.'),
     ('swordhand', 'Swordhand', 'battle', 'balance', 'wood', 'Trades evenly between the blow and the block. Levels with a sword in hand.'),
-    ('runecaster', 'Runecaster', 'battle', 'offense', 'raid', 'Cuts the marks that burn. Levels with a wand in hand.'),
+    ('knifedancer', 'Knifedancer', 'battle', 'offense', 'raid', 'Two blades and a guard in neither hand. Levels with daggers in hand.'),
 ]
 
 # ------------------------------------------------------------------ structure

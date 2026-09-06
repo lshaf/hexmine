@@ -66,7 +66,7 @@ final class BattleSimTest extends TestCase
         $bench = $this->bench();
 
         $this->assertSame(
-            ['shieldbearer', 'swordhand', 'runecaster'],
+            ['shieldbearer', 'swordhand', 'knifedancer'],
             array_keys($bench['jobs']),
         );
 
@@ -127,7 +127,7 @@ final class BattleSimTest extends TestCase
     {
         $nodes = array_keys(array_filter(
             Jobs::NODES,
-            static fn (array $n): bool => $n['job'] === 'runecaster',
+            static fn (array $n): bool => $n['job'] === 'knifedancer',
         ));
 
         $sim = $this->fight([
@@ -138,7 +138,7 @@ final class BattleSimTest extends TestCase
         ]);
 
         $this->assertSame('sword', $sim['family']);
-        $this->assertSame(0, $sim['tree']['attack'], 'a runecaster tree paid out through a sword');
+        $this->assertSame(0, $sim['tree']['attack'], 'a knifedancer tree paid out through a sword');
         $this->assertEqualsWithDelta(0.0, $sim['tree']['skillPower'], 1e-9);
     }
 

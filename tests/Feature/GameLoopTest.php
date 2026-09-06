@@ -1884,7 +1884,7 @@ final class GameLoopTest extends TestCase
         $job->update(['ends_at' => $this->game->now() - 1]);
         $this->game->collectJob($this->character->fresh(), $job->id);
 
-        foreach (['shieldbearer', 'swordhand', 'runecaster'] as $battle) {
+        foreach (['shieldbearer', 'swordhand', 'knifedancer'] as $battle) {
             $row = $this->character->fresh()->jobLevels()->where('job_key', $battle)->first();
             $this->assertSame(1, $row->level, "{$battle} levelled without a raid");
             $this->assertSame(0, $row->xp, "{$battle} earned XP without a raid");
@@ -3031,7 +3031,7 @@ final class GameLoopTest extends TestCase
     {
         $kinds = [];
 
-        foreach (['keepers_carapace', 'ironwood_axe', 'knotted_rod', 'marching_boots'] as $key) {
+        foreach (['keepers_carapace', 'ironwood_axe', 'notched_dirks', 'marching_boots'] as $key) {
             $def = Catalog::item($key);
 
             for ($seed = 1; $seed <= 300; $seed++) {
@@ -3056,7 +3056,7 @@ final class GameLoopTest extends TestCase
         // §8.0.1 -- and the one line with no number carries none. Every other
         // line answers "how much"; this one either happened or it did not, and
         // a placeholder would be somewhere for a band to be invented later.
-        $rod = Catalog::item('knotted_rod');
+        $rod = Catalog::item('notched_dirks');
         $seen = false;
         for ($seed = 1; $seed <= 400; $seed++) {
             foreach (Formulas::rollOptions($rod, $seed) as $option) {
@@ -3075,7 +3075,7 @@ final class GameLoopTest extends TestCase
      * §8.0.1 -- what each piece is eligible for, on the four odd ones.
      *
      * A tool guards nothing, a weapon works nothing, boots are the only thing
-     * that walks, and a focus keeps nothing off you. Four rules, four pieces.
+     * that walks, and a pair of knives keeps nothing off you. Four rules, four pieces.
      */
     public function test_each_piece_rolls_what_it_is_for(): void
     {
@@ -3100,10 +3100,10 @@ final class GameLoopTest extends TestCase
         $this->assertSame(['attack', 'defense', 'durability', 'haul'], $pool('ironwood_armor'));
 
         // §9.5.8 -- and a weapon offers what comes off a body, which is the
-        // fight's own version of a tool's seam. A focus still guards nothing.
+        // fight's own version of a tool's seam. A pair of knives still guards nothing.
         $this->assertSame(
             ['attack', 'durability', 'haul', 'cooldown', ...Catalog::battleSeamMaterials()],
-            $pool('knotted_rod'),
+            $pool('notched_dirks'),
         );
 
         // §4.0 -- and the glove is the fifth odd one, because gathering has no
@@ -3574,7 +3574,7 @@ final class GameLoopTest extends TestCase
      * §8 answers "which lines" the way it answers everything else -- by what
      * the piece is FOR. A tool guards nothing (§8 rule 5 keeps the two ladders
      * apart in both directions), a weapon works nothing (the same rule read the
-     * other way), boots are the only thing that walks, and a focus guards
+     * other way), boots are the only thing that walks, and a pair of knives guards
      * nowhere in the kit (§9.5.4). The sweep is over the whole catalog because
      * every hole here so far has been a missing branch, not a wrong entry.
      */
@@ -3640,9 +3640,9 @@ final class GameLoopTest extends TestCase
                 $this->assertNotContains('travel', $stats, "{$key} walks");
                 $this->assertContains('cooldown', $stats, "{$key} cannot roll a cooldown");
 
-                // §9.5.4 -- a focus keeps nothing off you, of either kind.
-                if (($def['family'] ?? null) === 'focus') {
-                    $this->assertNotContains('defense', $stats, "{$key} is a focus that guards");
+                // §9.5.4 -- a pair of knives keeps nothing off you, of either kind.
+                if (($def['family'] ?? null) === 'dagger') {
+                    $this->assertNotContains('defense', $stats, "{$key} is a pair of knives that guards");
                 }
 
                 continue;

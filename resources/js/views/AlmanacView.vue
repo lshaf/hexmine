@@ -749,7 +749,7 @@ const WORN_NOTE: Partial<Record<EquipSlot, string>> = {
  * unrelated pieces under a single "Weapon" heading would hide the only choice
  * the slot actually asks you to make.
  */
-const FAMILIES: Array<{ key: 'shield' | 'sword' | 'focus'; title: string; sub: string }> = [
+const FAMILIES: Array<{ key: 'shield' | 'sword' | 'dagger'; title: string; sub: string }> = [
   {
     key: 'shield',
     title: 'Shield',
@@ -761,9 +761,9 @@ const FAMILIES: Array<{ key: 'shield' | 'sword' | 'focus'; title: string; sub: s
     sub: 'Weapon slot · Swordhand. An even split, and the reference the other two are read against. Balanced means the two numbers are the same, not a bit of both.',
   },
   {
-    key: 'focus',
-    title: 'Focus',
-    sub: 'Weapon slot · Runecaster. Four fifths attack, and the guard that is left is small rather than nothing — a focus that stopped none of it would make the sword the balanced one twice over. The only kit in the game whose hardest fight is genuinely uncertain.',
+    key: 'dagger',
+    title: 'Daggers',
+    sub: 'Weapon slot · Knifedancer. Four fifths attack, and the guard that is left is small rather than nothing — a pair that turned none of it would make the sword the balanced one twice over. The only kit in the game whose hardest fight is genuinely uncertain.',
   },
 ]
 
@@ -771,7 +771,7 @@ const FAMILIES: Array<{ key: 'shield' | 'sword' | 'focus'; title: string; sub: s
 const FAMILY_JOB: Record<string, string> = {
   shield: 'Shieldbearer',
   sword: 'Swordhand',
-  focus: 'Runecaster',
+  dagger: 'Knifedancer',
 }
 
 interface ItemEntry {

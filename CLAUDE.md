@@ -1221,7 +1221,7 @@ assuming a rule here covers all of them.
 | Alchemist | craft | consumable bench | brewing a potion |
 | Shieldbearer | battle | defense | fighting with a shield (§9.5) |
 | Swordhand | battle | balance | fighting with a sword (§9.5) |
-| Runecaster | battle | offense | fighting with a focus (§9.5) |
+| Knifedancer | battle | offense | fighting with daggers (§9.5) |
 
 **Processing is not crafting, and the split is the input.** A craft bench spends
 refined stock on an object; a processing line makes the stock. So the five
@@ -1309,7 +1309,7 @@ wear nodes. There is a test asserting no two trees share a shape.
 
 **The three battle jobs level on the road** (§9.5), and on nothing else. Which
 of them earns the XP is decided by the **weapon family** in the `weapon` slot —
-shield, sword or focus — so the job you level is the way you actually fight.
+shield, sword or daggers — so the job you level is the way you actually fight.
 They must never be given a stand-in XP source from gathering; a battle job that
 levels by digging would make combat optional.
 
@@ -1496,7 +1496,7 @@ is felt now, the next time a pack stops you on a road.)*
 **The two wear kinds are two questions, not one.** §9.5.6 runs two streams —
 what hit you comes off the armor, what you hit comes off the blade — so a tree
 that spared both with one number would be answering both with one node.
-`battleWear` is the shieldbearer's, `weaponWear` the runecaster's, and both are
+`battleWear` is the shieldbearer's, `weaponWear` the knifedancer's, and both are
 capped low because that bill is the largest sink in the game (§11.1).
 
 **A battle tree also gets paid.** `goldFind` and `lootOption` are the only place
@@ -2118,11 +2118,11 @@ family in it is what decides which three skills you carry at all (§9.5.9).
 
 **Only boots walk.** A coat does not get down the road faster for being a coat.
 
-**A focus rolls no guard either.** §9.5.4 says a focus has none at all — *a
-focus that also held a little of it would be the balanced one twice, and the
-glass cannon is the point.* A rolled line is luck rather than budget, but a wand
-that can come out of the bench guarding says the same wrong thing about what a
-wand is. It is the only per-*family* rule in the pool.
+**A pair of knives rolls no guard either.** §9.5.4 says they have none at all —
+*a pair that also held a little of it would be the balanced one twice, and the
+glass cannon is the point.* A rolled line is luck rather than budget, but a
+dagger that can come out of the bench guarding says the same wrong thing about
+what a dagger is. It is the only per-*family* rule in the pool.
 
 **A higher rarity does not roll a better line every time; it rolls from a deeper
 bag.** The ceiling climbs the ladder and the floor does not, so a good roll is
@@ -2178,7 +2178,7 @@ Rules, all mandatory:
    better tools on offer than another.
 5. **`Weapon` is combat only and never gathers.** Combat gear must not be able to
    stand in for a gathering tool, or fighting becomes a shortcut around the mining ladder.
-   One slot holds **three families** — shield, sword and focus — and the family decides
+   One slot holds **three families** — shield, sword and daggers — and the family decides
    which battle job levels (§9.5.4). It carries flat `attack` and `defense`, which are
    not the percentage stats of the same name and are not subject to their ceiling.
 
@@ -3213,7 +3213,7 @@ rather than a meter, because a meter implies a roof and these have none.
 **Defense belongs to armor, to the shield, and to the sword.** Those are the
 three things whose job is to be between you and something: the worn set, the
 thing built to stop a blow, and the one weapon family that is meant to be the
-balanced answer. **A focus has none at all** — a focus that also held a little
+balanced answer. **A pair of knives has none at all** — a pair that also held a little
 of it would be the balanced one twice, and the glass cannon is the point. It is
 paid for in attack.
 
@@ -3230,14 +3230,22 @@ before there was a number on both sides.
 |---|---|---|---|
 | Shield | Shieldbearer | **⅓ attack, ⅔ defense** | 14 / 31 |
 | Sword | Swordhand | **half and half** | 18 / 17 |
-| Focus (wand) | Runecaster | **⅘ attack** | 27 / 7 |
+| Daggers | Knifedancer | **⅘ attack** | 27 / 7 |
+
+*(The third family was a **focus** — a wand, and a Runecaster to swing it. It
+was renamed to a pair of daggers and nothing else moved: every value, cap,
+cooldown, level gate and measured matchup is exactly what it was, and the three
+skills kept their effects under new names. What changed is that the glass
+cannon is now a thing you can picture holding, and the silhouette says so — a
+blade in each hand and a guard in neither, which is the family's whole sentence
+drawn rather than written.)*
 
 **Balanced means an even split, not "a bit of both".** The sword is the one
 family whose two numbers are the same, and that is what makes it the reference
 the other two are read against.
 
-**A wand keeps a little off you, and a shield lands a little.** Neither may be
-zero. A wand at zero guard would make the sword the balanced one twice over; a
+**A pair of knives keeps a little off you, and a shield lands a little.** Neither
+may be zero. Knives at zero guard would make the sword the balanced one twice over; a
 shield that cannot land is not a defensive build but a stalemate, because
 §9.5.5 makes a fight a **race** — surviving everything in the center and putting
 none of it down loses on the bell.
@@ -3250,7 +3258,7 @@ One slot rather than three, because you fight with one thing. The five
 **gathering** tools are all equipped at once precisely because they never
 compete (§8 rule 3); a weapon competes with itself. Which family you carry is
 what decides **which battle job earns the XP** — §7.4 has always said a battle
-job levels by fighting with a shield, a sword or a focus, and this is what
+job levels by fighting with a shield, a sword or a pair of daggers, and this is what
 finally gives that sentence something to count.
 
 **Armor is one set with two axes, not a second wardrobe.** Every armor, boots
@@ -3297,18 +3305,18 @@ measured ladder, against the eight of §9.5.2:
 | Common battle | tier 1 |
 | Rare, any family | tiers 1–3, and **neither** of the center's two |
 | Epic sword | + the Barrow Knight. Driven off by the Ash Revenant |
-| Epic wand | + the Barrow Knight, and the Ash Revenant **about 3 times in 5** |
+| Epic daggers | + the Barrow Knight, and the Ash Revenant **about 3 times in 5** |
 | Epic shield | tiers 1–3 only. It survives a carapace and cannot put one down |
 | Legendary, any family | everything |
 | Full legendary *work* set | tier 1 and the tier-2 carapace |
 
-**The wand is the only kit in the game with a genuinely uncertain fight**, and
-that falls out of the model rather than being arranged: an epic wand and an Ash
+**The daggers are the only kit in the game with a genuinely uncertain fight**,
+and that falls out of the model rather than being arranged: an epic pair and an Ash
 Revenant race each other closely enough that §9.5.5's ±15% swing decides it.
 
 **The shield is always the most expensive win.** A slow kill is more rounds, and
 more rounds is more of both wear streams (§9.5.6) — a legendary shield pays 235
-durability in the center where a legendary wand pays 145. Survivability is not
+durability in the center where a legendary pair pays 145. Survivability is not
 free; it is paid at the repair bench instead of on the odds.
 
 That is the intended shape of the walk inward: it is a kit decision rather than
@@ -3644,7 +3652,7 @@ its own problem:
 |---|---|---|
 | **Shield** | kills slowly, so wins cost the most | turn being hit into damage, and buy rounds where nothing comes back |
 | **Sword** | remarkable at nothing | attrition — more swings, answered blows, a guard that never comes back up |
-| **Focus** | no guard anywhere in the kit | end it before that matters: pierce, burn, escalate |
+| **Daggers** | no guard anywhere in the kit | end it before that matters: pierce, bleed, escalate |
 
 | Family | Skill | CD | What it does |
 |---|---|---|---|
@@ -3654,9 +3662,9 @@ its own problem:
 | Sword | **Onslaught** | 10 | you swing **twice** for 2 rounds |
 | | **Sunder** | 12 | its guard drops **3 permanently**, and stacks with itself |
 | | **Riposte** | 13 | for 3 rounds everything it lands **comes straight back**, through no guard |
-| Focus | **Ember Bolt** | 11 | ignores guard, and **burns 3 rounds** — armor answers neither half |
-| | **Chain Arc** | 10 | a blow that is **bigger the deeper the fight has gone** |
-| | **Rune of Binding** | 15 | it loses its next answer |
+| Daggers | **Bleeding Cut** | 11 | ignores guard, and **bleeds 3 rounds** — armor answers neither half |
+| | **Rising Flurry** | 10 | a blow that is **bigger the deeper the fight has gone** |
+| | **Hamstring** | 15 | it loses its next answer |
 
 **The WEAPON decides which three; the TREE teaches them.** §9.5.4 makes the
 family in the slot your class, so carrying a sword is what makes you a
@@ -3669,7 +3677,7 @@ Being ordinary is the load-bearing part. A battle job still costs **thirty
 points like every other job** — the skills displaced three stat ranks rather
 than arriving beside them — so learning all three is a tenth of what the job
 teaches, paid for out of the same hundred (§7.4.1) and against the same stat
-ranks. That is the choice: a Runecaster who takes all three has three fewer
+ranks. That is the choice: a Knifedancer who takes all three has three fewer
 ranks of pair and wear than one who takes none.
 
 **What the displaced ranks were worth was merged, not lost.** Each one's value
@@ -3683,8 +3691,8 @@ are three skills rather than three ranks of one — a rank ladder would be sayin
 Sunder is a better Onslaught, and they are different tricks.
 
 *(They used to arrive with the weapon, on the argument that the three simply
-**are** what a sword is. That made a Runecaster's whole kit free the moment they
-picked up a wand, and left the battle trees buying nothing but percentages on
+**are** what a sword is. That made a Knifedancer's whole kit free the moment they
+picked up a pair, and left the battle trees buying nothing but percentages on
 skills nobody had chosen.)*
 
 **A `battleSkill` node is the one effect with no value** (§7.4.3): owning it IS
@@ -3786,7 +3794,7 @@ drift. The arithmetic was already shared — `/api/battle-sim` runs the real
 `resolveBattle()` and the real wear split — and now the drawing is too.
 
 **Open: the roster and the swing were tuned before any of this existed.** Adding
-skills moved §9.5.4's measured ladder up by roughly a rung — a rare focus now
+skills moved §9.5.4's measured ladder up by roughly a rung — a rare pair now
 takes a Barrow Knight, and an epic sword takes an Ash Revenant about one time in
 five where it never did. Monster `attack`/`defense`/`hp` and `BATTLE_SWING` are
 the levers for putting that back where it belongs, and neither has been touched

@@ -60,7 +60,7 @@ const nextId = () => `g${++gradientSeq}`
  * your class -- so the family has to own the shape, or a shieldbearer's shield
  * is drawn as a sword.
  */
-type IconShape = EquipSlot | 'potion' | 'shield' | 'focus'
+type IconShape = EquipSlot | 'potion' | 'shield' | 'dagger'
 
 const SILHOUETTE: Record<IconShape, (fill: string, edge: string) => string> = {
   // Woodcutting. A bearded bit hung off one side of the haft: the beard hooking
@@ -140,14 +140,23 @@ const SILHOUETTE: Record<IconShape, (fill: string, edge: string) => string> = {
     <path d="M20 7 V34" stroke="${edge}" stroke-width="1"/>
     <path d="M9 15 H31" stroke="${edge}" stroke-width="1"/>`,
 
-  // §9.5.4 Runecaster. A rod under a cut stone -- no edge anywhere on it, which
-  // is the whole read: the other two families are things you swing.
-  focus: (fill, edge) => `
-    <rect x="18.6" y="17" width="2.8" height="17" rx="1.3" fill="${edge}"/>
-    <path d="M20 5 L27 11.5 L20 20 L13 11.5 Z"
-          fill="${fill}" stroke="${edge}" stroke-width="1.2" stroke-linejoin="round"/>
-    <path d="M13 11.5 H27 M20 5 V20" stroke="${edge}" stroke-width="0.8"/>
-    <circle cx="20" cy="24.5" r="2.2" fill="${fill}" stroke="${edge}" stroke-width="1"/>`,
+  // §9.5.4 Knifedancer. TWO of them, crossed -- which is the whole read at icon
+  // size: the shield is one broad mass and the sword one long line, so the tell
+  // here is that there are a pair of anything at all. Short, because a knife
+  // that reached as far as the sword would be a sword.
+  dagger: (fill, edge) => `
+    <g transform="rotate(-30 20 21)">
+      <path d="M20 6.5 L22.6 11 L22.6 21 L20 23.6 L17.4 21 L17.4 11 Z"
+            fill="${fill}" stroke="${edge}" stroke-width="1.1" stroke-linejoin="round"/>
+      <rect x="14.6" y="23.4" width="10.8" height="2.2" rx="1" fill="${edge}"/>
+      <rect x="18.7" y="25.6" width="2.6" height="7.4" rx="1.2" fill="${edge}"/>
+    </g>
+    <g transform="rotate(30 20 21)">
+      <path d="M20 6.5 L22.6 11 L22.6 21 L20 23.6 L17.4 21 L17.4 11 Z"
+            fill="${fill}" stroke="${edge}" stroke-width="1.1" stroke-linejoin="round"/>
+      <rect x="14.6" y="23.4" width="10.8" height="2.2" rx="1" fill="${edge}"/>
+      <rect x="18.7" y="25.6" width="2.6" height="7.4" rx="1.2" fill="${edge}"/>
+    </g>`,
 
   // §8.5 consumables. A round bulb -- the only closed curve in the set, and the
   // only shape with no handle, because a potion is the one thing you do not hold
@@ -213,7 +222,7 @@ export interface IconOptions {
   /** Absent for consumables (§8.5), which have no slot and draw as a flask. */
   slot?: EquipSlot
   /** §9.5.4 -- one weapon slot, three families, and the family owns the shape. */
-  family?: 'shield' | 'sword' | 'focus'
+  family?: 'shield' | 'sword' | 'dagger'
   rarity: Rarity
   palette: keyof typeof MATERIAL_PALETTE
   size?: number

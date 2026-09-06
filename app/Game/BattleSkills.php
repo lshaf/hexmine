@@ -11,7 +11,7 @@ namespace App\Game;
  * the whole design brief: §9.5.4 already makes the family in the slot your
  * class, and three copies of "hit harder" in three costumes would have made
  * that choice cosmetic. What a shieldbearer does in a fight should be
- * unavailable to a runecaster, and the reverse.
+ * unavailable to a knifedancer, and the reverse.
  *
  * Each family gets the answer to its own problem (§9.5.4):
  *
@@ -129,43 +129,43 @@ final class BattleSkills
             'description' => 'The blade was already going back before you decided to send it.',
         ],
 
-        // --------------------------------------------------------------- focus
+        // -------------------------------------------------------------- dagger
         //
         // 27 attack and 7 guard at legendary (§9.5.4), and no defense anywhere
-        // else in the kit -- a runecaster that has not finished the fight is
+        // else in the kit -- a knifedancer that has not finished the fight is
         // losing it. All three are about the clock.
-        'ember_bolt' => [
+        'bleeding_cut' => [
             'jobLevel' => 1,
-            'family' => 'focus',
-            'name' => 'Ember Bolt',
-            'glyph' => 'ember',
+            'family' => 'dagger',
+            'name' => 'Bleeding Cut',
+            'glyph' => 'bleed',
             'cooldown' => 11,
             'pierce' => true,
             'burn' => 3,
             'tick' => 0.22,
-            'effect' => 'Burn your foe past its defense, and leave it burning.',
-            'description' => 'It goes in cold and it does not come out.',
+            'effect' => 'Find the gap in its guard, and leave it bleeding.',
+            'description' => 'It goes in narrow and it does not close.',
         ],
-        'chain_arc' => [
+        'rising_flurry' => [
             'jobLevel' => 5,
-            'family' => 'focus',
-            'name' => 'Chain Arc',
-            'glyph' => 'arc',
+            'family' => 'dagger',
+            'name' => 'Rising Flurry',
+            'glyph' => 'flurry',
             'cooldown' => 10,
             'power' => 1.2,
             'ramp' => 0.05,
-            'effect' => 'Loose the charge you have been building all fight.',
-            'description' => 'You have been holding this since the first round.',
+            'effect' => 'Spend every opening the fight has given you.',
+            'description' => 'You have been reading it since the first round.',
         ],
-        'rune_of_binding' => [
+        'hamstring' => [
             'jobLevel' => 12,
-            'family' => 'focus',
-            'name' => 'Rune of Binding',
-            'glyph' => 'bind',
+            'family' => 'dagger',
+            'name' => 'Hamstring',
+            'glyph' => 'hamstring',
             'cooldown' => 15,
             'stun' => 1,
-            'effect' => 'Bind your foe where it stands, stunning it.',
-            'description' => 'One syllable, and it forgets what it was doing.',
+            'effect' => 'Cut it out from under itself, stunning it.',
+            'description' => 'One cut behind the knee, and it forgets what it was doing.',
         ],
     ];
 

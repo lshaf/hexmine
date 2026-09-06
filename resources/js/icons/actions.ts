@@ -221,6 +221,8 @@ export const JOB_PATHS: Record<string, string> = {
 
   shieldbearer: ACTION_PATHS.effectDefense!,
   swordhand: ACTION_PATHS.effectAttack!,
-  /* A focus: the rune cut on the head of a wand (§9.5.4's glass cannon). */
-  runecaster: 'M4 20.5 11 13.5 M15 4.5a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9Z M15 6.8v4.4 M13 9h4',
+  /* A crossed pair of knives (§9.5.4's glass cannon). Two of them is the whole
+     mark: the shieldbearer's and the swordhand's are both single shapes, so
+     what tells this one apart at 18px is that there are a pair. */
+  knifedancer: 'M5 19.5 L15.5 9 M13 4.5 L17.5 4.5 L17.5 9 M19 19.5 L8.5 9 M11 4.5 L6.5 4.5 L6.5 9 M4 20.5 L6.5 18 M20 20.5 L17.5 18',
 }

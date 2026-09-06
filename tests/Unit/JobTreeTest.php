@@ -452,7 +452,7 @@ final class JobTreeTest extends TestCase
      *
      * This is the failure that has to be caught here rather than in play: pick
      * a node whose kind appears only once and the tree silently loses that kind
-     * outright. It happened twice while these were being placed -- a runecaster
+     * outright. It happened twice while these were being placed -- a knifedancer
      * that could not spare its armor, and a swordhand that rolled no extra loot
      * lines at all.
      */
@@ -548,7 +548,7 @@ final class JobTreeTest extends TestCase
 
             // How much of the armor bill a tree spares is now one of the things
             // that tells the three apart: a shieldbearer buys most of the cap,
-            // a runecaster almost none of it and spends on the blade instead.
+            // a knifedancer almost none of it and spends on the blade instead.
             $this->assertGreaterThan(0, $wear, "{$job} spares nothing at all");
             $this->assertLessThanOrEqual(
                 Balance::SKILL_BATTLE_WEAR_CAP + 1e-9,
@@ -561,7 +561,7 @@ final class JobTreeTest extends TestCase
         // sword is the one that is even. Read off the trees rather than
         // asserted per job, so a retune that flattens them all fails here.
         $lean = [];
-        foreach (['shieldbearer', 'swordhand', 'runecaster'] as $job) {
+        foreach (['shieldbearer', 'swordhand', 'knifedancer'] as $job) {
             $sums = ['attack' => 0, 'defense' => 0];
             foreach (Jobs::nodesFor($job) as $node) {
                 if ($node['effect']['kind'] === 'pair') {
@@ -573,7 +573,7 @@ final class JobTreeTest extends TestCase
 
         $this->assertSame(-1, $lean['shieldbearer'], 'a shieldbearer does not lean on the guard');
         $this->assertSame(0, $lean['swordhand'], 'a swordhand is not the even one');
-        $this->assertSame(1, $lean['runecaster'], 'a runecaster does not lean on the arm');
+        $this->assertSame(1, $lean['knifedancer'], 'a knifedancer does not lean on the arm');
     }
 
     /**

@@ -62,13 +62,13 @@ const tab = ref<Tab>('tool')
 const FAMILY_LABEL: Record<string, string> = {
   shield: 'Shield',
   sword: 'Sword',
-  focus: 'Focus',
+  dagger: 'Daggers',
 }
 
 const FAMILY_NOTE: Record<string, string> = {
   shield: 'Levels Shieldbearer · two thirds guard',
   sword: 'Levels Swordhand · even split',
-  focus: 'Levels Runecaster · four fifths arm',
+  dagger: 'Levels Knifedancer · four fifths arm',
 }
 
 /** What each worn slot is actually for, which is how they differ at the bench. */

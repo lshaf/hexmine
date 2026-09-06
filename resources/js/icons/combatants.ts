@@ -290,7 +290,7 @@ export function monsterCrest(
  *
  * The family in the weapon slot IS your class, so it is what the figure is
  * doing rather than a badge beside it: a shieldbearer is behind the shield, a
- * swordhand has the blade up, a runecaster is holding a mark off the ground.
+ * swordhand has the blade up, a knifedancer has one out on either side.
  *
  * Bare hands get their own stance rather than an empty frame. §9.5.3 makes
  * fighting with nothing a legitimate way out of a pin -- an expensive one, but
@@ -317,12 +317,20 @@ const FIGHTER: Record<string, (ink: string, dark: string) => string> = {
     <rect x="22.6" y="23.4" width="10.8" height="2.6" fill="${ink}"/>
     <rect x="26.2" y="26" width="3.6" height="4.4" fill="${ink}"/>`,
 
-  focus: (ink, dark) => `
-    <circle cx="14.5" cy="14" r="4" fill="${dark}"/>
-    <path d="M10 33 Q10 20.5 14.5 19.8 Q19 20.5 19 33 Z" fill="${dark}"/>
-    <path d="M17.5 22 L24 16.5" stroke="${dark}" stroke-width="2.6" stroke-linecap="round"/>
-    <circle cx="26.5" cy="13.5" r="5.6" fill="none" stroke="${ink}" stroke-width="1.8"/>
-    <circle cx="26.5" cy="13.5" r="2.6" fill="${ink}"/>`,
+  // §9.5.4 -- a blade in each hand and a guard in neither, which is the whole
+  // of what the family is. Both arms are out and neither is covering anything:
+  // the shield figure hides behind its slab and the sword figure holds one up,
+  // and this one is doing the opposite of both at once. Two knives rather than
+  // one long blade is also what tells it from `sword` at 24px -- a silhouette
+  // reads its OUTLINE, so the tell has to be the number of points, not the
+  // length of them.
+  dagger: (ink, dark) => `
+    <circle cx="20" cy="13" r="4" fill="${dark}"/>
+    <path d="M15 33 Q15 20 20 19.2 Q25 20 25 33 Z" fill="${dark}"/>
+    <path d="M16.8 21 L13.4 24" stroke="${dark}" stroke-width="2.6" stroke-linecap="round"/>
+    <path d="M23.2 21 L26.6 24" stroke="${dark}" stroke-width="2.6" stroke-linecap="round"/>
+    <path d="M13.2 25.6 L10.2 22.6 L8.4 13.2 L14.6 19.4 Z" fill="${ink}"/>
+    <path d="M26.8 25.6 L29.8 22.6 L31.6 13.2 L25.4 19.4 Z" fill="${ink}"/>`,
 
   bare: (ink, dark) => `
     <circle cx="20" cy="12.5" r="4" fill="${dark}"/>
@@ -360,5 +368,5 @@ export function fighterCrest(family: string | null, failing = false, size = 40):
 export const FAMILY_FOR_BATTLE_JOB: Record<string, string> = {
   shieldbearer: 'shield',
   swordhand: 'sword',
-  runecaster: 'focus',
+  knifedancer: 'dagger',
 }

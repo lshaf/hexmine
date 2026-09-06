@@ -18,6 +18,7 @@ import { computed } from 'vue'
 import SvgIcon from '@/components/SvgIcon.vue'
 import { skillGlyph } from '@/icons/skills'
 import { timesFired, type SkillLike } from '@/game/battle'
+import { FAMILY_LABEL } from '@/game/catalog'
 import type { BattleRound } from '@/game/types'
 
 /** A drawable skill, plus whatever detail the caller happens to have. */
@@ -63,7 +64,7 @@ const rows = computed(() =>
 <template>
   <div v-if="rows.length" class="skills">
     <p class="tiny muted lead">
-      <template v-if="family">Your {{ family }} can know these.</template>
+      <template v-if="family">Your {{ FAMILY_LABEL[family] ?? family }} can know these.</template>
       <template v-else>These are learned on the job's own sheet.</template>
       One skill each, one rank, at job levels 1, 5 and 12.
     </p>
@@ -98,7 +99,7 @@ const rows = computed(() =>
 <style scoped>
 /* §9.5.9 -- not learned yet. Dimmed rather than hidden: a skill you cannot use
    is the reason to keep levelling, and hiding it would make a job sheet say a
-   Runecaster has nothing until it suddenly has three. */
+   A Knifedancer has nothing until it suddenly has three. */
 .skill.unknown {
   opacity: 0.62;
 }

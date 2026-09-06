@@ -495,15 +495,15 @@ final class Catalog
     }
 
     /**
-     * §9.5.4 -- a focus keeps nothing off you, of either kind.
+     * §9.5.4 -- a pair of knives keeps nothing off you, of either kind.
      *
-     * "Defense belongs to armor, to the shield, and to the sword. A focus has
-     * none at all -- a focus that also held a little of it would be the
+     * "Defense belongs to armor, to the shield, and to the sword. A pair of
+     * knives has none at all -- a pair that also held a little of it would be the
      * balanced one twice, and the glass cannon is the point." A rolled line is
      * luck rather than budget, but a wand that can come out of the bench
      * guarding says the same wrong thing about what a wand is.
      */
-    public const OPTION_FAMILY_NO_DEFENSE = ['focus'];
+    public const OPTION_FAMILY_NO_DEFENSE = ['dagger'];
 
     /**
      * §8.0.1 -- every line a roll on this piece may land on.
@@ -551,7 +551,7 @@ final class Catalog
             }
 
             foreach (self::OPTION_FLAT_WORN as $stat) {
-                // §9.5.4 -- a focus keeps nothing off you, of either kind.
+                // §9.5.4 -- a pair of knives keeps nothing off you, of either kind.
                 if ($stat === 'defense' && $slot === 'weapon'
                     && in_array($def['family'] ?? null, self::OPTION_FAMILY_NO_DEFENSE, true)) {
                     continue;
@@ -600,12 +600,12 @@ final class Catalog
      *
      * One slot holds all three, and the family you carry is your class: §7.4 has
      * always said a battle job levels by fighting with a shield, a sword or a
-     * focus, and this is the line that finally makes that true.
+     * daggers, and this is the line that finally makes that true.
      */
     public const BATTLE_JOB_FOR_FAMILY = [
         'shield' => 'shieldbearer',
         'sword' => 'swordhand',
-        'focus' => 'runecaster',
+        'dagger' => 'knifedancer',
     ];
 
     /** §4.0 -- scrap is what a hex gives up to bare hands. It feeds no recipe. */

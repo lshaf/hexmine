@@ -35,13 +35,13 @@ const PATHS: Record<string, string> = {
   /** Riposte -- it comes straight back the way it came. */
   riposte: 'M8 7 h6 a5.5 5.5 0 0 1 0 11 H7 M10.5 4 L7 7 l3.5 3',
 
-  // ------------------------------------------------------------------- focus
-  /** Ember Bolt -- a flame with a flame inside it. Curves, where the bolt is angles. */
-  ember: 'M12 3 c3.5 3.5 5.5 6 5.5 9 a5.5 5.5 0 0 1 -11 0 c0 -3 2 -5.5 5.5 -9 Z M12 12 c1.6 1.5 2.4 2.6 2.4 3.8 a2.4 2.4 0 0 1 -4.8 0 c0 -1.2 0.8 -2.3 2.4 -3.8 Z',
-  /** Chain Arc -- a bolt. All angles, so it never reads as the flame beside it. */
-  arc: 'M13.5 3 L6 13.5 h4.5 l-2 7.5 L18 10.5 h-5 Z',
-  /** Rune of Binding -- a line drawn across a ring. It does not cross this round. */
-  bind: 'M12 3.5 a8.5 8.5 0 1 1 -0.01 0 M4 12 h16',
+  // ------------------------------------------------------------------ dagger
+  /** Bleeding Cut -- a blade gone in, and what runs off it afterwards. */
+  bleed: 'M8 3 L11 6.5 L11 15 L8 18 L5 15 L5 6.5 Z M8 18 v3 M16 8 c2.5 2.5 4 4.3 4 6 a4 4 0 0 1 -8 0 c0 -1.7 1.5 -3.5 4 -6 Z',
+  /** Rising Flurry -- three cuts, each longer than the one before it. */
+  flurry: 'M4 18.5 L9 13.5 M6.5 19.5 L14.5 11.5 M9 20.5 L20 9.5 M20 9.5 l0.5 -5 l-5 0.5',
+  /** Hamstring -- a leg bent at the knee, and the cut taken across the back of it. */
+  hamstring: 'M8.5 3 v7 a4 4 0 0 0 4 4 h1.5 M14 14 l-3 6.5 M4 12.5 L19.5 7',
 }
 
 

@@ -164,28 +164,28 @@ GROUPS = {
         'tails': ['Nailed together in an afternoon.', 'Rimmed all the way round this time.',
                   'Faced with the hardest thing the rung allows.'],
     },
-    'focus': {
-        'slot': 'weapon', 'family': 'focus', 'stat': 'power', 'palette': 'fiber',
-        # §9.5.4 -- high arm, small guard: four fifths attack. Not zero guard --
-        # a wand still keeps something off you, it is simply the least of the
+    'dagger': {
+        'slot': 'weapon', 'family': 'dagger', 'stat': 'power', 'palette': 'fiber',
+        # §9.5.4 -- all arm, almost no guard: four fifths attack. Not zero --
+        # a crossed pair still turns something, it is simply the least of the
         # three at it. The glass cannon is the point.
         'pairs': [(10, 2), (14, 3), (18, 4), (22, 6), (27, 7)],
         'dur': [60, 90, 150, 200, 240],
         'rare_mat': 'silkweave_fiber', 'component': 'quench_reed',
         'refined': ['cloth', 'cloth', 'linen', 'linen', 'canvas'],
         'names': [
-            ['Cracked Focus', 'Bound Focus', 'Sealed Focus'],
-            ['Knotted Rod', 'Corded Rod', 'Wound Rod'],
-            ['Rune Rod', 'Barbed Rune Rod', 'Silkbound Rune Rod'],
-            ['Silkweave Sigil', 'Fanged Sigil', 'Sunken Sigil'],
-            ['The Long Word', 'The Whole Word', 'The Spoken Word'],
+            ['Chipped Knives', 'Bound Knives', 'Whetted Knives'],
+            ['Notched Dirks', 'Corded Dirks', 'Paired Dirks'],
+            ['Fanged Dirks', 'Barbed Dirks', 'Silkbound Dirks'],
+            ['Silkweave Fangs', 'Hooked Fangs', 'Sunken Fangs'],
+            ['The Quick Pair', 'The Whole Pair', 'The Last Pair'],
         ],
         'blurb': [
-            'It works. The crack is where the last one stopped working.',
-            'Wound tight so the whole of it goes out the front.',
-            'Cut and cut again until only the working part is left.',
-            'Everything it throws arrives before the sound does.',
-            'Said once, slowly, and nothing in front of it stands.',
+            'Two of them. The chip is where the last one stopped working.',
+            'Bound at the grip so the pair sits the same in either hand.',
+            'Ground and ground again until only the working part is left.',
+            'Both of them arrive before you have finished seeing the first.',
+            'Drawn once, and nothing in front of them stands.',
         ],
         'tails': ['Bound with what was to hand.', 'Wrapped twice and sealed at both ends.',
                   'Every winding is the best the rung will take.'],

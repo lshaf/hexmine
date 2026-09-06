@@ -316,11 +316,11 @@ final class SkillEffectTest extends TestCase
     /** §7.4 -- a battle tree is scoped by the family in the slot, not the job. */
     public function test_a_battle_tree_only_pays_out_through_its_own_family(): void
     {
-        $this->assertGreaterThan(0, $this->grantKind('runecaster', 'weaponWear'));
-        $this->assertGreaterThan(0, $this->grantKind('runecaster', 'goldFind'));
-        $this->assertGreaterThan(0, $this->grantKind('runecaster', 'lootOption'));
+        $this->assertGreaterThan(0, $this->grantKind('knifedancer', 'weaponWear'));
+        $this->assertGreaterThan(0, $this->grantKind('knifedancer', 'goldFind'));
+        $this->assertGreaterThan(0, $this->grantKind('knifedancer', 'lootOption'));
 
-        $tree = $this->invoke('battleTree', [$this->character->fresh(), 'focus']);
+        $tree = $this->invoke('battleTree', [$this->character->fresh(), 'dagger']);
         $this->assertGreaterThan(0, $tree['weaponWear']);
         $this->assertGreaterThan(0, $tree['gold']);
         $this->assertGreaterThan(0, $tree['loot']);
@@ -331,23 +331,23 @@ final class SkillEffectTest extends TestCase
 
         foreach (['shield', 'sword'] as $family) {
             $other = $this->invoke('battleTree', [$this->character->fresh(), $family]);
-            $this->assertSame(0.0, $other['weaponWear'], "a runecaster node paid out with a {$family}");
+            $this->assertSame(0.0, $other['weaponWear'], "a knifedancer node paid out with a {$family}");
             $this->assertSame(0.0, $other['gold']);
             $this->assertSame(0.0, $other['loot']);
         }
 
         // §9.5.9 -- and the three skill upgrades are scoped the same way, which
-        // matters more than the rest of them: a Runecaster's Overdraw reaching
+        // matters more than the rest of them: a Knifedancer's Overdraw reaching
         // a shield would sharpen a Shield Bash it was never bought for.
-        $this->assertGreaterThan(0, $this->grantKind('runecaster', 'skillPower'));
+        $this->assertGreaterThan(0, $this->grantKind('knifedancer', 'skillPower'));
         $this->assertGreaterThan(
             0.0,
-            $this->invoke('battleTree', [$this->character->fresh(), 'focus'])['skillPower'],
+            $this->invoke('battleTree', [$this->character->fresh(), 'dagger'])['skillPower'],
         );
         $this->assertSame(
             0.0,
             $this->invoke('battleTree', [$this->character->fresh(), 'sword'])['skillPower'],
-            'a runecaster node sharpened a swordhand skill',
+            'a knifedancer node sharpened a swordhand skill',
         );
 
         $this->assertSame(

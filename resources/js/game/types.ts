@@ -399,7 +399,7 @@ export interface ItemDef {
    * of its attack/defense pair. Weapons only: one slot holds all three
    * families, and the family you carry is your class.
    */
-  family?: 'shield' | 'sword' | 'focus'
+  family?: 'shield' | 'sword' | 'dagger'
   /**
    * §9.5.4 -- FLAT combat numbers, and deliberately not the `power`/`defense`
    * StatKeys, which stay percentages under §8.1's +15% ceiling. A fight cannot

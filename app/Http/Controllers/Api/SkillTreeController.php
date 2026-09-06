@@ -118,7 +118,7 @@ class SkillTreeController extends GameController
 
             // Every one of the three, known or not -- a skill you cannot use
             // yet is the reason to keep levelling, and hiding it would make the
-            // job sheet say a Runecaster has nothing until it suddenly does.
+            // job sheet say a Knifedancer has nothing until it suddenly does.
             $out[$job] = array_values(array_map(
                 function (array $skill) use ($owned, $level, $points): array {
                     $nodeKey = BattleSkills::nodeKey($skill['key']);
