@@ -9,6 +9,8 @@ use App\Game\Catalog;
 use App\Game\Drops;
 use App\Game\Formulas;
 use App\Game\GameService;
+use App\Game\Monsters;
+use App\Game\Spoils;
 use App\Game\Variants;
 use App\Models\Character;
 use App\Models\CharacterItem;
@@ -85,13 +87,105 @@ final class SeamOptionTest extends TestCase
     }
 
     /**
-     * §4.0/§7.3 -- a tool or a glove, and nothing else.
+     * §9.5.8 -- and the weapon favours what comes off a body.
      *
-     * Gathering has no tool: it is worked with the hands in the tool's place,
-     * so there is nothing on the belt for a line like this to sit on and the
-     * glove is what carries it. Every other worn piece works no ground at all.
+     * The third of the same idea: the piece that DOES the work carries the
+     * line. A tool works a hex, a glove works one bare-handed, a weapon works
+     * a monster.
      */
-    public function test_only_a_tool_or_a_glove_may_roll_one(): void
+    public function test_a_weapon_offers_what_a_monster_drops(): void
+    {
+        $battle = Catalog::battleSeamMaterials();
+
+        // Every tier-1 thing a fight pays: both ladders and the four countries.
+        foreach (Spoils::BY_GRADE as $lines) {
+            $this->assertContains($lines['plate'], $battle);
+            $this->assertContains($lines['ichor'], $battle);
+        }
+        foreach (Spoils::BIOME_SPOIL as $spoil) {
+            $this->assertContains($spoil, $battle);
+        }
+
+        // And nothing at tier 0: a trophy and a leaving are worth a gold and
+        // feed no recipe, so a line promising more of one is a bonus to
+        // nothing -- the same exclusion junk and scrap get.
+        foreach (array_merge(Spoils::TROPHY_BY_TIER, Spoils::BIOME_LEAVING) as $rubbish) {
+            $this->assertNotContains($rubbish, $battle, "{$rubbish} is tier 0 and is on offer");
+        }
+    }
+
+    /** And it bends what the fight dropped, by the share, and nothing else. */
+    public function test_a_weapons_line_bends_what_came_off_the_body(): void
+    {
+        $monster = Monsters::ROSTER['thornback'];
+
+        $plain = 0;
+        $lucky = 0;
+        for ($seed = 1; $seed <= 3000; $seed++) {
+            $plain += Drops::battleSpoils($monster, $seed)['bone_plate'] ?? 0;
+            $lucky += Drops::battleSpoils($monster, $seed, 0.0, ['bone_plate' => 0.30])['bone_plate'] ?? 0;
+        }
+
+        $this->assertEqualsWithDelta(1.30, $lucky / $plain, 0.05, 'the share did not land');
+
+        // Nothing else on the body moved, and a line for something this
+        // monster does not drop is worth nothing at all -- the rule every
+        // seam keeps.
+        $one = Drops::battleSpoils($monster, 7);
+        $other = Drops::battleSpoils($monster, 7, 0.0, ['bone_plate' => 0.30]);
+        unset($one['bone_plate'], $other['bone_plate']);
+        $this->assertSame($one, $other);
+
+        $this->assertSame(
+            Drops::battleSpoils($monster, 7),
+            Drops::battleSpoils($monster, 7, 0.0, ['grave_heart' => 0.30]),
+        );
+    }
+
+    /**
+     * §8 rule 5, both directions -- a sword is worth nothing down a mine and an
+     * axe is worth nothing in a fight.
+     *
+     * One slot pays out in each of the three cases, which is what keeps them
+     * from bleeding into each other: the tool on a mine, the glove on a gather,
+     * the weapon on a fight.
+     */
+    public function test_each_of_the_three_reads_its_own_slot(): void
+    {
+        $game = app(GameService::class);
+        $character = $game->createCharacter(Player::create(['wallet' => '0xthree', 'session_id' => 'three']));
+
+        foreach ([
+            ['hewn_axe', 40, 'toadstool'],
+            ['work_gloves', 90, 'birch_sap'],
+            ['notched_sword', 60, 'bone_plate'],
+        ] as [$key, $durability, $stat]) {
+            CharacterItem::create([
+                'character_id' => $character->id,
+                'item_key' => $key,
+                'durability' => $durability,
+                'equipped' => true,
+                'options' => [['stat' => $stat, 'value' => 0.20, 'kind' => Catalog::OPTION_SEAM]],
+            ]);
+        }
+
+        $character = $character->fresh();
+
+        $this->assertSame(['toadstool' => 0.20], $game->seamFavour($character, 'woodcutting'));
+        $this->assertSame(['birch_sap' => 0.20], $game->seamFavour($character, 'woodcutting', true));
+        $this->assertSame(['bone_plate' => 0.20], $game->seamFavour($character, null));
+    }
+
+    /**
+     * §4.0/§7.3/§9.5.8 -- a tool, a glove or a weapon, and nothing else.
+     *
+     * One rule three times: the piece that DOES the work carries the line. A
+     * tool works a hex, a glove works one bare-handed (gathering has no tool --
+     * it is worked with the hands in the tool's place, so there is nothing on
+     * the belt for a line like this to sit on), and a weapon works a monster.
+     * A coat and a boot do none of the three.
+     */
+    public function test_only_a_tool_a_glove_or_a_weapon_may_roll_one(): void
     {
         foreach (Catalog::items() as $key => $def) {
             $slot = (string) ($def['slot'] ?? '');
@@ -99,7 +193,11 @@ final class SeamOptionTest extends TestCase
             $has = in_array(Catalog::OPTION_SEAM, $kinds, true);
 
             $this->assertSame(
-                $slot !== '' && (Catalog::skillForSlot($slot) !== null || $slot === 'gloves'),
+                $slot !== '' && (
+                    Catalog::skillForSlot($slot) !== null
+                    || $slot === 'gloves'
+                    || $slot === 'weapon'
+                ),
                 $has,
                 "{$key} disagrees about whether it can favour a seam",
             );

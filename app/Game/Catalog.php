@@ -418,6 +418,48 @@ final class Catalog
     }
 
     /**
+     * §9.5.8/§8.0.1 -- what a WEAPON may favour, which is what comes off a body.
+     *
+     * The third of the same idea. A tool works a hex and favours what the
+     * ground gives up; a glove works one bare-handed and favours what hands
+     * pick up; a weapon works a monster and favours what a monster drops. In
+     * each case it is the piece that **does that work** which carries the line,
+     * which is why this is the weapon rather than the coat: §8.0.1 already
+     * singles the weapon out as the only slot that shortens a cooldown, and for
+     * the same reason -- what is in that slot is what the fight is fought with.
+     *
+     * The plate line, the ichor line and the four countries' own stock, which
+     * is every tier-1 thing §9.5.8 pays. Not the trophies and not the leavings:
+     * those are tier 0, which is the same exclusion SEAM_NEVER makes about junk
+     * and scrap and for the same reason -- a line promising more of a thing
+     * worth a gold that feeds no recipe is a bonus to nothing.
+     *
+     * Not the gold either, which needs no line: §3.2's faucet is its own thing
+     * and `goldFind` (§7.4.3) already owns it. Nor the looted gear, because §2
+     * stops loot at rare whatever anybody is wearing.
+     *
+     * @return list<string>
+     */
+    public static function battleSeamMaterials(): array
+    {
+        $out = [];
+
+        foreach (Spoils::BY_GRADE as $lines) {
+            $out[] = $lines['plate'];
+            $out[] = $lines['ichor'];
+        }
+
+        foreach (Spoils::BIOME_SPOIL as $spoil) {
+            $out[] = $spoil;
+        }
+
+        return array_values(array_filter(
+            array_unique($out),
+            static fn (string $key) => ((int) (Spoils::STOCK[$key]['tier'] ?? 0)) > 0,
+        ));
+    }
+
+    /**
      * §4.0/§8.0.1 -- what a GLOVE may favour, which is what hands pick up.
      *
      * Gathering has no tool: §7.3 works it "with your hands in the tool's
@@ -532,6 +574,13 @@ final class Catalog
 
         if ($slot === 'weapon') {
             $pool[] = $line(self::OPTION_COOLDOWN, 'cooldown');
+
+            // §9.5.8 -- and what it favours off a body, which is the fight's
+            // own version of a tool's seam. The weapon rather than the worn
+            // set, because the weapon is what the fight is fought with.
+            foreach (self::battleSeamMaterials() as $material) {
+                $pool[] = $line($material, self::OPTION_SEAM);
+            }
         }
 
         return $pool;

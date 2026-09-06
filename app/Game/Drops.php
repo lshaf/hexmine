@@ -390,10 +390,15 @@ final class Drops
      *
      * @return array<string,int>
      */
+    /**
+     * @param  array<string,float>  $seam  §8.0.1 -- material key -> the share more
+     *                                     of it a rolled line on the WEAPON asks for.
+     */
     public static function battleSpoils(
         array $monster,
         int $seed,
         float $haul = 0.0,
+        array $seam = [],
     ): array {
         $grade = max(1, min(5, (int) $monster['tier']));
         $lines = Spoils::BY_GRADE[$grade];
@@ -490,9 +495,20 @@ final class Drops
         // off the body and nothing else: not the gold (§3.2's faucet is its
         // own thing and `goldFind` already owns it), and not the looted gear,
         // because §2 stops loot at rare whatever anybody is wearing.
-        if ($haul > 0) {
-            foreach ($out as $key => $quantity) {
-                $out[$key] = self::scaleSpoil($quantity, $haul, Hash::hash2($seed, crc32($key), Balance::mapSeed() ^ 0x5910));
+        //
+        // §8.0.1 -- and a `seam` line on the weapon, which is the same bonus
+        // aimed at ONE of them. The two add rather than multiply, because they
+        // are one question asked at two widths: how much more of what came off
+        // the body, and how much more of this in particular.
+        //
+        // Applied to what the fight actually dropped and never to what it did
+        // not, which is the rule every seam keeps: a line for ember gland is
+        // worth nothing on a monster that has none, exactly as a line for
+        // ironwood is worth nothing on plain forest.
+        foreach ($out as $key => $quantity) {
+            $share = $haul + ($seam[$key] ?? 0.0);
+            if ($share > 0) {
+                $out[$key] = self::scaleSpoil($quantity, $share, Hash::hash2($seed, crc32($key), Balance::mapSeed() ^ 0x5910));
             }
         }
 

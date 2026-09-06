@@ -8,7 +8,7 @@ import { CONSUMABLES, JUNK, REAGENTS } from './alchemy'
 import { COMPONENTS } from './components'
 import { TOP_TIER } from './toptier'
 import { CRITTERS, CRITTER_BY_BIOME } from './critters'
-import { SPOILS } from './spoils'
+import { BIOME_SPOIL, SPOILS, SPOILS_BY_GRADE } from './spoils'
 import {
   HUNT_EXTRA,
   HUNT_GRADED_PART,
@@ -555,7 +555,15 @@ export function optionRollsFor(def: ItemDef): OptionRoll[] {
   pool.push({ stat: 'durability', kind: 'durability' })
   pool.push({ stat: 'haul', kind: 'gain' })
   if (def.slot === 'boots') pool.push({ stat: 'travel', kind: 'gain' })
-  if (def.slot === 'weapon') pool.push({ stat: 'cooldown', kind: 'cooldown' })
+  if (def.slot === 'weapon') {
+    pool.push({ stat: 'cooldown', kind: 'cooldown' })
+
+    // §9.5.8 -- and what it favours off a body, which is the fight's own
+    // version of a tool's seam.
+    for (const material of battleSeamMaterials()) {
+      pool.push({ stat: material, kind: 'seam' })
+    }
+  }
 
   return pool
 }
@@ -621,6 +629,31 @@ export function seamMaterialsForSlot(slot: EquipSlot | undefined): MaterialKey[]
   }
 
   return []
+}
+
+/**
+ * §9.5.8/§8.0.1 -- what a WEAPON may favour, which is what comes off a body.
+ *
+ * The third of the same idea: a tool works a hex and favours what the ground
+ * gives up, a glove works one bare-handed and favours what hands pick up, a
+ * weapon works a monster and favours what a monster drops. The piece that does
+ * the work carries the line.
+ *
+ * The plate line, the ichor line and the four countries' own stock -- every
+ * tier-1 thing a fight pays. Not the trophies and not the leavings: those are
+ * tier 0, which is the same exclusion SEAM_NEVER makes about junk and scrap.
+ *
+ * Mirrors `Catalog::battleSeamMaterials()`.
+ */
+export function battleSeamMaterials(): MaterialKey[] {
+  const out: string[] = []
+
+  for (const lines of Object.values(SPOILS_BY_GRADE)) out.push(lines.plate, lines.ichor)
+  out.push(...Object.values(BIOME_SPOIL))
+
+  const tier = new Map<string, number>(SPOILS.map((m) => [m.key as string, m.tier]))
+
+  return [...new Set(out)].filter((k) => (tier.get(k) ?? 0) > 0) as MaterialKey[]
 }
 
 /**

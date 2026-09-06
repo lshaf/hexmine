@@ -3098,7 +3098,13 @@ final class GameLoopTest extends TestCase
         );
         $this->assertSame(['attack', 'defense', 'durability', 'haul', 'travel'], $pool('marching_boots'));
         $this->assertSame(['attack', 'defense', 'durability', 'haul'], $pool('ironwood_armor'));
-        $this->assertSame(['attack', 'durability', 'haul', 'cooldown'], $pool('knotted_rod'));
+
+        // §9.5.8 -- and a weapon offers what comes off a body, which is the
+        // fight's own version of a tool's seam. A focus still guards nothing.
+        $this->assertSame(
+            ['attack', 'durability', 'haul', 'cooldown', ...Catalog::battleSeamMaterials()],
+            $pool('knotted_rod'),
+        );
 
         // §4.0 -- and the glove is the fifth odd one, because gathering has no
         // tool for a seam line to sit on. What it offers is the GATHER table's
@@ -3615,6 +3621,17 @@ final class GameLoopTest extends TestCase
 
             if ($slot === 'weapon') {
                 $checked['weapon']++;
+                // §9.5.8 -- and it favours what comes off a body, which is the
+                // fight's own seam: the piece that does the work carries the
+                // line, and a weapon is what a fight is fought with.
+                $this->assertSame(
+                    Catalog::battleSeamMaterials(),
+                    array_column(
+                        array_filter($pool, static fn (array $p) => $p['kind'] === Catalog::OPTION_SEAM),
+                        'stat',
+                    ),
+                    "{$key}",
+                );
                 // §9.5.8 -- a weapon hauls too; what it hauls is the FIGHT, and
                 // §8 rule 5 is what keeps that off a mine rather than what
                 // forbids it. It does not walk, and it is the only thing that

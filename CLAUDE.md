@@ -1966,7 +1966,7 @@ One rule, and it is §8's usual one: **what is the piece FOR.**
 | Piece | May roll |
 |---|---|
 | **Gathering tool** | `attack` · `durability` · `haul` · `seam` (one per material) |
-| **Weapon** | `attack` · `defense` · `durability` · `haul` · `cooldown` |
+| **Weapon** | `attack` · `defense` · `durability` · `haul` · `cooldown` · `seam` — what a body gives up (§9.5.8) |
 | **Armor** | `attack` · `defense` · `durability` · `haul` |
 | **Gloves** | the same, plus `seam` — the gather table's own (§4.0) |
 | **Boots** | the same, plus `travel` |
@@ -2018,13 +2018,31 @@ it, and what is left is the base raw and the two herbs — three a country, twel
 in all. **The base raw is on this list where it is off the mining one**, because
 bare-handed it is the rare find rather than the usual one.
 
-**One slot pays out either way, and that is what keeps the glove honest.** On a
-mine the line's own tool counts and the glove does not; on a gather the glove
-counts and the tool does not. That is §8.0 rule 1 pointed both ways — a hex is
-worked with the tool or with the hands and never with both — and without it a
-glove would be a second seam slot on every line, which would make the hands
-argument decoration and put a lucky glove ahead of a lucky tool on the five
-materials the two lists share. A glove is otherwise **not** line-locked: one
+**And the WEAPON carries it for what comes off a body** (§9.5.8) — the plate
+line, the ichor line and the four countries' own stock, which is every tier-1
+thing a fight pays. Not the trophies and not the leavings: those are tier 0, and
+tier 0 is the exclusion above.
+
+**One rule, said three times: the piece that DOES the work carries the line.** A
+tool works a hex and favours what the ground gives up; a glove works one
+bare-handed and favours what hands pick up; a weapon works a monster and favours
+what a monster drops. Which is why the weapon rather than the coat — §8.0.1
+already singles that slot out as the only one that shortens a cooldown, and for
+the same reason: what is in it is what the fight is fought with.
+
+**A weapon's `haul` and its `seam` are one question at two widths** — how much
+more of what came off the body, and how much more of *this* in particular — so
+they add rather than multiply, and both are the seeded chance on the fraction
+that §8.0.1 already uses for a spoil row.
+
+**One slot pays out in every case, and that is what keeps the three honest.** On
+a mine the line's own tool counts; on a gather the glove; on a fight the weapon,
+and nothing else in any of them. That is §8.0 rule 1 and §8 rule 5 pointed in
+every direction — a hex is worked with the tool or with the hands and never with
+both, a sword is worth nothing down a mine and an axe nothing in a fight. Without
+it a glove would be a second seam slot on every line, which would make the hands
+argument decoration and put a lucky glove ahead of a lucky tool on the materials
+the two lists share. A glove and a weapon are otherwise **not** line-locked: one
 favouring toadstool favours it wherever toadstool is picked up.
 
 **Three values and not five**, which is why the ladder above pairs off the
@@ -3579,6 +3597,14 @@ biome* rather than the nearest one — and it is what stops biome-locking being
 scenery. Tier 1 like the rest of the spoil stock, and safe under §2 for the
 usual reason: it is capped by how many packs a country can hold, and it bridges
 to nothing external.
+
+**A weapon can favour one of these** (§8.0.1's `seam`), which is the fight's own
+version of a tool's line: the plate ladder, the ichor ladder and the four
+countries' stock, every tier-1 thing on this list. Not the trophies and not the
+leavings — those are tier 0, and a line promising more of a thing worth a gold
+that feeds no recipe is a bonus to nothing. Not the **gold** either, which needs
+no line because `goldFind` (§7.4.3) already owns it, and not the **looted gear**,
+because §2 stops loot at rare whatever anybody is wearing.
 
 **Harder packs roll better options, not better rarity.** A tougher monster
 grants **extra option slots** (§8.0.1) on what it drops — the same mechanism the

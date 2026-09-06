@@ -2948,7 +2948,15 @@ class GameService
             $spoilHaul = Formulas::optionGain($this->itemRows($character), Catalog::OPTION_HAUL);
 
             foreach (
-                Drops::battleSpoils($monster, $seed, $spoilHaul) as $material => $quantity
+                Drops::battleSpoils(
+                    $monster,
+                    $seed,
+                    $spoilHaul,
+                    // §8.0.1 -- and what the weapon favours off a body, which
+                    // is the fight's own seam. No line, because a fight is not
+                    // one: seamFavour reads that as the weapon's question.
+                    $this->seamFavour($character, null),
+                ) as $material => $quantity
             ) {
                 $granted = $this->addMaterial($character, $material, $quantity);
                 if ($granted > 0) {
@@ -6691,8 +6699,10 @@ class GameService
      */
     public function seamFavour(Character $character, ?string $line, bool $gathering = false): array
     {
+        // §9.5.8 -- no line at all is the fight, exactly as it is for `haul`
+        // (§8 rule 5, both directions): the weapon counts and no tool does.
         if ($line === null) {
-            return [];
+            return $this->favourOf($character, Catalog::battleSeamMaterials(), null, ['weapon']);
         }
 
         // §4.0/§7.3 -- on a gather the HANDS are the tool, so the glove is what
@@ -6703,22 +6713,31 @@ class GameService
         // mine. The list is the gather table's own, which is a different list.
         $slot = Catalog::slotForSkill($line);
 
-        $materials = $gathering
-            ? Catalog::gatherSeamMaterials()
-            : Catalog::seamMaterialsForSlot($slot);
+        // ONE slot in every case, and that is what keeps each of the three
+        // honest. A glove carries this line only because gathering has no tool
+        // to carry it; letting it pay out down a mine as well would make the
+        // hands argument decoration and put a lucky glove ahead of a lucky tool
+        // on the materials the two lists share. The same for a weapon and a
+        // hex: §8 rule 5 keeps the two ladders apart in both directions.
+        return $gathering
+            ? $this->favourOf($character, Catalog::gatherSeamMaterials(), $line, ['gloves'])
+            : $this->favourOf($character, Catalog::seamMaterialsForSlot($slot), $line, [(string) $slot]);
+    }
 
-        // ONE slot either way, and that is what keeps the glove from being a
-        // second seam slot on every line. It carries this line only because
-        // gathering has no tool to carry it; letting it pay out down a mine as
-        // well would make the hands argument decoration and put a lucky glove
-        // ahead of a lucky tool on the five materials the two lists share.
-        $only = $gathering ? ['gloves'] : [(string) $slot];
-
+    /**
+     * The share this character's kit asks for, of each of these materials.
+     *
+     * @param  list<string>  $materials
+     * @param  list<string>  $slots
+     * @return array<string,float>
+     */
+    private function favourOf(Character $character, array $materials, ?string $line, array $slots): array
+    {
         $rows = $this->itemRows($character);
         $out = [];
 
         foreach ($materials as $material) {
-            $share = Formulas::optionGain($rows, $material, $line, $only);
+            $share = Formulas::optionGain($rows, $material, $line, $slots);
             if ($share > 0) {
                 $out[$material] = $share;
             }
