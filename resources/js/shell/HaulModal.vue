@@ -33,11 +33,14 @@
  */
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ITEM_BY_KEY, MATERIALS, SKILL_BY_KEY } from '@/game/catalog'
+import { useGame } from '@/stores/game'
 import { optionStatLine } from '@/game/formulas'
 import { itemIcon, materialAccent, materialIcon, skillIcon } from '@/icons/procedural'
 import SvgIcon from '@/components/SvgIcon.vue'
 import StatChips from '@/components/StatChips.vue'
 import type { CollectResult } from '@/api/types'
+
+const game = useGame()
 
 const props = defineProps<{ haul: CollectResult }>()
 const emit = defineEmits<{ (e: 'close'): void }>()
@@ -234,7 +237,7 @@ onBeforeUnmount(() => {
              the almanac and the bag all use, so a piece reads the same wherever
              it is met. A potion has no stats and draws nothing. -->
         <div v-if="madeDef && !made.consumable" class="made-stats">
-          <StatChips :def="madeDef" :options="madeRolls" />
+          <StatChips :def="madeDef" :options="madeRolls" :level="game.state?.character.level" />
         </div>
 
         <!-- §8.0.1 -- the payoff, and the reason this plate exists at all: two

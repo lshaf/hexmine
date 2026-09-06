@@ -16,6 +16,7 @@
 import { computed } from 'vue'
 import { statChips } from '@/game/formulas'
 import type { ItemDef, ItemOption } from '@/game/types'
+import type { StatChip } from '@/game/formulas'
 
 const props = withDefaults(
   defineProps<{
@@ -23,8 +24,18 @@ const props = withDefaults(
     options?: ItemOption[]
     /** Drop the work stat and show only the pair, where the name says the rest. */
     pairOnly?: boolean
+    /**
+     * §7.1 -- the reader's own level, where there is a reader.
+     *
+     * Optional because half the places this is drawn have no character behind
+     * them: the almanac and the battle bench answer with no wallet at all. With
+     * one, a gate you cannot meet goes ember; without one it is drawn plain,
+     * which is honest -- it is still the level the rung wants, and there is
+     * nobody for it to be a problem for.
+     */
+    level?: number
   }>(),
-  { options: () => [], pairOnly: false },
+  { options: () => [], pairOnly: false, level: undefined },
 )
 
 const chips = computed(() => {
@@ -32,11 +43,20 @@ const chips = computed(() => {
 
   return props.pairOnly ? all.filter((c) => c.label !== null) : all
 })
+
+/** §13.3 -- ember is for a state to deal with, and this is the only one here. */
+const short = (chip: StatChip) =>
+  chip.gate !== undefined && props.level !== undefined && props.level < chip.gate
 </script>
 
 <template>
   <span v-if="chips.length" class="chips">
-    <span v-for="(chip, i) in chips" :key="i" class="chip tiny" :class="{ pair: chip.label }">
+    <span
+      v-for="(chip, i) in chips"
+      :key="i"
+      class="chip tiny"
+      :class="{ pair: chip.label, short: short(chip) }"
+    >
       <span v-if="chip.label" class="key">{{ chip.label }}</span>
       <span :class="{ mono: chip.label }">{{ chip.value }}</span>
     </span>
@@ -61,5 +81,15 @@ const chips = computed(() => {
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--vellum-dim);
+}
+
+/*
+ * §13.3 -- a rung you cannot reach yet. Ember is what a state to deal with
+ * looks like, and a gate is the only chip in this row that can be one: every
+ * other one is a figure, and a figure is neither good news nor bad.
+ */
+.short,
+.short .key {
+  color: var(--ember);
 }
 </style>

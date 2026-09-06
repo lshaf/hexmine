@@ -531,6 +531,17 @@ export interface Monster {
   biome: string
   /** 1..4, and the ring it is new on. A ring fights its own tier and the one outside. */
   tier: number
+  /**
+   * §9.5.2 -- what it is worth as one number, on the equipment ladder.
+   *
+   * The tier picks the band -- §9.5.4's measured ladder, so the band is the rung
+   * that answers it -- and its own attack, guard and staying power place it
+   * inside. Read against your own level, which now bounds the rung you may wear
+   * (Balance::EQUIP_LEVEL), so the two are on one scale.
+   *
+   * It is a glance, never the answer. The preview is the answer (§9.5.5).
+   */
+  level: number
   /** What a player reads instead of a level: brute, carapace, swift. */
   profile: 'brute' | 'carapace' | 'swift'
   attack: number

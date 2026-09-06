@@ -80,7 +80,17 @@ const pays = computed(() => {
         <header class="head">
           <SvgIcon class="crest" :svg="crest" />
           <div class="grow">
-            <span class="label eyebrow">{{ def.profile }} · tier {{ def.tier }}</span>
+            <!--
+              §9.5.2 -- the level sits with the profile and the tier because it
+              is the same kind of fact: what this thing IS, read off the catalog.
+              No verdict here. This plate deliberately says nothing about your
+              side -- whether you win and what it costs are the preview's, thirty
+              pixels away -- so the comparison is drawn on the pin, where the
+              decision is, and the number alone is drawn here.
+            -->
+            <span class="label eyebrow">
+              {{ def.profile }} · tier {{ def.tier }} · level {{ def.level }}
+            </span>
             <strong class="name">{{ def.name }}</strong>
           </div>
           <button class="close" type="button" aria-label="Close" @click="$emit('close')">

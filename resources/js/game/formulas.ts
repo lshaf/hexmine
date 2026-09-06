@@ -6,7 +6,7 @@
  * IMPORTANT: the server owns these numbers. This module exists so the client
  * can *predict* and display them; it must never be the authority.
  */
-import { EQUIPMENT, MINING, PROCESSING, SKILLS } from './balance'
+import { EQUIPMENT, MINING, PROCESSING, SKILLS, equipLevel } from './balance'
 import { ITEM_BY_KEY, LINE_STAT_LABEL, MATERIALS, SKILL_BY_KEY, STAT_LABEL, skillForSlot } from './catalog'
 import type {
   BuffScope,
@@ -593,6 +593,15 @@ export interface StatChip {
   /** Short uppercase word, or null for a work stat that says its own name. */
   label: string | null
   value: string
+  /**
+   * §7.1 -- the level this chip is a GATE for, on the one chip that is one.
+   *
+   * Carried so the drawing can say whether it is met without re-deriving it,
+   * and so every other chip stays what it has always been: a figure. A gate is
+   * the only thing in that row that can be a problem, which is the whole reason
+   * §13.3 lets it wear ember and nothing else there may.
+   */
+  gate?: number
 }
 
 export const PAIR_STATS = new Set<StatKey>(['power', 'defense'])
@@ -609,6 +618,19 @@ function lineScope(scope: BuffScope | undefined): SkillKey | null {
 
 export function statChips(def: ItemDef, options: ItemOption[] = []): StatChip[] {
   const chips: StatChip[] = []
+
+  /*
+   * §7.1/§8.0 -- the rung's level, first, because it is a gate rather than a
+   * figure.
+   *
+   * Ahead of the stats deliberately: what a piece is worth only matters once
+   * you can wear it, and a player reading an epic's numbers before finding out
+   * they cannot put it on has read them for nothing. A consumable has no gate
+   * -- §8.5 gives a draft no slot and nothing to wear it in -- so it says
+   * nothing here rather than saying "level 1".
+   */
+  const need = def.consumable ? 1 : equipLevel(def.rarity)
+  if (need > 1) chips.push({ label: 'lv', value: String(need), gate: need })
   // A tool reads its line off its slot (§8.0.1); a potion has no slot and reads
   // it off the action it is armed for (§8.5). Both are line-locked and both
   // have to say so -- a Forest Draft that printed "+3% yield" would be claiming

@@ -156,3 +156,44 @@ export function jobFromFight(fight: {
     skills: fight.skills,
   }
 }
+
+// ------------------------------------------------------------- the level
+
+/**
+ * §9.5.2 -- how a monster's level reads against your own.
+ *
+ * The comparison is honest only because of Balance::EQUIP_LEVEL: a level bounds
+ * the RUNG you may wear, so it is a real ceiling on how good a kit can be, and
+ * the two numbers are on one scale. What it is not is a promise -- §7.1 says
+ * level unlocks access rather than power, so a level 60 in a work coat does not
+ * beat a level 38 pack. **The preview is the answer** (§9.5.5); this is the
+ * glance that says whether to read it.
+ *
+ * Three states rather than two. An even fight is the interesting one and it has
+ * to be distinguishable from both edges, or the whole thing collapses into a
+ * light saying yes or no about something the preview is already deciding.
+ */
+export const LEVEL_BAND = 5
+
+export type LevelStanding = 'under' | 'even' | 'over'
+
+export function levelStanding(mine: number, theirs: number): LevelStanding {
+  if (mine + LEVEL_BAND < theirs) return 'under'
+  if (mine > theirs + LEVEL_BAND) return 'over'
+
+  return 'even'
+}
+
+/**
+ * §13.3 -- and only one of the three takes a colour.
+ *
+ * Ember marks a state to deal with, which is exactly what a pack above your
+ * rung is. Outclassing one is not a payout and must not wear sap: it is the
+ * absence of a problem, and the absence of a problem is what plain text looks
+ * like everywhere else in this game.
+ */
+export const LEVEL_NOTE: Record<LevelStanding, string> = {
+  under: 'above your rung',
+  even: 'an even rung',
+  over: 'under your rung',
+}

@@ -1305,7 +1305,12 @@ function nature(item: ItemDef): string {
                      puts on the tile, halo and all. -->
                 <span class="specimen" v-html="monsterSpecimen(m.key, 76)" />
                 <div class="grow">
-                  <span class="label eyebrow">{{ m.profile }}</span>
+                  <!-- §9.5.2 -- the level beside the profile, because they are
+                       the same kind of fact: what this thing IS. The almanac is
+                       static and talks to nobody (§13), so there is no reader to
+                       compare it against here -- the comparison is drawn on the
+                       pin, where a decision is actually being made. -->
+                  <span class="label eyebrow">{{ m.profile }} · level {{ m.level }}</span>
                   <strong class="name">{{ m.name }}</strong>
                   <!-- §9.5.4/§9.5.5 -- the three solid numbers a fight is
                        decided by. Flat, never percentages, so they are printed

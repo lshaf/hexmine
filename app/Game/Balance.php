@@ -1206,6 +1206,48 @@ final class Balance
     }
 
     /**
+     * §7.1/§8.0 -- the character level each rung may be worn at.
+     *
+     * **Level unlocks access, not power**, which is what §7.1 has always said
+     * it does -- this is the same rule pointed at the wardrobe. A rung is not
+     * made weaker by being gated; it simply cannot be reached around.
+     *
+     * What it actually closes is a §3.3 hole. An epic is the first rung that
+     * may be bought on the marketplace and withdrawn, and until now a wallet a
+     * day old could buy one and wear it. Now it cannot: the gear is bought, the
+     * levelling is not, and §2's sybil arithmetic gets worse for every wallet a
+     * farm has to walk to level 38 rather than fund.
+     *
+     * It does not touch §8.1 rule 4 -- every rarity below unique is still
+     * reachable by crafting without spending. It is later, not denied, and the
+     * binding constraint on a rung was always the materials and the bench.
+     *
+     * Measured against §7.4.4's curve at a career's real income, the gates fall
+     * at about half a day, three days, two weeks, seven weeks and three and a
+     * half months. Common is level 1 because §12's opening arc is worked in it.
+     */
+    public const EQUIP_LEVEL = [
+        'common' => 1,
+        'uncommon' => 8,
+        'rare' => 20,
+        'epic' => 38,
+        'legendary' => 60,
+        'unique' => 80,
+    ];
+
+    /**
+     * Derived from the rung and never stored on the item.
+     *
+     * A column on a hundred catalog rows is a hundred chances to disagree with
+     * the ladder, and the ladder is the only thing this depends on. The client
+     * mirrors the same function over the same table for the same reason.
+     */
+    public static function equipLevel(string $rarity): int
+    {
+        return self::EQUIP_LEVEL[$rarity] ?? 1;
+    }
+
+    /**
      * §8.0 -- how far up the ladder each workbench reaches. A village will never
      * make an epic no matter what materials you carry to it, which is most of
      * what makes a capital worth the walk.

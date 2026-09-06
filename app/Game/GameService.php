@@ -7023,6 +7023,21 @@ class GameService
             throw new GameException('Broken. Repair it before equipping.', 'broken');
         }
 
+        // §7.1/§8.0 -- the rung has a level on it, and this is where it is kept.
+        //
+        // Checked at the belt rather than at the bench or the counter on
+        // purpose: owning a thing you cannot yet use is a reason to keep
+        // levelling, where a shop that refuses to sell it is a wall with
+        // nothing behind it. A crafted piece, a looted one and a bought one all
+        // arrive in the bag and all wait there.
+        $need = Balance::equipLevel((string) ($def['rarity'] ?? 'common'));
+        if ((int) $character->level < $need) {
+            throw new GameException(
+                "{$def['name']} is {$def['rarity']} gear. Level {$need} to wear it.",
+                'level',
+            );
+        }
+
         // One item per slot.
         foreach ($character->items as $other) {
             if ($other->id !== $item->id && (Catalog::item($other->item_key)['slot'] ?? null) === $def['slot']) {

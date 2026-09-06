@@ -929,6 +929,45 @@ somebody with nothing wrong is an alarm nobody can switch off.
 Level unlocks **capacity, not power**: access to higher-tier hexes and dungeon
 floors. A whale can out-scale logistics but never out-damage a grinder.
 
+**And it unlocks the wardrobe, which is the same rule pointed somewhere new.**
+Every rung of §8.0's ladder has a level on it, and a piece above it cannot be
+worn:
+
+| Rung | Level | About |
+|---|---|---|
+| Common | **1** | §12's opening arc is worked in it, so it can never be gated |
+| Uncommon | **8** | half a day |
+| Rare | **20** | three days |
+| Epic | **38** | two weeks |
+| Legendary | **60** | seven weeks |
+| Unique | **80** | three and a half months |
+
+*(Measured against §7.4.4's curve at a career's real income.)*
+
+**What it actually closes is a §3.3 hole.** Epic is the first rung that may be
+bought on the marketplace and withdrawn, and until now a wallet a day old could
+buy one and wear it. The gear is bought; the levelling is not. §2's sybil
+arithmetic gets worse for every wallet a farm has to *walk* to level 38 rather
+than fund.
+
+**It does not touch §8.1 rule 4.** Every rarity below unique is still reachable
+by crafting without spending — it is later, not denied, and what actually bound
+a rung was always the materials and the bench.
+
+**Derived from the rung, never written on the item.** A column on a hundred
+catalog rows is a hundred chances to disagree with the ladder, and the ladder is
+the only thing this depends on. The client mirrors the same function over the
+same table, and there is a test pinning the two — plus a third copy in
+`gen_monsters.py`, which is where the ladder is borrowed for something else
+entirely (§9.5.2).
+
+**Refused at the belt, never at the counter.** Owning a thing you cannot yet use
+is a reason to keep levelling; a shop that will not sell it is a wall with
+nothing behind it. A crafted piece, a looted one and a bought one all arrive in
+the bag and all wait there. On screen the rung's level is the **first chip** on
+every piece, ahead of what it is worth — what a piece does only matters once you
+can put it on — and it goes ember (§13.3) for a reader who cannot meet it.
+
 **Every verb that finishes work pays character XP, and the road is the only
 exception.** A mine, a gather, a processing run, a craft and a won fight all
 level the character; §7.5's walking deliberately does not, and the reason it
@@ -2803,7 +2842,46 @@ biome the place to grind and the rest scenery.
 
 Each carries its own `attack`, `defense` and a profile — a brute is high attack
 and low defense, a carapace the reverse, a fast one is middling in both and
-wears a weapon harder. The profile is what a player reads, not a level number.
+wears a weapon harder. The profile is what a player reads to know **how** to
+fight it.
+
+**And a level, which says whether to bother.** Three solid numbers are the
+honest description of a pack and §9.5.5's preview is the honest answer, but
+neither is a *glance*: the preview needs you standing on the hex, and comparing
+three figures is arithmetic a player does in their head every time. The level is
+the one number that says whether to read the rest.
+
+**It is quoted on the equipment ladder, and that is what makes it comparable.**
+§7.1 has always said character level unlocks access rather than power, which
+used to make it useless for this — the wardrobe gate changes that, because a
+level now bounds the *rung you may wear* and is therefore a real ceiling on how
+good a kit can be. A monster quoted on that scale is quoted against something
+true.
+
+The **tier picks the band**, anchored on §9.5.4's own measured ladder — common
+battle gear answers tier 1, rare answers tiers 1–3, epic and legendary answer
+the center — and **threat places it inside**, so a brute and a carapace of one
+tier are not the same number. Half the band, so the tiers stay apart on the eye:
+what separates a tier-2 from a tier-3 must never be smaller than what separates
+two tier-2s. It comes out 1–5 · 8–14 · 20–29 · 38–49, and there are tests
+pinning the anchor, the absence of overlap, and that a harder peer reads higher.
+
+**Derived in the generator, never written by hand**, so retuning a monster's
+attack moves its level with it and cannot be forgotten.
+
+**It is a glance and never a promise.** §7.1's rule still holds: a level 60 in a
+work coat does not beat a level 38 pack. So the *number* is drawn wherever the
+monster is named — the Study plate, the bestiary — and the **comparison** is
+drawn only on the pin, where a decision is actually being made and the reader's
+own level is known. The Study plate saying nothing about your side is a rule
+(below), and the level is a fact about the creature rather than about you.
+
+**One state takes a colour and two do not.** Ember on a pack above your rung,
+because §13.3 spends ember on a state to deal with and that is exactly one.
+Outclassing a pack is the *absence* of a problem rather than a payout, so it is
+drawn plain — sap there would read as an invitation, and the difference between
+"you can take this" and "this is nothing" is the preview's to draw thirty pixels
+away.
 
 **Every country runs all three profiles**, and so does every ring across the
 map. The second was the older rule and the reason the roster grew a third
@@ -2898,8 +2976,8 @@ screen: it talks to nothing and is correct with no character at all.
 
 **Studying one costs nothing** (§9.5.3's pin has two exits and this is neither).
 A `Study` plate beside the Fight button gives the name, the profile, the tier,
-the three solid numbers, what the profile *means*, where its wear lands, and
-what it pays — read straight off the catalog the client already mirrors, so it
+**the level**, the three solid numbers, what the profile *means*, where its wear
+lands, and what it pays — read straight off the catalog the client already mirrors, so it
 needs no request and cannot be stale. It deliberately says nothing about your
 side: whether you win and what it costs are the preview's, thirty pixels away,
 and saying them twice would make two answers out of one.

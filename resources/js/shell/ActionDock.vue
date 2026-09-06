@@ -16,6 +16,7 @@ import { computed, ref, watch } from 'vue'
 import { useGame } from '@/stores/game'
 import { api } from '@/api/client'
 import { MONSTERS } from '@/game/monsters'
+import { levelStanding } from '@/game/battle'
 import { RECIPES, RING_LABEL, SKILL_BY_KEY } from '@/game/catalog'
 import { groundLabel } from '@/game/ground'
 import { formatDuration, placeLabel } from '@/game/formulas'
@@ -145,6 +146,22 @@ const gatherHint = computed(() => gather.value?.reason ?? `${gather.value?.yield
  * explain the pin -- the verbs are simply not what this hex is offering.
  */
 const pinned = computed(() => Boolean(underfoot.value?.pinned))
+/**
+ * §9.5.2 -- what this pack is worth, against what the reader may wear.
+ *
+ * Null when there is nobody to compare against, which the pin never actually
+ * is -- but the state arrives after the first paint, and a chip that flashes a
+ * wrong verdict for one frame is worse than one that arrives a frame late.
+ */
+const packLevel = computed(() => {
+  const def = pack.value ? MONSTERS[pack.value.key] : null
+  const mine = game.state?.character.level
+
+  if (!def || mine === undefined) return null
+
+  return { level: def.level, standing: levelStanding(mine, def.level) }
+})
+
 
 /** The pack itself is derived client-side, so the name costs no request. */
 const pack = computed(() => game.tileAt(game.character?.col ?? 0, game.character?.row ?? 0)?.pack)
@@ -417,6 +434,19 @@ function hunted(): void {
           <div class="pinned">
             <div class="who">
               <strong class="name">{{ pack ? MONSTERS[pack.key]?.name : 'Something' }}</strong>
+              <!--
+                §9.5.2 -- one number saying whether this is your weight, before
+                the preview says whether you win. It is on the equipment ladder
+                (Balance::EQUIP_LEVEL), which is what makes it comparable to the
+                reader's own level at all: a level bounds the rung you may wear.
+
+                Ember on the one state that is a problem, and nothing on the
+                other two (§13.3): outclassing a pack is the absence of a
+                problem, not a payout, and sap there would read as an invitation.
+              -->
+              <span v-if="packLevel" class="tiny lv" :class="packLevel.standing">
+                lv {{ packLevel.level }}
+              </span>
               <span v-if="packLeaves" class="tiny leaves">leaves in {{ packLeaves }}</span>
             </div>
 
@@ -778,6 +808,27 @@ function hunted(): void {
   color: var(--vellum-dim);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+/*
+ * §13.3 -- ember on the one standing that is a problem. `even` and `over` are
+ * deliberately the same quiet chip: the difference between "you can take this"
+ * and "this is nothing" is the preview's to draw, and two colours here would be
+ * two answers to a question thirty pixels away already answers better.
+ */
+.lv {
+  padding: 1px 5px;
+  border-radius: 2px;
+  background: var(--line);
+  color: var(--vellum-dim);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.lv.under {
+  background: color-mix(in srgb, var(--ember) 26%, transparent);
+  color: var(--ember);
 }
 
 .pinned .warn {

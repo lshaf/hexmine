@@ -381,6 +381,28 @@ export const EQUIPMENT = {
   goldPerCraftMinute: 1,
 } as const
 
+/**
+ * §7.1/§8.0 -- the character level each rung may be worn at.
+ *
+ * Balance::EQUIP_LEVEL. Level unlocks ACCESS, not power, which is what §7.1 has
+ * always said -- this is the same rule pointed at the wardrobe. It also closes a
+ * §3.3 hole: an epic is the first rung that may be bought on the marketplace,
+ * and a wallet a day old can no longer wear one.
+ *
+ * Derived from the rung and never stored on the item: a column on a hundred
+ * catalog rows is a hundred chances to disagree with the ladder.
+ */
+export const EQUIP_LEVEL: Record<string, number> = {
+  common: 1,
+  uncommon: 8,
+  rare: 20,
+  epic: 38,
+  legendary: 60,
+  unique: 80,
+}
+
+export const equipLevel = (rarity: string): number => EQUIP_LEVEL[rarity] ?? 1
+
 export const ECONOMY = {
   /** NPC buy-back is deliberately a bad rate, §3.2 / §12 step 2. */
   npcSellMultiplier: 1,

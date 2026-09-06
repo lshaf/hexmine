@@ -131,6 +131,56 @@ def hp(tier, profile):
     return int(round(HP_BY_TIER[tier] * HP_BY_PROFILE[profile]))
 
 
+# ------------------------------------------------------------- the level
+
+# Balance::EQUIP_LEVEL. Kept here as a literal rather than parsed out of PHP,
+# and pinned by a test on the other side: this file is the only place these two
+# ladders meet, and a silent drift between them would put a monster's level on a
+# scale nothing else uses.
+EQUIP_LEVEL = {'common': 1, 'uncommon': 8, 'rare': 20, 'epic': 38, 'legendary': 60}
+
+# §9.5.4's own measured ladder: common battle gear answers tier 1, rare answers
+# tiers 1-3, epic and legendary answer the center. So the tier picks the band and
+# the band is the rung that beats it.
+LEVEL_BAND = {1: 'common', 2: 'uncommon', 3: 'rare', 4: 'epic'}
+LEVEL_NEXT = {1: 'uncommon', 2: 'rare', 3: 'epic', 4: 'legendary'}
+
+
+def threat(tier, profile):
+    """Attack, guard and staying power in one figure. Ordering only."""
+    atk, dfn, _, _ = stats(tier, profile)
+    return atk + dfn + hp(tier, profile) / 3
+
+
+def level(tier, profile):
+    """
+    §9.5.2 -- what a monster is worth as one number, on the wardrobe's ladder.
+
+    The three solid numbers are the honest description and the preview is the
+    honest answer, but neither is a GLANCE: the preview needs you standing on the
+    hex, and comparing three numbers is something a player has to do in their
+    head every time. This is the one number that says whether to read the rest.
+
+    It is on the EQUIPMENT ladder, and that is what makes it comparable. §7.1 has
+    always said character level unlocks access rather than power, which used to
+    make it useless for this -- Balance::EQUIP_LEVEL changes that, because a
+    level now bounds the rung you may wear and is therefore a real ceiling on how
+    good a kit can be.
+
+    The tier picks the band; threat places the monster inside it. Half the band,
+    so the tiers stay apart on the eye: what separates a tier-2 from a tier-3
+    must never be smaller than what separates two tier-2s.
+    """
+    peers = [threat(tier, p) for p in HP_BY_PROFILE]
+    low, high = min(peers), max(peers)
+    share = (threat(tier, profile) - low) / (high - low) if high > low else 0.0
+
+    base = EQUIP_LEVEL[LEVEL_BAND[tier]]
+    nxt = EQUIP_LEVEL[LEVEL_NEXT[tier]]
+
+    return base + round((nxt - base) / 2 * share)
+
+
 # Which ring each tier is NEW on. A pool is its own tier plus the one outside it.
 RING_OF_TIER = {1: 'outer', 2: 'mid', 3: 'inner', 4: 'center'}
 
@@ -351,7 +401,7 @@ def emit_monsters_php():
         rare = f"'{d['rare']}'" if d['rare'] else 'null'
         o.write(
             f"        '{key}' => ['name' => {php_str(name)}, 'biome' => '{biome}', "
-            f"'tier' => {tier}, "
+            f"'tier' => {tier}, 'level' => {level(tier, profile)}, "
             f"'profile' => '{profile}', 'attack' => {atk}, 'defense' => {dfn}, "
             f"'hp' => {hp(tier, profile)}, "
             f"'wearBias' => {wear}, 'gold' => [{gold[0]}, {gold[1]}], "
@@ -391,7 +441,7 @@ def emit_monsters_ts():
         rare = f"'{d['rare']}'" if d['rare'] else 'undefined'
         o.write(
             f"  {key}: {{ key: '{key}', name: {ts_str(name)}, biome: '{biome}', "
-            f"tier: {tier}, "
+            f"tier: {tier}, level: {level(tier, profile)}, "
             f"profile: '{profile}', attack: {atk}, defense: {dfn}, "
             f"hp: {hp(tier, profile)}, "
             f"wearBias: {wear}, gold: [{gold[0]}, {gold[1]}], "
