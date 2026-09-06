@@ -24,7 +24,7 @@ import {
   stationForRarity,
   stationReaches,
 } from '@/game/catalog'
-import { formatDuration, placeLabel } from '@/game/formulas'
+import { benchFee, formatDuration, makeCost, placeLabel } from '@/game/formulas'
 import { CRAFT, PROCESSING } from '@/game/balance'
 import { itemIcon, materialIcon } from '@/icons/procedural'
 import SvgIcon from '@/components/SvgIcon.vue'
@@ -316,8 +316,20 @@ function inputs(item: ItemDef): Array<{ key: MaterialKey; need: number; have: nu
 
 const stocked = (item: ItemDef) => inputs(item).every((i) => i.have >= i.need)
 
-/** Stock, a free bench, and nothing of yours already on one here (§8.4). */
-const ready = (item: ItemDef) => stocked(item) && !benchFull.value && !mineHere.value
+/**
+ * §6/§8.4 -- what the bench charges to make it, beside what it is made of.
+ *
+ * A settlement is shared infrastructure and standing at its anvil costs
+ * something. Small by rule: §3.2 cuts gold off above the cheapest rung, so a
+ * fee big enough to gate a craft would sew them back together.
+ */
+const fee = (item: ItemDef) => benchFee(makeCost(item))
+
+const affordable = (item: ItemDef) => (game.state?.character.gold ?? 0) >= fee(item)
+
+/** Stock, the fee, a free bench, and nothing of yours already on one (§8.4). */
+const ready = (item: ItemDef) =>
+  stocked(item) && affordable(item) && !benchFull.value && !mineHere.value
 
 /**
  * Name the shortfall. "Missing materials" is a state; this is a shopping list.
@@ -334,6 +346,10 @@ function shortfall(item: ItemDef): string | null {
     .filter((i) => i.have < i.need)
     .map((i) => MATERIALS[i.key].name.toLowerCase())
 
+  // The fee is named on its own, because it is the one shortfall a walk to
+  // another hex does not fix: you go and sell something rather than go and
+  // gather something.
+  if (!short.length && !affordable(item)) return `The bench wants ${fee(item)} gold`
   if (!short.length) return null
   if (short.length === 1) return `Short on ${short[0]}`
   if (short.length === 2) return `Short on ${short[0]} and ${short[1]}`

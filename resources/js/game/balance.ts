@@ -367,7 +367,11 @@ export const EQUIPMENT = {
   } as Record<string, number>,
 
   shopMaterialMarkup: 1.5,
-  goldPerCraftMinute: 1,
+  /** §6/§8.4 -- what a bench charges to be used, as a share of what it handles.
+   *  Small by rule rather than by tuning: §3.2 cuts gold off above the cheapest
+   *  rung, so a fee big enough to gate a craft would sew them back together.
+   *  Mirrors Balance::BENCH_FEE_SHARE. */
+  benchFeeShare: 0.1,
 } as const
 
 /**

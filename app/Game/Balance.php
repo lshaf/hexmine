@@ -1529,15 +1529,31 @@ final class Balance
     public const SHOP_MATERIAL_MARKUP = 1.5;
 
     /**
-     * §8.4 -- a bench takes time, and time is worth something.
+     * §6/§8.4 -- what a bench charges to be used, as a share of what it handles.
      *
-     * One gold a minute, flat, against the rarity's own craft clock
-     * (CRAFT_BASE_SECONDS above). It is the smallest term in the price and that
-     * is correct: it is not there to set the number, it is there to be the
-     * difference between two pieces made of the same parts at different
-     * benches, which material cost alone cannot express.
+     * A settlement is shared infrastructure (§6) rather than your workshop, and
+     * standing at somebody else's saw pit costs something. It joins §3.2's list
+     * of gold sinks -- repair, the shelf, settlement upgrades, guild bidding --
+     * as the steady one that touches everybody who makes anything.
+     *
+     * **A TENTH, and small is the rule rather than the tuning.** §3.2 severs
+     * gold from everything above the cheapest rung: the shelf stops at common
+     * and every rung after it is made. A large bench fee would quietly reattach
+     * them -- pay enough gold and the epic appears -- so the fee has to stay
+     * far under the point where gold, rather than the materials and the walk,
+     * is what gates a craft. At a tenth of the parts an Ironwood Axe costs 23
+     * gold in fees against 228 gold of materials that no amount of gold can
+     * buy.
+     *
+     * It is charged on what the bench HANDLES, at the NPC's own poor rate: the
+     * parts for a craft, the inputs for a run. One rule for both benches, and
+     * it scales with the rung for free rather than needing a table.
+     *
+     * §8.3's shelf price has always included a term for the bench -- "plus the
+     * bench time it takes" -- which nothing ever charged. It charges this now,
+     * so that line of the price is a fact rather than a valuation.
      */
-    public const GOLD_PER_CRAFT_MINUTE = 1.0;
+    public const BENCH_FEE_SHARE = 0.10;
 
     /**
      * §8.2 -- what the trader gives back for a piece of shop gear, before wear.

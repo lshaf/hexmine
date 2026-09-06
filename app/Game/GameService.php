@@ -5322,17 +5322,37 @@ class GameService
 
             // Never below one of anything per batch: a free run is not a
             // discount, it is a hole in the §11 materials sink.
-            $this->takeMaterial(
-                $character,
-                $recipe['input'],
-                max($count, (int) round($recipe['inputQty'] * $count * (1 - $effects['costReduction']))),
-            );
+            $take = [
+                $recipe['input'] => max($count, (int) round($recipe['inputQty'] * $count * (1 - $effects['costReduction']))),
+            ];
             if (isset($recipe['secondInput'])) {
-                $this->takeMaterial(
-                    $character,
-                    $recipe['secondInput'],
-                    max($count, (int) round(($recipe['secondInputQty'] ?? 1) * $count * (1 - $effects['costReduction']))),
+                $take[$recipe['secondInput']] = max(
+                    $count,
+                    (int) round(($recipe['secondInputQty'] ?? 1) * $count * (1 - $effects['costReduction'])),
                 );
+            }
+
+            // §6/§8.4 -- and the pit's own fee, on what it is being asked to
+            // handle. Read off the DISCOUNTED pile, so a Sawyer's costReduction
+            // thins the bill with it -- the fee is a share of the work, and
+            // there is less work.
+            //
+            // Refused before anything is spent, exactly as the strap above is.
+            $fee = Formulas::benchFee(Formulas::materialWorth($take));
+            if ($fee > 0 && (int) $character->gold < $fee) {
+                throw new GameException(
+                    "The line at {$settlement['name']} charges {$fee} gold. You have {$character->gold}.",
+                    'gold',
+                );
+            }
+
+            foreach ($take as $key => $qty) {
+                $this->takeMaterial($character, $key, $qty);
+            }
+
+            if ($fee > 0) {
+                $character->gold -= $fee;
+                $character->save();
             }
 
             $now = $this->now();
@@ -6198,8 +6218,30 @@ class GameService
                     throw new GameException("Not enough {$name}.", 'insufficient');
                 }
             }
+
+            // §6/§8.4 -- and the bench's own fee, on what it is being asked to
+            // handle. Charged on the DISCOUNTED inputs, so a Smith's
+            // costReduction thins the bill as well as the pile: the fee is a
+            // share of the work, and there is less work.
+            //
+            // Refused before a single material is spent, which is §8.4's rule
+            // about everything that can refuse -- the reach, the strap, the
+            // stock, and now this.
+            $fee = Formulas::benchFee(Formulas::materialWorth($inputs));
+            if ($fee > 0 && (int) $character->gold < $fee) {
+                throw new GameException(
+                    "The bench at {$here['name']} charges {$fee} gold. You have {$character->gold}.",
+                    'gold',
+                );
+            }
+
             foreach ($inputs as $key => $qty) {
                 $this->takeMaterial($character, $key, $qty);
+            }
+
+            if ($fee > 0) {
+                $character->gold -= $fee;
+                $character->save();
             }
 
             $now = $this->now();

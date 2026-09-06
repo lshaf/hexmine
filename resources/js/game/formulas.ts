@@ -10,11 +10,12 @@ import { EQUIPMENT, MINING, PROCESSING, SKILLS, equipLevel } from './balance'
 import { ITEM_BY_KEY, LINE_STAT_LABEL, MATERIALS, SKILL_BY_KEY, STAT_LABEL, skillForSlot } from './catalog'
 import type {
   BuffScope,
-  Rarity,
   ItemDef,
   ItemOption,
   MaterialKey,
   OwnedItem,
+  Rarity,
+  Recipe,
   SettlementTier,
   SkillKey,
   StatKey,
@@ -214,12 +215,40 @@ export function resaleBasis(def: ItemDef): number {
 
 /** §8.3 -- what a thing's parts fetch at the NPC's own poor rate. */
 export function makeCost(def: ItemDef): number {
+  return materialWorth(def.inputs ?? {})
+}
+
+/** The same, for a loose pile of materials. */
+export function materialWorth(materials: Record<string, number>): number {
   let worth = 0
-  for (const [key, qty] of Object.entries(def.inputs ?? {})) {
+  for (const [key, qty] of Object.entries(materials)) {
     worth += (MATERIALS[key as MaterialKey]?.npcPrice ?? 0) * (qty as number)
   }
 
   return worth
+}
+
+/**
+ * §6/§8.4 -- what a bench charges to be used: a share of what it handles.
+ *
+ * Rounded UP, so the cheapest thing a bench will do still costs a coin -- a
+ * fee that rounds to nothing on the small jobs is a sink with a hole in it, and
+ * the small jobs are the ones there are most of. Mirrors Formulas::benchFee().
+ */
+export function benchFee(handled: number): number {
+  return handled > 0 ? Math.ceil(handled * EQUIPMENT.benchFeeShare) : 0
+}
+
+/** §6 -- the fee for a processing run: a share of what goes into it. */
+export function runFee(recipe: Recipe, batches: number): number {
+  const inputs: Record<string, number> = {
+    [recipe.input]: recipe.inputQty * batches,
+  }
+  if (recipe.secondInput) {
+    inputs[recipe.secondInput] = (recipe.secondInputQty ?? 1) * batches
+  }
+
+  return benchFee(materialWorth(inputs))
 }
 
 /**

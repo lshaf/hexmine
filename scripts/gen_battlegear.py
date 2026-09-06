@@ -62,16 +62,18 @@ STATION_GOLD_PER_DURABILITY = {'village': 0.43, 'city': 1.40}
 
 SHOP_MATERIAL_MARKUP = 1.5
 
-# §8.4 -- a bench takes time, and time is worth something. One gold a minute,
-# flat, and the minutes come from the rarity's craft clock (Balance::
-# CRAFT_BASE_SECONDS): common 8, uncommon 14.
+# §6/§8.4 -- what the bench charges to make it (Balance::BENCH_FEE_SHARE).
 #
-# It is the smaller term everywhere and that is correct -- it is not meant to
-# set the price, it is meant to be the difference between two items made of the
-# same materials at different benches, which materials alone cannot express.
-GOLD_PER_CRAFT_MINUTE = 1.0
-
-CRAFT_MINUTES = {'common': 8, 'uncommon': 14, 'rare': 22, 'epic': 34, 'legendary': 50}
+# The price has always carried a term for the bench, and for a while that term
+# was notional -- a gold a minute of craft clock, valuing time nobody was
+# charged for. The bench charges a fee now, so the term IS the fee: the shelf
+# quotes what the thing costs to make, fee and all, rather than an estimate of
+# it.
+#
+# Still the smaller term everywhere, which is correct -- it is not meant to set
+# the price, it is meant to be the difference between two items made of the
+# same parts, which the parts alone cannot express.
+BENCH_FEE_SHARE = 0.10
 
 
 def shop_price(station, rarity, durability, inputs):
@@ -94,8 +96,8 @@ def shop_price(station, rarity, durability, inputs):
     client quoting a price the server will not honor.
     """
     parts = sum(NPC_PRICE[k] * q for k, q in inputs.items() if k in NPC_PRICE)
-    labour = CRAFT_MINUTES[rarity] * GOLD_PER_CRAFT_MINUTE
-    to_make = parts * SHOP_MATERIAL_MARKUP + labour
+    fee = math.ceil(parts * BENCH_FEE_SHARE) if parts > 0 else 0
+    to_make = parts * SHOP_MATERIAL_MARKUP + fee
     worth = durability * STATION_GOLD_PER_DURABILITY[station]
 
     return math.floor(max(to_make, worth) + 0.5)

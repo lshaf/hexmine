@@ -1063,12 +1063,65 @@ final class Formulas
      */
     public static function makeCost(array $def): int
     {
+        return self::materialWorth($def['inputs'] ?? []);
+    }
+
+    /**
+     * What a pile of materials fetches at the NPC's own poor rate.
+     *
+     * @param  array<string,int>  $materials
+     */
+    public static function materialWorth(array $materials): int
+    {
         $worth = 0;
-        foreach ($def['inputs'] ?? [] as $key => $qty) {
+        foreach ($materials as $key => $qty) {
             $worth += ((Catalog::material($key)['npcPrice'] ?? 0) * $qty);
         }
 
         return $worth;
+    }
+
+    /**
+     * §6/§8.4 -- what a bench charges to be used.
+     *
+     * A share of what it handles, at the NPC's own rate, and never enough to be
+     * the thing standing between a player and a rung: §3.2 cuts gold off above
+     * the cheapest rung, so a fee big enough to gate a craft would quietly sew
+     * them back together (Balance::BENCH_FEE_SHARE).
+     *
+     * Rounded UP, so the cheapest thing a bench will do still costs a coin. A
+     * fee that rounds to nothing on the small jobs is a sink with a hole at the
+     * bottom, and the small jobs are the ones there are most of.
+     */
+    public static function benchFee(int $handled): int
+    {
+        return $handled > 0 ? (int) ceil($handled * Balance::BENCH_FEE_SHARE) : 0;
+    }
+
+    /** §8.4 -- the fee for making this piece: a share of what it is made of. */
+    public static function craftFee(array $def): int
+    {
+        return self::benchFee(self::makeCost($def));
+    }
+
+    /**
+     * §6 -- the fee for a processing run: a share of what goes into it.
+     *
+     * Scaled by the batch, because a batch is that many runs' worth of work
+     * through the same pit -- the same reason it takes that much longer and
+     * eats that much more.
+     *
+     * @param  array<string,mixed>  $recipe
+     */
+    public static function runFee(array $recipe, int $batches): int
+    {
+        $inputs = [(string) $recipe['input'] => (int) $recipe['inputQty'] * $batches];
+
+        if (isset($recipe['secondInput'])) {
+            $inputs[(string) $recipe['secondInput']] = (int) ($recipe['secondInputQty'] ?? 1) * $batches;
+        }
+
+        return self::benchFee(self::materialWorth($inputs));
     }
 
     /**

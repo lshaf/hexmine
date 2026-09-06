@@ -49,7 +49,9 @@ The three currencies are strictly separated. No backdoor converts one into anoth
 ### 3.2 Gold
 - **In-game only**, NPC-facing, freely inflatable/deflatable by design (no on-chain consequence)
 - Faucets: selling excess resources to NPC (deliberately bad rate), monster gold drops, quests/dailies
-- Sinks: NPC repair, basic equipment, settlement upgrades, **guild capital bidding** (largest sink)
+- Sinks: NPC repair, basic equipment, **bench fees** (§6/§8.4 — the steady one,
+  paid by everybody who makes anything), settlement upgrades, **guild capital
+  bidding** (largest sink)
 - Buys **common only** (§8.0). Every rung above the cheapest thing in the game
   is made rather than bought — never convertible to NFT either way
 - The trader still *buys back* up to uncommon, which is a different question:
@@ -898,6 +900,35 @@ control.
 icon beside it is the output's, the arrow under it ends on the output, and the
 material that lands in the bag is the output, so the row was the one part of it
 naming something else.
+
+**A bench charges to be used, and it charges on the way in.** A settlement is
+shared infrastructure rather than your workshop, so standing at somebody else's
+saw pit or anvil costs gold: **a tenth of what the bench handles**, at the NPC's
+own poor rate — the parts for a craft, the inputs for a run. One rule for both
+benches, scaling with the rung for free rather than needing a table.
+
+**Small is a rule, not a tuning value.** §3.2 cuts gold off above the cheapest
+rung: the shelf stops at common and every rung after it is *made*. A fee big
+enough to stand between a player and a craft would sew the two back together —
+pay enough gold and the epic appears — so it stays far under the point where
+gold, rather than the materials and the walk, is what gates a rung. An Ironwood
+Axe costs 23 gold in fees against 228 gold of materials no gold can buy, and
+there is a test holding every recipe under a fifth.
+
+**It is read off the DISCOUNTED pile**, so a Sawyer's or a Smith's
+`costReduction` (§7.4.3) thins the bill as well as the materials: the fee is a
+share of the work, and there is less work.
+
+**Refused before anything is spent**, which is §8.4's rule about every other
+refusal — the reach, the strap and the stock all say no with the materials still
+in the bag.
+
+**And §8.3's shelf price stops estimating it.** That price has always carried a
+term for the bench — *"plus the bench time it takes"* — valued at a notional
+gold a minute that nothing ever charged. The term is the **fee** now, so the
+shelf quotes what a thing costs to make rather than a guess at it. Six of the
+twelve stocked pieces moved by four or five gold when it was swapped, which is
+the whole of the price change: the numbers were re-derived rather than picked.
 
 ### 6.1 Processing queue
 - **5 open slots** per feature, first-come-first-served, any player
@@ -2525,7 +2556,7 @@ same object.** The price is the higher of them:
 
 | | What it means |
 |---|---|
-| **Cost to make** | its parts at the NPC's own poor rate, marked up by half, **plus the bench time it takes** (§8.4's craft clock, at a gold a minute) |
+| **Cost to make** | its parts at the NPC's own poor rate, marked up by half, **plus the fee the bench charges** (§6, a tenth of the parts) |
 | **What it is worth** | gold per point of durability, set per station — village ~0.43, city ~1.40 |
 
 Neither alone is enough, and both failures are ones this catalog actually had.
@@ -2535,9 +2566,12 @@ shelf that beats the bench inverts §8's whole ladder. *Make-cost alone* would
 price a 40-durability axe and a 60-durability cloak the same, because neither of
 them has a recipe at all.
 
-Bench time is the smallest term and is meant to be: it is not there to set the
-number, it is there to be the difference between two pieces made of the same
-parts at different benches, which material cost alone cannot express.
+The bench fee is the smallest term and is meant to be: it is not there to set
+the number, it is there to be the difference between two pieces made of the same
+parts, which material cost alone cannot express. It was a *valuation* of bench
+time for a while — a gold a minute of craft clock, pricing minutes nobody was
+billed for — and it is the real fee now (§6), so this line of the price is a
+fact rather than an estimate.
 
 Hand-picked numbers drift the moment the catalog grows, and these had already
 drifted twice — first the gathering tools sat half again under everything added

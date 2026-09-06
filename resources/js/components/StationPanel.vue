@@ -9,7 +9,7 @@
 import { computed, ref, watch } from 'vue'
 import { useGame } from '@/stores/game'
 import { MATERIALS, RECIPES, SKILL_BY_KEY, SKILL_LIST, recipesForLines } from '@/game/catalog'
-import { formatSpan, processingTime } from '@/game/formulas'
+import { formatSpan, processingTime, runFee } from '@/game/formulas'
 import { PROCESSING } from '@/game/balance'
 import { materialIcon } from '@/icons/procedural'
 import SvgIcon from './SvgIcon.vue'
@@ -64,6 +64,11 @@ watch(
 )
 
 const shown = computed(() => available.value.filter((r) => r.skill === line.value))
+
+/** §6/§8.4 -- what this pit charges to run the recipe, at this batch size. */
+const fee = (recipe: Recipe) => runFee(recipe, batches.value)
+
+const affordable = (recipe: Recipe) => (game.state?.character.gold ?? 0) >= fee(recipe)
 
 /** Lines this settlement does NOT run. Deduped by skill: several recipes can
  *  share one line (ingots and reinforced frames are both Mining), and listing
@@ -268,6 +273,14 @@ watch(() => props.settlement.id, () => { batches.value = 1 })
             </template>
             → {{ recipe.outputQty * batches }} {{ MATERIALS[recipe.output].name }}
           </div>
+          <!-- §6/§8.4 -- and what the pit charges to run it. A settlement is
+               shared infrastructure and standing at its line costs something.
+               Ember when the purse cannot meet it (§13.3): it is the one
+               shortfall here a walk does not fix -- you go and sell something
+               rather than go and gather something. -->
+          <div v-if="fee(recipe)" class="tiny fee" :class="{ short: !affordable(recipe) }">
+            {{ fee(recipe) }}g to the line
+          </div>
         </div>
         <!-- §8.4 -- a line runs at a bench somewhere on the map, and this is
              what remembers which one you meant. It is the one control here
@@ -278,7 +291,7 @@ watch(() => props.settlement.id, () => { batches.value = 1 })
           type="button"
           :disabled="
             game.busy || !onSite || workFull || runsLeft(recipe) === 0 || freeSlots === 0
-              || maxBatches(recipe) < batches
+              || maxBatches(recipe) < batches || !affordable(recipe)
           "
           :title="
             runsLeft(recipe) === 0
@@ -404,6 +417,16 @@ watch(() => props.settlement.id, () => { batches.value = 1 })
 
 .line :deep(svg) {
   display: block;
+}
+
+/* §13.3 -- ember on the one thing here that is a state to deal with. */
+.fee {
+  margin-top: 2px;
+  color: var(--vellum-dim);
+}
+
+.fee.short {
+  color: var(--ember);
 }
 
 .recipe {

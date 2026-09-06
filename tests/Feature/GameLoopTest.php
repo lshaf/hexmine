@@ -5749,9 +5749,12 @@ final class GameLoopTest extends TestCase
                 $parts += (Catalog::material($material)['npcPrice'] ?? 0) * $qty;
             }
 
-            $minutes = (Balance::CRAFT_BASE_SECONDS[$def['rarity']] ?? 0) / 60;
-            $toMake = $parts * Balance::SHOP_MATERIAL_MARKUP
-                + $minutes * Balance::GOLD_PER_CRAFT_MINUTE;
+            // §6/§8.4 -- the bench's own fee, and it is the fee the bench
+            // actually charges rather than a valuation of its minutes. The term
+            // was notional for a while -- a gold a minute of craft clock,
+            // pricing time nobody was billed for -- so the shelf quoted an
+            // estimate of a cost that did not exist.
+            $toMake = $parts * Balance::SHOP_MATERIAL_MARKUP + Formulas::benchFee($parts);
 
             $this->assertSame(
                 (int) round(max($toMake, $worth)),
@@ -5766,6 +5769,82 @@ final class GameLoopTest extends TestCase
 
         // Twelve, which is every price there is: §3.2's shelf stops at common.
         $this->assertGreaterThan(8, $checked, 'the shelf sweep found almost nothing to check');
+    }
+
+    /**
+     * §6/§8.4 -- a bench charges to be used, and it charges on the way in.
+     *
+     * A settlement is shared infrastructure (§6) rather than your workshop, so
+     * standing at somebody else's line costs something. It joins §3.2's gold
+     * sinks as the steady one that touches everybody who makes anything.
+     */
+    public function test_a_run_and_a_craft_both_cost_gold(): void
+    {
+        $recipe = Catalog::recipe('planks');
+        $fee = Formulas::runFee($recipe, 1);
+        $this->assertGreaterThan(0, $fee, 'a run is free');
+
+        $settlement = $this->standAtWoodcuttingVillage();
+        $this->character->update(['gold' => 500]);
+        $this->give(['wood' => 20]);
+
+        $before = (int) $this->character->fresh()->gold;
+        $this->game->startProcessing($this->character->fresh(), $settlement['id'], 'planks', 1);
+
+        $this->assertSame($before - $fee, (int) $this->character->fresh()->gold);
+    }
+
+    /**
+     * And it is refused before anything is spent, which is §8.4's rule about
+     * every other refusal: the reach, the strap and the stock all say no with
+     * the materials still in the bag.
+     */
+    public function test_a_bench_short_of_its_fee_spends_nothing(): void
+    {
+        $settlement = $this->standAtWoodcuttingVillage();
+        $this->character->update(['gold' => 0]);
+        $this->give(['wood' => 20]);
+
+        try {
+            $this->game->startProcessing($this->character->fresh(), $settlement['id'], 'planks', 1);
+            $this->fail('a run started with no gold for the fee');
+        } catch (GameException $e) {
+            $this->assertSame('gold', $e->errorCode);
+        }
+
+        $this->assertSame(20, $this->game->held($this->character->fresh(), 'wood'), 'the wood was taken anyway');
+    }
+
+    /**
+     * §3.2 -- and the fee never becomes the thing that gates a rung.
+     *
+     * Gold reaches the cheapest rung and stops; every rung above it is made.
+     * A bench fee big enough to stand between a player and a craft would sew
+     * the two back together -- pay enough gold and the epic appears -- so it is
+     * small by RULE rather than by tuning, and this is the rule.
+     *
+     * A fifth of what the parts are worth is the line: at a tenth an Ironwood
+     * Axe costs 23 gold in fees against 228 gold of materials no gold can buy.
+     */
+    public function test_the_bench_fee_never_gates_a_rung(): void
+    {
+        $checked = 0;
+
+        foreach (Catalog::items() as $key => $def) {
+            $parts = Formulas::makeCost($def);
+            if ($parts <= 0) {
+                continue;
+            }
+
+            $this->assertLessThan(
+                $parts * 0.2,
+                Formulas::craftFee($def),
+                "{$key}'s bench fee is a serious fraction of what it is made of",
+            );
+            $checked++;
+        }
+
+        $this->assertGreaterThan(40, $checked);
     }
 
     /**
