@@ -3002,12 +3002,27 @@ material and the hunt's animal are, and the same flat run of pips beneath.
 |---|---|---|
 | The lede | the material, and the line it trains | the creature, its profile and its tier |
 | The figure | the clock | **the level** |
-| The pips | what the seam can give up | what the pack drops |
-| Behind the tap | how the clock got to its number | how the level got to its |
+| On the face | what the seam can give up | **attack, defense and the pool**, then what it drops |
+| Behind the tap | how the clock got to its number | what those three MEAN |
 
 **The level sits where the clock sits because it answers the same question.**
 One number saying whether to bother reading the rest — which is what a clock is
 on the rows beneath it.
+
+**And the three solid numbers sit on the face, above the drops.** They are the
+same kind of fact the pips are — what a hex can give up is owed at a glance, and
+on a pack these three *are* the place. Above the drops rather than below,
+because they decide whether there will be any. Drawn in §9.5.4's own two
+channels, a dim uppercase word and a mono figure, so a monster's numbers read
+the way a piece of gear's do.
+
+*(They were behind the chevron, which left the level as the only figure on the
+row — and a level is a summary of exactly these three, so the card was showing
+the conclusion and hiding the evidence.)*
+
+What is left behind the tap is what is behind it on every other row: not another
+figure, but what the figures **mean** — the sentence a profile adds up to, the
+one thing those numbers do not explain (§9.5.6), and the gold.
 
 *(It was a block of its own for a moment: a crest, a heading, a figures row and
 an always/often/rarely column, on a panel tinted ember. Every one of those was
@@ -3023,6 +3038,13 @@ a pip promises one. It goes in the breakdown with the figures.
 matters while something is looking at you — §9.5.3 refuses every verb on a
 pinned hex — so a seam read before the pack standing on it is a seam read in the
 wrong order.
+
+**And a hostile is on its own enough to open the card for.** Whether there is a
+chevron and whether there is anything under it are **one question**, asked once:
+the two were asked separately and disagreed, so a hex whose only news was a pack
+standing on it offered no arrow at all and the creature was invisible unless the
+player tapped a row that looked like it did nothing. That kind of hex is not
+exotic — dead ground carries no seam (§5.2) and packs stand on it.
 
 **Ember on the one word, which is the card's own idiom.** `rich` takes gold and
 `gather` goes quiet; this takes ember, because §13.3 spends ember on a state to

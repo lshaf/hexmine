@@ -236,6 +236,21 @@ const wearNote = computed(() =>
 )
 
 /**
+ * Is there anything behind the chevron, and therefore a chevron at all.
+ *
+ * **One computed, read in both places, and that is the whole of the fix.** The
+ * summary asked `mine || tables.length` and the panel under it asked
+ * `tables.length || (mine && mat)` -- two conditions for one question, which is
+ * two chances to disagree. They did: a hex whose only news is a pack standing
+ * on it satisfies neither, so the card offered no arrow and the hostile was
+ * invisible until you happened to tap a row with nothing under it.
+ *
+ * `mine && mat` rather than `mine`, because the lede that branch draws needs
+ * the material: a costing with nothing to cost is not a reason to open a panel.
+ */
+const hasDetail = computed(() => Boolean(tables.value.length || (mine.value && mat.value) || pack.value))
+
+/**
  * §9.5.8 -- what it pays, in the same flat run of pips every verb here uses.
  *
  * Most likely first, exactly as a seam's kinds are: the plate and the trophy
@@ -518,7 +533,7 @@ watch(open, (isOpen) => {
 
           <span v-else class="reason tiny">{{ preview?.reason }}</span>
 
-          <span v-if="mine || tables.length" class="chevron" :class="{ open }" aria-hidden="true">
+          <span v-if="hasDetail" class="chevron" :class="{ open }" aria-hidden="true">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
               <path d="m6 15 6-6 6 6" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
@@ -537,7 +552,7 @@ watch(open, (isOpen) => {
         />
         </div>
 
-        <div v-if="open && (tables.length || (mine && mat) || pack)" class="detail">
+        <div v-if="open && hasDetail" class="detail">
           <!-- §9.5.2 -- the pack gets the lede the seam's material and the
                animal get, and for the same reason: the row below is a price
                list and this is what it is a price list FOR. Drawn as well as
@@ -605,37 +620,49 @@ watch(open, (isOpen) => {
               </span>
             </button>
 
+            <!--
+              §9.5.4/§9.5.5 -- the three solid numbers a fight is decided by,
+              on the face and above what it pays.
+
+              They belong here for the same reason the pips do: what a hex can
+              give up is a fact about the place and the card owes it at a
+              glance, and on a pack these three ARE the place. They were behind
+              the chevron, which made the level the only figure on the row --
+              and a level is a summary of exactly these, so the card was showing
+              the conclusion and hiding the evidence.
+
+              Above the drops rather than below, because they decide whether
+              there will be any.
+
+              Drawn as §9.5.4's own pair of channels -- a dim uppercase word and
+              a mono figure -- so a monster's numbers read the way a piece of
+              gear's do. The pool is one of the three because durability IS the
+              health bar on both sides of the exchange.
+            -->
+            <div class="solids">
+              <span class="solid"><span class="key">atk</span><span class="mono">{{ pack.attack }}</span></span>
+              <span class="solid"><span class="key">def</span><span class="mono">{{ pack.defense }}</span></span>
+              <span class="solid"><span class="key">pool</span><span class="mono">{{ pack.hp }}</span></span>
+            </div>
+
             <div class="pips">
               <span v-for="d in packDrops" :key="d.key" class="pip" :title="d.name">
                 <SvgIcon :svg="materialIcon(d, 18)" />{{ d.name }}
               </span>
             </div>
 
-            <!-- §9.5.4/§9.5.5 -- the three solid numbers a fight is decided
-                 by, read the way a mine's rate is read: a column of figures
-                 with the one that matters most at the foot of it. The pool is
-                 one of the three because durability IS the health bar on both
-                 sides of the exchange.
+            <!-- What is behind the tap is what is behind it on every other row:
+                 not another figure, but what the figures MEAN. A profile is the
+                 sentence those three add up to, and the wear note is the one
+                 thing they do not explain (§9.5.6).
 
-                 Gold sits with them rather than in the pips above, because it
-                 is the one thing off a pack that needs no strap (§7.6) -- and
-                 a pip promises a strap. -->
+                 Gold sits here rather than in the pips above, because it is the
+                 one thing off a pack that needs no strap (§7.6) -- and a pip
+                 promises a strap. -->
             <div v-if="openVerb === 'fight'" id="verb-fight" class="rates tiny">
-              <div class="row-between">
-                <span class="muted">Attack</span>
-                <span class="readout">{{ pack.attack }}</span>
-              </div>
-              <div class="row-between">
-                <span class="muted">Defense</span>
-                <span class="readout">{{ pack.defense }}</span>
-              </div>
-              <div class="row-between">
-                <span class="muted">Gold</span>
-                <span class="readout">{{ pack.gold[0] }}–{{ pack.gold[1] }}</span>
-              </div>
               <div class="row-between rate">
-                <span>Its pool</span>
-                <span class="readout">{{ pack.hp }}</span>
+                <span>Gold</span>
+                <span class="readout">{{ pack.gold[0] }}–{{ pack.gold[1] }}</span>
               </div>
               <p class="note">{{ PROFILE_NOTE[pack.profile] }}</p>
               <p v-if="wearNote" class="note">{{ wearNote }}</p>
@@ -1063,6 +1090,31 @@ watch(open, (isOpen) => {
 
 .verb.fight + .verb {
   margin-top: 8px;
+}
+
+/* §9.5.4 -- the pair and the pool, in the two channels gear already uses: a dim
+   uppercase word and a mono figure. Told apart by the LABEL and never by
+   colour, because §13.3 spends ember on a state to deal with and sap on one
+   worth crossing the screen for, and a stat is neither. */
+.solids {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+
+.solid {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--vellum);
+}
+
+.solid .key {
+  font-size: 8.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--vellum-dim);
 }
 
 /* §5.5 -- the animal's lede carries its drawing, so the mark rides the text
