@@ -563,10 +563,23 @@ final class Catalog
 
         $pool[] = $line(self::OPTION_DURABILITY, 'durability');
 
-        // Everything hauls. What it hauls is decided by the slot: a tool's is
-        // its line's (§7.3), a weapon's is the fight's (§9.5.8), and worn gear
-        // is in both.
-        $pool[] = $line(self::OPTION_HAUL, 'gain');
+        // §8.0.1 -- what hauls, and it is not everything.
+        //
+        // A tool's haul is its own line's (§7.3), a weapon's is the fight's
+        // (§9.5.8), and of the three worn pieces only the GLOVES have one --
+        // because the glove is the hand, and the hand is what picks a thing up.
+        // The same argument that gave the glove the gather's seam line (§4.0:
+        // gathering has no tool, so the glove is the tool) gives it the haul,
+        // and it is the only one of the worn three that argument reaches.
+        //
+        // A coat and a pair of boots used to haul as well, on the reasoning
+        // that they are what carries it home. That was carrying doing the work
+        // of taking: three of the four worn slots asking the same question, and
+        // a glove kept on a shorter ladder to stop it out-hauling a coat --
+        // which is the tell that the coat was the odd one, not the glove.
+        if ($slot !== 'armor' && $slot !== 'boots') {
+            $pool[] = $line(self::OPTION_HAUL, 'gain');
+        }
 
         if ($slot === 'boots') {
             $pool[] = $line(self::OPTION_TRAVEL, 'gain');

@@ -1974,7 +1974,7 @@ to be legible.
 | **the pair** | solid `attack` or `defense` (§9.5.4), simply added | +1–2 · +1–3 · +2–4 · +3–6 · +4–8 |
 | **`durability`** | points on this copy's own ceiling (§8.2) | 3–5% · 4–7% · 5–9% · 7–12% · 9–15% **of its own max** |
 | **`cooldown`** | whole rounds off **every** skill the weapon's family carries (§9.5.9) | −1 · −1 · −1 · −2 · −2 |
-| **`haul`** | a share of what the work pays — a hex, or a pack | +10% · +15% · +20% · +25% · +30% — **on gloves** +5% · +10% · +15% · +20% · +20% |
+| **`haul`** | a share of what the work pays — a hex, or a pack | +10% · +15% · +20% · +25% · +30% |
 | **`travel`** | a share off the road clock | +10% · +15% · +20% · +25% · +30% |
 | **`seam`** | a share more of ONE named grade off the ground (§5.3) | +10% · +10% · +20% · +20% · +30% |
 
@@ -1992,11 +1992,19 @@ about the ceiling: a second haul line is worth less than the first, and
 line-locked like everything else on a tool (§8 rule 1) — a lucky axe fattens a
 felling trip and does nothing to a seam.
 
-**Gloves haul on a shorter ladder**, 5% to 20% in the same fives. Hands are not
-what takes material out of a hex — the tool is (§7.3), and the coat and the
-boots are what carry it home — so a glove that hauled as well as a coat would
-be saying the bench piece is a mining piece. Four steps across five rungs, so
-the top two share; that is tuning rather than a rule.
+**Of the three worn pieces, only the GLOVES haul**, because the glove is the
+hand and the hand is what picks a thing up. It is the same argument that gives
+the glove the gather's `seam` line — gathering has no tool, so the glove is the
+tool (§4.0/§7.3) — and it is the only one of the worn three that argument
+reaches.
+
+*(A coat and a pair of boots hauled too, on the reasoning that they are what
+carries it home. That was carrying doing the work of taking: three of the four
+worn slots asking one question, and a glove kept on a shorter ladder — 5% to
+20% — so that it could not out-haul a coat. Needing that clamp is the tell that
+the coat was the odd one, not the glove. Both are gone together, and the glove
+is on the full ladder now: exclusivity was the change, and leaving it short
+would have made it a nerf.)*
 
 **A `durability` line is rolled as a share and stored as points**, and both
 halves are deliberate. The share keeps it worth the same on a 40-point stone
@@ -2034,8 +2042,8 @@ One rule, and it is §8's usual one: **what is the piece FOR.**
 |---|---|
 | **Gathering tool** | `attack` · `durability` · `haul` · `seam` (one per material) |
 | **Weapon** | `attack` · `defense` · `durability` · `haul` · `cooldown` · `seam` — what a body gives up (§9.5.8) |
-| **Armor** | `attack` · `defense` · `durability` · `haul` |
-| **Gloves** | the same, plus `seam` — the gather table's own (§4.0) |
+| **Armor** | `attack` · `defense` · `durability` |
+| **Gloves** | the same, plus `haul` and `seam` — the gather table's own (§4.0) |
 | **Boots** | the same, plus `travel` |
 
 …and any of them may, rarely, come out unbreakable.
@@ -2136,14 +2144,16 @@ rule 5 keeps combat off a tool entirely — so a second name for the one number 
 a thing to decode rather than a distinction being made. The distinction is a
 rule about what the number *means*, and rules live here.
 
-**Everything hauls, and the slot decides WHAT it hauls.** A tool's haul is its
-own line's (§7.3); a **weapon's haul is the fight's** — more comes off the pack
-(§9.5.8); worn gear is in both, which is §9.5.4's *one set with two axes*. §8
-rule 5 is what makes that safe rather than what forbids it: the rule was never
-"combat gear has no work", it is that combat gear may not stand in for a
-gathering tool. A sword is worth nothing down a mine and an axe is worth nothing
-in a fight — the same sentence pointed both ways, and both directions are
-enforced where the sum is taken.
+**Three things haul, and the slot decides WHAT.** A tool's haul is its own
+line's (§7.3); a **weapon's haul is the fight's** — more comes off the pack
+(§9.5.8); and a **glove's is whatever the hand picks up**, which is both, and
+which is why the glove is the only worn piece with one at all.
+
+§8 rule 5 is what makes the weapon's safe rather than what forbids it: the rule
+was never "combat gear has no work", it is that combat gear may not stand in for
+a gathering tool. A sword is worth nothing down a mine and an axe is worth
+nothing in a fight — the same sentence pointed both ways, and both directions
+are enforced where the sum is taken.
 
 *(It was weapon-excluded on the first reading of that rule, which is how a sword
 ended up the one piece of equipment with nothing to gain from being lucky. The

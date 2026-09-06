@@ -181,13 +181,11 @@ function rollBrief(def: ItemDef): RollBrief | null {
     }
 
     if (entry.kind === 'gain') {
-      // §8.0.1 -- gloves haul on a shorter ladder than everything else.
-      const table =
-        def.slot === 'gloves' && entry.stat === 'haul'
-          ? EQUIPMENT.optionGainValueGloves
-          : EQUIPMENT.optionGainValue
-      const low = table[first]
-      const high = table[last]
+      // §8.0.1 -- one ladder, and the tier is the step. A glove used to be
+      // short of it so that it could not out-haul a coat; the coat does not
+      // haul at all now.
+      const low = EQUIPMENT.optionGainValue[first]
+      const high = EQUIPMENT.optionGainValue[last]
 
       return low === high ? `+${pct(low)}` : `+${pct(low)}–${pct(high)}`
     }

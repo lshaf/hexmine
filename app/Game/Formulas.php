@@ -228,14 +228,16 @@ final class Formulas
         }
 
         if ($pick['kind'] === 'gain') {
-            // §8.0.1 -- a glove hauls on a shorter ladder. Hands are not what
-            // takes material out of a hex; the tool is, and the coat and the
-            // boots are what carry it home.
-            $table = ($def['slot'] ?? null) === 'gloves' && $pick['stat'] === Catalog::OPTION_HAUL
-                ? Balance::OPTION_GAIN_VALUE_GLOVES
-                : Balance::OPTION_GAIN_VALUE;
-
-            return $line($table[$tier]);
+            // §8.0.1 -- one ladder, ten to thirty in fives, and the tier IS the
+            // step: a player reads "+20% haul" and knows which rung of luck
+            // they got.
+            //
+            // A glove used to be short of it, 5 to 20, so that it could not
+            // out-haul a coat. The coat does not haul at all now -- the glove
+            // is the hand and the hand is what picks a thing up -- so the only
+            // reason the glove was held back has gone with it, and holding it
+            // back anyway would have made an exclusivity change into a nerf.
+            return $line(Balance::OPTION_GAIN_VALUE[$tier]);
         }
 
         // §9.5.4 -- attack and defense are solid numbers, so the line is one

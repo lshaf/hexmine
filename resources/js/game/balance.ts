@@ -329,16 +329,6 @@ export const EQUIPMENT = {
     epic: 0.25,
     legendary: 0.3,
   } as const,
-  /** §8.0.1 -- gloves haul on a shorter ladder: hands are not what takes
-   *  material out of a hex, and a glove that hauled like a coat would make the
-   *  bench piece a mining piece. */
-  optionGainValueGloves: {
-    common: 0.05,
-    uncommon: 0.1,
-    rare: 0.15,
-    epic: 0.2,
-    legendary: 0.2,
-  } as const,
   /** The most a whole kit's haul or travel lines come to together. */
   optionGainCap: 0.3,
   /** §8.0.1/§8.2 -- the chance a crafted piece comes out unbreakable: at zero

@@ -2921,11 +2921,12 @@ final class GameLoopTest extends TestCase
                             Balance::OPTION_SEAM_VALUE[$tiers[0]],
                             Balance::OPTION_SEAM_VALUE[end($tiers)],
                         ],
+                        // §8.0.1 -- one ladder for every haul and every travel
+                        // line. A glove was short of it while a coat hauled
+                        // too; only the glove hauls now, so there is nothing
+                        // for it to be held under.
                         'gain' => [
-                            min(
-                                Balance::OPTION_GAIN_VALUE_GLOVES[$tiers[0]],
-                                Balance::OPTION_GAIN_VALUE[$tiers[0]],
-                            ),
+                            Balance::OPTION_GAIN_VALUE[$tiers[0]],
                             Balance::OPTION_GAIN_VALUE[end($tiers)],
                         ],
                         'cooldown' => [
@@ -3149,8 +3150,8 @@ final class GameLoopTest extends TestCase
             ],
             $pool('ironwood_axe'),
         );
-        $this->assertSame(['attack', 'defense', 'durability', 'haul', 'travel'], $pool('marching_boots'));
-        $this->assertSame(['attack', 'defense', 'durability', 'haul'], $pool('ironwood_armor'));
+        $this->assertSame(['attack', 'defense', 'durability', 'travel'], $pool('marching_boots'));
+        $this->assertSame(['attack', 'defense', 'durability'], $pool('ironwood_armor'));
 
         // §9.5.8 -- and a weapon offers what comes off a body, which is the
         // fight's own version of a tool's seam. A pair of knives still guards nothing.
@@ -3703,6 +3704,16 @@ final class GameLoopTest extends TestCase
 
             $checked['worn']++;
 
+            // §8.0.1 -- of the three worn pieces only the GLOVES haul, because
+            // the glove is the hand and the hand is what picks a thing up. A
+            // coat and a pair of boots used to as well, on the reasoning that
+            // they carry it home -- which was carrying doing the work of
+            // taking, and it is why a glove had to be kept on a shorter ladder
+            // to stop it out-hauling a coat.
+            $slot === 'gloves'
+                ? $this->assertContains('haul', $stats, "{$key} cannot roll a haul")
+                : $this->assertNotContains('haul', $stats, "{$key} hauls, and it is not a glove");
+
             $seams = array_column(
                 array_filter($pool, static fn (array $p) => $p['kind'] === Catalog::OPTION_SEAM),
                 'stat',
@@ -3725,7 +3736,6 @@ final class GameLoopTest extends TestCase
                 $this->assertSame([], $seams, "{$key} favours a seam");
             }
 
-            $this->assertContains('haul', $stats, "{$key} cannot roll a haul");
             $this->assertNotContains('cooldown', $stats, "{$key} shortens a cooldown");
             // Boots walk. A coat does not.
             $slot === 'boots'
@@ -3781,9 +3791,6 @@ final class GameLoopTest extends TestCase
         foreach (Balance::OPTION_GAIN_VALUE as $tier => $share) {
             $this->assertMatchesRegularExpression("/optionGainValue: \{[^}]*{$tier}: {$share},/s", $ts, "optionGainValue.{$tier}");
         }
-        foreach (Balance::OPTION_GAIN_VALUE_GLOVES as $tier => $share) {
-            $this->assertMatchesRegularExpression("/optionGainValueGloves: \{[^}]*{$tier}: {$share},/s", $ts, "optionGainValueGloves.{$tier}");
-        }
         $this->assertStringContainsString('optionGainCap: '.Balance::OPTION_GAIN_CAP, $ts);
         $this->assertStringContainsString(
             'optionIndestructibleChance: '.Balance::OPTION_INDESTRUCTIBLE_CHANCE,
@@ -3793,6 +3800,10 @@ final class GameLoopTest extends TestCase
         // And the percentage machinery is gone from both sides rather than
         // dormant on one: a band nothing rolls is a promise nothing keeps.
         $this->assertStringNotContainsString('optionValue:', $ts);
+        // §8.0.1 -- and the glove's short haul ladder with them, for the same
+        // reason: only the glove hauls now, so a second table it could be held
+        // under is a number nothing reads.
+        $this->assertStringNotContainsString('optionGainValueGloves', $ts);
         $this->assertStringNotContainsString('optionScopedMultiplier', $ts);
         $this->assertFalse(defined(Balance::class.'::OPTION_VALUE'));
         $this->assertFalse(defined(Balance::class.'::OPTION_SCOPED_MULTIPLIER'));

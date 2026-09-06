@@ -562,7 +562,15 @@ export function optionRollsFor(def: ItemDef): OptionRoll[] {
   }
 
   pool.push({ stat: 'durability', kind: 'durability' })
-  pool.push({ stat: 'haul', kind: 'gain' })
+
+  // §8.0.1 -- what hauls, and it is not everything. A tool's haul is its own
+  // line's, a weapon's is the fight's, and of the three worn pieces only the
+  // GLOVES have one -- the glove is the hand, and the hand is what picks a
+  // thing up. Mirrors Catalog::optionRollsFor().
+  if (def.slot !== 'armor' && def.slot !== 'boots') {
+    pool.push({ stat: 'haul', kind: 'gain' })
+  }
+
   if (def.slot === 'boots') pool.push({ stat: 'travel', kind: 'gain' })
   if (def.slot === 'weapon') {
     pool.push({ stat: 'cooldown', kind: 'cooldown' })

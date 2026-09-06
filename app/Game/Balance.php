@@ -1409,24 +1409,6 @@ final class Balance
     ];
 
     /**
-     * §8.0.1 -- gloves haul on a shorter ladder, 5% to 20% in the same fives.
-     *
-     * Hands are not what takes material out of a hex -- the tool is (§7.3), and
-     * the coat and the boots are what carry it home. A glove that hauled as
-     * well as a coat would be saying the bench piece is a mining piece.
-     *
-     * Four steps across five rungs, so the top two share: a legendary glove is
-     * a legendary glove for its other lines. Tuning, not a rule.
-     */
-    public const OPTION_GAIN_VALUE_GLOVES = [
-        'common' => 0.05,
-        'uncommon' => 0.10,
-        'rare' => 0.15,
-        'epic' => 0.20,
-        'legendary' => 0.20,
-    ];
-
-    /**
      * §5.3 / §8.0.1 -- how much likelier a favoured grade is to come up.
      *
      * THREE values and not five, because three is what the line is: ten, twenty
