@@ -236,26 +236,24 @@ const wearNote = computed(() =>
 )
 
 /**
- * §9.5.8 -- what it pays, as pips like every other price list on this card.
+ * §9.5.8 -- what it pays, in the same flat run of pips every verb here uses.
  *
- * Named, never with odds: odds would be a spreadsheet, and the words in front
- * of them (always, often, rarely) are the whole of what a player can act on.
- * Gold leads because it is the one drop that needs no strap (§7.6).
+ * Most likely first, exactly as a seam's kinds are: the plate and the trophy
+ * come off every win, the ichor often, the grade above it rarely. It carried
+ * its own always/often/rarely column for a while, which was a table where the
+ * rest of the card has a list -- and the odds are already the order.
+ *
+ * Gold is not among them, because gold needs no strap (§7.6). That is what
+ * makes it worth a sentence in the breakdown rather than a pip out here.
  */
-const packPays = computed(() => {
+const packDrops = computed(() => {
   const d = pack.value
   if (!d) return []
 
-  const mat = (key: string) => MATERIALS[key as MaterialKey] ?? null
-
-  return [
-    { when: 'Always', mats: [mat(d.plate)] },
-    { when: 'Often', mats: [mat(d.ichor)] },
-    ...(d.rareSpoil ? [{ when: 'Rarely', mats: [mat(d.rareSpoil)] }] : []),
-    { when: 'Leavings', mats: [mat(TROPHY_BY_TIER[d.tier] ?? '')] },
-  ]
-    .map((r) => ({ ...r, mats: r.mats.filter(Boolean) }))
-    .filter((r) => r.mats.length)
+  return [d.plate, TROPHY_BY_TIER[d.tier], d.ichor, d.rareSpoil]
+    .filter((k): k is string => Boolean(k))
+    .map((k) => MATERIALS[k as MaterialKey])
+    .filter(Boolean)
 })
 
 /**
@@ -540,54 +538,15 @@ watch(open, (isOpen) => {
         </div>
 
         <div v-if="open && (tables.length || (mine && mat) || pack)" class="detail">
-          <!--
-            §9.5.2 -- what is STANDING here comes before what is under it.
-            A seam is what the hex is worth and a pack is what the hex is
-            about: nothing on the price list below matters while something is
-            looking at you (§9.5.3 refuses every verb on a pinned hex), so
-            reading it second would be reading it in the wrong order.
-
-            It carries no verdict and no clock. Whether you win is the
-            preview's (§9.5.5) and when it leaves is the pin's -- this is the
-            half that is true of the creature whoever is reading it, which is
-            exactly the half a card is for.
-          -->
-          <div v-if="pack" class="inset foe">
-            <div class="quarry">
-              <span class="mark" aria-hidden="true" v-html="monsterSpecimen(pack.key, 34)" />
-              <div class="grow">
-                <span class="label eyebrow">
-                  {{ pack.profile }} · tier {{ pack.tier }} · level {{ pack.level }}
-                </span>
-                <strong class="tiny name">{{ pack.name }}</strong>
-              </div>
-            </div>
-
-            <!-- §9.5.4/§9.5.5 -- the three solid numbers a fight is decided by,
-                 and the pool is one of them: durability IS the health bar on
-                 both sides of the exchange. -->
-            <div class="figures">
-              <span class="fig"><span class="label muted">Attack</span><strong class="readout">{{ pack.attack }}</strong></span>
-              <span class="fig"><span class="label muted">Defense</span><strong class="readout">{{ pack.defense }}</strong></span>
-              <span class="fig"><span class="label muted">Pool</span><strong class="readout">{{ pack.hp }}</strong></span>
-            </div>
-
-            <p class="note">{{ PROFILE_NOTE[pack.profile] }}</p>
-            <p v-if="wearNote" class="note wear">{{ wearNote }}</p>
-
-            <!-- The same pips the verbs use, because it is the same kind of
-                 thing: a list of what this hex can give up. Gold is not among
-                 them -- it needs no strap (§7.6), which is what makes it the
-                 one drop worth saying in words. -->
-            <p class="tiny muted coin">Pays {{ pack.gold[0] }}–{{ pack.gold[1] }} gold, which costs no strap.</p>
-
-            <div v-for="row in packPays" :key="row.when" class="pips">
-              <span class="label muted when">{{ row.when }}</span>
-              <span v-for="d in row.mats" :key="d.key" class="pip" :title="d.name">
-                <SvgIcon :svg="materialIcon(d, 18)" />{{ d.name }}
-              </span>
-            </div>
-          </div>
+          <!-- §9.5.2 -- the pack gets the lede the seam's material and the
+               animal get, and for the same reason: the row below is a price
+               list and this is what it is a price list FOR. Drawn as well as
+               named, because it is the drawing the player just tapped on the
+               map. -->
+          <p v-if="pack" class="tiny muted lede quarry">
+            <span class="mark" aria-hidden="true" v-html="monsterSpecimen(pack.key, 22)" />
+            {{ pack.name }} · {{ pack.profile }} · tier {{ pack.tier }}
+          </p>
 
           <!-- The line comes from the server, not from the material: a scrap
                haul still belongs to the hex's own line, §4.0. -->
@@ -606,6 +565,82 @@ watch(open, (isOpen) => {
             <span class="mark" aria-hidden="true" v-html="animalMark(animal.key, 22)" />
             {{ animal.name }} · {{ animal.grade }} rung · trains Hunting
           </p>
+
+          <!--
+            §9.5.2 -- a fight is a verb this hex answers to, so it is priced
+            like one: the same row, the same leader, the same chevron, the
+            same run of pips underneath.
+
+            **First, and that is not layout.** Nothing on the price list below
+            matters while something is looking at you -- §9.5.3 refuses every
+            verb on a pinned hex -- so a seam read before the pack standing on
+            it is a seam read in the wrong order.
+
+            What sits where the clock sits is the LEVEL, because it answers the
+            same question a clock does on the rows beneath: the one number that
+            says whether to bother reading the rest. And what is behind the tap
+            is what is behind it everywhere else here -- how that number was
+            arrived at.
+
+            It carries no verdict. Whether you win is the preview's (§9.5.5)
+            and when it leaves is the pin's; this is the half that is true of
+            the creature whoever is reading it, which is the half a card is
+            for.
+          -->
+          <div v-if="pack" class="inset verb fight">
+            <button
+              class="price"
+              type="button"
+              :aria-expanded="openVerb === 'fight'"
+              aria-controls="verb-fight"
+              @click="toggleVerb('fight')"
+            >
+              <span class="label muted">Fight</span>
+              <span class="leader" aria-hidden="true" />
+              <span class="readout clock">level {{ pack.level }}</span>
+              <span class="chevron small" :class="{ open: openVerb === 'fight' }" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="m6 15 6-6 6 6" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </span>
+            </button>
+
+            <div class="pips">
+              <span v-for="d in packDrops" :key="d.key" class="pip" :title="d.name">
+                <SvgIcon :svg="materialIcon(d, 18)" />{{ d.name }}
+              </span>
+            </div>
+
+            <!-- §9.5.4/§9.5.5 -- the three solid numbers a fight is decided
+                 by, read the way a mine's rate is read: a column of figures
+                 with the one that matters most at the foot of it. The pool is
+                 one of the three because durability IS the health bar on both
+                 sides of the exchange.
+
+                 Gold sits with them rather than in the pips above, because it
+                 is the one thing off a pack that needs no strap (§7.6) -- and
+                 a pip promises a strap. -->
+            <div v-if="openVerb === 'fight'" id="verb-fight" class="rates tiny">
+              <div class="row-between">
+                <span class="muted">Attack</span>
+                <span class="readout">{{ pack.attack }}</span>
+              </div>
+              <div class="row-between">
+                <span class="muted">Defense</span>
+                <span class="readout">{{ pack.defense }}</span>
+              </div>
+              <div class="row-between">
+                <span class="muted">Gold</span>
+                <span class="readout">{{ pack.gold[0] }}–{{ pack.gold[1] }}</span>
+              </div>
+              <div class="row-between rate">
+                <span>Its pool</span>
+                <span class="readout">{{ pack.hp }}</span>
+              </div>
+              <p class="note">{{ PROFILE_NOTE[pack.profile] }}</p>
+              <p v-if="wearNote" class="note">{{ wearNote }}</p>
+            </div>
+          </div>
 
           <!-- §4 / §7.3 -- one price line per verb, because this hex answers
                to both and each has its own clock: a dig takes the seam at the
@@ -1011,71 +1046,23 @@ watch(open, (isOpen) => {
   color: #7b8580;
 }
 
-/* §9.5.2 -- the pack, and the one block on this card that is not a price list.
+/* §9.5.2 -- and the fight is told apart the way every other verb here is:
+ * one word in its own colour, on a row that is otherwise identical.
  *
- * The FILL says so rather than a line: §13 is explicit that a border under a
- * clip-path does not follow the cut, and `.inset` is clipped -- a hairline here
- * comes out with two bare diagonal edges, which is the exact bug that section
- * exists to warn about. Dropping the line and letting the ground carry it is
- * the answer that section recommends, and it is the one already used everywhere
- * a chamfered thing needs to read as chosen.
+ * That is the card's own idiom -- `.rich` takes gold and `.gather` goes quiet
+ * -- and it is the whole reason this block needed no panel of its own. It had
+ * one, tinted ember, and a tinted panel inside a card of untinted panels is a
+ * different KIND of thing rather than a different verb, which is exactly the
+ * claim that was wrong: a fight is a verb this hex answers to.
  *
- * A trace of ember and no more. §13.3 spends ember on a state to deal with and
- * something standing on the hex is the only thing on this card that is one --
- * but a filled ember panel would be an alarm over a card the player opened on
- * purpose, and the block already holds the loudest mark here: the creature. */
-.foe {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  margin-bottom: 10px;
-  background: color-mix(in srgb, var(--ember) 13%, rgba(0, 0, 0, 0.28));
+ * Ember, because §13.3 spends it on a state to deal with and something
+ * standing on the hex is the only thing on this card that is one. */
+.verb.fight .label {
+  color: var(--ember);
 }
 
-.foe .quarry {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.foe .mark :deep(svg) {
-  display: block;
-}
-
-.foe .name {
-  display: block;
-  color: var(--vellum);
-}
-
-/* The three that decide a fight, on one line and evenly spaced, because they
-   are read against each other rather than one at a time. */
-.figures {
-  display: flex;
-  gap: 14px;
-}
-
-.fig {
-  display: flex;
-  align-items: baseline;
-  gap: 5px;
-}
-
-.foe .note {
-  margin: 0;
-}
-
-.foe .coin {
-  margin: 0;
-}
-
-/* §9.5.8 -- the odds word rides the row rather than heading it: four rows of
-   one pip each under four headings would be a table where a list belongs. */
-.foe .pips {
-  align-items: center;
-}
-
-.when {
-  min-width: 52px;
+.verb.fight + .verb {
+  margin-top: 8px;
 }
 
 /* §5.5 -- the animal's lede carries its drawing, so the mark rides the text

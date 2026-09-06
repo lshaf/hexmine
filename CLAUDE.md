@@ -2993,23 +2993,49 @@ by the same rule the map draws a pack under (§13.2): live state is read by
 standing near it, and a monster legible from four days away is the scanner §5.6
 exists to refuse.
 
-**What is standing here comes before what is under it.** The block sits above
-the price list, because nothing on that list matters while something is looking
-at you — §9.5.3 refuses every verb on a pinned hex — so reading the seam first
-would be reading it in the wrong order.
+**A fight is a verb this hex answers to, so it is priced like one.** The same
+row as Mine and Gather — a word on the left, a leader, a figure on the right, a
+chevron — with the creature named in a lede above it exactly as the seam's
+material and the hunt's animal are, and the same flat run of pips beneath.
+
+| | On a mine | On a fight |
+|---|---|---|
+| The lede | the material, and the line it trains | the creature, its profile and its tier |
+| The figure | the clock | **the level** |
+| The pips | what the seam can give up | what the pack drops |
+| Behind the tap | how the clock got to its number | how the level got to its |
+
+**The level sits where the clock sits because it answers the same question.**
+One number saying whether to bother reading the rest — which is what a clock is
+on the rows beneath it.
+
+*(It was a block of its own for a moment: a crest, a heading, a figures row and
+an always/often/rarely column, on a panel tinted ember. Every one of those was
+the card saying a fight is a different KIND of thing, and it is not — it is a
+different verb, and the card already had a grammar for those. The odds column
+went the same way: it was a table where the rest of the card has a list, and
+the odds are already the order.)*
+
+**Gold is the one drop that is not a pip**, because it needs no strap (§7.6) and
+a pip promises one. It goes in the breakdown with the figures.
+
+**First among the rows, and that is not layout.** Nothing on the price list
+matters while something is looking at you — §9.5.3 refuses every verb on a
+pinned hex — so a seam read before the pack standing on it is a seam read in the
+wrong order.
+
+**Ember on the one word, which is the card's own idiom.** `rich` takes gold and
+`gather` goes quiet; this takes ember, because §13.3 spends ember on a state to
+deal with and a pack is the only thing on this card that is one. A tinted panel
+was the wrong version of the same thought — it made the block a different kind
+of thing rather than a different verb, and (§13) a hairline would not have
+survived the clip anyway.
 
 **It says nothing about your side.** Whether you win and what it costs are the
 preview's; when it leaves and what a loss costs are the pin's. What the card
 holds is the half that is true of the creature whoever is reading it, which is
 the half a card is for — and it is why the level's *comparison* is drawn on the
 pin and only the number here.
-
-**The ground says it is different, not a line around it.** §13 is explicit that
-a border under a `clip-path` does not follow the cut, and an inset is clipped —
-so the block carries a trace of ember in its own fill instead. A trace, because
-§13.3 spends ember on a state to deal with and a pack is one, while a filled
-ember panel would be an alarm over a card the player opened on purpose. The
-block already holds the loudest mark on the card: the creature.
 
 #### 9.5.3 The pin — the road stops, and so does everything else
 
