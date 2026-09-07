@@ -28,11 +28,11 @@ final class BattleSkillTest extends TestCase
     use RefreshDatabase;
 
     /** A kit good enough that fights run long enough for skills to matter. */
-    private const ATTACK = 30;
+    private const ATTACK = 3000;
 
-    private const DEFENSE = 20;
+    private const DEFENSE = 2000;
 
-    private const POOL = 900;
+    private const POOL = 90000;
 
     /**
      * §9.5.4 -- three families, three skills each, and almost nothing shared.

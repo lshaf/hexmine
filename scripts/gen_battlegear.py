@@ -58,7 +58,15 @@ NPC_PRICE = {
     'cracked_carapace': 4, 'bone_plate': 7,
 }
 
-STATION_GOLD_PER_DURABILITY = {'village': 0.43, 'city': 1.40}
+# Balance::SOLID_SCALE -- the pair and the durability come out at this scale.
+# The 'pairs' and 'dur' ladders below stay written at the old one, because that
+# is the scale they are legible at, and are multiplied on the way out.
+SOLID_SCALE = 100
+
+# Gold per point of durability (§8.3's second valuation). Divided by the scale,
+# because the durability it multiplies is now a hundred times larger and the
+# PRICE must not be: a shelf tag is gold, and gold did not move.
+STATION_GOLD_PER_DURABILITY = {'village': 0.43 / SOLID_SCALE, 'city': 1.40 / SOLID_SCALE}
 
 SHOP_MATERIAL_MARKUP = 1.5
 
@@ -271,8 +279,13 @@ def key_for(name):
 
 
 def scale(n, factor):
-    """Zero stays zero: a slot that gives no attack does not start giving one."""
-    return 0 if n == 0 else max(1, round(n * factor))
+    """A grade's share of the rung's pair, at SOLID_SCALE.
+
+    Zero stays zero: a slot that gives no attack does not start giving one. The
+    floor is one point at the game's own scale rather than one raw unit, so the
+    smallest a pair can be is still the smallest number a player ever sees.
+    """
+    return 0 if n == 0 else max(SOLID_SCALE, round(n * factor * SOLID_SCALE))
 
 
 def inputs_for(group, rung_i, grade):
@@ -305,7 +318,7 @@ def items():
             for g, grade in enumerate(GRADES):
                 atk, dfn = group['pairs'][i]
                 label = group['names'][i][g]
-                durability = round(group['dur'][i] * DUR_SCALE[grade])
+                durability = round(group['dur'][i] * DUR_SCALE[grade]) * SOLID_SCALE
                 recipe = inputs_for(group, i, grade)
                 # Low is the rung's shop line as well, at the ONE rung a shelf
                 # reaches (§3.2/§8.0). Everything else is bench work -- which is

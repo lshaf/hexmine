@@ -2272,11 +2272,12 @@ final class GameLoopTest extends TestCase
         $this->assertSame(Balance::BARE_HAND_ATTACK, Formulas::gatherAttack(0));
         $this->assertSame(Balance::BARE_HAND_ATTACK, Formulas::gatherAttack(1));
         $this->assertSame(Balance::BARE_HAND_ATTACK, Formulas::gatherAttack(9));
-        $this->assertSame(Balance::BARE_HAND_ATTACK + 1, Formulas::gatherAttack(10));
-        $this->assertSame(Balance::BARE_HAND_ATTACK + 2, Formulas::gatherAttack(20));
+        $this->assertSame(Balance::BARE_HAND_ATTACK + Balance::SOLID_SCALE, Formulas::gatherAttack(10));
+        $this->assertSame(Balance::BARE_HAND_ATTACK + 2 * Balance::SOLID_SCALE, Formulas::gatherAttack(20));
 
         // The line skill stops where the line skill stops.
-        $capped = intdiv(Balance::SKILL_MAX_LEVEL, Balance::MINING_SKILL_LEVELS_PER_ATTACK);
+        $capped = intdiv(Balance::SKILL_MAX_LEVEL, Balance::MINING_SKILL_LEVELS_PER_ATTACK)
+            * Balance::SOLID_SCALE;
         $this->assertSame($capped, Formulas::skillAttack(Balance::SKILL_MAX_LEVEL));
         $this->assertSame($capped, Formulas::skillAttack(9999));
         $this->assertSame(
@@ -2326,7 +2327,7 @@ final class GameLoopTest extends TestCase
         // The cap is enforced where the rate is built, not only where the
         // nodes are added up. A rate is a bad place to find out a cap was
         // missed somewhere upstream.
-        $overrun = Formulas::mineTime($hex, $level, Balance::MINING_COMMON_ATTACK, 99);
+        $overrun = Formulas::mineTime($hex, $level, Balance::MINING_COMMON_ATTACK, Balance::SKILL_BITE_CAP * 99);
         $this->assertSame($tree['rate'], $overrun['rate'], 'the mine rate does not enforce SKILL_BITE_CAP');
 
         // A count, so a maxed coat could never clamp it away -- which is why
@@ -2549,11 +2550,11 @@ final class GameLoopTest extends TestCase
         $this->assertSame(0, Formulas::skillAttack(0));
         $this->assertSame(0, Formulas::skillAttack(1));
         $this->assertSame(0, Formulas::skillAttack(9));
-        $this->assertSame(1, Formulas::skillAttack(10));
+        $this->assertSame(Balance::SOLID_SCALE, Formulas::skillAttack(10));
 
-        $mine = Formulas::mineTime(Balance::TILE_HP_MIN, 1, 3);
+        $mine = Formulas::mineTime(Balance::TILE_HP_MIN, 1, Balance::MINING_COMMON_ATTACK);
         $this->assertSame(0, $mine['skillAttack']);
-        $this->assertSame(3.0, $mine['rate']);
+        $this->assertSame((float) Balance::MINING_COMMON_ATTACK, $mine['rate']);
     }
 
     /**
@@ -3040,22 +3041,25 @@ final class GameLoopTest extends TestCase
             'item_key' => 'ironwood_axe',
             'durability' => 100,
             'equipped' => true,
-            'options' => [['stat' => 'attack', 'value' => 5, 'kind' => 'flat']],
+            'options' => [['stat' => 'attack', 'value' => 500, 'kind' => 'flat']],
         ]);
 
         $def = Catalog::item('ironwood_axe');
         $bare = Formulas::toolAttack($def);
 
         $this->assertSame(
-            $bare + 5,
+            $bare + 500,
             $this->game->lineToolAttack($this->character->fresh(), 'woodcutting'),
             'a rolled line did not sharpen the axe',
         );
 
-        // A faster hex, and the same fight.
+        // A faster hex, and the same fight. A real hex rather than a small
+        // number: at SOLID_SCALE a few thousand hit points is under a minute
+        // of work either way, and §7.3's floor would have swallowed the whole
+        // difference this is here to measure.
         $this->assertLessThan(
-            Formulas::mineTime(3600, 0, $bare)['total'],
-            Formulas::mineTime(3600, 0, $bare + 5)['total'],
+            Formulas::mineTime(Balance::TILE_HP_MAX, 0, $bare)['total'],
+            Formulas::mineTime(Balance::TILE_HP_MAX, 0, $bare + 500)['total'],
         );
 
         $pair = Formulas::combatPair(

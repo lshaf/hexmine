@@ -180,9 +180,32 @@ final class Balance
      * 5,400 is thirty. That is the whole of what the numbers mean and the only
      * reason they are these numbers -- there is a test pinning it.
      */
-    public const TILE_HP_MIN = 2700;
+    /**
+     * Every solid number in the game is quoted at this scale.
+     *
+     * Attack, defense, hit points, durability, a hex's own pile of work, and
+     * every rolled line that adds to one of them. Not gold, not XP, and not
+     * anything already expressed as a percentage.
+     *
+     * **It buys granularity and nothing else.** The arithmetic is identical --
+     * a hex takes as long, a fight goes the same way, a kit lasts as many
+     * mines -- because every term in every ratio moved together. What changes
+     * is that a rolled line now has somewhere to land: `+1 to 2 attack` was two
+     * possible outcomes and read as a rounding error, where `+100 to 200` is a
+     * hundred and one of them and reads as luck. §8.0.1 asks luck to be
+     * legible, and two values cannot be.
+     *
+     * The whole reason it is written down rather than baked in is that a
+     * number left behind at the old scale is invisible: it does not fail, it
+     * quietly stops mattering. BATTLE_BAND was one -- a margin denominator,
+     * which at 20 against margins a hundred times larger would have pinned
+     * every fight to the odds clamp.
+     */
+    public const SOLID_SCALE = 100;
 
-    public const TILE_HP_MAX = 5400;
+    public const TILE_HP_MIN = 270000;
+
+    public const TILE_HP_MAX = 540000;
 
     /**
      * §5.3 -- what a grade of ground costs, as the rung it is named for.
@@ -207,10 +230,10 @@ final class Balance
      * and TypeScript generators cannot round apart (scripts/parity.ts).
      */
     public const TILE_HP_GRADE_ATTACK = [
-        'common' => 3,
-        'uncommon' => 6,
-        'rare' => 10,
-        'epic' => 14,
+        'common' => 300,
+        'uncommon' => 600,
+        'rare' => 1000,
+        'epic' => 1400,
     ];
 
     /**
@@ -247,7 +270,7 @@ final class Balance
      * minutes against a Stone Axe's fifteen, which made §12's step 5 -- buy the
      * axe, work the same hex, see the payoff -- a hex that got slower.
      */
-    public const BARE_HAND_ATTACK = 3;
+    public const BARE_HAND_ATTACK = 300;
 
     /**
      * §7.3 -- how many levels of the line buy one more point a second.
@@ -265,7 +288,7 @@ final class Balance
      *
      * It is above BARE_HAND_ATTACK, and that direction is a rule -- see there.
      */
-    public const MINING_COMMON_ATTACK = 3;
+    public const MINING_COMMON_ATTACK = 300;
 
     /** Exactly two mining slots per hex, §5.1. */
     public const SLOTS_PER_TILE = 2;
@@ -464,7 +487,7 @@ final class Balance
      * a rung beats its own tier around 60-80%, is a real risk one tier up
      * around 30-50%, and is properly outmatched two tiers up.
      */
-    public const BATTLE_BAND = 20;
+    public const BATTLE_BAND = 2000;
 
     /**
      * §9.5.5 -- the smallest a strike can ever be.
@@ -473,7 +496,7 @@ final class Balance
      * floor. A wall you cannot scratch would be a locked hex, and §9.5.3 says
      * fighting is always one of the two ways out.
      */
-    public const BATTLE_CHIP = 1;
+    public const BATTLE_CHIP = 100;
 
     /**
      * §9.5.5 -- and the floor scales with what is swinging, not just with the
@@ -570,15 +593,6 @@ final class Balance
     /** §9.5.4 -- a battle job's level is worth this fraction of itself, in both halves. */
     public const BATTLE_JOB_DIVISOR = 3;
 
-    /**
-     * §9.5.6 -- wear is the combat system.
-     *
-     * There is no health, so the cost of a fight lands on the gear and scales
-     * with how badly matched you were: a weapon wears on the gap to their
-     * defense, one random worn piece wears on the excess of their attack over
-     * its own. Matched, both cost `WEAR_BASE` and nothing more.
-     */
-    public const WEAR_BASE = 2;
 
     public const WEAR_PER_GAP = 0.4;
 
@@ -1039,7 +1053,7 @@ final class Balance
      * away by a good coat. Being flat is what makes it felt at the bottom of
      * the ladder, where the percentage never was.
      */
-    public const SKILL_BITE_CAP = 5;
+    public const SKILL_BITE_CAP = 500;
 
     /**
      * §5.3 + §7.4.3 -- how often a gathering tree takes the better thing off
@@ -1107,7 +1121,7 @@ final class Balance
      * business being worth more, because gear is the ladder §8 is built on and
      * the tree is meant to be a different road rather than a longer one.
      */
-    public const SKILL_PAIR_CAP = 12;
+    public const SKILL_PAIR_CAP = 1200;
 
     /**
      * §7.4.3 -- how much of a fight's bill a battle tree may spare the kit.
@@ -1333,11 +1347,11 @@ final class Balance
      * bottom of the ladder and a nice extra at the top.
      */
     public const OPTION_FLAT_VALUE = [
-        'common' => [1, 2],
-        'uncommon' => [1, 3],
-        'rare' => [2, 4],
-        'epic' => [3, 6],
-        'legendary' => [4, 8],
+        'common' => [100, 200],
+        'uncommon' => [100, 300],
+        'rare' => [200, 400],
+        'epic' => [300, 600],
+        'legendary' => [400, 800],
     ];
 
     /**
@@ -1493,7 +1507,7 @@ final class Balance
      */
     public const SCRAP_XP_RATE = 0.25;
 
-    public const DRAIN_PER_MINE = 1;
+    public const DRAIN_PER_MINE = 100;
 
     public const DRAIN_PER_RAID = 4;
 
@@ -1523,8 +1537,16 @@ final class Balance
      * Declared here and computed in scripts/gen_battlegear.py, which cannot read
      * PHP. A test asserts the catalog matches these numbers, so the two cannot
      * drift apart in silence.
+     *
+     * **Divided by SOLID_SCALE, because the durability it multiplies moved and
+     * the PRICE did not.** A shelf tag is gold, and gold is not on that scale
+     * (§3.2 — it is its own currency with its own ladder). Left alone, every
+     * stocked piece would have cost a hundred times what it does.
      */
-    public const STATION_GOLD_PER_DURABILITY = ['village' => 0.43, 'city' => 1.40];
+    public const STATION_GOLD_PER_DURABILITY = [
+        'village' => 0.43 / self::SOLID_SCALE,
+        'city' => 1.40 / self::SOLID_SCALE,
+    ];
 
     public const SHOP_MATERIAL_MARKUP = 1.5;
 

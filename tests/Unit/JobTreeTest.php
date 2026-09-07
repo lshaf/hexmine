@@ -544,7 +544,15 @@ final class JobTreeTest extends TestCase
             // §9.5.4 -- and the same twenty points, split into the same three
             // shapes the weapons have. A sword trades the peak for evenness,
             // which is what balanced means.
-            $this->assertSame(20, array_sum($pair), "{$job} does not spend twenty points");
+            //
+            // Twenty POINTS, at the scale a point is quoted in (§7.3's
+            // SOLID_SCALE): the budget is what it always was, said in the units
+            // the rest of the game now says solid numbers in.
+            $this->assertSame(
+                20 * Balance::SOLID_SCALE,
+                array_sum($pair),
+                "{$job} does not spend twenty points",
+            );
 
             // How much of the armor bill a tree spares is now one of the things
             // that tells the three apart: a shieldbearer buys most of the cap,

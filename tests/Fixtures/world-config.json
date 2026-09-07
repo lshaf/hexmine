@@ -9,15 +9,15 @@
         "inner": 0.34,
         "mid": 0.64
     },
-    "hpMin": 2700,
-    "hpMax": 5400,
+    "hpMin": 270000,
+    "hpMax": 540000,
     "hpGradeAttack": {
-        "common": 3,
-        "uncommon": 6,
-        "rare": 10,
-        "epic": 14
+        "common": 300,
+        "uncommon": 600,
+        "rare": 1000,
+        "epic": 1400
     },
-    "commonAttack": 3,
+    "commonAttack": 300,
     "yieldMin": 3,
     "yieldMax": 8,
     "extractionsMin": 6,

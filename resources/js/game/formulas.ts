@@ -6,7 +6,7 @@
  * IMPORTANT: the server owns these numbers. This module exists so the client
  * can *predict* and display them; it must never be the authority.
  */
-import { EQUIPMENT, MINING, PROCESSING, SKILLS, equipLevel } from './balance'
+import { EQUIPMENT, MINING, PROCESSING, SKILLS, SOLID_SCALE, equipLevel } from './balance'
 import { ITEM_BY_KEY, LINE_STAT_LABEL, MATERIALS, SKILL_BY_KEY, STAT_LABEL, skillForSlot } from './catalog'
 import type {
   BuffScope,
@@ -386,7 +386,9 @@ export function mineTime(
 export function skillAttack(skillLevel: number): number {
   const level = Math.max(0, Math.min(skillLevel, SKILLS.maxLevel))
 
-  return Math.floor(level / MINING.skillLevelsPerAttack)
+  // At SOLID_SCALE, like every other term in the rate: a whole point of skill
+  // has to be worth a whole point of tool. Mirrors Formulas::skillAttack().
+  return Math.floor(level / MINING.skillLevelsPerAttack) * SOLID_SCALE
 }
 
 /**

@@ -4,6 +4,21 @@
  * a balance pass never means grepping the codebase.
  */
 
+/**
+ * Every solid number in the game is quoted at this scale.
+ *
+ * Attack, defense, hit points, durability, a hex's own pile of work, and every
+ * rolled line that adds to one of them. Not gold, not XP, and nothing already
+ * expressed as a percentage.
+ *
+ * It buys granularity and nothing else: the arithmetic is identical because
+ * every term in every ratio moved together. What changes is that a rolled line
+ * has somewhere to land -- `+1 to 2` was two possible outcomes and read as a
+ * rounding error, where `+100 to 200` is a hundred and one of them and reads as
+ * luck. Mirrors Balance::SOLID_SCALE.
+ */
+export const SOLID_SCALE = 100
+
 export const MINUTE = 60_000
 export const HOUR = 60 * MINUTE
 
@@ -48,12 +63,12 @@ export const MAP = {
 export const MINING = {
   /** §7.3 -- a hex's HP, which is the only thing the world rolls for it.
    *  2,700 is fifteen minutes for the common rung with nothing learned yet. */
-  hpMin: 2700,
-  hpMax: 5400,
+  hpMin: 270000,
+  hpMax: 540000,
   /** §5.3 -- the tool rung each grade of ground is measured at. Base ground is
    *  the common rung and comes through untouched; every grade above it costs
    *  what its own rung is worth, so better ground asks for a better tool. */
-  hpGradeAttack: { common: 3, uncommon: 6, rare: 10, epic: 14 },
+  hpGradeAttack: { common: 300, uncommon: 600, rare: 1000, epic: 1400 },
   /** §5.1 -- hauls a hex holds, inversely to what one haul is worth. A count,
    *  never a chance: a seam you can read is a seam you can decide about. */
   extractionsMin: 6,
@@ -66,12 +81,12 @@ export const MINING = {
   /** §4.0 -- what bare hands manage per second. GATHERING's rate and no other
    *  verb's: a seam wants a pick and a herd wants a bow, and neither has a
    *  bare-handed mode to fall back on. */
-  bareHandAttack: 2,
+  bareHandAttack: 300,
   /** §7.3 -- levels of the line that buy one more point a second. Floored, so
    *  a character who has learned nothing adds nothing. */
   skillLevelsPerAttack: 10,
   /** §8.3 -- the common rung, which every hex's HP is measured against. */
-  commonAttack: 3,
+  commonAttack: 300,
   /** Exactly two mining slots per hex, §5.1. */
   slotsPerTile: 2,
   /** Depleted tiles regrow after ~9h, §5.1. */
@@ -208,7 +223,7 @@ export const SKILLS = {
    * cannot clamp it away. Five is about one rung of §8.0's tool ladder, which
    * is the same bargain SKILL_PAIR_CAP strikes on the combat side.
    */
-  biteCap: 5,
+  biteCap: 500,
   xpForLevel: (level: number) => Math.round(45 * Math.pow(level, 1.4)),
 } as const
 
@@ -294,11 +309,11 @@ export const EQUIPMENT = {
    *  percentage climbs toward a ceiling nobody can see, and a line is luck,
    *  which has to be legible. */
   optionFlatValue: {
-    common: [1, 2],
-    uncommon: [1, 3],
-    rare: [2, 4],
-    epic: [3, 6],
-    legendary: [4, 8],
+    common: [100, 200],
+    uncommon: [100, 300],
+    rare: [200, 400],
+    epic: [300, 600],
+    legendary: [400, 800],
   } as const,
   /** §8.0.1 -- a durability line, as a share of the piece's own max. Rolled as
    *  a share and stored as points, so it is worth the same on a 40-point axe
@@ -338,7 +353,7 @@ export const EQUIPMENT = {
    *  stat contributes value * falloff^(n-1). */
   stackFalloff: 0.5,
   /** Durability drain per use, §8.1 rule 3. Raiding drains faster than mining. */
-  drainPerMine: 1,
+  drainPerMine: 100,
   drainPerRaid: 4,
   /** Discard returns a small % salvage, §8.2. */
   salvageRate: 0.25,

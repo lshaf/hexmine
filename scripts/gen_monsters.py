@@ -107,11 +107,16 @@ BIOMES = ['forest', 'mountain', 'badlands', 'grassland']
 
 
 def stats(tier, profile):
-    """Attack, defense, wear bias and gold, all off (tier, profile)."""
+    """Attack, defense, wear bias and gold, all off (tier, profile).
+
+    The pair comes out at SOLID_SCALE and the GOLD does not: gold is §3.2's own
+    currency with its own ladder and its own prices, and scaling it here would
+    have been a hundredfold inflation wearing a refactor's clothes.
+    """
     atk, dfn = PAIR[(tier, profile)]
     wear = WEAR[tier] if profile == 'swift' else 1.0
 
-    return atk, dfn, wear, GOLD[tier]
+    return atk * SOLID_SCALE, dfn * SOLID_SCALE, wear, GOLD[tier]
 
 
 # §9.5.5 -- what a monster has to be worked through, in durability.
@@ -127,8 +132,15 @@ HP_BY_TIER = {1: 45, 2: 105, 3: 160, 4: 240}
 HP_BY_PROFILE = {'brute': 1.15, 'carapace': 0.9, 'swift': 1.0}
 
 
+# Balance::SOLID_SCALE -- every solid number in the game is quoted at this
+# scale, so a monster's three are too. It buys granularity and nothing else:
+# the ladders below are written at the old scale because that is the scale they
+# are legible at, and multiplied on the way out.
+SOLID_SCALE = 100
+
+
 def hp(tier, profile):
-    return int(round(HP_BY_TIER[tier] * HP_BY_PROFILE[profile]))
+    return int(round(HP_BY_TIER[tier] * HP_BY_PROFILE[profile])) * SOLID_SCALE
 
 
 # ------------------------------------------------------------- the level
@@ -147,7 +159,12 @@ LEVEL_NEXT = {1: 'uncommon', 2: 'rare', 3: 'epic', 4: 'legendary'}
 
 
 def threat(tier, profile):
-    """Attack, guard and staying power in one figure. Ordering only."""
+    """Attack, guard and staying power in one figure. Ordering only.
+
+    Scale-invariant by construction: level() normalises it against its own
+    tier's spread, so quoting the three at SOLID_SCALE moves every term of the
+    fraction and the ladder comes out identical.
+    """
     atk, dfn, _, _ = stats(tier, profile)
     return atk + dfn + hp(tier, profile) / 3
 

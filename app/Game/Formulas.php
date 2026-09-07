@@ -1312,7 +1312,10 @@ final class Formulas
     {
         $level = max(0, min($skillLevel, Balance::SKILL_MAX_LEVEL));
 
-        return intdiv($level, Balance::MINING_SKILL_LEVELS_PER_ATTACK);
+        // At SOLID_SCALE, like every other term in the rate. A whole point of
+        // skill has to be worth a whole point of tool, or the ten points a
+        // maxed line is worth would be a hundredth of the cheapest axe.
+        return intdiv($level, Balance::MINING_SKILL_LEVELS_PER_ATTACK) * Balance::SOLID_SCALE;
     }
 
     /**

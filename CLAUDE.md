@@ -1159,6 +1159,36 @@ road to the top rather than a longer one**, which is the same bargain
 `SKILL_PAIR_CAP` strikes on the combat side — five is about one rung of §8.0's
 ladder and never a tier of it.
 
+**Every solid number is quoted at `Balance::SOLID_SCALE` (100).** Attack,
+defense, hit points, durability, a hex's own pile of work, and every rolled line
+that adds to one of them. Not gold, not XP, and nothing already a percentage.
+
+**It buys granularity and nothing else.** The arithmetic is identical — a hex
+takes as long, a fight goes the same way, a kit lasts as many mines — because
+every term in every ratio moved together. What changes is that a rolled line has
+somewhere to land: `+1 to 2 attack` was two possible outcomes and read as a
+rounding error, where `+100 to 200` is a hundred and one of them and reads as
+luck. §8.0.1 asks luck to be legible, and two values cannot be.
+
+**The figures below are written at the old scale on purpose**, because that is
+the scale they are legible at: 2,700 hp and attack 3 are the sentence *fifteen
+minutes at the common rung*, and 270,000 over 300 is the same sentence in a
+worse font. Multiply by the scale to get what is in the code.
+
+**The thing to watch is a number left behind**, because it does not fail — it
+quietly changes a ratio. Three were nearly missed, and each would have been
+invisible in a different way:
+
+| Left behind | What it would have done |
+|---|---|
+| `BATTLE_BAND` | A margin denominator. At 20 against margins a hundred times larger, every matchup pins to the odds clamp and the preview becomes "you win" and "you don't". |
+| `TILE_HP_GRADE_ATTACK` | A table of tool attacks used as a numerator over `MINING_COMMON_ATTACK`. Left at 3/6/10/14 against a divisor of 300, it divided every hex's work by a hundred. |
+| `STATION_GOLD_PER_DURABILITY` | Gold per point of durability. The durability moved and **gold did not**, so it is divided by the scale — otherwise every shelf tag is a hundred times what it was. |
+
+The last of those is the general rule: **anything that converts between a solid
+number and something that did not move has to divide.** Gold, XP and every
+percentage stayed exactly where they were.
+
 **HP is what the world rolls, and it is the only thing it rolls.** There used to
 be a range of *seconds* that a reference rate converted into work, which meant a
 tile carried its answer rather than its question: the same fact stored once as a
@@ -2002,7 +2032,7 @@ to be legible.
 
 | Kind | What it is | Band by tier |
 |---|---|---|
-| **the pair** | solid `attack` or `defense` (§9.5.4), simply added | +1–2 · +1–3 · +2–4 · +3–6 · +4–8 |
+| **the pair** | solid `attack` or `defense` (§9.5.4), simply added | +100–200 · +100–300 · +200–400 · +300–600 · +400–800 |
 | **`durability`** | points on this copy's own ceiling (§8.2) | 3–5% · 4–7% · 5–9% · 7–12% · 9–15% **of its own max** |
 | **`cooldown`** | whole rounds off **every** skill the weapon's family carries (§9.5.9) | −1 · −1 · −1 · −2 · −2 |
 | **`haul`** | a share of what the work pays — a hex, or a pack | +10% · +15% · +20% · +25% · +30% |
