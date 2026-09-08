@@ -467,6 +467,16 @@ export const useGame = defineStore('game', () => {
     () => state.value?.skillPoints ?? { total: 0, spent: 0, available: 0 },
   )
   const jobLevels = computed(() => state.value?.jobLevels ?? [])
+
+  /**
+   * §7.1 -- the same list keyed by job, for the one thing that asks about a
+   * single job rather than reading the sheet: an equip gate. A tool and a
+   * weapon are gated on the job that swings them, and the chip that draws it
+   * has to be able to look one up without scanning an array per row.
+   */
+  const jobLevelMap = computed(() =>
+    Object.fromEntries(jobLevels.value.map((j) => [j.key, j.level])),
+  )
   const ownedNodes = computed(() => new Set(state.value?.nodes ?? []))
 
   /**
@@ -1324,7 +1334,7 @@ export const useGame = defineStore('game', () => {
     // derived
     character, timeScale, bag, bagFull, inventory, equipment, skills, bonuses, toolYield, jobs, readyJobs,
     consumables, buffs,
-    tree, skillPoints, jobLevels, ownedNodes, skillRanks, rankOf,
+    tree, skillPoints, jobLevels, jobLevelMap, ownedNodes, skillRanks, rankOf,
     rename,
     questDefs, quests, questsReady, questReward,
     dailyDefs, dailies, dailiesResetAt,

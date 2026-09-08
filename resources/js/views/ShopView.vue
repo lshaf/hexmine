@@ -303,7 +303,7 @@ const owned = (key: string) => game.equipment.filter((e) => e.key === key).lengt
               <!-- §9.5.4 -- one row of chips, the same everywhere. A shopper
                    choosing between a shield and a wand is choosing on the pair,
                    so the pair is on the shelf. -->
-              <StatChips :def="item" :level="game.state?.character.level" />
+              <StatChips :def="item" :level="game.state?.character.level" :job-levels="game.jobLevelMap" />
               <span class="chip tiny">{{ item.maxDurability }} dur</span>
               <span v-if="owned(item.key)" class="tiny muted">owned ×{{ owned(item.key) }}</span>
             </div>

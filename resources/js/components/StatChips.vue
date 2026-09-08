@@ -34,8 +34,17 @@ const props = withDefaults(
      * nobody for it to be a problem for.
      */
     level?: number
+    /**
+     * §7.1 -- and the reader's job levels, for the pieces gated on one.
+     *
+     * A tool and a weapon answer to the job that swings them, so the career's
+     * number is the wrong one to hold their gate up against. Optional for the
+     * same reason `level` is: the almanac and the battle bench answer with no
+     * wallet at all, and a gate with nobody behind it is drawn plain.
+     */
+    jobLevels?: Record<string, number>
   }>(),
-  { options: () => [], pairOnly: false, level: undefined },
+  { options: () => [], pairOnly: false, level: undefined, jobLevels: undefined },
 )
 
 const chips = computed(() => {
@@ -44,9 +53,19 @@ const chips = computed(() => {
   return props.pairOnly ? all.filter((c) => c.label !== null) : all
 })
 
-/** §13.3 -- ember is for a state to deal with, and this is the only one here. */
-const short = (chip: StatChip) =>
-  chip.gate !== undefined && props.level !== undefined && props.level < chip.gate
+/**
+ * §13.3 -- ember is for a state to deal with, and this is the only one here.
+ *
+ * Which of the reader's two levels answers it is the chip's own business: a
+ * job-gated piece names its job, and a worn one names none.
+ */
+const short = (chip: StatChip) => {
+  if (chip.gate === undefined) return false
+
+  const mine = chip.gateJob ? props.jobLevels?.[chip.gateJob] : props.level
+
+  return mine !== undefined && mine < chip.gate
+}
 </script>
 
 <template>

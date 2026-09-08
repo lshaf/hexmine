@@ -7172,12 +7172,33 @@ class GameService
         // levelling, where a shop that refuses to sell it is a wall with
         // nothing behind it. A crafted piece, a looted one and a bought one all
         // arrive in the bag and all wait there.
-        $need = Balance::equipLevel((string) ($def['rarity'] ?? 'common'));
-        if ((int) $character->level < $need) {
-            throw new GameException(
-                "{$def['name']} is {$def['rarity']} gear. Level {$need} to wear it.",
-                'level',
-            );
+        //
+        // Two ladders, because two kinds of piece answer to two different
+        // things. A tool and a weapon are gated on the JOB that swings them --
+        // an axe on Woodcutting, a sword on Swordhand -- so a rung cannot be
+        // reached around by work the piece has nothing to do with. Worn gear
+        // answers to no line and no family, so it keeps the career's own level.
+        $rarity = (string) ($def['rarity'] ?? 'common');
+        $gateJob = Catalog::equipGateJob($def);
+
+        if ($gateJob !== null) {
+            $need = Balance::equipJobLevel($rarity);
+            $have = (int) ($this->jobLevels($character)[$gateJob] ?? 1);
+            if ($have < $need) {
+                $job = Jobs::JOBS[$gateJob]['name'] ?? $gateJob;
+                throw new GameException(
+                    "{$def['name']} is {$rarity} gear. {$job} level {$need} to wear it.",
+                    'level',
+                );
+            }
+        } else {
+            $need = Balance::equipLevel($rarity);
+            if ((int) $character->level < $need) {
+                throw new GameException(
+                    "{$def['name']} is {$rarity} gear. Level {$need} to wear it.",
+                    'level',
+                );
+            }
         }
 
         // One item per slot.

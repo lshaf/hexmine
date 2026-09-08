@@ -1220,7 +1220,7 @@ final class Balance
     }
 
     /**
-     * §7.1/§8.0 -- the character level each rung may be worn at.
+     * §7.1/§8.0 -- the character level each WORN rung may be put on at.
      *
      * **Level unlocks access, not power**, which is what §7.1 has always said
      * it does -- this is the same rule pointed at the wardrobe. A rung is not
@@ -1236,6 +1236,11 @@ final class Balance
      * reachable by crafting without spending. It is later, not denied, and the
      * binding constraint on a rung was always the materials and the bench.
      *
+     * **Armor, boots and gloves only.** A coat answers to no line and to no
+     * weapon family, so there is no job standing behind it and the character's
+     * own level is the honest gate. The five tools and the weapon do have one,
+     * and they read EQUIP_JOB_LEVEL below instead.
+     *
      * Measured against §7.4.4's curve at a career's real income, the gates fall
      * at about half a day, three days, two weeks, seven weeks and three and a
      * half months. Common is level 1 because §12's opening arc is worked in it.
@@ -1250,6 +1255,43 @@ final class Balance
     ];
 
     /**
+     * §7.1/§8.0 -- the JOB level each rung of a tool or a weapon wants.
+     *
+     * The piece that does the work is gated on the job that does it: an axe on
+     * Woodcutting, a sword on Swordhand (§9.5.4 makes the family in the slot
+     * your class). That is the same sentence §8 rule 1 and §8 rule 5 already
+     * make about where a piece pays out, said about where it may be carried --
+     * a pickaxe is worth nothing in a fight, and a Swordhand's twenty levels
+     * are worth nothing toward one.
+     *
+     * It is a **better** gate than the character's own, and for the reason §7.1
+     * gives: a character level is one number covering nine slots, so grinding
+     * any one thing unlocked all of them. A job level cannot be reached around
+     * by work the piece has nothing to do with -- an epic pickaxe wants a miner
+     * rather than somebody who has walked a long way, and §2's sybil arithmetic
+     * gets worse again, because a farm now has to level five lines rather than
+     * one character.
+     *
+     * The numbers are a different ladder because the scale is: a job stops at
+     * `JOB_MAX_LEVEL` where a career runs to 100. Common is 1 for §12's sake,
+     * and unique at 28 is the last thing a job has left to give.
+     *
+     * Uncommon is 4 rather than 3 for §9.5.2 rather than for anything here. A
+     * monster's level is quoted on this ladder and placed inside its own tier's
+     * band; half of a two-point band cannot separate three profiles, so the
+     * rim's five would have come out as two numbers rather than three. There is
+     * a test.
+     */
+    public const EQUIP_JOB_LEVEL = [
+        'common' => 1,
+        'uncommon' => 4,
+        'rare' => 8,
+        'epic' => 14,
+        'legendary' => 22,
+        'unique' => 28,
+    ];
+
+    /**
      * Derived from the rung and never stored on the item.
      *
      * A column on a hundred catalog rows is a hundred chances to disagree with
@@ -1259,6 +1301,12 @@ final class Balance
     public static function equipLevel(string $rarity): int
     {
         return self::EQUIP_LEVEL[$rarity] ?? 1;
+    }
+
+    /** The same, for the pieces that answer to a job rather than to a career. */
+    public static function equipJobLevel(string $rarity): int
+    {
+        return self::EQUIP_JOB_LEVEL[$rarity] ?? 1;
     }
 
     /**

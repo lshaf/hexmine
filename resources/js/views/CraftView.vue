@@ -520,7 +520,7 @@ const emptyNote = computed(() => {
                  chosen between, and the chips are the choice. One component
                  draws them everywhere, so a piece reads the same on every screen. -->
             <div class="row tiny stats">
-              <StatChips :def="item" :level="game.state?.character.level" />
+              <StatChips :def="item" :level="game.state?.character.level" :job-levels="game.jobLevelMap" />
               <span class="chip tiny">{{ lifespan(item) }}</span>
               <span v-if="item.tradeable" class="chip tiny chip-nft">NFT</span>
             </div>

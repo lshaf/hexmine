@@ -1029,35 +1029,60 @@ floors. A whale can out-scale logistics but never out-damage a grinder.
 
 **And it unlocks the wardrobe, which is the same rule pointed somewhere new.**
 Every rung of §8.0's ladder has a level on it, and a piece above it cannot be
-worn:
+worn.
 
-| Rung | Level | About |
+**But it is the JOB's level that gates the piece that does the work, and the
+career's only where no job stands behind one.** Two ladders, because the piece
+that swings is answerable to the thing that swings it:
+
+| The piece | Answers to | Because |
 |---|---|---|
-| Common | **1** | §12's opening arc is worked in it, so it can never be gated |
-| Uncommon | **8** | half a day |
-| Rare | **20** | three days |
-| Epic | **38** | two weeks |
-| Legendary | **60** | seven weeks |
-| Unique | **80** | three and a half months |
+| A gathering tool | its own **line** — an axe to Woodcutting | §8 rule 1: a tool pays out on its line and no other |
+| A weapon | its **family's** battle job — a sword to Swordhand | §9.5.4: the family in the slot is your class |
+| Armor · boots · gloves | the **career** | they answer to no line and no family, so there is no job to ask |
 
-*(Measured against §7.4.4's curve at a career's real income.)*
+**A job level cannot be reached around by work the piece has nothing to do
+with**, and a character level can. That is the whole of the argument: one number
+covering nine slots meant grinding *anything* unlocked *everything*, so an epic
+pickaxe was earned by a long walk as readily as by mining. It wants a miner now.
+§2's sybil arithmetic gets worse again with it — a farm has to level five lines
+and three fighting styles rather than one character.
+
+| Rung | Job level | Career level, worn only |
+|---|---|---|
+| Common | **1** | **1** — §12's opening arc is worked in it, so it can never be gated |
+| Uncommon | **4** | **8** |
+| Rare | **8** | **20** |
+| Epic | **14** | **38** |
+| Legendary | **22** | **60** |
+| Unique | **28** | **80** |
+
+**Two ladders because it is two scales**, not because it is two rules: a job
+stops at `JOB_MAX_LEVEL` where a career runs to 100. The career column is
+measured against §7.4.4's curve at a career's real income — about half a day,
+three days, two weeks, seven weeks and three and a half months.
+
+**Uncommon is 4 rather than 3, and that is §9.5.2 rather than tuning.** A
+monster's level is quoted on this ladder and placed inside its tier's own band,
+so a band narrower than the three profiles it has to separate makes two of them
+read alike — which is the number going decorative on the rim, where a first
+fight happens. There is a test.
 
 **What it actually closes is a §3.3 hole.** Epic is the first rung that may be
 bought on the marketplace and withdrawn, and until now a wallet a day old could
-buy one and wear it. The gear is bought; the levelling is not. §2's sybil
-arithmetic gets worse for every wallet a farm has to *walk* to level 38 rather
-than fund.
+buy one and wear it. The gear is bought; the levelling is not.
 
 **It does not touch §8.1 rule 4.** Every rarity below unique is still reachable
 by crafting without spending — it is later, not denied, and what actually bound
 a rung was always the materials and the bench.
 
-**Derived from the rung, never written on the item.** A column on a hundred
-catalog rows is a hundred chances to disagree with the ladder, and the ladder is
-the only thing this depends on. The client mirrors the same function over the
-same table, and there is a test pinning the two — plus a third copy in
-`gen_monsters.py`, which is where the ladder is borrowed for something else
-entirely (§9.5.2).
+**Derived from the rung and the slot, never written on the item.** A column on a
+hundred catalog rows is a hundred chances to disagree with the ladder, and the
+ladder is the only thing this depends on — and *which* ladder falls out of the
+two maps §8 already keeps for the two other questions they answer. The client
+mirrors the same functions over the same tables, and there is a test pinning
+them — plus a third copy of the job ladder in `gen_monsters.py`, which is where
+it is borrowed for something else entirely (§9.5.2).
 
 **Refused at the belt, never at the counter.** Owning a thing you cannot yet use
 is a reason to keep levelling; a shop that will not sell it is a wall with
@@ -1065,6 +1090,11 @@ nothing behind it. A crafted piece, a looted one and a bought one all arrive in
 the bag and all wait there. On screen the rung's level is the **first chip** on
 every piece, ahead of what it is worth — what a piece does only matters once you
 can put it on — and it goes ember (§13.3) for a reader who cannot meet it.
+
+**The chip names the job, and only a worn piece still reads `lv`.** A career
+runs to 100 and a job stops at 30, so the two ladders look nothing alike and
+read exactly alike: *lv 14* on a pickaxe is the one figure in that row a player
+could hold up against the wrong number. *mining 14* and *sword 8* cannot be.
 
 **Every verb that finishes work pays character XP, and the road is the only
 exception.** A mine, a gather, a processing run, a craft and a won fight all
@@ -3071,25 +3101,37 @@ three figures is arithmetic a player does in their head every time. The level is
 the one number that says whether to read the rest.
 
 **It is quoted on the equipment ladder, and that is what makes it comparable.**
-§7.1 has always said character level unlocks access rather than power, which
-used to make it useless for this — the wardrobe gate changes that, because a
-level now bounds the *rung you may wear* and is therefore a real ceiling on how
-good a kit can be. A monster quoted on that scale is quoted against something
-true.
+§7.1 has always said a level unlocks access rather than power, which used to
+make it useless for this — the wardrobe gate changes that, because a level now
+bounds the *rung you may carry* and is therefore a real ceiling on how good a
+kit can be. A monster quoted on that scale is quoted against something true.
+
+**The BATTLE JOB's ladder, and the reader's battle job is what it is held up
+against.** §7.1 gates a weapon on the family in the slot, so that is the number
+bounding what can be carried into this fight — and a long-dug mine buys nothing
+against a pack, which is exactly the sentence the old career comparison could
+not say. Nothing in the slot reads as level nothing, which is the honest version
+of walking into a pack unarmed.
 
 The **tier picks the band**, anchored on §9.5.4's own measured ladder — common
 battle gear answers tier 1, rare answers tiers 1–3, epic and legendary answer
 the center — and **threat places it inside**, so a brute and a carapace of one
 tier are not the same number. Half the band, so the tiers stay apart on the eye:
 what separates a tier-2 from a tier-3 must never be smaller than what separates
-two tier-2s. It comes out 1–5 · 8–14 · 20–29 · 38–49, and there are tests
+two tier-2s. It comes out 1–3 · 4–6 · 8–11 · 14–18, and there are tests
 pinning the anchor, the absence of overlap, and that a harder peer reads higher.
+
+**Which is what sets the bottom of §7.1's job ladder.** Half of a two-point band
+cannot separate three profiles, so the rim's five would have come out as two
+numbers rather than three — the level going decorative on exactly the ground a
+first fight happens on. Uncommon is 4 rather than 3 for that and for nothing
+else.
 
 **Derived in the generator, never written by hand**, so retuning a monster's
 attack moves its level with it and cannot be forgotten.
 
-**It is a glance and never a promise.** §7.1's rule still holds: a level 60 in a
-work coat does not beat a level 38 pack. So the *number* is drawn wherever the
+**It is a glance and never a promise.** §7.1's rule still holds: a Swordhand 22
+in a work coat does not beat a level 14 pack. So the *number* is drawn wherever the
 monster is named — the Study plate, the bestiary — and the **comparison** is
 drawn only on the pin, where a decision is actually being made and the reader's
 own level is known. The Study plate saying nothing about your side is a rule

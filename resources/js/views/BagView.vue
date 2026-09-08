@@ -925,7 +925,7 @@ async function mend(item: OwnedItem): Promise<void> {
                       <strong class="tiny" :class="`rarity-${wornDef.rarity}`">{{ wornDef.name }}</strong>
                       <span class="tiny mono muted">{{ worn.durability }}/{{ worn.maxDurability || wornDef.maxDurability }}</span>
                     </div>
-                    <StatChips :def="wornDef" :options="worn.options ?? []" :level="game.state?.character.level" />
+                    <StatChips :def="wornDef" :options="worn.options ?? []" :level="game.state?.character.level" :job-levels="game.jobLevelMap" />
                   </div>
 
                   <div class="side on">
@@ -934,7 +934,7 @@ async function mend(item: OwnedItem): Promise<void> {
                       <strong class="tiny" :class="`rarity-${def.rarity}`">{{ def.name }}</strong>
                       <span class="tiny mono">{{ picked.item.durability }}/{{ def.maxDurability }}</span>
                     </div>
-                    <StatChips :def="def" :options="picked.item.options ?? []" :level="game.state?.character.level" />
+                    <StatChips :def="def" :options="picked.item.options ?? []" :level="game.state?.character.level" :job-levels="game.jobLevelMap" />
                   </div>
 
                   <div class="moves">
@@ -952,7 +952,7 @@ async function mend(item: OwnedItem): Promise<void> {
                   </div>
                   <div class="kv">
                     <span class="eyebrow">Carries</span>
-                    <StatChips :def="def" :options="picked.item.options ?? []" :level="game.state?.character.level" />
+                    <StatChips :def="def" :options="picked.item.options ?? []" :level="game.state?.character.level" :job-levels="game.jobLevelMap" />
                   </div>
                 </div>
 

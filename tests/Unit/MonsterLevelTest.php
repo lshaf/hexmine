@@ -14,11 +14,11 @@ use PHPUnit\Framework\TestCase;
 final class MonsterLevelTest extends TestCase
 {
     /**
-     * The whole point of the number is that it is comparable to a character's
-     * own, and it is comparable only because Balance::EQUIP_LEVEL makes a level
-     * bound the rung you may wear. The generator carries its own copy of that
-     * table; if the two drift, every monster is quoted on a scale nothing else
-     * uses and nobody finds out.
+     * The whole point of the number is that it is comparable to the reader's
+     * own, and it is comparable only because Balance::EQUIP_JOB_LEVEL makes a
+     * battle job level bound the rung a fighter may carry. The generator
+     * carries its own copy of that table; if the two drift, every monster is
+     * quoted on a scale nothing else uses and nobody finds out.
      */
     public function test_the_bands_are_the_equipment_ladder(): void
     {
@@ -28,7 +28,7 @@ final class MonsterLevelTest extends TestCase
             $peers = array_filter(Monsters::ROSTER, static fn (array $m) => $m['tier'] === $tier);
 
             $this->assertSame(
-                Balance::equipLevel($rarity),
+                Balance::equipJobLevel($rarity),
                 min(array_column($peers, 'level')),
                 "tier {$tier} does not start on the {$rarity} rung",
             );

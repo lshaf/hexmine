@@ -160,20 +160,49 @@ export function jobFromFight(fight: {
 // ------------------------------------------------------------- the level
 
 /**
- * §9.5.2 -- how a monster's level reads against your own.
+ * §9.5.4 -- the battle job you are actually carrying, and how far up it is.
  *
- * The comparison is honest only because of Balance::EQUIP_LEVEL: a level bounds
- * the RUNG you may wear, so it is a real ceiling on how good a kit can be, and
- * the two numbers are on one scale. What it is not is a promise -- §7.1 says
- * level unlocks access rather than power, so a level 60 in a work coat does not
- * beat a level 38 pack. **The preview is the answer** (§9.5.5); this is the
+ * Mirrors GameService::battleJobLevel: the family in the weapon slot is your
+ * class, so it is the first equipped, unbroken weapon that decides which of the
+ * three answers for you. Null when nothing is in the slot -- which is a real
+ * answer rather than a missing one, and the pin reads it as level nothing.
+ */
+export function carriedBattleJob(
+  items: Array<{ key: string; equipped: boolean; durability: number }>,
+  familyOf: (key: string) => string | undefined,
+  jobLevels: Record<string, number>,
+): { job: string; level: number } | null {
+  for (const item of items) {
+    if (!item.equipped || item.durability <= 0) continue
+
+    const job = BATTLE_JOB_FOR_FAMILY[familyOf(item.key) ?? '']
+    if (job) return { job, level: jobLevels[job] ?? 1 }
+  }
+
+  return null
+}
+
+/**
+ * §9.5.2 -- how a monster's level reads against the job you fight with.
+ *
+ * The comparison is honest only because of Balance::EQUIP_JOB_LEVEL: a battle
+ * job level bounds the RUNG you may carry, so it is a real ceiling on how good
+ * a kit can be, and the two numbers are on one scale. The BATTLE job and not
+ * the career: a weapon is gated on the family in the slot, so a long-dug mine
+ * buys nothing against a pack. What it is not is a promise -- §7.1 says a level
+ * unlocks access rather than power, so a Swordhand 22 in a work coat does not
+ * beat a level 14 pack. **The preview is the answer** (§9.5.5); this is the
  * glance that says whether to read it.
  *
  * Three states rather than two. An even fight is the interesting one and it has
  * to be distinguishable from both edges, or the whole thing collapses into a
  * light saying yes or no about something the preview is already deciding.
+ *
+ * The band is two rather than five, because the ladder it is read on is the
+ * job's: a career runs to 100 and a job stops at 30, and a band that stayed
+ * wide would have called every fight on the map even.
  */
-export const LEVEL_BAND = 5
+export const LEVEL_BAND = 2
 
 export type LevelStanding = 'under' | 'even' | 'over'
 

@@ -145,11 +145,15 @@ def hp(tier, profile):
 
 # ------------------------------------------------------------- the level
 
-# Balance::EQUIP_LEVEL. Kept here as a literal rather than parsed out of PHP,
-# and pinned by a test on the other side: this file is the only place these two
-# ladders meet, and a silent drift between them would put a monster's level on a
-# scale nothing else uses.
-EQUIP_LEVEL = {'common': 1, 'uncommon': 8, 'rare': 20, 'epic': 38, 'legendary': 60}
+# Balance::EQUIP_JOB_LEVEL. Kept here as a literal rather than parsed out of
+# PHP, and pinned by a test on the other side: this file is the only place these
+# two ladders meet, and a silent drift between them would put a monster's level
+# on a scale nothing else uses.
+#
+# The JOB ladder rather than the career one, because the rung a fighter may
+# carry is gated on their battle job (§7.1) -- that is the ceiling on how good a
+# kit can be, and it is the number the pin holds this up against.
+EQUIP_JOB_LEVEL = {'common': 1, 'uncommon': 4, 'rare': 8, 'epic': 14, 'legendary': 22}
 
 # §9.5.4's own measured ladder: common battle gear answers tier 1, rare answers
 # tiers 1-3, epic and legendary answer the center. So the tier picks the band and
@@ -179,10 +183,12 @@ def level(tier, profile):
     head every time. This is the one number that says whether to read the rest.
 
     It is on the EQUIPMENT ladder, and that is what makes it comparable. §7.1 has
-    always said character level unlocks access rather than power, which used to
-    make it useless for this -- Balance::EQUIP_LEVEL changes that, because a
-    level now bounds the rung you may wear and is therefore a real ceiling on how
-    good a kit can be.
+    always said a level unlocks access rather than power, which used to make it
+    useless for this -- Balance::EQUIP_JOB_LEVEL changes that, because a battle
+    job level now bounds the rung a fighter may carry and is therefore a real
+    ceiling on how good a kit can be. The BATTLE job specifically: a weapon is
+    gated on the family in the slot, so that is the number a pack is read
+    against, and a well-dug mine buys nothing here.
 
     The tier picks the band; threat places the monster inside it. Half the band,
     so the tiers stay apart on the eye: what separates a tier-2 from a tier-3
@@ -192,8 +198,8 @@ def level(tier, profile):
     low, high = min(peers), max(peers)
     share = (threat(tier, profile) - low) / (high - low) if high > low else 0.0
 
-    base = EQUIP_LEVEL[LEVEL_BAND[tier]]
-    nxt = EQUIP_LEVEL[LEVEL_NEXT[tier]]
+    base = EQUIP_JOB_LEVEL[LEVEL_BAND[tier]]
+    nxt = EQUIP_JOB_LEVEL[LEVEL_NEXT[tier]]
 
     return base + round((nxt - base) / 2 * share)
 

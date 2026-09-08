@@ -731,6 +731,21 @@ export const BATTLE_JOB_FOR_FAMILY: Record<string, string> = {
   dagger: 'knifedancer',
 }
 
+/**
+ * §7.1 -- the job whose level gates this piece, or null where none does.
+ *
+ * Mirrors Catalog::equipGateJob. One rule, and it is §8's usual one: the piece
+ * that does the work answers to the job that does it -- a tool to its own line
+ * (§8 rule 1), a weapon to its family's battle job (§9.5.4). Armor, boots and
+ * gloves answer to neither, so nothing here reaches them and the career's own
+ * level is their gate.
+ */
+export const equipGateJob = (def: { slot?: EquipSlot; family?: string }): string | null => {
+  if (def.slot === 'weapon') return BATTLE_JOB_FOR_FAMILY[def.family ?? ''] ?? null
+
+  return def.slot ? skillForSlot(def.slot) : null
+}
+
 export const RARITIES: Rarity[] = [
   'common',
   'uncommon',

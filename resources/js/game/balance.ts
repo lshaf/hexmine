@@ -390,12 +390,16 @@ export const EQUIPMENT = {
 } as const
 
 /**
- * §7.1/§8.0 -- the character level each rung may be worn at.
+ * §7.1/§8.0 -- the character level each WORN rung may be put on at.
  *
  * Balance::EQUIP_LEVEL. Level unlocks ACCESS, not power, which is what §7.1 has
  * always said -- this is the same rule pointed at the wardrobe. It also closes a
  * §3.3 hole: an epic is the first rung that may be bought on the marketplace,
  * and a wallet a day old can no longer wear one.
+ *
+ * Armor, boots and gloves only. A coat answers to no line and no weapon family,
+ * so the career's own level is its gate; the five tools and the weapon answer to
+ * a job and read the ladder below.
  *
  * Derived from the rung and never stored on the item: a column on a hundred
  * catalog rows is a hundred chances to disagree with the ladder.
@@ -409,7 +413,27 @@ export const EQUIP_LEVEL: Record<string, number> = {
   unique: 80,
 }
 
+/**
+ * §7.1/§8.0 -- the JOB level a tool or a weapon wants. Balance::EQUIP_JOB_LEVEL.
+ *
+ * The piece that does the work answers to the job that does it: an axe to
+ * Woodcutting, a sword to Swordhand. A different ladder because it is a
+ * different scale -- a job stops at 30 where a career runs to 100 -- and a
+ * better gate, because a job level cannot be reached around by work the piece
+ * has nothing to do with.
+ */
+export const EQUIP_JOB_LEVEL: Record<string, number> = {
+  common: 1,
+  uncommon: 4,
+  rare: 8,
+  epic: 14,
+  legendary: 22,
+  unique: 28,
+}
+
 export const equipLevel = (rarity: string): number => EQUIP_LEVEL[rarity] ?? 1
+
+export const equipJobLevel = (rarity: string): number => EQUIP_JOB_LEVEL[rarity] ?? 1
 
 export const ECONOMY = {
   /** NPC buy-back is deliberately a bad rate, §3.2 / §12 step 2. */

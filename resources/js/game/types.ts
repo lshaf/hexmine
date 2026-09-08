@@ -536,8 +536,10 @@ export interface Monster {
    *
    * The tier picks the band -- §9.5.4's measured ladder, so the band is the rung
    * that answers it -- and its own attack, guard and staying power place it
-   * inside. Read against your own level, which now bounds the rung you may wear
-   * (Balance::EQUIP_LEVEL), so the two are on one scale.
+   * inside. Read against your BATTLE JOB's level, which bounds the rung you may
+   * carry (Balance::EQUIP_JOB_LEVEL), so the two are on one scale. Not the
+   * career's: a weapon is gated on the family in the slot, so a long-dug mine
+   * buys nothing against a pack.
    *
    * It is a glance, never the answer. The preview is the answer (§9.5.5).
    */

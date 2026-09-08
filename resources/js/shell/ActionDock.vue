@@ -16,8 +16,8 @@ import { computed, ref, watch } from 'vue'
 import { useGame } from '@/stores/game'
 import { api } from '@/api/client'
 import { MONSTERS } from '@/game/monsters'
-import { levelStanding } from '@/game/battle'
-import { RECIPES, RING_LABEL, SKILL_BY_KEY } from '@/game/catalog'
+import { carriedBattleJob, levelStanding } from '@/game/battle'
+import { ITEM_BY_KEY, RECIPES, RING_LABEL, SKILL_BY_KEY } from '@/game/catalog'
 import { groundLabel } from '@/game/ground'
 import { formatDuration, placeLabel } from '@/game/formulas'
 import HexAction from './HexAction.vue'
@@ -146,7 +146,12 @@ const gatherHint = computed(() => gather.value?.reason ?? `${gather.value?.yield
  */
 const pinned = computed(() => Boolean(underfoot.value?.pinned))
 /**
- * §9.5.2 -- what this pack is worth, against what the reader may wear.
+ * §9.5.2 -- what this pack is worth, against what the reader may CARRY.
+ *
+ * The battle job of the weapon in the slot, not the career: §7.1 gates a weapon
+ * on the family's own job, so that is the number bounding how good a kit can be
+ * and the only one a monster's level is on a scale with. Nothing in the slot is
+ * level nothing, which is the honest reading of walking into a pack unarmed.
  *
  * Null when there is nobody to compare against, which the pin never actually
  * is -- but the state arrives after the first paint, and a chip that flashes a
@@ -154,9 +159,13 @@ const pinned = computed(() => Boolean(underfoot.value?.pinned))
  */
 const packLevel = computed(() => {
   const def = pack.value ? MONSTERS[pack.value.key] : null
-  const mine = game.state?.character.level
+  if (!def || !game.state) return null
 
-  if (!def || mine === undefined) return null
+  const mine = carriedBattleJob(
+    game.equipment,
+    (key) => ITEM_BY_KEY[key]?.family,
+    game.jobLevelMap,
+  )?.level ?? 0
 
   return { level: def.level, standing: levelStanding(mine, def.level) }
 })
@@ -422,8 +431,11 @@ function hunted(): void {
               <!--
                 §9.5.2 -- one number saying whether this is your weight, before
                 the preview says whether you win. It is on the equipment ladder
-                (Balance::EQUIP_LEVEL), which is what makes it comparable to the
-                reader's own level at all: a level bounds the rung you may wear.
+                (Balance::EQUIP_JOB_LEVEL), which is what makes it comparable at
+                all: a battle job level bounds the rung you may carry. It is
+                read against the job of the weapon in the slot, so what is
+                compared is what you fight with rather than how long you have
+                played.
 
                 Ember on the one state that is a problem, and nothing on the
                 other two (§13.3): outclassing a pack is the absence of a

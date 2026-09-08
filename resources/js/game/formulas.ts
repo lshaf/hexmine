@@ -6,8 +6,8 @@
  * IMPORTANT: the server owns these numbers. This module exists so the client
  * can *predict* and display them; it must never be the authority.
  */
-import { EQUIPMENT, MINING, PROCESSING, SKILLS, SOLID_SCALE, equipLevel } from './balance'
-import { ITEM_BY_KEY, LINE_STAT_LABEL, MATERIALS, SKILL_BY_KEY, STAT_LABEL, skillForSlot } from './catalog'
+import { EQUIPMENT, MINING, PROCESSING, SKILLS, SOLID_SCALE, equipJobLevel, equipLevel } from './balance'
+import { FAMILY_LABEL, ITEM_BY_KEY, LINE_STAT_LABEL, MATERIALS, SKILL_BY_KEY, STAT_LABEL, equipGateJob, skillForSlot } from './catalog'
 import type {
   BuffScope,
   ItemDef,
@@ -633,6 +633,15 @@ export interface StatChip {
    * §13.3 lets it wear ember and nothing else there may.
    */
   gate?: number
+  /**
+   * §7.1 -- the JOB that gate is measured against, where it is a job's.
+   *
+   * A tool and a weapon answer to the job that swings them; armor, boots and
+   * gloves answer to the career. Null is the second of those, and it is what
+   * tells the drawing which of the reader's two levels to hold the gate up
+   * against -- one chip, two ladders, and no way to read it off the figure.
+   */
+  gateJob?: string | null
 }
 
 export const PAIR_STATS = new Set<StatKey>(['power', 'defense'])
@@ -659,9 +668,32 @@ export function statChips(def: ItemDef, options: ItemOption[] = []): StatChip[] 
    * they cannot put it on has read them for nothing. A consumable has no gate
    * -- §8.5 gives a draft no slot and nothing to wear it in -- so it says
    * nothing here rather than saying "level 1".
+   *
+   * Two ladders, and the chip has to say which. A tool and a weapon are gated
+   * on the job that swings them; armor, boots and gloves on the career. So the
+   * label is the job's own word -- `woodcutting 14`, `sword 8` -- and only a
+   * worn piece still reads `lv`.
    */
-  const need = def.consumable ? 1 : equipLevel(def.rarity)
-  if (need > 1) chips.push({ label: 'lv', value: String(need), gate: need })
+  const gateJob = def.consumable ? null : equipGateJob(def)
+  const need = def.consumable
+    ? 1
+    : gateJob !== null
+      ? equipJobLevel(def.rarity)
+      : equipLevel(def.rarity)
+  if (need > 1) {
+    // The label names what has to be levelled, because "lv 14" alone would be
+    // the one chip in the row a reader could hold up against the wrong number:
+    // a career runs to 100 and a job stops at 30, so the two ladders look
+    // nothing alike and read exactly alike.
+    const label =
+      gateJob === null
+        ? 'lv'
+        : def.slot === 'weapon'
+          ? FAMILY_LABEL[def.family ?? ''] ?? gateJob
+          : SKILL_BY_KEY[gateJob as SkillKey]?.name.toLowerCase() ?? gateJob
+
+    chips.push({ label, value: String(need), gate: need, gateJob })
+  }
   // A tool reads its line off its slot (§8.0.1); a potion has no slot and reads
   // it off the action it is armed for (§8.5). Both are line-locked and both
   // have to say so -- a Forest Draft that printed "+3% yield" would be claiming

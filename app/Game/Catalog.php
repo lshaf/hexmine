@@ -621,6 +621,35 @@ final class Catalog
         'dagger' => 'knifedancer',
     ];
 
+    /**
+     * §7.1 -- the job whose level gates this piece, or null where none does.
+     *
+     * One rule, and it is §8's usual one: **the piece that does the work
+     * answers to the job that does it.** A tool reads its own line off its slot
+     * (§8 rule 1) and a weapon reads its family's battle job (§9.5.4, the
+     * family in the slot is your class). Armor, boots and gloves answer to
+     * neither, so nothing here reaches them and the character's own level is
+     * their gate (Balance::EQUIP_LEVEL).
+     *
+     * Derived, never stored: a `gateJob` column on a hundred catalog rows would
+     * be a hundred chances to disagree with the two maps above, which already
+     * say the same thing for the two other questions they are asked.
+     *
+     * @param  array<string,mixed>  $def
+     */
+    public static function equipGateJob(array $def): ?string
+    {
+        $slot = (string) ($def['slot'] ?? '');
+
+        if ($slot === 'weapon') {
+            return self::BATTLE_JOB_FOR_FAMILY[(string) ($def['family'] ?? '')] ?? null;
+        }
+
+        // A gathering job's level IS its §7.2 skill level, so the line key and
+        // the job key are one key (§7.4).
+        return self::TOOL_SLOT_SKILL[$slot] ?? null;
+    }
+
     /** §4.0 -- scrap is what a hex gives up to bare hands. It feeds no recipe. */
     public static function isScrap(string $materialKey): bool
     {
