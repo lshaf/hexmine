@@ -237,7 +237,7 @@ onBeforeUnmount(() => {
              the almanac and the bag all use, so a piece reads the same wherever
              it is met. A potion has no stats and draws nothing. -->
         <div v-if="madeDef && !made.consumable" class="made-stats">
-          <StatChips :def="madeDef" :options="madeRolls" :level="game.state?.character.level" :job-levels="game.jobLevelMap" />
+          <StatChips :def="madeDef" :options="madeRolls" :quality="made.quality" :level="game.state?.character.level" :job-levels="game.jobLevelMap" />
         </div>
 
         <!-- §8.0.1 -- the payoff, and the reason this plate exists at all: two

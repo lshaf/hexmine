@@ -1548,6 +1548,38 @@ final class Balance
     public const STACK_FALLOFF = 0.5;
 
     /**
+     * §8.0.2 -- how far a copy may fall either side of its recipe.
+     *
+     * Every solid figure a piece carries -- its attack, its defense and its
+     * durability ceiling -- moves together by one rolled offset, so a piece is
+     * *a good one* or *a poor one* rather than a bag of unrelated luck. One
+     * number a player can hold in their head; three independent rolls would be
+     * noise wearing the word variety.
+     *
+     * A share rather than a count, so it scales up the ladder for free rather
+     * than needing a table -- the same argument §6 makes about the bench fee.
+     * At the common rung it comes to about ±20 points of a Stone Axe's 300,
+     * which is where the figure came from.
+     *
+     * **It is not a `StatKey` and meets no ceiling** (§8.1 rule 1): these are
+     * solid numbers, the same standing §8.0.1's rolled lines have. And it is
+     * far under BATTLE_SWING's ±10% per strike, so it colours a piece without
+     * deciding a fight §9.5.4 says the kit decides.
+     */
+    public const QUALITY_BAND = 0.07;
+
+    /**
+     * Rolled as the MEAN OF TWO, which is what makes a good one worth having.
+     *
+     * A flat roll makes every value equally likely, so "a fine axe" is a
+     * sentence about nothing -- one copy in ten is near the top and one in ten
+     * near the bottom, and the middle is no more ordinary than either end.
+     * Averaging two rolls gives a triangle: most copies sit near the recipe,
+     * the edges are rare, and finding one is a find.
+     */
+    public const QUALITY_ROLLS = 2;
+
+    /**
      * §4.0 -- what a scrap haul is worth as XP, against the same haul of the
      * real material. Bare-handed work still teaches the line, just badly: at 1.0
      * a player could max a skill without ever buying a tool, which would make
@@ -1555,9 +1587,44 @@ final class Balance
      */
     public const SCRAP_XP_RATE = 0.25;
 
+    /**
+     * §8.1 rule 3 -- what one mine takes off the line's tool, as a BAND.
+     *
+     * It was a flat 100 -- one whole point at the old scale, multiplied up and
+     * left there. That made the finest thing in the game about a piece of gear
+     * the one number that never used the granularity: every mine took exactly
+     * the same bite, so a durability bar moved in identical steps forever and
+     * the two digits SOLID_SCALE bought were always zeroes.
+     *
+     * A band instead, seeded per mine like every other outcome (§16). The mean
+     * is 100, so a tool still lasts the forty-odd mines it always did and no
+     * repair bill moves -- what changes is that no two mines cost the same and
+     * a bar you are watching is worth watching.
+     *
+     * Not so wide that "how many mines has this got left" stops being
+     * answerable: at ±20% the answer is still forty, give or take one.
+     */
     public const DRAIN_PER_MINE = 100;
 
-    public const DRAIN_PER_RAID = 4;
+    public const DRAIN_PER_MINE_BAND = 0.20;
+
+    /** The most one mine can ever take, which is what a warning has to use. */
+    public static function maxDrainPerMine(): int
+    {
+        return (int) ceil(self::DRAIN_PER_MINE * (1 + self::DRAIN_PER_MINE_BAND));
+    }
+
+    /**
+     * The same for a raid, and it is 400 rather than 4 because durability moved
+     * to SOLID_SCALE and this did not (§7.3's rule: anything converting between
+     * a solid number and something that did not move has to be moved with it).
+     *
+     * Nothing reads it yet -- §14 has dungeon combat undesigned -- which is
+     * exactly how it came to be left behind. A dormant constant at the wrong
+     * scale does not fail; it waits, and then it is a hundredfold error in a
+     * system that arrives believing it.
+     */
+    public const DRAIN_PER_RAID = 400;
 
     public const SALVAGE_RATE = 0.25;
 

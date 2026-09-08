@@ -116,9 +116,9 @@ final class SkillEffectTest extends TestCase
     /**
      * §7.4.3 -- a gathering tree spares the line's tool, and only that line's.
      *
-     * Rolled per mine rather than shaved off it, because DRAIN_PER_MINE is one
-     * point and a fraction of one point is nothing a player could read off the
-     * item.
+     * Rolled per mine rather than shaved off it, because `toolWear` is a share
+     * of MINES rather than of points: half a point off a bar is nothing a
+     * player could ever read.
      */
     public function test_a_gathering_tree_spares_the_tool_it_swings(): void
     {
@@ -134,12 +134,13 @@ final class SkillEffectTest extends TestCase
             $drain = $this->invoke('tripDrain', [$this->character->fresh(), $job, 'woodcutting']);
             $drain === 0 ? $spared++ : $paid++;
 
-            // The other four tools idle, §8 rule 2, and so does the tree.
-            $this->assertSame(
-                Balance::DRAIN_PER_MINE,
-                $this->invoke('tripDrain', [$this->character->fresh(), $job, 'mining']),
-                'a woodcutting node paid out down a mine',
-            );
+            // The other four tools idle, §8 rule 2, and so does the tree: the
+            // mine is never SPARED, so it always pays a full band's worth.
+            // §8.0.2 -- inside the band rather than exactly the mean, because
+            // no two mines cost the same any more.
+            $off = $this->invoke('tripDrain', [$this->character->fresh(), $job, 'mining']);
+            $this->assertGreaterThan(0, $off, 'a woodcutting node paid out down a mine');
+            $this->assertLessThanOrEqual(Balance::maxDrainPerMine(), $off);
         }
 
         $this->assertGreaterThan(0, $spared, 'a maxed tree never spared a single mine');

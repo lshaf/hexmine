@@ -586,6 +586,11 @@ class GameService
             'maxDurability' => $i->maxDurability(),
             'equipped' => $i->equipped,
             'options' => $i->options ?? [],
+            // §8.0.2 -- how well this copy came out. Everything downstream that
+            // reads a solid figure off a piece reads it through this, for the
+            // same reason as the ceiling above: the recipe's number is not this
+            // object's number.
+            'quality' => $i->quality,
         ])->all();
     }
 
@@ -1039,7 +1044,9 @@ class GameService
             // it is only ever mining attack.
             $best = max(
                 $best,
-                Formulas::toolAttack($def) + Formulas::optionCount($item->options ?? [], 'attack'),
+                // §8.0.2 -- this copy's bite, not the recipe's.
+                Formulas::toolAttack($def, $item->quality)
+                    + Formulas::optionCount($item->options ?? [], 'attack'),
             );
         }
 
@@ -1264,28 +1271,43 @@ class GameService
     }
 
     /**
-     * §7.4.3 -- what this mine takes off the line's tool, after the tree.
+     * §8.1 rule 3 -- what this mine takes off the line's tool, after the tree.
      *
-     * A gathering node spares the whole of one mine's wear or none of it,
-     * rolled from the job rather than the clock: DRAIN_PER_MINE is one point,
-     * and a fraction of one point is nothing a player could ever read off the
-     * item. Seeded like every other outcome (§16), so collecting twice cannot
-     * roll twice.
+     * Two rolls off one job, and they answer two different questions. A
+     * gathering node spares the whole of a mine's wear or none of it -- that
+     * one is all-or-nothing because `toolWear` is a share of MINES rather than
+     * of points, and half a point is nothing a player could read off a bar.
+     * Then what the mine takes at all is a band rather than a flat figure
+     * (Balance::DRAIN_PER_MINE_BAND): the same average, so a tool lasts the
+     * forty-odd mines it always did, but no two mines cost the same.
+     *
+     * Seeded like every other outcome (§16), so collecting twice cannot roll
+     * twice -- and salted apart from the sparing roll, or a tool that survived
+     * a mine would always have been about to survive it cheaply too.
      */
     private function tripDrain(Character $character, GameJob $job, string $line): int
     {
         $spare = (float) $this->jobEffects($character, $line)['toolWear'];
-        if ($spare <= 0) {
-            return Balance::DRAIN_PER_MINE;
+
+        if ($spare > 0) {
+            $roll = Hash::rand01(Hash::hash2(
+                (int) $job->id,
+                (int) $job->started_at,
+                Balance::mapSeed() ^ 0x7001,
+            ));
+
+            if ($roll < $spare) {
+                return 0;
+            }
         }
 
-        $roll = Hash::rand01(Hash::hash2(
-            (int) $job->id,
-            (int) $job->started_at,
-            Balance::mapSeed() ^ 0x7001,
-        ));
+        $band = (int) round(Balance::DRAIN_PER_MINE * Balance::DRAIN_PER_MINE_BAND);
 
-        return $roll < $spare ? 0 : Balance::DRAIN_PER_MINE;
+        return max(1, Hash::randInt(
+            Hash::hash2((int) $job->id, (int) $job->started_at, Balance::mapSeed() ^ 0x7002),
+            Balance::DRAIN_PER_MINE - $band,
+            Balance::DRAIN_PER_MINE + $band,
+        ));
     }
 
     // ------------------------------------------------------------------ skills
@@ -3202,7 +3224,11 @@ class GameService
             $def,
             intdiv((int) $monster['tier'], 2) + $extraOption,
         );
-        $max = Formulas::maxDurabilityFor($def, $options);
+        // §8.0.2 -- and how well this one came out, off the same seed. A
+        // monster's kit is a piece somebody made and lost, so it is as much an
+        // individual object as anything off a bench.
+        $quality = Formulas::rollQuality($seed);
+        $max = Formulas::maxDurabilityFor($def, $options, 0.0, $quality);
         $durability = max(1, (int) round($max * Hash::randInt(
             Hash::hash2($seed, 41, Balance::mapSeed() ^ 0x5909),
             Balance::LOOT_DURABILITY_MIN_PERCENT,
@@ -3216,6 +3242,7 @@ class GameService
             'max_durability' => $max,
             'equipped' => false,
             'options' => $options,
+            'quality' => $quality,
         ]);
 
         return [
@@ -3225,6 +3252,7 @@ class GameService
             'durability' => $durability,
             'maxDurability' => $max,
             'options' => $item->options,
+            'quality' => $quality,
         ];
     }
 
@@ -3435,6 +3463,9 @@ class GameService
                 'max_durability' => $loot['maxDurability'] ?? null,
                 'equipped' => false,
                 'options' => $loot['options'] ?? [],
+                // §8.0.2 -- carried through from the roll, never re-rolled. The
+                // piece on the plate is the piece in the bag.
+                'quality' => $loot['quality'] ?? null,
             ]),
         };
 
@@ -3996,7 +4027,11 @@ class GameService
                 continue;
             }
 
-            if ((int) $item->durability <= Balance::DRAIN_PER_MINE) {
+            // §8.2 -- against the WORST this mine could take, never the
+            // average. A band means the honest question is "could this finish
+            // it", and an idle game may never take something expensive by
+            // surprise because the roll came in high.
+            if ((int) $item->durability <= Balance::maxDrainPerMine()) {
                 $out[] = $def['name'].' will not survive this mine.';
             }
         }
@@ -5919,17 +5954,34 @@ class GameService
             $this->fireGoal($character, 'buy', 1, $def['slot'] ?? null);
             $character->save();
 
+            // §8.0.2 -- and which one off the rack you got. A shelf holds
+            // objects rather than a stack of one object, so two Stone Axes are
+            // not the same axe -- seeded on the sale so the roll is the
+            // server's and cannot be shopped for by retrying.
+            $quality = Formulas::rollQuality(Hash::hash2(
+                (int) $character->id,
+                (int) $character->gold,
+                Balance::mapSeed() ^ 0x5A1E,
+            ));
+            $max = Formulas::maxDurabilityFor($def, [], 0.0, $quality);
+
             return CharacterItem::create([
                 'character_id' => $character->id,
                 'item_key' => $itemKey,
-                'durability' => $def['maxDurability'],
+                'durability' => $max,
+                'max_durability' => $max,
                 'equipped' => false,
-                // §8.0.1 -- gold buys a plain item, at every shelf including a
+                // §8.0.1 -- gold buys a PLAIN item, at every shelf including a
                 // capital's. An option is what a BENCH puts on a thing: it is
                 // the difference between a piece somebody made and a piece
                 // somebody stocked, and a shop that sold rolled goods would
                 // make crafting the slower way to buy one.
+                //
+                // §8.0.2's quality is not that, and the two must not be
+                // confused: plain means no rolled LINES, and it never meant
+                // that every copy on a shelf is the same object.
                 'options' => [],
+                'quality' => $quality,
             ]);
         });
     }
@@ -6464,7 +6516,15 @@ class GameService
             $this->extraRoll($character, $effects['craftOption'], 0x5C11),
             (float) $effects['optionTier'],
         );
-        $max = Formulas::maxDurabilityFor($def, $options, (float) $effects['craftDurability']);
+        // §8.0.2 -- and how well it came out, which is the other half of what
+        // an hour at the bench is for: §8.4 calls a craft a reveal, and until
+        // now the only thing revealed was whether a line landed.
+        $quality = Formulas::rollQuality(Hash::hash2(
+            (int) $job->id,
+            (int) $job->started_at,
+            Balance::mapSeed() ^ 0x9C2A,
+        ));
+        $max = Formulas::maxDurabilityFor($def, $options, (float) $effects['craftDurability'], $quality);
         $durability = $max;
 
         $item = CharacterItem::create([
@@ -6474,6 +6534,7 @@ class GameService
             'max_durability' => $max,
             'equipped' => false,
             'options' => $options,
+            'quality' => $quality,
         ]);
 
         return [
@@ -6485,6 +6546,9 @@ class GameService
                 'durability' => $durability,
                 'maxDurability' => $max,
                 'options' => $item->options ?? [],
+                // §8.0.2 -- and how well it came out, which is the other half
+                // of the reveal §8.4 says this plate exists for.
+                'quality' => $quality,
             ],
             'job' => $jobKey,
             'jobXp' => $jobXp,

@@ -437,7 +437,7 @@ const ceilings = computed(() =>
                 </div>
 
                 <div class="grow facts">
-                  <StatChips :def="picked.def" :options="picked.item.options ?? []" :level="game.state?.character.level" :job-levels="game.jobLevelMap" />
+                  <StatChips :def="picked.def" :options="picked.item.options ?? []" :quality="picked.item.quality" :level="game.state?.character.level" :job-levels="game.jobLevelMap" />
 
                   <!-- §8 rule 1 -- what this line is actually worth, and the
                        only per-line figure on the sheet. It belongs with the

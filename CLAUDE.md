@@ -2302,6 +2302,76 @@ it the one screen that can tell you — every line it is eligible for, each with
 its own band in its own unit, and the odds on the one that has no band.
 
 
+### 8.0.2 Quality — how well this copy came out
+
+**A rolled line is a bonus the bench put ON a piece; this is how the piece
+itself turned out.** Every copy of every item is rolled a **quality** when it
+comes into the world, and that one figure moves every solid number it carries —
+its attack, its defense and its durability ceiling, together.
+
+**One roll rather than three, and that is the point.** A piece good in attack
+and poor in guard is noise wearing the word variety; *a good one* is something
+a player can hold in their head, look for, and talk about. It is the same
+instinct §13.1 follows when it gives rarity one channel and material another —
+a reading learned once and true everywhere.
+
+**The band is ±7%** (`Balance::QUALITY_BAND`). A share rather than a count, so
+it scales up the ladder for free rather than needing a table — the same
+argument §6 makes about the bench fee. At the common rung it is about **twenty
+points of a Stone Axe's three hundred**, which is where the figure came from.
+
+**It is not a `StatKey` and meets no ceiling.** §8.1 rule 1 governs
+percentages; these are solid numbers, the same standing §8.0.1's lines have.
+And it sits under `BATTLE_SWING`, so a copy varies less than a single strike
+does — it colours a piece without deciding a fight §9.5.4 says the *kit*
+decides.
+
+**Rolled as the mean of two, so the middle is ordinary and the edges are
+rare.** This is the whole of what makes "a fine axe" a sentence about
+something. Under a flat roll every value is equally likely, the middle is no
+more common than either end, and a good one means nothing; averaging two draws
+gives a triangle — a quarter of everything lands within a point of the recipe
+and the far edges are about one copy in a hundred. **Finding one is a find.**
+
+**Crafted, bought and looted alike**, and the second of those is the
+interesting one: a shelf holds *objects* rather than a stack of one object, so
+two Stone Axes off one rack are not the same axe.
+
+That does **not** contradict §8.0.1's *gold buys a plain item*. Plain means no
+rolled **lines** — that is what separates a piece somebody made from a piece
+somebody stocked, and it is untouched. It never meant every copy on a shelf is
+the same object, and a shop that sold identical goods is the odder claim of the
+two.
+
+**The shelf price does not move with it** (§8.3). A tag is priced off the
+recipe, so a lucky buy is a lucky buy and an unlucky one costs the same — which
+is what makes looking twice worth anything.
+
+**Seeded, like every other outcome** (§16). The same seed is the same piece,
+so nothing can be re-rolled by collecting twice, and a bought copy is drawn on
+the sale rather than on the browse.
+
+**A bad roll may never round a figure away.** §9.5.4 makes a shield that cannot
+land and a pair of knives with no guard two different broken things; neither
+may be quietly created by arithmetic, so a figure that had a point keeps one.
+
+**On screen it is one chip, and only on the copies worth a chip.** Most pieces
+are ordinary and a chip on every item reading *average* is exactly what §13
+keeps warning about — a list where every row shouts says nothing. So a copy
+outside the ordinary band gets a word and its figure — *fine +3.2%*, *superb
++5.1%*, *rough −2.4%*, *poor −4.8%* — drawn last in the row, because it
+qualifies every figure before it rather than adding one of its own.
+
+**Sap on the good ones and no colour at all on the poor ones**, which is §13.3
+read exactly: sap marks a thing worth crossing the screen for, and ember marks
+a state to *deal with*. A middling axe is neither — it is a fact, and a fact is
+drawn plain. Ember there would be an alarm about a working tool.
+
+**And it is the other half of the reveal** (§8.4). A craft plate lands last on
+what the bench rolled; until now the only thing revealed was whether a *line*
+landed, and a craft that rolled none had nothing to say. A craft with no lines
+can still hand over a superb one.
+
 ### 8.0 Slots — a gathering tool per line, and combat kept separate
 
 Nine slots. Five are **gathering tools, one per skill line**; the rest are worn.
@@ -2353,6 +2423,21 @@ Rules, all mandatory:
 3. **Durability decays with use** (fighting drains fastest, then raiding, then mining),
    and at zero the thing is **gone** (§8.2). Equipment is never "buy once, dominate
    forever" — it is rented from the repair bill.
+
+   **A mine's bite is a band, not the same figure every time.**
+   `DRAIN_PER_MINE` was a flat 100 — one whole point at the old scale,
+   multiplied up and left there — which made the one number a player actually
+   watches the only one that never used the granularity §7.3's scale bought.
+   ±20% around it now (`DRAIN_PER_MINE_BAND`), seeded per mine like every other
+   outcome (§16). **The average has not moved**, so a tool lasts the forty-odd
+   mines it always did and no repair bill changed; what changed is that no two
+   mines cost the same and a bar you are watching is worth watching.
+
+   Not so wide that *how many mines has this got left* stops being answerable:
+   at a fifth either way the answer is still forty, give or take one. And §8.2's
+   warning is measured against the **worst** the band can do rather than the
+   average, because an idle game may never take something expensive by surprise
+   because a roll came in high.
 4. The gap from common to unique is **12 points, not an order of magnitude**, and every
    rarity below unique is reachable by crafting without spending. That is what keeps F2P
    viable — and F2P viability is what sustains the active playerbase that drives NFT

@@ -580,6 +580,18 @@ export interface OwnedItem {
   equipped: boolean
   /** Rolled lines. Empty for commons, unless a capital bazaar added one. */
   options: ItemOption[]
+  /**
+   * §8.0.2 -- how well this copy came out, in permille either side of nothing.
+   *
+   * One roll spent on every solid figure the piece carries, so a piece is *a
+   * good one* or *a poor one* rather than a bag of unrelated luck. Null is a
+   * piece made before any of this existed and reads as the recipe exactly.
+   *
+   * It is not a rolled LINE (§8.0.1) and must not be drawn as one: a line is a
+   * bonus the bench put on, and this is how the thing itself turned out. Which
+   * is why a bought piece has this and never has lines.
+   */
+  quality?: number | null
 }
 
 // ---------------------------------------------------------------- processing

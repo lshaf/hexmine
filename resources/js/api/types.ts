@@ -809,6 +809,15 @@ export interface CollectResult {
      * hour at the anvil. Empty is a normal outcome, not a broken one.
      */
     options?: ItemOption[]
+    /**
+     * §8.0.2 -- and how well the copy itself came out.
+     *
+     * The other half of the reveal, and a different question from the lines
+     * above: a line is a bonus the bench put ON the piece, this is how the
+     * piece turned out. A craft can roll no lines at all and still hand over a
+     * superb one.
+     */
+    quality?: number | null
   } | null
   /** Units that did not fit: the §2 per-wallet cap, or a full bag (§7.6). */
   lostToOverflow: number

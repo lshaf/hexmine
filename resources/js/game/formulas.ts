@@ -495,8 +495,11 @@ export function gatherAttack(skillLevel: number): number {
  * percentage: attack is how fast you work through a hex (§7.3) and yield is how
  * big the haul is, which are different questions and now different numbers.
  */
-export function toolAttack(def: Pick<ItemDef, 'attack'>): number {
-  return def.attack ?? 0
+export function toolAttack(
+  def: Pick<ItemDef, 'attack'>,
+  quality?: number | null,
+): number {
+  return withQuality(def.attack ?? 0, quality)
 }
 
 /** Yield for one mine. Skill and equipment both add; ring adds the risk premium. */
@@ -743,7 +746,12 @@ function lineScope(scope: BuffScope | undefined): SkillKey | null {
   return scope !== undefined && scope in SKILL_BY_KEY ? (scope as SkillKey) : null
 }
 
-export function statChips(def: ItemDef, options: ItemOption[] = []): StatChip[] {
+export function statChips(
+  def: ItemDef,
+  options: ItemOption[] = [],
+  /** §8.0.2 -- how well THIS copy came out, where there is a copy. */
+  quality?: number | null,
+): StatChip[] {
   const chips: StatChip[] = []
 
   /*
@@ -802,19 +810,68 @@ export function statChips(def: ItemDef, options: ItemOption[] = []): StatChip[] 
   }
 
   if (line !== null) {
-    const bite = toolAttack(def) + flatOption(options, 'attack')
+    const bite = toolAttack(def, quality) + flatOption(options, 'attack')
     if (bite > 0) chips.push({ label: 'atk', value: String(bite) })
 
     return chips
   }
 
-  const attack = (def.attack ?? 0) + flatOption(options, 'attack')
-  const defense = (def.defense ?? 0) + flatOption(options, 'defense')
+  const attack = withQuality(def.attack ?? 0, quality) + flatOption(options, 'attack')
+  const defense = withQuality(def.defense ?? 0, quality) + flatOption(options, 'defense')
 
   if (attack > 0) chips.push({ label: 'atk', value: String(attack) })
   if (defense > 0) chips.push({ label: 'def', value: String(defense) })
 
   return chips
+}
+
+/**
+ * §8.0.2 -- a solid figure off the catalog, as THIS copy carries it.
+ *
+ * Mirrors Formulas::withQuality. Every read of an owned piece's attack, defense
+ * or ceiling comes through here rather than off the catalog, for the reason
+ * §8.2 gives about the ceiling: the recipe's figure is not this object's.
+ *
+ * Rounded away from nothing, so a piece that had a point of guard still has
+ * one -- §9.5.4 makes a shield that cannot land and a pair of knives with no
+ * guard two different broken things, and neither may be created by bad luck.
+ */
+export function withQuality(base: number, quality: number | null | undefined): number {
+  if (!quality || base === 0) return base
+
+  const scaled = Math.round(base * (1 + quality / 1000))
+
+  return base > 0 ? Math.max(1, scaled) : Math.min(-1, scaled)
+}
+
+/**
+ * §8.0.2 -- what to CALL a copy that came out unusually, or null for one that
+ * did not.
+ *
+ * Most pieces are ordinary -- the roll is the mean of two, so the middle is
+ * where the mass is -- and a chip on every item saying "average" is the thing
+ * §13 keeps warning about: a list where every row shouts says nothing. So only
+ * the copies worth noticing get a word, and the rest are simply their figures.
+ *
+ * Sap on the good ones and nothing on the poor ones, which is §13.3 read
+ * exactly: sap marks a thing worth crossing the screen for, and ember marks a
+ * state to DEAL with. A middling axe is neither -- it is a fact, and a fact is
+ * drawn plain. Ember there would be an alarm about a working tool.
+ */
+export function qualityNote(
+  quality: number | null | undefined,
+): { word: string; percent: string; good: boolean } | null {
+  if (!quality || Math.abs(quality) < 15) return null
+
+  const good = quality > 0
+  const strong = Math.abs(quality) >= 40
+  const word = good ? (strong ? 'superb' : 'fine') : strong ? 'poor' : 'rough'
+
+  return {
+    word,
+    percent: `${good ? '+' : '−'}${(Math.abs(quality) / 10).toFixed(1)}%`,
+    good,
+  }
 }
 
 /** §8.0.1 -- what an item's rolled lines add to one solid number. */
@@ -832,7 +889,7 @@ export interface SwapChange {
 
 /** The solid pair (§9.5.4), rolled lines included -- what `statChips` prints. */
 function solid(item: OwnedItem, def: ItemDef, stat: 'attack' | 'defense'): number {
-  return (def[stat] ?? 0) + flatOption(item.options ?? [], stat)
+  return withQuality(def[stat] ?? 0, item.quality) + flatOption(item.options ?? [], stat)
 }
 
 /**

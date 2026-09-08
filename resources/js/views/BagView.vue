@@ -945,7 +945,7 @@ const coinMend = computed(() => {
                       <strong class="tiny" :class="`rarity-${wornDef.rarity}`">{{ wornDef.name }}</strong>
                       <span class="tiny mono muted">{{ worn.durability }}/{{ worn.maxDurability || wornDef.maxDurability }}</span>
                     </div>
-                    <StatChips :def="wornDef" :options="worn.options ?? []" :level="game.state?.character.level" :job-levels="game.jobLevelMap" />
+                    <StatChips :def="wornDef" :options="worn.options ?? []" :quality="worn.quality" :level="game.state?.character.level" :job-levels="game.jobLevelMap" />
                   </div>
 
                   <div class="side on">
@@ -954,7 +954,7 @@ const coinMend = computed(() => {
                       <strong class="tiny" :class="`rarity-${def.rarity}`">{{ def.name }}</strong>
                       <span class="tiny mono">{{ picked.item.durability }}/{{ def.maxDurability }}</span>
                     </div>
-                    <StatChips :def="def" :options="picked.item.options ?? []" :level="game.state?.character.level" :job-levels="game.jobLevelMap" />
+                    <StatChips :def="def" :options="picked.item.options ?? []" :quality="picked.item.quality" :level="game.state?.character.level" :job-levels="game.jobLevelMap" />
                   </div>
 
                   <div class="moves">
@@ -972,7 +972,7 @@ const coinMend = computed(() => {
                   </div>
                   <div class="kv">
                     <span class="eyebrow">Carries</span>
-                    <StatChips :def="def" :options="picked.item.options ?? []" :level="game.state?.character.level" :job-levels="game.jobLevelMap" />
+                    <StatChips :def="def" :options="picked.item.options ?? []" :quality="picked.item.quality" :level="game.state?.character.level" :job-levels="game.jobLevelMap" />
                   </div>
                 </div>
 

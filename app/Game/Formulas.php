@@ -248,6 +248,55 @@ final class Formulas
     }
 
     /**
+     * §8.0.2 -- how well this copy came out, in permille either side of zero.
+     *
+     * One roll per piece, spent on every solid figure it carries. Rolled here
+     * rather than at each call site so a crafted piece, a bought one and a
+     * looted one are the same kind of object -- which is the whole reason the
+     * shelf is worth looking at twice.
+     *
+     * The mean of QUALITY_ROLLS draws, which is what makes the middle ordinary
+     * and the edges rare (Balance::QUALITY_ROLLS). Seeded like every other
+     * outcome (§16): the same seed is the same piece, so nothing can be rolled
+     * twice for a better one.
+     */
+    public static function rollQuality(int $seed): int
+    {
+        $band = (int) round(Balance::QUALITY_BAND * 1000);
+        $total = 0;
+
+        for ($i = 0; $i < Balance::QUALITY_ROLLS; $i++) {
+            $total += Hash::randInt(Hash::hash2($seed, $i, Balance::mapSeed() ^ 0x9111), -$band, $band);
+        }
+
+        return (int) round($total / Balance::QUALITY_ROLLS);
+    }
+
+    /**
+     * §8.0.2 -- a solid figure off the catalog, as THIS copy carries it.
+     *
+     * Everything that reads an owned piece's attack, defense or ceiling comes
+     * through here, for the reason §8.2 gives about the ceiling: a figure read
+     * off the catalog for a piece that is not the catalog's is a different
+     * object from the one in the bag.
+     *
+     * Rounded away from nothing, so a piece that had a point of guard still has
+     * one: §9.5.4 says a shield that cannot land is a stalemate and a pair of
+     * knives with no guard at all is the sword twice, and neither of those is a
+     * thing an unlucky roll may quietly create.
+     */
+    public static function withQuality(int $base, ?int $quality): int
+    {
+        if ($quality === null || $quality === 0 || $base === 0) {
+            return $base;
+        }
+
+        $scaled = (int) round($base * (1 + $quality / 1000));
+
+        return $base > 0 ? max(1, $scaled) : min(-1, $scaled);
+    }
+
+    /**
      * §8.2 -- the ceiling a NEW piece is born with, which is not the catalog's.
      *
      * Two things raise it and they stack: §7.4.3's `craftDurability`, and
@@ -260,9 +309,18 @@ final class Formulas
      * @param  array<string,mixed>  $def
      * @param  array<int,array<string,mixed>>  $options
      */
-    public static function maxDurabilityFor(array $def, array $options = [], float $craftBonus = 0.0): int
-    {
-        $max = (int) round((int) ($def['maxDurability'] ?? 1) * (1 + $craftBonus));
+    public static function maxDurabilityFor(
+        array $def,
+        array $options = [],
+        float $craftBonus = 0.0,
+        ?int $quality = null,
+    ): int {
+        // §8.0.2 -- the copy's own figure first, then what the bench added to
+        // it. In that order because quality is a fact about how this one came
+        // out and the node is a fact about who made it: a Smith's bonus should
+        // be worth the same on a lucky piece and an unlucky one.
+        $base = self::withQuality((int) ($def['maxDurability'] ?? 1), $quality);
+        $max = (int) round($base * (1 + $craftBonus));
 
         return max(1, $max + self::optionCount($options, Catalog::OPTION_DURABILITY));
     }
@@ -474,9 +532,15 @@ final class Formulas
                 continue;
             }
 
-            $gearAttack += (int) ($def['attack'] ?? 0)
+            // §8.0.2 -- this COPY's pair, not the recipe's. The rolled lines
+            // add on top rather than being scaled by it: a line is luck of its
+            // own (§8.0.1) and multiplying one kind of luck by another is how a
+            // band nobody chose ends up twice as wide as either.
+            $quality = $item['quality'] ?? null;
+
+            $gearAttack += self::withQuality((int) ($def['attack'] ?? 0), $quality)
                 + self::optionCount($item['options'] ?? [], 'attack');
-            $gearDefense += (int) ($def['defense'] ?? 0)
+            $gearDefense += self::withQuality((int) ($def['defense'] ?? 0), $quality)
                 + self::optionCount($item['options'] ?? [], 'defense');
         }
 
@@ -1398,9 +1462,9 @@ final class Formulas
      * Mining attack only. A tool is worth nothing in a fight (§8 rule 5), which
      * is why combatPair skips every non-combat slot rather than reading this.
      */
-    public static function toolAttack(?array $def): int
+    public static function toolAttack(?array $def, ?int $quality = null): int
     {
-        return (int) ($def['attack'] ?? 0);
+        return self::withQuality((int) ($def['attack'] ?? 0), $quality);
     }
 
     /**

@@ -6331,20 +6331,38 @@ final class GameLoopTest extends TestCase
     }
 
     /**
-     * §7.4.3 -- and a piece nobody improved just uses the recipe's ceiling.
+     * §8.0.2 -- a bought piece carries its OWN ceiling, near the recipe's.
      *
-     * Null on the row rather than a copy of the catalog figure, so a recipe
-     * retuned tomorrow moves every ordinary piece with it and leaves the
-     * well-made ones where their Smith put them.
+     * The column used to be null for anything nobody improved, and the fallback
+     * read the catalog. §8.0.2 ended that: every copy is rolled a quality when
+     * it comes into the world, so a bought Stone Axe is a Stone Axe within a few
+     * per cent and the ceiling is a fact about the object rather than about the
+     * recipe. The fallback is still there for the pieces made before any of this
+     * existed, and those genuinely are the recipe (see below).
      */
-    public function test_an_ordinary_piece_takes_its_ceiling_from_the_recipe(): void
+    public function test_a_bought_piece_carries_its_own_ceiling(): void
     {
-        $item = $this->boughtItem();
+        $item = $this->boughtItem()->fresh();
+        $recipe = (int) Catalog::item('stone_axe')['maxDurability'];
 
-        $this->assertNull($item->fresh()->max_durability);
+        $this->assertNotNull($item->max_durability, 'a copy did not get a ceiling of its own');
+        $this->assertSame($item->max_durability, $item->maxDurability());
+
+        // Within the band, and full: a thing off a shelf is not worn.
+        $band = (int) ceil($recipe * Balance::QUALITY_BAND);
+        $this->assertGreaterThanOrEqual($recipe - $band, $item->max_durability);
+        $this->assertLessThanOrEqual($recipe + $band, $item->max_durability);
+        $this->assertSame($item->max_durability, (int) $item->durability);
+    }
+
+    /** And a row from before §8.0.2 still reads as the recipe, which it was. */
+    public function test_a_piece_with_no_roll_still_reads_the_recipe(): void
+    {
+        $item = new CharacterItem(['item_key' => 'stone_axe']);
+
         $this->assertSame(
             (int) Catalog::item('stone_axe')['maxDurability'],
-            $item->fresh()->maxDurability(),
+            $item->maxDurability(),
         );
     }
 

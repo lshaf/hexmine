@@ -56,8 +56,18 @@ STAT = {
     'armor': 'yield', 'boots': 'travelSpeed', 'gloves': 'processingSpeed',
 }
 
+# Balance::SOLID_SCALE -- every solid number this file emits comes out at this
+# scale, exactly as gen_battlegear.py's does.
+#
+# It was left behind when the scale landed: TopTier.php was edited by hand and
+# this was not, so running it silently divided the whole top of the ladder by a
+# hundred -- attack 17 against a world of 1700, and a Wardencoat that could not
+# scratch anything. A generator at the wrong scale does not fail; it waits for
+# somebody to run it.
+SOLID_SCALE = 100
+
 # §7.3 -- the top of the tool ladder, in mining attack.
-TOOL_ATTACK = {'legendary': 17, 'unique': 19}
+TOOL_ATTACK = {'legendary': 17 * SOLID_SCALE, 'unique': 19 * SOLID_SCALE}
 
 # §9.5.4 -- "Every armor, boots and gloves item gains attack and defense next to
 # its work stat." Every rung below this one already did; these two did not, which
@@ -78,6 +88,10 @@ PAIR = {
     'armor':  {'legendary': (1, 9),  'unique': (2, 10)},
     'boots':  {'legendary': (0, 5),  'unique': (0, 6)},
     'gloves': {'legendary': (5, 1),  'unique': (6, 2)},
+}
+PAIR = {
+    slot: {rung: tuple(v * SOLID_SCALE for v in pair) for rung, pair in rungs.items()}
+    for slot, rungs in PAIR.items()
 }
 
 PALETTE = {
@@ -162,7 +176,7 @@ def rows():
             'value': None if tool else 0.14,
             'attack': TOOL_ATTACK['legendary'] if tool else lattack,
             'defense': 0 if tool else ldefense,
-            'palette': PALETTE[biome], 'station': 'guild', 'maxDurability': 240,
+            'palette': PALETTE[biome], 'station': 'guild', 'maxDurability': 240 * SOLID_SCALE,
             'inputs': legendary_inputs(slot), 'perk': None, 'description': ldesc,
         }
         yield {
@@ -172,7 +186,7 @@ def rows():
             'value': None if tool else 0.15,
             'attack': TOOL_ATTACK['unique'] if tool else uattack,
             'defense': 0 if tool else udefense,
-            'palette': PALETTE[biome], 'station': None, 'maxDurability': 260,
+            'palette': PALETTE[biome], 'station': None, 'maxDurability': 260 * SOLID_SCALE,
             'inputs': None, 'perk': uperk, 'description': udesc,
         }
 

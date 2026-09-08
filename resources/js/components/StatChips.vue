@@ -14,7 +14,7 @@
  * sword. So: a dim uppercase word, a mono figure, and nothing else.
  */
 import { computed } from 'vue'
-import { statChips } from '@/game/formulas'
+import { qualityNote, statChips } from '@/game/formulas'
 import type { ItemDef, ItemOption } from '@/game/types'
 import type { StatChip } from '@/game/formulas'
 
@@ -43,15 +43,27 @@ const props = withDefaults(
      * wallet at all, and a gate with nobody behind it is drawn plain.
      */
     jobLevels?: Record<string, number>
+    /**
+     * §8.0.2 -- how well THIS copy came out, where the reader is looking at a
+     * copy rather than at a recipe.
+     *
+     * Undefined on a shelf tag, a bench card and the almanac, which describe
+     * the thing rather than a thing -- so those draw the recipe's own figures,
+     * which is what they are quoting.
+     */
+    quality?: number | null
   }>(),
-  { options: () => [], pairOnly: false, level: undefined, jobLevels: undefined },
+  { options: () => [], pairOnly: false, level: undefined, jobLevels: undefined, quality: undefined },
 )
 
 const chips = computed(() => {
-  const all = statChips(props.def, props.options)
+  const all = statChips(props.def, props.options, props.quality)
 
   return props.pairOnly ? all.filter((c) => c.label !== null) : all
 })
+
+/** §8.0.2 -- and the word for the copy itself, on the ones worth a word. */
+const note = computed(() => qualityNote(props.quality))
 
 /**
  * §13.3 -- ember is for a state to deal with, and this is the only one here.
@@ -69,7 +81,7 @@ const short = (chip: StatChip) => {
 </script>
 
 <template>
-  <span v-if="chips.length" class="chips">
+  <span v-if="chips.length || note" class="chips">
     <span
       v-for="(chip, i) in chips"
       :key="i"
@@ -78,6 +90,14 @@ const short = (chip: StatChip) => {
     >
       <span v-if="chip.label" class="key">{{ chip.label }}</span>
       <span :class="{ mono: chip.label }">{{ chip.value }}</span>
+    </span>
+    <!--
+      §8.0.2 -- the copy itself, last, because it qualifies every figure before
+      it rather than adding one of its own.
+    -->
+    <span v-if="note" class="chip tiny pair make" :class="{ good: note.good }">
+      <span class="key">{{ note.word }}</span>
+      <span class="mono">{{ note.percent }}</span>
     </span>
   </span>
 </template>
@@ -100,6 +120,14 @@ const short = (chip: StatChip) => {
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--vellum-dim);
+}
+
+/* §13.3 -- sap marks a thing worth crossing the screen for, and a copy that
+   came out well is one. A poor one takes no colour at all: it is a fact, not a
+   state to deal with, and ember there would be an alarm about a working tool. */
+.make.good,
+.make.good .key {
+  color: var(--sap);
 }
 
 /*

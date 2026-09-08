@@ -5,11 +5,12 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Game\Catalog;
+use App\Game\Formulas;
 use Illuminate\Database\Eloquent\Model;
 
 class CharacterItem extends Model
 {
-    protected $fillable = ['character_id', 'item_key', 'durability', 'max_durability', 'equipped', 'options'];
+    protected $fillable = ['character_id', 'item_key', 'durability', 'max_durability', 'equipped', 'options', 'quality'];
 
     /** §8.0.1 -- `options` is the rolled bonus lines, a list of {stat, value}. */
     protected $casts = [
@@ -17,6 +18,7 @@ class CharacterItem extends Model
         'max_durability' => 'integer',
         'equipped' => 'boolean',
         'options' => 'array',
+        'quality' => 'integer',
     ];
 
     /**
@@ -34,5 +36,22 @@ class CharacterItem extends Model
     {
         return $this->max_durability
             ?: (int) (Catalog::item($this->item_key)['maxDurability'] ?? 0);
+    }
+
+    /**
+     * §8.0.2 -- this copy's attack, defense or ceiling, as it actually carries
+     * it.
+     *
+     * Null quality is a piece made before any of this existed and it reads as
+     * the recipe exactly, which is what it was. Everything that wants a solid
+     * figure for an OWNED piece comes through here or through Formulas, never
+     * off the catalog -- the same rule the ceiling above is under.
+     */
+    public function solid(string $stat): int
+    {
+        return Formulas::withQuality(
+            (int) (Catalog::item($this->item_key)[$stat] ?? 0),
+            $this->quality,
+        );
     }
 }
