@@ -1564,6 +1564,39 @@ final class Balance
     public const REPAIR_COST_RATE = 0.6;
 
     /**
+     * §8.2 -- the highest material TIER a counter will sell you the parts for.
+     *
+     * A mend may be paid in coin as far as the trader reaches, and no further.
+     * A village keeps a rack of raw; a city and a capital have the refined
+     * stock behind the counter as well. **Nothing above tier 2 is ever payable
+     * in gold, at any settlement** -- and that is a §2 rule rather than a
+     * tuning value. Tier 3 is capped per wallet and §5.3 says the trader will
+     * not touch one, so a gold price on a mend that wanted ironwood would turn
+     * a capped rare into uncapped coin, which is the sentence §8.2 already
+     * writes about the resale counter.
+     *
+     * A capital is no better stocked than a city here, exactly as its shelf is
+     * no better stocked than a village's (§8.0). What a capital is for is the
+     * bench.
+     */
+    public const REPAIR_COIN_TIER = [
+        'village' => 1,
+        'city' => 2,
+        'capital' => 2,
+    ];
+
+    /**
+     * §8.3 -- and the counter's spread, which is the shelf's own markup.
+     *
+     * The parts at the NPC's own poor rate, marked up by half. That the markup
+     * is above 1 is the load-bearing part rather than a tuning value: the NPC
+     * pays 1x for a material and charges 1.5x for it, so gathering the parts is
+     * always strictly better value than buying them, and there is no
+     * gather-sell-mend loop that beats mending directly. There is a test.
+     */
+    public const REPAIR_COIN_MARKUP = 1.5;
+
+    /**
      * §3.2 -- what the shop shelf charges: two ways of valuing one object, and
      * the price is the higher of them.
      *

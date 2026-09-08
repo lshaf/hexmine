@@ -318,6 +318,93 @@ export function repairCost(def: ItemDef, missingDurability: number, max?: number
   return out
 }
 
+/**
+ * §8.2 -- how much of a mend the counter will sell you, and how much of it you
+ * have to have brought. Mirrors Formulas::repairCoinSplit.
+ *
+ * A settlement reaches a material TIER, and the bill is split on it: at or
+ * under, payable in coin; above, still out of the bag. So a village mends the
+ * raw half of a bill and a city the refined half as well, and no counter
+ * anywhere sells you the ironwood — §5.3 gives a capped rare no price at all,
+ * and a part valued at nothing would be a part handed over for nothing.
+ */
+export function repairCoinSplit(
+  cost: Record<string, number>,
+  coinTier: number,
+): { coin: Record<string, number>; materials: Record<string, number> } {
+  const coin: Record<string, number> = {}
+  const materials: Record<string, number> = {}
+
+  for (const [key, qty] of Object.entries(cost)) {
+    const def = MATERIALS[key as MaterialKey]
+    const tier = def?.tier ?? 0
+
+    if (tier <= coinTier && (tier === 0 || (def?.npcPrice ?? 0) > 0)) coin[key] = qty
+    else materials[key] = qty
+  }
+
+  return { coin, materials }
+}
+
+/**
+ * §8.2/§8.3 -- what the counter charges for that half of the bill: the parts at
+ * the NPC's own poor rate, marked up by half. Rounded up, so the smallest mend
+ * the trader will do still costs a coin.
+ */
+export function repairCoinPrice(coinParts: Record<string, number>): number {
+  const worth = materialWorth(coinParts)
+
+  return worth > 0 ? Math.ceil(worth * EQUIPMENT.repairCoinMarkup) : 0
+}
+
+/**
+ * §8.2 -- how far the counter at a settlement reaches, or nought in the field.
+ *
+ * Mirrors Balance::REPAIR_COIN_TIER, and takes the tier straight off the
+ * server's `standingAt` so the plate, the button and the rule read one value: a
+ * control offering a mend the server would refuse is worse than one that says
+ * nothing at all.
+ */
+export function repairCoinTierAt(settlementTier: string | undefined): number {
+  return settlementTier ? (EQUIPMENT.repairCoinTier[settlementTier] ?? 0) : 0
+}
+
+/**
+ * §8.2 -- the whole of a mend's bill, worked out once for everybody who draws
+ * it.
+ *
+ * The plate under the wear bar and the button beside it are two readings of one
+ * question, and they used to be two derivations: the plate listed the parts and
+ * the button knew nothing at all, which was fine while there was one way to pay.
+ * With two there is a figure on the button, and a button quoting a price the
+ * plate did not compute is the first thing to drift.
+ *
+ * `coinTier` is nought out in the field, which makes the coin half empty and
+ * the material half the whole bill -- so a caller needs no branch for "not at a
+ * settlement".
+ */
+export function repairBill(
+  def: ItemDef | undefined,
+  item: Pick<OwnedItem, 'durability' | 'maxDurability'>,
+  coinTier: number,
+): {
+  missing: number
+  cost: Record<string, number>
+  coin: Record<string, number>
+  keep: Record<string, number>
+  gold: number
+  /** Whether there is anything on this bill the counter under your feet stocks. */
+  coinOffered: boolean
+} {
+  const ceiling = item.maxDurability || (def?.maxDurability ?? 0)
+  const missing = Math.max(0, ceiling - item.durability)
+  const cost = missing > 0 && def ? repairCost(def, missing, ceiling) : {}
+  const { coin, materials } = repairCoinSplit(cost, coinTier)
+  const gold = repairCoinPrice(coin)
+
+  return { missing, cost, coin, keep: materials, gold, coinOffered: gold > 0 }
+}
+
 // -------------------------------------------------------------------- mining
 
 export interface TripBreakdown {

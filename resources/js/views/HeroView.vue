@@ -42,7 +42,7 @@ import {
   STAT_LABEL,
   slotForSkill,
 } from '@/game/catalog'
-import { formatPercent, formatStat, optionStatLine, swapChanges } from '@/game/formulas'
+import { formatPercent, formatStat, optionStatLine, repairBill, repairCoinTierAt, swapChanges } from '@/game/formulas'
 import { EQUIPMENT } from '@/game/balance'
 import { itemIcon, skillIcon } from '@/icons/procedural'
 import GearCell from '@/components/GearCell.vue'
@@ -194,6 +194,26 @@ async function act(run: Promise<unknown>): Promise<void> {
   await run
   close()
 }
+
+/**
+ * §8.2 -- what the counter under your feet would cover of this mend.
+ *
+ * The same derivation RepairCost draws, so the figure on the button is the
+ * figure on the plate. Nothing is offered out in the field, and nothing is
+ * offered on a bill made entirely of things a trader will not touch.
+ */
+const coinMend = computed(() => {
+  const item = picked.value?.item
+  if (!item) return null
+
+  const bill = repairBill(
+    picked.value?.def ?? undefined,
+    item,
+    repairCoinTierAt(game.currentSettlement?.tier),
+  )
+
+  return bill.coinOffered ? bill : null
+})
 
 /**
  * §8.1 rule 1 -- the load-bearing number on this page.
@@ -453,6 +473,17 @@ const ceilings = computed(() =>
                   wide
                   :disabled="game.busy"
                   @click="act(game.repair(picked.item.id))"
+                />
+                <!-- §8.2 -- the same verb, paid at the counter instead. It
+                     carries the figure because the two buttons differ by the
+                     price and by nothing else. -->
+                <GearAction
+                  v-if="coinMend"
+                  action="repair"
+                  :label="`Buy parts · ${coinMend.gold}g`"
+                  wide
+                  :disabled="game.busy"
+                  @click="act(game.repair(picked.item.id, true))"
                 />
                 <GearAction
                   action="stow"

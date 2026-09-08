@@ -359,6 +359,18 @@ export const EQUIPMENT = {
   salvageRate: 0.25,
   /** Repair must be cheaper than crafting new, but not dramatically, §8.2. */
   repairCostRate: 0.6,
+  /**
+   * §8.2 -- the highest material TIER a counter will sell you the parts for.
+   *
+   * Mirrors Balance::REPAIR_COIN_TIER. A village keeps a rack of raw; a city
+   * and a capital have the refined stock too. Nothing above tier 2 is ever
+   * payable in gold anywhere, which is a §2 rule rather than a tuning value: a
+   * capped Tier 3 with a gold price on it is a capped rare turned into
+   * uncapped coin.
+   */
+  repairCoinTier: { village: 1, city: 2, capital: 2 } as Record<string, number>,
+  /** §8.3 -- and the counter's spread: the parts at the NPC rate, plus half. */
+  repairCoinMarkup: 1.5,
   /** §8.2 -- what the trader gives back for shop gear, before wear is applied. */
   resaleRate: 0.5,
   /**

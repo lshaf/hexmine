@@ -1082,6 +1082,62 @@ final class Formulas
     }
 
     /**
+     * §8.2 -- how much of a mend the counter will sell you, and how much of it
+     * you have to have brought.
+     *
+     * A settlement reaches a material TIER (Balance::REPAIR_COIN_TIER), and the
+     * bill is split on it: everything at or under the tier may be paid in coin,
+     * everything above it still comes out of the bag. So a village mends the
+     * raw half of a bill and a city the refined half as well, and no counter
+     * anywhere sells you the ironwood.
+     *
+     * Splitting rather than capping the whole piece is what makes the rule
+     * reach the gear it matters for. A rarity cap would have said "no coin on
+     * an epic" and stopped; this says "coin for the parts a trader stocks", so
+     * an epic mend is still nine-tenths payable and the two capped units in it
+     * are still the gate.
+     *
+     * @param  array<string,int>  $cost
+     * @return array{coin:array<string,int>,materials:array<string,int>}
+     */
+    public static function repairCoinSplit(array $cost, int $coinTier): array
+    {
+        $coin = [];
+        $materials = [];
+
+        foreach ($cost as $key => $qty) {
+            $tier = (int) (Catalog::material($key)['tier'] ?? 0);
+
+            // A tier the counter reaches AND a thing it will actually price.
+            // §5.3 gives a capped rare no npcPrice at all, and a part valued at
+            // nothing would be a part handed over for nothing.
+            if ($tier <= $coinTier && ($tier === 0 || (Catalog::material($key)['npcPrice'] ?? 0) > 0)) {
+                $coin[$key] = $qty;
+            } else {
+                $materials[$key] = $qty;
+            }
+        }
+
+        return ['coin' => $coin, 'materials' => $materials];
+    }
+
+    /**
+     * §8.2/§8.3 -- what the counter charges for that half of the bill.
+     *
+     * The parts at the NPC's own poor rate, marked up by half -- the same
+     * valuation §8.3 puts on a shelf price, pointed at a repair. Rounded up, so
+     * the smallest mend the trader will do still costs a coin.
+     *
+     * @param  array<string,int>  $coinParts
+     */
+    public static function repairCoinPrice(array $coinParts): int
+    {
+        $worth = self::materialWorth($coinParts);
+
+        return $worth > 0 ? (int) ceil($worth * Balance::REPAIR_COIN_MARKUP) : 0;
+    }
+
+    /**
      * §6/§8.4 -- what a bench charges to be used.
      *
      * A share of what it handles, at the NPC's own rate, and never enough to be

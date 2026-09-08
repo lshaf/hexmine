@@ -743,6 +743,21 @@ export interface BattleWear {
   destroyed: boolean
 }
 
+/**
+ * §8.2 -- what a mend taught, and what it cost in coin.
+ *
+ * `gold` is nought on a mend paid entirely out of the bag, which is most of
+ * them. It is the trader's price for the parts (§8.3's own markup), or the
+ * whole bill on basic gear the trader simply mends for you.
+ */
+export interface RepairResult {
+  jobXp: number
+  characterXp: number
+  job: string | null
+  levels: number
+  gold: number
+}
+
 /** Standard envelope: the result of the action plus the new authoritative state. */
 export interface ActionResult<T = unknown> {
   data: T
@@ -1004,9 +1019,8 @@ export interface GameApi {
 
   equipItem(ownedId: string): Promise<ActionResult<null>>
   unequipItem(ownedId: string): Promise<ActionResult<null>>
-  repairItem(
-    ownedId: string,
-  ): Promise<ActionResult<{ jobXp: number; characterXp: number; job: string | null; levels: number }>>
+  /** §8.2 -- `coin` buys the parts over the counter as far as the tier reaches. */
+  repairItem(ownedId: string, coin?: boolean): Promise<ActionResult<RepairResult>>
   /**
    * §9.5.9 -- the three each battle job knows, keyed by job.
    *

@@ -30,15 +30,23 @@ class EquipmentController extends GameController
     public function repair(Request $request, int $item): JsonResponse
     {
         $character = $this->character($request);
-        $learned = $this->game->repairItem($character, $item);
+
+        // §8.2 -- whether the parts come out of the bag or over the counter.
+        // The same verb either way, which is why it is a flag on the mend
+        // rather than a second endpoint: what changes is who supplies the
+        // materials, not what happens to the piece.
+        $learned = $this->game->repairItem($character, $item, $request->boolean('coin'));
 
         // §8.2 -- and say what the mending taught, because it is the one part
         // of a repair that is not a bill. Silent, it would be a number the
         // player only found by watching a job level move on another screen.
         $note = 'Repaired.';
+        if ($learned['gold'] > 0) {
+            $note = "Repaired for {$learned['gold']} gold.";
+        }
         if ($learned['jobXp'] > 0 && $learned['job'] !== null) {
             $job = Jobs::JOBS[$learned['job']]['name'];
-            $note = "Repaired. {$job} +{$learned['jobXp']} xp.";
+            $note = rtrim($note, '.').". {$job} +{$learned['jobXp']} xp.";
         }
 
         return $this->respond($character, $learned, $note);

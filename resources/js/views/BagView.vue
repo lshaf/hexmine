@@ -64,7 +64,7 @@ import {
   SCOPE_LABEL,
   SLOT_LABEL,
 } from '@/game/catalog'
-import { statLine, swapCeilingNote, swapChanges } from '@/game/formulas'
+import { repairBill, repairCoinTierAt, statLine, swapCeilingNote, swapChanges } from '@/game/formulas'
 import type { SwapChange } from '@/game/formulas'
 import GearAction from '@/components/GearAction.vue'
 import RepairCost from '@/components/RepairCost.vue'
@@ -691,10 +691,30 @@ async function scrap(item: OwnedItem): Promise<void> {
  * repair queue was that the button lived on the prospector sheet, where you can
  * only reach gear you are already wearing.
  */
-async function mend(item: OwnedItem): Promise<void> {
-  await game.repair(item.id)
+async function mend(item: OwnedItem, coin = false): Promise<void> {
+  await game.repair(item.id, coin)
   close()
 }
+
+/**
+ * §8.2 -- what the counter under your feet would cover of this mend.
+ *
+ * The same derivation RepairCost draws, so the figure on the button is the
+ * figure on the plate. Nothing is offered out in the field, and nothing is
+ * offered on a bill made entirely of things a trader will not touch.
+ */
+const coinMend = computed(() => {
+  if (picked.value?.kind !== 'gear') return null
+
+  const item = picked.value.item
+  const bill = repairBill(
+    ITEM_BY_KEY[item.key],
+    item,
+    repairCoinTierAt(game.currentSettlement?.tier),
+  )
+
+  return bill.coinOffered ? bill : null
+})
 </script>
 
 <template>
@@ -1042,6 +1062,17 @@ async function mend(item: OwnedItem): Promise<void> {
                   wide
                   :disabled="game.busy"
                   @click="mend(picked.item)"
+                />
+                <!-- §8.2 -- the same verb, paid at the counter instead. It
+                     carries the figure because the two buttons differ by the
+                     price and by nothing else. -->
+                <GearAction
+                  v-if="coinMend"
+                  action="repair"
+                  :label="`Buy parts · ${coinMend.gold}g`"
+                  wide
+                  :disabled="game.busy"
+                  @click="mend(picked.item, true)"
                 />
                 <GearAction
                   action="scrap"

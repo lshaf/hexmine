@@ -40,6 +40,7 @@ import type {
   PlayerState,
   LedgerCatalog,
   QuestReward,
+  RepairResult,
   SkillPoints,
   SkillTree,
   StationState,
@@ -307,10 +308,9 @@ export class HttpDriver implements GameApi {
 
   repairItem(
     ownedId: string,
-  ): Promise<ActionResult<{ jobXp: number; characterXp: number; job: string | null; levels: number }>> {
-    return post<
-      ActionResult<{ jobXp: number; characterXp: number; job: string | null; levels: number }>
-    >(`/equipment/${ownedId}/repair`)
+    coin = false,
+  ): Promise<ActionResult<RepairResult>> {
+    return post<ActionResult<RepairResult>>(`/equipment/${ownedId}/repair`, { coin })
   }
 
   getBattleSkills(): Promise<Record<string, BattleSkillRow[]>> {

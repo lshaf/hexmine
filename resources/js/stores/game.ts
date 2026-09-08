@@ -1278,8 +1278,9 @@ export const useGame = defineStore('game', () => {
     await act(() => api.unequipItem(ownedId))
   }
 
-  async function repair(ownedId: string): Promise<void> {
-    await act(() => api.repairItem(ownedId))
+  /** §8.2 -- `coin` buys the parts over the counter as far as the tier reaches. */
+  async function repair(ownedId: string, coin = false): Promise<void> {
+    await act(() => api.repairItem(ownedId, coin))
   }
 
   /** §8.2 -- the third exit: gold back, scaled by what is left of the piece. */

@@ -50,10 +50,15 @@ The three currencies are strictly separated. No backdoor converts one into anoth
 - **In-game only**, NPC-facing, freely inflatable/deflatable by design (no on-chain consequence)
 - Faucets: selling excess resources to NPC (deliberately bad rate), monster gold drops, quests/dailies
 - Sinks: NPC repair, basic equipment, **bench fees** (§6/§8.4 — the steady one,
-  paid by everybody who makes anything), settlement upgrades, **guild capital
-  bidding** (largest sink)
+  paid by everybody who makes anything), **repair parts** (§8.2 — the counter
+  sells you a mend's cheap half at a markup), settlement upgrades, **guild
+  capital bidding** (largest sink)
 - Buys **common only** (§8.0). Every rung above the cheapest thing in the game
   is made rather than bought — never convertible to NFT either way
+- It buys **materials only inside a repair bill**, and only up to tier 2 (§8.2).
+  That is a chokepoint rather than an exception: there is no counter that sells
+  materials outright, so gold never becomes a general supply of them, and the
+  capped Tier 3s stay the gate on keeping good gear alive
 - The trader still *buys back* up to uncommon, which is a different question:
   a shelf is about where gear comes from, a counter is about a piece's exit
   (§8.2)
@@ -2398,6 +2403,55 @@ the game, §11.1.)*
   **Paying the trader teaches nothing.** A trader is not a bench (§8.4), and
   that branch is exactly the gear with no recipe: there is no craft job standing
   behind it to learn.
+
+  **Buying the parts does teach, and the difference is what the gold bought.**
+  A trader selling you four planks and standing back is not a bench either —
+  the mending is still yours. Gold buys the **parts**, never the labour, which
+  is the whole of what tells the two branches apart.
+- **The parts can be bought over the counter, as far as the counter reaches.**
+  Standing at a settlement, a mend may be paid in gold instead of out of the
+  bag — for the materials that settlement stocks, and no others.
+
+  **It is a MATERIAL tier, not a rarity.** The bill is split on it: everything
+  at or under the tier is payable in coin, everything above still comes out of
+  the bag.
+
+  | Counter | Sells you | Which is |
+  |---|---|---|
+  | Village | tier 1 | a rack of raw |
+  | City · capital | tier 1–2 | the refined stock as well |
+  | Anywhere | **never tier 3 or 4** | §2 |
+
+  **Splitting rather than capping the piece is what makes the rule reach the
+  gear it matters for.** A rarity cap would have said *no coin on an epic* and
+  stopped; this says *coin for the parts a trader stocks*, so an Ironwood Axe is
+  still nine-tenths payable at a city — 221 gold — and the two ironwood and the
+  shard in it are still the gate. What a player buys their way out of is the
+  errand; what they cannot buy their way out of is the walk into the contested
+  ring.
+
+  **Nothing above tier 2 is ever payable in gold, and that is a §2 rule rather
+  than a tuning value.** §5.3 gives a capped rare no NPC price at all, because
+  the trader will not touch one — so a gold figure on a mend that wanted
+  ironwood would route straight around the per-wallet cap. It is the same
+  sentence §8.2 already writes about the resale counter, said about repair, and
+  there is a test sweeping every craftable piece at every tier for it.
+
+  **The price is the shelf's own valuation** (§8.3): the parts at the NPC's own
+  poor rate, marked up by half. **That the markup is above one is the
+  load-bearing part** — the NPC pays 1× for a material and asks 1.5× for it, so
+  gathering the parts is always strictly better value than buying them and there
+  is no gather-sell-then-buy loop that beats mending directly. There is a test.
+
+  **A capital is no better stocked than a city here**, exactly as its shelf is
+  no better stocked than a village's (§8.0). What a capital is for is the bench.
+
+  **On screen the bill is said twice**, because there are two ways to pay it and
+  the choice is between two bills: what the parts cost out of the bag, and what
+  the counter wants for the half it stocks *plus* what you still have to have
+  brought. Two lines rather than one toggled line — a player comparing them
+  should not have to press something to see the other one — and two buttons,
+  the same anvil differing by the figure on it.
 - **A piece carries its own ceiling, not its recipe's.** §7.4.3's
   `craftDurability` raises the max of what a Smith makes, and §8.0.1's rolled
   `durability` line raises it again — so two copies of one recipe can differ,

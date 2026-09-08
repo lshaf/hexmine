@@ -7237,11 +7237,18 @@ class GameService
     /**
      * §8.2 -- mend it, and learn something for the mending.
      *
-     * @return array{jobXp:int,characterXp:int,job:?string,levels:int}
+     * `$withCoin` buys the parts over the counter instead of taking them out of
+     * the bag, as far up the material tiers as the settlement reaches
+     * (Balance::REPAIR_COIN_TIER). It buys the PARTS and never the labour --
+     * which is why it still teaches, where the trader mending a basic for you
+     * teaches nothing. A trader is not a bench (§8.4); a trader selling you
+     * four planks and standing back is not one either.
+     *
+     * @return array{jobXp:int,characterXp:int,job:?string,levels:int,gold:int}
      */
-    public function repairItem(Character $character, int $itemId): array
+    public function repairItem(Character $character, int $itemId, bool $withCoin = false): array
     {
-        return DB::transaction(function () use ($character, $itemId) {
+        return DB::transaction(function () use ($character, $itemId, $withCoin) {
             $item = $this->ownedItem($character, $itemId);
             $def = Catalog::item($item->item_key);
             // §7.4.3 -- the PIECE's ceiling, not the catalog's. A Smith's node
@@ -7254,16 +7261,53 @@ class GameService
                 throw new GameException('Nothing to repair.', 'noop');
             }
 
+            $gold = 0;
+
             if (isset($def['inputs'])) {
                 $cost = Formulas::repairCost($def, $missing, $max);
-                foreach ($cost as $key => $qty) {
+
+                // §8.2 -- what the counter is covering, and what you still have
+                // to have brought. Nothing is covered out in the field, so the
+                // split is the whole bill in the second half.
+                $split = ['coin' => [], 'materials' => $cost];
+
+                if ($withCoin) {
+                    $settlement = $this->requireSettlement($character, 'buy repair parts');
+                    $reach = Balance::REPAIR_COIN_TIER[$settlement['tier']] ?? 0;
+                    $split = Formulas::repairCoinSplit($cost, $reach);
+
+                    if ($split['coin'] === []) {
+                        throw new GameException(
+                            "Nothing in this mend is anything {$settlement['name']} stocks.",
+                            'nothing_stocked',
+                        );
+                    }
+
+                    $gold = Formulas::repairCoinPrice($split['coin']);
+                    if ($character->gold < $gold) {
+                        $short = $gold - (int) $character->gold;
+                        throw new GameException(
+                            "The parts come to {$gold} gold. You are {$short} short.",
+                            'no_gold',
+                        );
+                    }
+                }
+
+                // §7.6/§8.2 -- refused before anything is spent, gold included.
+                foreach ($split['materials'] as $key => $qty) {
                     if ($this->held($character, $key) < $qty) {
                         $name = Catalog::material($key)['name'] ?? $key;
                         throw new GameException("Repair needs {$qty} {$name}.", 'insufficient');
                     }
                 }
-                foreach ($cost as $key => $qty) {
+
+                foreach ($split['materials'] as $key => $qty) {
                     $this->takeMaterial($character, $key, $qty);
+                }
+
+                if ($gold > 0) {
+                    $character->gold -= $gold;
+                    $character->save();
                 }
             } else {
                 // Basic gear is repaired by the NPC for gold, §3.2 -- which means
@@ -7283,7 +7327,7 @@ class GameService
                 // it teaches you nothing, which is also why this branch exists
                 // at all: it is the gear that has no recipe, so there is no
                 // craft job standing behind it to learn.
-                return ['jobXp' => 0, 'characterXp' => 0, 'job' => null, 'levels' => 0];
+                return ['jobXp' => 0, 'characterXp' => 0, 'job' => null, 'levels' => 0, 'gold' => $gold];
             }
 
             $item->durability = $max;
@@ -7318,6 +7362,7 @@ class GameService
                 'characterXp' => $characterXp,
                 'job' => $jobKey,
                 'levels' => $levels,
+                'gold' => $gold,
             ];
         });
     }
