@@ -909,6 +909,151 @@ final class GuildTest extends TestCase
         $this->assertSame(0, (int) $guild->fresh()->gold, 'a city fee reached a treasury');
     }
 
+    /**
+     * §10.6 -- a level is BUILT, not bought.
+     *
+     * It used to land the instant it was paid for, which made the most
+     * expensive thing a guild can do the only thing in the game with no clock
+     * on it. The gold goes now and the level arrives later.
+     */
+    public function test_a_level_takes_time_to_build(): void
+    {
+        $this->standAt('city');
+        $this->purse(Balance::GUILD_FOUNDING_COST);
+        $guild = $this->game->foundGuild($this->character->fresh(), $this->identity());
+        $this->claimLandFor($guild);
+
+        $cost = Balance::guildLandLevelCost(1);
+        $guild->refresh();
+        $guild->gold = $cost;
+        $guild->save();
+
+        $this->game->upgradeGuildLand($this->character->fresh(), 'processing');
+        $guild->refresh();
+
+        // Paid for, and standing at nothing.
+        $this->assertSame(0, (int) $guild->gold, 'the build did not cost the treasury');
+        $this->assertSame(0, (int) $guild->land_processing_level, 'the level landed instantly');
+        $this->assertSame('processing', $guild->land_building);
+        $this->assertGreaterThan($this->game->now(), (int) $guild->land_built_at);
+
+        // Still nothing, a moment later.
+        $this->assertSame(
+            0,
+            $this->game->settleGuildLand($guild->fresh())->land_processing_level,
+        );
+
+        // Wind the clock back rather than sleeping, like every other timer here.
+        $guild->land_built_at = $this->game->now() - 1;
+        $guild->save();
+
+        $settled = $this->game->settleGuildLand($guild->fresh());
+
+        $this->assertSame(1, (int) $settled->land_processing_level);
+        $this->assertNull($settled->land_building, 'the build did not clear');
+        $this->assertNull($settled->land_built_at);
+
+        // And it lands once. Settling again is a no-op, which is what makes it
+        // safe to call on every read path (§16).
+        $this->assertSame(
+            1,
+            (int) $this->game->settleGuildLand($settled->fresh())->land_processing_level,
+            'a finished build was handed over twice',
+        );
+    }
+
+    /**
+     * §10.6 -- and it finishes on its OWN, with nothing to claim.
+     *
+     * A level is not carried home, so unlike a mine or a bench run there is
+     * nobody who has to come back for it. Reading the guild is enough, which is
+     * what makes an hour offline and an hour watching the same (§16).
+     */
+    public function test_a_finished_build_lands_without_being_collected(): void
+    {
+        $this->standAt('city');
+        $this->purse(Balance::GUILD_FOUNDING_COST);
+        $guild = $this->game->foundGuild($this->character->fresh(), $this->identity());
+        $this->claimLandFor($guild);
+
+        $guild->refresh();
+        $guild->land_building = 'craft';
+        $guild->land_built_at = $this->game->now() - 1;
+        $guild->save();
+
+        // Nothing collected: just somebody asking about the guild.
+        $read = $this->game->guildOf($this->character->fresh());
+
+        $this->assertSame(1, (int) $read->land_craft_level);
+        $this->assertSame('common', Balance::guildLandCraftCap(1));
+
+        // And the same through the map, which is the other read path.
+        $land = $this->game->guildLandAt((int) $guild->land_col, (int) $guild->land_row);
+        $this->assertSame('common', $land['craftCap']);
+        $this->assertNull($land['building']);
+    }
+
+    /**
+     * §10.6 -- one build at a time. A guild builds one thing at a time, and
+     * that is what keeps WHICH ladder to climb a decision.
+     */
+    public function test_the_yard_builds_one_thing_at_a_time(): void
+    {
+        $this->standAt('city');
+        $this->purse(Balance::GUILD_FOUNDING_COST);
+        $guild = $this->game->foundGuild($this->character->fresh(), $this->identity());
+        $this->claimLandFor($guild);
+
+        $guild->refresh();
+        $guild->gold = 10_000_000;
+        $guild->save();
+
+        $this->game->upgradeGuildLand($this->character->fresh(), 'processing');
+        $spent = (int) $guild->fresh()->gold;
+
+        try {
+            $this->game->upgradeGuildLand($this->character->fresh(), 'craft');
+            $this->fail('two builds went up at once');
+        } catch (GameException $e) {
+            $this->assertSame('busy', $e->errorCode);
+        }
+
+        $this->assertSame($spent, (int) $guild->fresh()->gold, 'a refused build spent gold');
+    }
+
+    /** §10.6 -- the clock climbs with the level, and goes through scaled(). */
+    public function test_a_higher_level_takes_longer_to_build(): void
+    {
+        $seen = 0;
+        for ($level = 1; $level <= Balance::GUILD_LAND_MAX_LEVEL; $level++) {
+            $ms = Balance::guildLandBuildMs($level);
+            $this->assertGreaterThan($seen, $ms, "level {$level} builds no slower than the one below");
+            $seen = $ms;
+        }
+
+        // Compared in ONE unit: CRAFT_BASE_SECONDS is seconds and this is
+        // milliseconds, and the first version of this test compared them raw
+        // and passed only because scaled() clamps to a one-second floor.
+        $craftMs = (int) (max(Balance::CRAFT_BASE_SECONDS) * 1000);
+        $runMs = (int) (26 * 60 * 1000);  // §6's longest run: banding a frame.
+
+        // Even the FIRST level outlasts any single run at a bench, because this
+        // is a building rather than an object.
+        $this->assertGreaterThan(
+            $runMs,
+            Balance::GUILD_BUILD_BASE_MS,
+            'the first level goes up quicker than a frame is banded',
+        );
+
+        // And the last is in another league entirely -- ten hours against the
+        // longest craft in the game.
+        $this->assertGreaterThan(
+            $craftMs * 10,
+            Balance::GUILD_BUILD_BASE_MS * Balance::GUILD_LAND_MAX_LEVEL,
+            'a maxed ladder is an afternoon',
+        );
+    }
+
     /** §10.5 -- a hall seats what it has been built to seat, and no more. */
     public function test_a_full_hall_turns_arrivals_away(): void
     {

@@ -4434,7 +4434,10 @@ class GameService
     {
         $row = GuildMember::where('character_id', $character->id)->first();
 
-        return $row?->guild;
+        // §10.6 -- and hand over any finished build on the way past. Every
+        // screen that asks about a guild comes through here, so this is the one
+        // place a level can be waiting to land.
+        return $this->settleGuildLand($row?->guild);
     }
 
     /**
@@ -4859,6 +4862,45 @@ class GameService
     }
 
     /**
+     * §10.6 -- hand over any build whose clock has run out.
+     *
+     * Read against the clock rather than swept by a worker, which is how every
+     * other timer in the game works (§16): a build nobody has looked at is
+     * still finished, and an hour offline and an hour watching produce the same
+     * thing.
+     *
+     * It finishes on its OWN, with nothing to claim -- unlike a mine or a bench
+     * run, which hand you something that needs a strap (§7.6). A level is not
+     * carried home, so there is nobody who has to come back for it and no way
+     * for it to be lost by not doing so.
+     *
+     * Called wherever a guild is read for play. Cheap when there is nothing to
+     * do, which is almost always: one null check.
+     */
+    public function settleGuildLand(?Guild $guild): ?Guild
+    {
+        if ($guild === null || $guild->land_building === null) {
+            return $guild;
+        }
+
+        if ($this->now() < (int) $guild->land_built_at) {
+            return $guild;
+        }
+
+        $column = $guild->land_building === 'craft' ? 'land_craft_level' : 'land_processing_level';
+
+        $guild->{$column} = min(
+            Balance::GUILD_LAND_MAX_LEVEL,
+            (int) $guild->{$column} + 1,
+        );
+        $guild->land_building = null;
+        $guild->land_built_at = null;
+        $guild->save();
+
+        return $guild;
+    }
+
+    /**
      * §10.6 -- the guild land standing on a hex, or none.
      *
      * Stored state rather than seed state, so unlike everything else about a
@@ -4867,7 +4909,9 @@ class GameService
      */
     public function guildLandAt(int $col, int $row): ?array
     {
-        return Guild::where('land_col', $col)->where('land_row', $row)->first()?->landSettlement();
+        $guild = Guild::where('land_col', $col)->where('land_row', $row)->first();
+
+        return $this->settleGuildLand($guild)?->landSettlement();
     }
 
     /**
@@ -5030,8 +5074,26 @@ class GameService
                 );
             }
 
+            // §10.6 -- one build at a time, and a guild builds one thing at a
+            // time. That is a real constraint rather than a technical one: with
+            // both ladders going at once the choice of WHICH to climb stops
+            // being a choice, and it is most of what a roster argues about.
+            if ($guild->land_building !== null) {
+                $name = $guild->land_building === 'craft' ? 'the bench' : 'the pits';
+
+                throw new GameException(
+                    "The yard is busy. Work on {$name} has to finish first.",
+                    'busy',
+                );
+            }
+
+            // §8.4's rule about everything that can refuse: it does so before a
+            // single coin is spent, and what happens afterwards is only the
+            // clock. The gold goes now -- a build you can cancel for a refund
+            // is a build with no decision in it.
             $guild->gold -= $cost;
-            $guild->{$column} = $level + 1;
+            $guild->land_building = $facility;
+            $guild->land_built_at = $this->now() + Balance::guildLandBuildMs($level + 1);
             $guild->save();
 
             return $guild;

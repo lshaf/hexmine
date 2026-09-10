@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useGame } from '@/stores/game'
-import { placeLabel } from '@/game/formulas'
+import { formatDuration, placeLabel } from '@/game/formulas'
 import { hexDistance } from '@/map/hexGeometry'
 import FlagCanvas from '@/components/FlagCanvas.vue'
 import FlagEditor from '@/components/FlagEditor.vue'
@@ -138,6 +138,7 @@ const facilities = computed(() => {
       max: HALL_MAX_LEVEL,
       cost: g.hallCost,
       standing: `Seats ${g.rosterCap}`,
+      building: null as number | null,
     },
     // §10.6 -- the land's two ladders. Drawn even with no land yet, greyed and
     // costing nothing, because what a claim OPENS is most of the argument for
@@ -153,6 +154,7 @@ const facilities = computed(() => {
       standing: g.land
         ? `${g.land.lines.length} of five lines`
         : 'No land yet',
+      building: g.land?.building?.facility === 'processing' ? g.land.building.at : null,
     },
     {
       key: 'craft' as const,
@@ -162,9 +164,17 @@ const facilities = computed(() => {
       max: LAND_MAX_LEVEL,
       cost: g.landCraftCost,
       standing: g.land?.craftCap ? `Reaches ${g.land.craftCap}` : 'Nothing standing yet',
+      building: g.land?.building?.facility === 'craft' ? g.land.building.at : null,
     },
   ]
 })
+
+/**
+ * §10.6 -- one build at a time, so a row that could otherwise be started has to
+ * say why it cannot. Naming the reason beats graying a button and leaving the
+ * reader to guess which of four rules bit.
+ */
+const yardBusy = computed(() => Boolean(mine.value?.land?.building))
 
 /* ----------------------------------------------------------------- editing */
 
@@ -272,8 +282,14 @@ async function saveIdentity(): Promise<void> {
           <span class="tiny muted block">{{ f.what }}</span>
         </span>
 
+        <!-- §10.6 -- what is under construction, and when it lands. It
+             finishes on its own, so this is a readout rather than a button
+             waiting to be pressed: a level is not carried home. -->
+        <span v-if="f.building" class="tiny building">
+          Building · {{ formatDuration(f.building - game.now) }}
+        </span>
         <button
-          v-if="isOwner && f.cost !== null"
+          v-else-if="isOwner && f.cost !== null && !(yardBusy && f.key !== 'hall')"
           class="btn btn-sm"
           :class="{ 'btn-primary': mine.gold >= f.cost }"
           type="button"
@@ -282,6 +298,9 @@ async function saveIdentity(): Promise<void> {
         >
           {{ f.cost }}g
         </button>
+        <!-- The yard builds one thing at a time (§10.6), and the reason is
+             said rather than left to a grayed button. -->
+        <span v-else-if="yardBusy && f.key !== 'hall'" class="tiny muted">Yard busy</span>
         <span v-else-if="f.cost === null" class="tiny open">Built out</span>
       </div>
 
@@ -482,6 +501,13 @@ async function saveIdentity(): Promise<void> {
 </template>
 
 <style scoped>
+/* §13.3 -- copper is what work in progress looks like everywhere else in the
+   game (§8.4's slate mark, §12.2's lane tag), and a build is exactly that. */
+.building {
+  color: var(--copper);
+  white-space: nowrap;
+}
+
 .page {
   display: flex;
   flex-direction: column;

@@ -28,6 +28,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string|null $land_name
  * @property int $land_processing_level
  * @property int $land_craft_level
+ * @property string|null $land_building
+ * @property int|null $land_built_at
  */
 class Guild extends Model
 {
@@ -46,6 +48,7 @@ class Guild extends Model
         'name', 'code', 'description', 'flag', 'settlement_id', 'col', 'row',
         'founder_character_id', 'recruitment', 'gold', 'hall_level', 'bench_level',
         'land_col', 'land_row', 'land_name', 'land_processing_level', 'land_craft_level',
+        'land_building', 'land_built_at',
     ];
 
     protected $casts = [
@@ -59,6 +62,7 @@ class Guild extends Model
         'land_row' => 'integer',
         'land_processing_level' => 'integer',
         'land_craft_level' => 'integer',
+        'land_built_at' => 'integer',
     ];
 
     /** §10.6 -- has this guild put a flag on a hex yet? */
@@ -110,6 +114,13 @@ class Guild extends Model
                 (int) $this->land_processing_level,
                 (int) $this->land_craft_level,
             ),
+            // §10.6 -- what is under construction, and when it lands. Null is a
+            // guild with nothing going, which is most of them. It finishes on
+            // its own, so this is a readout rather than something to collect.
+            'building' => $this->land_building === null ? null : [
+                'facility' => $this->land_building,
+                'at' => (int) $this->land_built_at,
+            ],
         ];
     }
 

@@ -834,6 +834,30 @@ final class Balance
     public const GUILD_LAND_SPEED_FLOOR = 0.40;
 
     /**
+     * §10.6 -- how long a level takes to BUILD, at the level being built.
+     *
+     * A level used to land the instant it was paid for, which made the most
+     * expensive thing a guild can do the only thing in the game with no clock
+     * on it. A saw pit takes twelve minutes (§6) and the cheapest craft eight
+     * (§8.4); raising a hall on a waste cannot take none.
+     *
+     * Linear in the level rather than following the cost curve, and that is
+     * deliberate: the GOLD is the gate (7.6 million across the two), and a
+     * second exponential on top would make the last few levels a wall rather
+     * than a wait. Half an hour for the first, ten hours for the twentieth,
+     * about four and a half days to build one ladder out.
+     *
+     * Through `scaled()` like every other clock, so a fast development clock
+     * shortens it -- §7.4.4 exempts XP alone.
+     */
+    public const GUILD_BUILD_BASE_MS = 30 * self::MINUTE;
+
+    public static function guildLandBuildMs(int $level): int
+    {
+        return self::scaled(self::GUILD_BUILD_BASE_MS * max(1, $level));
+    }
+
+    /**
      * §10.5 -- gold a facility level costs, at the level being bought.
      *
      * Rounded to the nearest hundred, because a price with two significant

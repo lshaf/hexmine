@@ -4447,6 +4447,35 @@ a hex with a flag on it.
 level 4 and passes it at 5. Everything above that is spent on the clock rather
 than the count, because five is all there is.
 
+**A level is BUILT, not bought.** It used to land the instant it was paid for,
+which made the most expensive thing a guild can do the only thing in the game
+with no clock on it: carry the gold in, walk out with the level. A saw pit takes
+twelve minutes (§6) and the cheapest craft eight (§8.4); raising a hall on a
+waste cannot take none.
+
+**Half an hour for the first level, ten hours for the twentieth** —
+`GUILD_BUILD_BASE_MS × level`, about four and a half days to build one ladder
+out. **Linear rather than following the cost curve**, deliberately: the *gold*
+is the gate, and a second exponential on top would make the last few levels a
+wall rather than a wait. Through `scaled()` like every other clock.
+
+**The gold goes at the start**, which is §8.4's rule about everything that can
+refuse — it does so before a coin is spent, and what happens afterwards is only
+the clock. A build you can cancel for a refund is a build with no decision in
+it.
+
+**It finishes on its own, and there is nothing to claim.** A mine or a bench run
+hands you something that needs a strap (§7.6), so somebody has to come back for
+it; a level is not carried home. Nobody has to stand there and nobody can lose
+it by not returning — an hour offline and an hour watching produce the same
+thing (§16). It is read against the clock rather than swept by a worker, so a
+build nobody has looked at is still finished.
+
+**One build at a time**, and that is a design constraint rather than a technical
+one: with both ladders going at once, *which* to climb stops being a choice, and
+it is most of what a roster will argue about. The Hall (§10.5) is a different
+building and is not blocked by it.
+
 **The cost curve** is `5000 × level^1.5`, rounded to the nearest hundred: 5,000
 at level 1, 158,100 at 10, 447,200 at 20. Both facilities maxed comes to about
 **7.6 million** — a few times §10.5's Hall, and still well under §10.4's capital
@@ -4496,6 +4525,11 @@ a control that appears where it cannot work is worse than one that is absent.
 **And the name is set from the same panel**, on your own guild's ground, by the
 owner alone (§10.0.2). It sits above the line tabs because it is what the place
 *is* rather than what it does.
+
+**A facility being built says so where its price was**, in copper — §13.3 spends
+copper on work in progress, and this is exactly that. The other ladder says
+*yard busy* rather than graying its button, because naming the reason beats
+leaving the reader to guess which of four rules bit.
 
 #### On the map — five glyphs, and it grows
 

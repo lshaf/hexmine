@@ -861,6 +861,14 @@ export interface GuildLand {
   craftCap: Rarity | null
   /** §13.2 -- 1..5, which glyph the map draws. */
   glyphTier: number
+  /**
+   * §10.6 -- the level being BUILT, and when it lands.
+   *
+   * Null is a guild with nothing going, which is most of them. It finishes on
+   * its own -- a level is not carried home, so there is nothing to collect and
+   * no way to lose it by not coming back.
+   */
+  building: { facility: 'processing' | 'craft'; at: number } | null
 }
 
 export interface Tile {
