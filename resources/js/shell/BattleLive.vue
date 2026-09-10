@@ -112,8 +112,16 @@ const theirCrest = computed(() =>
   ),
 )
 
+/**
+ * §9.5.4 -- you, drawn as what you are actually fighting with.
+ *
+ * Null when there is nothing in the weapon slot, and `fighterCrest` has a bare
+ * body for exactly that. It used to read the job row's `skill_key`, which is
+ * NOT NULL and therefore says 'swordhand' for a bare-handed fight -- a
+ * placeholder the column needs, drawn as a claim about the fighter.
+ */
 const myCrest = computed(() =>
-  fighterCrest(FAMILY_FOR_BATTLE_JOB[props.job.skill] ?? null, failing.value, 44),
+  fighterCrest(FAMILY_FOR_BATTLE_JOB[props.job.skill ?? ''] ?? null, failing.value, 44),
 )
 
 let timer: ReturnType<typeof setInterval> | undefined
@@ -187,7 +195,7 @@ onBeforeUnmount(stop)
           :their-profile="monster?.profile"
           :their-attack="monster?.attack"
           :their-defense="monster?.defense"
-          :my-sub="job.skill"
+          :my-sub="job.skill ?? 'bare-handed'"
           :my-attack="mine?.attack ?? 0"
           :my-defense="mine?.defense ?? 0"
           :struck-them="tookTheirs > 0"

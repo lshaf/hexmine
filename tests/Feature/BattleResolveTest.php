@@ -653,6 +653,44 @@ final class BattleResolveTest extends TestCase
     }
 
     /**
+     * §9.5.4/§9.5.9 -- with nothing in the slot you fight BARE-HANDED.
+     *
+     * No family means no class, so there is no battle job to teach and none of
+     * the nine skills is armed: §9.5.9 says the weapon decides which three you
+     * carry, and an empty hand decides none.
+     *
+     * The job row still has to write something to its NOT NULL `skill_key`, and
+     * writes 'swordhand'. That is a placeholder rather than a fact, and the
+     * things that matter read the PAYLOAD -- which is what this pins, because
+     * the placeholder leaked into the replay once and drew a swordsman for
+     * somebody swinging their fists.
+     */
+    public function test_an_empty_hand_fights_bare_and_teaches_nobody(): void
+    {
+        // Armour only: something to absorb with, and nothing to swing.
+        $this->equip('longwatch_carapace');
+
+        $this->standOnALivePack();
+        $job = $this->game->startBattle($this->character->fresh());
+
+        // `??` fires on null as well as on absent, so it cannot tell the two
+        // apart -- and the payload carries the key WITH a null in it, which is
+        // the honest shape. Ask for the key and the value separately.
+        $this->assertArrayHasKey('job', $job->payload);
+        $this->assertNull($job->payload['job'], 'a bare fist named a battle job');
+        $this->assertSame([], $job->payload['skills'] ?? [], 'an empty hand armed a skill');
+
+        // And what the screen is handed says the same, which is the half that
+        // broke: the column is a placeholder and must not reach a drawing.
+        $drawn = $this->game->jobPayload($job->fresh());
+        $this->assertNull($drawn['skill'], 'the replay was told to draw a swordsman');
+
+        // The fight still happens -- §9.5.3 says fighting is always one of the
+        // two ways off a pinned hex, bare-handed if it comes to that.
+        $this->assertNotEmpty($job->payload['log'] ?? [], 'a bare-handed fight never swung');
+    }
+
+    /**
      * §9.5.3 -- losing is an exit, not a strategy. Half XP for it sounds
      * generous and is a trickle you can farm by dying on purpose.
      */

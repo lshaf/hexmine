@@ -7923,6 +7923,21 @@ class GameService
         // (§9.5.3), so there is no decision left for foreknowledge to spoil.
         // Reading ahead buys a few seconds of knowing and nothing else.
         if ($job->kind === 'battle') {
+            // §9.5.4 -- the job that actually took the fight, off the payload
+            // rather than off the column.
+            //
+            // `skill_key` is NOT NULL on the table, so a bare-handed fight has
+            // to write SOMETHING there and writes 'swordhand'. That is a
+            // placeholder, not a fact: it pays no XP (the grant reads the
+            // payload) and it arms no skills. Sending it made the replay draw a
+            // swordsman for somebody fighting with their fists -- the one
+            // screen where the placeholder became a claim.
+            //
+            // Assigned rather than handed to `+` below: array union keeps the
+            // LEFT side's value for a duplicate key, so an override there is
+            // silently thrown away.
+            $payload['skill'] = $job->payload['job'] ?? null;
+
             return $payload + [
                 'col' => $job->col,
                 'row' => $job->row,

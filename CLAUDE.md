@@ -4030,6 +4030,19 @@ its own problem:
 | | **Rising Flurry** | 10 | a blow that is **bigger the deeper the fight has gone** |
 | | **Hamstring** | 15 | it loses its next answer |
 
+**An empty hand decides none.** With nothing in the slot there is no family, so
+there is no class — no battle job to teach, and not one of the nine armed. You
+still fight, because §9.5.3 makes fighting one of the only two ways off a pinned
+hex and a loss is a legitimate exit; you just do it with your fists and learn
+nothing by it.
+
+*(The job row has to write something to a NOT NULL column and writes
+`swordhand`. That is a placeholder and never a fact — the XP grant and the armed
+skills both read the payload, which says null honestly. It leaked into the live
+replay once and drew a swordsman for somebody swinging their fists, which is the
+whole hazard of a placeholder: it is harmless until something treats it as a
+claim. There is a test.)*
+
 **The WEAPON decides which three; the TREE teaches them.** §9.5.4 makes the
 family in the slot your class, so carrying a sword is what makes you a
 Swordhand — but the three sword skills are then *learned*, and they are learned

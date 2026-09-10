@@ -147,7 +147,9 @@ export function jobFromFight(fight: {
     quantity: 1,
     startedAt: now,
     endsAt: now + fight.log.length * fight.roundMs,
-    skill: BATTLE_JOB_FOR_FAMILY[fight.family ?? ''] ?? 'swordhand',
+    // §9.5.4 -- null with nothing in the slot, so the bench draws a bare
+    // fighter rather than defaulting somebody's empty hands to a sword.
+    skill: BATTLE_JOB_FOR_FAMILY[fight.family ?? ''] ?? null,
     monster: fight.monster,
     pool: fight.pool,
     monsterHp: fight.monsterHp,
