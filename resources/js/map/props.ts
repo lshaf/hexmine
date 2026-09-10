@@ -829,6 +829,74 @@ function settlementProp(tier: SettlementTier, seed: number, pal: Masonry = LIT):
 }
 
 /**
+ * §10.6 -- a guild's own ground, in five steps.
+ *
+ * §13.2 tells the three settlement TIERS apart by shape category rather than by
+ * size, because at a 58x34 hex there is usually nothing beside one to compare
+ * against. This is the other kind of question and it takes the other answer:
+ * these are not five kinds of place, they are one place at five stages, and
+ * "how far along are they" is exactly the quantitative reading size is for.
+ *
+ * So it grows by ACCRETION -- each step keeps everything the step below drew
+ * and adds one thing. That is what makes it readable without a legend: you are
+ * not learning five silhouettes, you are watching one get built. A waste with a
+ * flag on it becomes the busiest ground in the world.
+ *
+ *   1  a stake      a post and a pennant on empty ground
+ *   2  a camp       + the first hut
+ *   3  a yard       + a second hut and a footing
+ *   4  a works      + the wall closed round it and a hall behind
+ *   5  a hold       + the tower, which is the tallest thing a guild builds
+ *
+ * The pennant is on it from the first step and stays. It is the only gold on
+ * the map besides a capital's (§13.3 spends gold on the currency itself, and
+ * §10 makes a guild the thing gold is spent on), and it is what says *somebody
+ * owns this* at every stage including the one where there is nothing else.
+ */
+function guildStake(x: number, y: number, pal: Masonry): string {
+  const top = y - 20
+
+  return (
+    rect(x - 1, top, 2, 20, shade(pal.stone, -0.15)) +
+    poly(`${x + 1},${top} ${x + 10},${top + 3} ${x + 1},${top + 6}`, pal.pennant)
+  )
+}
+
+export function guildLandProp(step: number, pal: Masonry = LIT): string {
+  const tier = Math.max(1, Math.min(5, Math.round(step)))
+  let out = ''
+
+  // The ground it stands on, from the point there is enough standing to need a
+  // footing. A stake in a waste has no yard.
+  if (tier >= 3) out += rect(-13, 10, 26, 5, shade(pal.stone, -0.28))
+
+  // The wall, once the place is worth closing.
+  if (tier >= 4) out += rampart(15, 15, 8, pal)
+
+  // The hall behind it, in the same cold slate a city roofs in: this is
+  // institutional building rather than somebody's house.
+  if (tier >= 4) out += gable(-3, 7, 1.25, shade(pal.slate, -0.3))
+
+  if (tier >= 2) out += hut(-11, 11, 0.7, pal)
+  if (tier >= 3) out += hut(9, 9, 0.62, pal)
+
+  // The tower last and tallest, so a maxed hold reads across the map the way a
+  // capital's spire does -- which is the point of the top step.
+  if (tier >= 5) out += spire(2, 8, 30, pal)
+
+  // And the stake, which never leaves. Off to the left once there is a tower,
+  // so the two verticals do not fight.
+  out += guildStake(tier >= 5 ? -14 : 0, tier >= 5 ? 12 : 14, pal)
+
+  return out
+}
+
+/** §5.6 -- the same ground with the light taken out of it. */
+export function guildLandGlyph(step: number): string {
+  return guildLandProp(step, FOG)
+}
+
+/**
  * §5.6 -- the settlement's own silhouette with the light taken out of it (§13.2
  * tells the three tiers apart by shape category, so the fog keeps the
  * distinction for free).
@@ -1080,6 +1148,9 @@ function deadProps(
 
 export function tileProps(tile: Tile, depleted: boolean): string {
   if (tile.dungeon) return dungeonProp()
+  // §10.6 -- before the terrain, because a hold is what the hex IS now. It
+  // stands on dead ground (§5.2), so what it replaces is a field of snags.
+  if (tile.guildLand) return guildLandProp(tile.guildLand.glyphTier)
   if (tile.settlement) return settlementProp(tile.settlement.tier, tile.propSeed)
   if (tile.water) return waterProp(tile)
 

@@ -31,6 +31,7 @@ import {
   huntProp,
   packProp,
   pocketProp,
+  guildLandGlyph,
   settlementGlyph,
   tileProps,
 } from './props'
@@ -352,9 +353,11 @@ const renderTiles = computed<RenderTile[]>(() =>
       ? ''
       : tile.dungeon
         ? dungeonGlyph()
-        : tile.settlement
-          ? settlementGlyph(tile.settlement.tier, tile.propSeed)
-          : ''
+        : tile.guildLand
+          ? guildLandGlyph(tile.guildLand.glyphTier)
+          : tile.settlement
+            ? settlementGlyph(tile.settlement.tier, tile.propSeed)
+            : ''
 
     return {
       key: `${tile.col},${tile.row}`,
@@ -397,7 +400,9 @@ const renderTiles = computed<RenderTile[]>(() =>
       // the atlas has always drawn them at any distance. What the fog holds
       // back is the server's half -- depletion, who is working here, what the
       // hex would pay -- so an unscouted name is dimmed rather than withheld.
-      label: tile.settlement?.name ?? tile.dungeon?.name ?? null,
+      // §10.6 -- a hold is named by its guild, and the name is what a
+      // stranger walks toward.
+      label: tile.guildLand?.name ?? tile.settlement?.name ?? tile.dungeon?.name ?? null,
       labelLit: inSight,
       jobState: jobsByTile.value.get(`${tile.col},${tile.row}`) ?? 'none',
       rare: inSight && rare,

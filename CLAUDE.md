@@ -853,10 +853,22 @@ cognitive load from an idle game.
 |---|---|---|---|
 | Village | 1 of 5 | Outer ring | Slowest, cheapest |
 | City | 2 of 5 | Mid ring | Moderate |
-| Capital | All 5 | Inner (contested) ring | Fastest, most expensive, one ring out from the dungeons |
+| Capital | **4 of 5** | Inner (contested) ring | Fastest, most expensive, one ring out from the dungeons |
+| **Guild land** | **all 5** | any dead ground (§5.2) | §10.6 — bought, named and levelled by a roster |
 
 Village count > City count > Capital count. This is a **cost curve outcome**, not a map-slot
 system — no extra implementation needed, just tune upgrade costs.
+
+**A capital runs four of the five, and giving the fifth away is the point.**
+The only place in the world that runs every line is one a roster paid a hundred
+thousand gold for and then built (§10.6). A capital is still the best thing the
+*map itself* offers, and it is still where two of the five you happen to need
+are most likely to meet — what it stopped being is complete.
+
+**Which line it lacks is drawn from the same pool the smaller tiers draw
+from**, rather than being "all but one". So a capital missing quarrying is a
+fact about *that* capital and a reason to know your own map, exactly as a
+village's single line is.
 
 ### 6.0 Minimum spacing — a floor, not an average
 
@@ -1980,9 +1992,27 @@ easiest way to break the economy:
 | Common | gray | +3% | 0 | village | village+ | no |
 | Uncommon | green | +5% | 0–1 | city | city+ | no |
 | Rare | blue | +8% | 0–1 | capital | never | no |
-| Epic | violet | +11% | 0–2 | capital | never | **yes** |
-| Legendary | gold | +14% | 0–3 | guild hall | never | **yes** |
+| Epic | violet | +11% | 0–2 | **guild land** (§10.6) | never | **yes** |
+| Legendary | gold | +14% | 0–3 | **never — it drops** | never | **yes** |
 | Unique | ember | +15% | 0–3 + fixed perk | never | never | no — soulbound |
+
+**Epic is a guild's, and a capital stops at rare.** The last rung a player can
+*make* is one a roster had to buy a hex for, name and level to fifteen (§10.6).
+That is the whole bargain of the guild section: the top of the crafting ladder
+is cooperative, and a solo prospector's ceiling is the capital's rare.
+
+**Legendary and unique are not crafted at all.** They come off a dungeon (§9.2)
+and that is their only source, so no station in the game reaches either and the
+recipes stand defined and switched off. §8.1 rule 4's "every rarity below unique
+is reachable by crafting without spending" is therefore true up to **epic** and
+no further — epic is where an F2P ladder now ends, and it is reachable, because
+a guild is something you join rather than something you buy.
+
+The recipes stay written down: §8.0's ladder is easier to reason about whole
+than with a hole in the top, and a rung that is designed and switched off is a
+rung a dungeon can hand out tomorrow. What they do **not** carry is a station —
+a rung nothing reaches says so by naming no bench, rather than by naming one
+that cannot make it.
 
 **The option column is a ceiling, never a quota**, and only a **crafted** piece
 rolls against it at all (§8.0.1). Anything off a shelf is plain.
@@ -2000,8 +2030,9 @@ are solid counts and two shares of the work, and not one of them is a `StatKey`.
 §8.0.1's table, and it depends on what the piece is for.
 
 **A bench reaches exactly as far as its tier**, whatever materials you carry to
-it: village → common, city → uncommon, capital → rare and epic, guild hall →
-legendary. That is most of what makes a capital worth the walk.
+it: village → common, city → uncommon, capital → rare, guild land → epic
+(§10.6). That is most of what makes a capital worth the walk, and all of what
+makes a guild worth joining.
 
 **A shelf stops at common, at every settlement tier.** Anything better than the
 cheapest thing in the game is made rather than bought, which is what puts the
@@ -4151,20 +4182,23 @@ size for the number to keep meaning anything.
 place: §10.4 keeps capital *ownership* as its own separate, admin-triggered
 thing, and conflating the two would make founding a guild an act of conquest.
 
-#### The hall is the legendary bench
+#### The hall is an address, not a workshop
 
-§8.0 has always said legendary is made at a guild hall and nowhere else. Until
-now that was a rung nobody could reach — forty recipes with a station no
-building in the game had. A hall is what can eventually reach them, **for that
-guild's members, at that guild's hall**.
+Founding buys the name, the code, the flag, the roster and the door, and it buys
+**no bench at all**. A guild that has founded and not claimed land (§10.6) has
+somewhere to *be* and nowhere to *work*.
 
-**Founding opens the building, not the rung.** A new hall's bench reaches
-exactly what the settlement under it already reached, and every rung above that
-is bought a level at a time out of the treasury (§10.5). So 20,000 gold is the
-*entry* to the top rung rather than the price of it, which is the right shape:
-it is payable by anyone, and what comes after is payable only *together*. A hall
-open to passers-by would be a public good rather than a reason to join, and a
-legendary bench that needed no guild would make §10 optional.
+That is the right shape and it is why the two prices are so far apart: 20,000 is
+what one patient prospector saves for, and the 100,000 that follows is what a
+roster does together. **Epic is the guild rung** (§8.0), it is made on the
+guild's own ground, and it is made there **for that guild's members**. Ground
+open to passers-by would be a public good rather than a reason to join, and an
+epic bench that needed no guild would make §10 optional.
+
+*(This section used to say "the hall is the legendary bench", back when
+legendary was crafted and a capital reached epic. Both moved: legendary is a
+dungeon drop now and epic came down one place, onto ground a guild has to put
+there itself.)*
 
 #### 10.0.1 The door — one setting, three positions
 
@@ -4281,7 +4315,13 @@ a time out of a shared purse.
 | | What the level buys |
 |---|---|
 | **Hall** | seats. 10 flat, **+10 a level**, five levels, so a maxed hall holds sixty |
-| **Bench** | rungs. One **more** than the ground underneath it already reached, up to legendary |
+
+**The Bench facility is gone.** It bought rungs past whatever the settlement
+underneath already reached, up to legendary — and §10.6 took that job outright:
+crafting is the land's now, on its own twenty-level ladder, and legendary is not
+crafted anywhere (§8.0). Two benches in two places would have been two answers
+to one question. Seats stay here because a roster's size is a fact about the
+guild rather than about its ground.
 
 **Gold goes in and does not come out.** Non-retractable, exactly as §10.4
 requires of a bidding donation and for the same reason: a pot that can be
@@ -4307,28 +4347,22 @@ cost(level) = round(25000 * level^1.6, to the nearest 100)
 than an accident. Founding is what one patient prospector saves for; a facility
 is what a roster does together. Gold is the one currency the game may inflate
 freely (§3.2), which is exactly why it is the one that can carry a sink this
-size — a maxed Hall and a city Bench run to a million between them.
+size — a maxed Hall runs to about eight hundred thousand, and a maxed
+land to seven and a half million on top of it (§10.6).
 
-#### The bench climbs from the ground it stands on
+#### What a rung costs now lives on the land
 
-This is the part that decides whether the early levels are worth anything. A
-Bench level is **one rung past what the settlement itself reaches** (§8.0), not
-one rung up from common:
+This used to be the Bench facility's own argument — a level bought one rung past
+whatever the settlement underneath already reached, so a hall in a city climbed
+three levels to legendary and one in a capital climbed one. §10.6 replaced all
+of it: the bench is on the guild's **land** now, on a twenty-level ladder of its
+own, and it starts from nothing rather than from the ground it stands on,
+because dead ground reaches nothing at all.
 
-| Hall stands in | Starts at | Levels to legendary |
-|---|---|---|
-| City | uncommon | **3** — rare, epic, legendary |
-| Capital | epic | **1** |
-
-So no level is ever money thrown away, and a capital hall reaches the top for a
-fifth of what a city hall pays. That gap is the same pull inward §5.2 puts on
-everything else, said in gold: the contested ring is where the cheap route to
-legendary is.
-
-**Legendary still needs the hall as well as the bench.** The two questions are
-separate and both are asked — *is this your guild's hall* (§8.0: members only,
+**Epic still needs the land as well as the level.** The two questions are
+separate and both are asked — *is this your guild's ground* (§8.0: members only,
 at their own) and *has the bench been built that far*. A capital's own bench
-never reaches legendary no matter who is standing at it.
+never reaches epic no matter who is standing at it.
 
 **The seats are checked on the way in, not warned about.** Both doors (§10.0.1)
 arrive at the same admission, so that is the one place a full hall says so. A
@@ -4336,6 +4370,131 @@ guild that wants to grow has to build for it, which is what makes the Hall
 facility worth buying at all.
 
 ---
+
+### 10.6 The land — a hex a guild bought, named and built
+
+**A guild buys a hex for 100,000 gold and the world gains a place that was not
+there before.** It is the only thing on the map that is not a function of the
+seed, the only ground that runs all five processing lines (§6), and the only
+bench that reaches epic (§8.0).
+
+| | |
+|---|---|
+| **Cost** | **100,000 gold**, from the **treasury** and never a purse |
+| **Who** | the **owner** alone (§10.0.2 keeps the irreversible things there) |
+| **Where** | **dead ground only** (§5.2), standing on it, one to a guild |
+| **Name** | the guild names it, and may rename it |
+| **Levels** | two facilities, **1–20 each**, bought from the treasury |
+
+**Dead ground only, and that is the rule the whole section rests on.** §5.2
+gives half the outer rim ground that never carried a seam and never will — so a
+claim can never take a workable hex out of the world, and there is no version of
+this where guilds buy up the good country. The wastes stop being scenery and
+become the one thing worth walking to them for. It is also why the placement
+needs no §6.0-style spacing rule: worldgen never puts a settlement on dead
+ground, so the two can never collide, and a hold has no reason not to stand next
+to another one.
+
+**Founding is an address; the land is the workshop.** §10.0's 20,000 at a city
+or capital still buys the name, the code, the flag, the roster and the door. It
+buys no bench. A guild that has founded and not claimed has somewhere to *be*
+and nowhere to *work*, which is the right shape: one is what a patient
+prospector saves for and the other is what a roster does together.
+
+#### The two ladders
+
+Twenty levels each, bought apart, because they answer different questions — how
+many of the five lines run here, and how far the bench reaches. A roster that
+needs planks does not need an epic bench to get them.
+
+| Level | Processing | Craft |
+|---|---|---|
+| 0 | **nothing** | **nothing** |
+| 1 | 1 line | common |
+| 2–5 | a line a level, to all five | uncommon at 5 |
+| 10 | — | rare |
+| 15 | — | **epic** |
+| 20 | the clock, and nothing left to unlock | the clock |
+
+**Nothing runs until it is levelled once**, and that is what makes a claim the
+beginning of the work rather than the end of it. A hex bought and left alone is
+a hex with a flag on it.
+
+**A line a level for the first five**, so a guild matches a capital's four at
+level 4 and passes it at 5. Everything above that is spent on the clock rather
+than the count, because five is all there is.
+
+**The cost curve** is `5000 × level^1.5`, rounded to the nearest hundred: 5,000
+at level 1, 158,100 at 10, 447,200 at 20. Both facilities maxed comes to about
+**7.6 million** — a few times §10.5's Hall, and still well under §10.4's capital
+bidding, which stays the largest gold sink in the game.
+
+#### What it costs to work there, and where that goes
+
+**A member of the guild pays a quarter less** on the bench fee (§6). It is the
+one thing membership is worth at a bench, and it is deliberately a discount on
+the **fee** rather than on the materials: §3.2 keeps materials out of gold's
+reach entirely.
+
+**Half of what is actually paid goes into the treasury**, whoever paid it. A
+busy hold funds its own next level, which is the loop the whole section runs on:
+build it, people work there, it builds itself.
+
+**Half rather than all**, because a guild taking the whole fee would make its own
+land free to its own members by the back door — pay the fee, watch it come home.
+And **half of what was *paid*, not of what was charged**, so a member's discount
+thins the guild's cut as well as their own bill. You cannot take half of money
+nobody handed over.
+
+**Nowhere else pays a guild anything.** A capital's fee is the NPC's, and a
+guild standing somewhere is not a reason for the world's gold to start flowing
+to it.
+
+#### Anybody may fund a guild
+
+§10.5's donations open up: **membership is no longer required**. Gold bridges to
+nothing external (§3.2), so moving it between players carries none of the weight
+§3.1's no-P2P-trade rule is protecting — there is no laundering vector in a
+number that cannot leave the game, and a donation is non-retractable, so it is
+one-way rather than a channel.
+
+What stays members-only is the **credit**. §10.5 keeps a running total on the
+member's row because the roster wants to know who carried it, and an outsider is
+not on the roster to be asked about.
+
+#### On the map — five glyphs, and it grows
+
+§13.2 tells the three settlement *tiers* apart by shape category rather than by
+size, because at a 58×34 hex there is usually nothing beside one to compare
+against. This is the other kind of question and takes the other answer: these
+are not five kinds of place, they are **one place at five stages**, and *how far
+along are they* is exactly the quantitative reading size is for.
+
+So it grows by **accretion** — each step keeps everything below it and adds one
+thing. You are not learning five silhouettes, you are watching one get built.
+
+| Step | | |
+|---|---|---|
+| 1 | a stake | a post and a pennant on empty ground |
+| 2 | a camp | + the first hut |
+| 3 | a yard | + a second hut and a footing |
+| 4 | a works | + the wall closed round it, and a hall behind |
+| 5 | a hold | + the tower, the tallest thing a guild builds |
+
+The step is the two facility levels **added together**, so it reports the whole
+project rather than either half. The **pennant is on it from the first step and
+never leaves** — it is the only gold on the map besides a capital's (§13.3
+spends gold on the currency itself, and §10 makes a guild the thing gold is
+spent on), and it is what says *somebody owns this* at the stage where there is
+nothing else to say it.
+
+**Open: it obeys the fog, and a landmark arguably should not.** §5.6 draws a
+settlement glyph and its name at any distance because deciding to walk somewhere
+has to be possible — but a settlement is *derived* and this is *stored*, so it
+rides the map query and is bounded by the same disc as everything else there.
+A hold you cannot see until you are standing next to it is the wrong answer for
+the top step; the right one needs a cheap way to hand the client every hold on
+the map, and that is not designed yet.
 
 ## 11. Sinks (the stability engine)
 

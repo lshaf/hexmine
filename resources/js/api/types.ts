@@ -16,7 +16,7 @@ import type {
   Job,
   MaterialKey,
   OwnedItem,
-  Rarity,
+  GuildLand,
   Settlement,
   SkillKey,
   StatKey,
@@ -580,6 +580,14 @@ export interface MapMutations {
    * something, and both of those already refresh.
    */
   nextChangeAt: number | null
+  /**
+   * §10.6 -- guild land, the one PLACE on the map that is not a function of the
+   * seed.
+   *
+   * Sent whole rather than as a subtraction, for the same reason `roaming` is:
+   * the seed says the hex is empty, so anything standing there has to be named.
+   */
+  guildLands: GuildLand[]
 }
 
 /**
@@ -869,12 +877,16 @@ export interface GuildSummary {
   members: number
   /** §10.5 -- seats bought over the flat base. */
   hallLevel: number
-  /** §10.5 -- rungs bought over what the settlement underneath already reached. */
-  benchLevel: number
-  /** §10.5 -- how far up §8.0's ladder this guild's own bench reaches. */
-  benchReach: Rarity
   /** §10.5 -- how many the hall seats, all in. */
   rosterCap: number
+  /**
+   * §10.6 -- the hex this guild bought, named and is levelling, or null.
+   *
+   * Public, and meant to be: it is the best recruiting line a guild has, being
+   * the only ground in the world that runs all five processing lines and the
+   * only bench that reaches epic.
+   */
+  land: GuildLand | null
 }
 
 /**
@@ -885,11 +897,13 @@ export interface GuildSummary {
  */
 export interface GuildTreasury {
   gold: number
-  /** The last Bench level worth buying — the one that reaches legendary. */
-  benchMaxLevel: number
   /** Gold the next level costs, or null when the facility is finished. */
   hallCost: number | null
-  benchCost: number | null
+  /** §10.6 -- what a hex costs, or null once the guild holds one. */
+  landCost: number | null
+  /** And the next level of each of the land's two ladders. */
+  landProcessingCost: number | null
+  landCraftCost: number | null
 }
 
 export type GuildRole = 'owner' | 'officer' | 'member'
@@ -996,7 +1010,7 @@ export interface GameApi {
   /** §10.5 -- gold into the treasury. It does not come back out. */
   donateToGuild(gold: number): Promise<ActionResult<GuildDetail>>
   /** §10.5 -- spend it on a facility level. Owner only. */
-  upgradeGuildFacility(facility: 'hall' | 'bench'): Promise<ActionResult<GuildDetail>>
+  upgradeGuildFacility(facility: 'hall' | 'processing' | 'craft'): Promise<ActionResult<GuildDetail>>
   /** §9.5.5 -- starts a fight and answers with the JOB; the report is on collect. */
   fight(): Promise<ActionResult<Job>>
 

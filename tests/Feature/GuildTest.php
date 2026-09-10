@@ -7,6 +7,7 @@ namespace Tests\Feature;
 use App\Game\Balance;
 use App\Game\Catalog;
 use App\Game\GameException;
+use App\Game\Formulas;
 use App\Game\GameService;
 use App\Game\WorldGen;
 use App\Models\Character;
@@ -103,6 +104,59 @@ final class GuildTest extends TestCase
         }
 
         $this->fail("no {$tier} anywhere near the spawn");
+    }
+
+    /**
+     * §10.6 -- put the owner on dead ground and buy it.
+     *
+     * Searched rather than fabricated, like everything else about the world:
+     * §5.2 says half the outer rim never carried a seam, so the nearest waste
+     * is never far. The treasury is topped up here because what this helper is
+     * for is the land, not the saving up.
+     *
+     * @return array<string,mixed>
+     */
+    private function claimLandFor(Guild $guild, ?Character $who = null): array
+    {
+        $who ??= $this->character;
+        $who = $who->fresh();
+
+        $radius = Balance::mapRadius();
+        $found = null;
+
+        for ($ring = 0; $ring < 60 && $found === null; $ring++) {
+            for ($dc = -$ring; $dc <= $ring && $found === null; $dc++) {
+                for ($dr = -$ring; $dr <= $ring && $found === null; $dr++) {
+                    if ($ring > 0 && max(abs($dc), abs($dr)) !== $ring) {
+                        continue;
+                    }
+
+                    $col = (int) $who->col + $dc;
+                    $row = (int) $who->row + $dr;
+                    if (abs($col) > $radius || abs($row) > $radius) {
+                        continue;
+                    }
+
+                    $tile = $this->game->buildTile($col, $row, $this->game->now());
+                    if (($tile['dead'] ?? false) && ! ($tile['water'] ?? false)
+                        && ($tile['settlement'] ?? null) === null
+                        && ($tile['dungeon'] ?? null) === null) {
+                        $found = [$col, $row];
+                    }
+                }
+            }
+        }
+
+        $this->assertNotNull($found, '§5.2 promises dead ground, and there was none nearby');
+
+        $who->update(['col' => $found[0], 'row' => $found[1]]);
+
+        $guild->gold = Balance::GUILD_LAND_COST;
+        $guild->save();
+
+        $this->game->claimGuildLand($who->fresh());
+
+        return $guild->fresh()->landSettlement();
     }
 
     private function purse(int $gold, ?Character $who = null): void
@@ -368,61 +422,95 @@ final class GuildTest extends TestCase
     }
 
     /**
-     * §8.0 / §10.0 -- the hall is the legendary bench, and it is the guild's
-     * own. Founding one is what puts the top rung in reach.
+     * §8.0/§10.6 -- EPIC is a guild's own land, and nowhere else.
+     *
+     * A capital used to reach it and does not any more: the last rung a player
+     * can craft is one a roster had to buy a hex for, name and level to
+     * fifteen. That is the whole bargain of §10.6.
      */
-    public function test_legendary_is_made_at_your_own_hall_and_nowhere_else(): void
+    public function test_epic_is_made_on_your_own_land_and_nowhere_else(): void
     {
-        $legendary = collect(Catalog::items())
-            ->filter(fn (array $d) => ($d['rarity'] ?? null) === 'legendary' && ! empty($d['inputs']))
+        $epic = collect(Catalog::items())
+            ->filter(fn (array $d) => ($d['rarity'] ?? null) === 'epic' && ! empty($d['inputs']))
             ->keys()
             ->first();
 
-        $this->assertNotNull($legendary, 'no legendary recipe to test with');
+        $this->assertNotNull($epic, 'no epic recipe to test with');
 
-        $capital = $this->standAt('capital');
+        $this->standAt('capital');
         $this->purse(Balance::GUILD_FOUNDING_COST);
 
-        // Standing at the best bench in the game, with no guild.
+        // Standing at the best bench the MAP offers, with no guild.
         try {
-            $this->game->startCraft($this->character->fresh(), $legendary);
-            $this->fail('legendary work came off a capital bench');
+            $this->game->startCraft($this->character->fresh(), $epic);
+            $this->fail('epic work came off a capital bench');
         } catch (GameException $e) {
             $this->assertSame('station', $e->errorCode);
             $this->assertStringContainsString('guild', $e->getMessage());
         }
 
         $guild = $this->game->foundGuild($this->character->fresh(), $this->identity());
+
+        // §10.6 -- founding is an address, not a workshop. Until the guild
+        // holds land there is nowhere for this to be made at all.
+        $this->assertFalse($this->game->atOwnGuildHall($this->character->fresh()));
+
+        $land = $this->claimLandFor($guild);
         $this->assertTrue($this->game->atOwnGuildHall($this->character->fresh()));
 
-        // §10.5 -- and the hall alone is not the bench. A capital reaches epic,
-        // so a brand-new hall standing in one reaches epic too until somebody
-        // pays for the rung above it.
+        // And the ground alone is not the bench: a claim buys the hex and
+        // nothing standing on it.
         try {
-            $this->game->startCraft($this->character->fresh(), $legendary);
-            $this->fail('legendary came off a bench nobody had built');
+            $this->game->startCraft($this->character->fresh(), $epic);
+            $this->fail('epic came off a bench nobody had built');
         } catch (GameException $e) {
             $this->assertSame('station', $e->errorCode);
-            $this->assertStringContainsString('epic', $e->getMessage());
         }
 
-        $this->purse(Balance::guildFacilityCost(1));
-        $this->game->donateToGuild($this->character->fresh(), Balance::guildFacilityCost(1));
-        $this->game->upgradeGuildFacility($this->character->fresh(), 'bench');
+        // Level fifteen is where epic opens (§10.6).
+        $guild->land_craft_level = 15;
+        $guild->save();
 
-        $this->assertSame('legendary', $this->game->guildBenchReach($guild->fresh()));
+        $this->assertSame('epic', Balance::guildLandCraftCap(15));
 
         // The station gate is open now; what refuses is the shopping list.
         try {
-            $this->game->startCraft($this->character->fresh(), $legendary);
+            $this->game->startCraft($this->character->fresh(), $epic);
         } catch (GameException $e) {
             $this->assertNotSame('station', $e->errorCode, 'the built bench did not open');
         }
+    }
 
-        // Walk away and it closes again: it is a place, not a permission.
-        $this->character->col = (int) $capital['col'] + 3;
-        $this->character->save();
-        $this->assertFalse($this->game->atOwnGuildHall($this->character->fresh()));
+    /**
+     * §8.0 -- and legendary is not crafted at all any more.
+     *
+     * It drops (§9.2), so there is no station in the game that reaches it and
+     * the refusal says so rather than pointing at a bench nobody can build.
+     */
+    public function test_legendary_is_never_crafted_anywhere(): void
+    {
+        $legendary = collect(Catalog::items())
+            ->filter(fn (array $d) => ($d['rarity'] ?? null) === 'legendary' && ! empty($d['inputs']))
+            ->keys()
+            ->first();
+
+        $this->assertNull(Balance::stationForRarity('legendary'));
+
+        $this->standAt('capital');
+        $this->purse(Balance::GUILD_FOUNDING_COST);
+        $guild = $this->game->foundGuild($this->character->fresh(), $this->identity());
+        $this->claimLandFor($guild);
+
+        $guild->land_craft_level = Balance::GUILD_LAND_MAX_LEVEL;
+        $guild->save();
+
+        try {
+            $this->game->startCraft($this->character->fresh(), $legendary);
+            $this->fail('a legendary was crafted');
+        } catch (GameException $e) {
+            $this->assertSame('station', $e->errorCode);
+            $this->assertStringContainsString('drops', $e->getMessage());
+        }
     }
 
     /**
@@ -524,39 +612,301 @@ final class GuildTest extends TestCase
     }
 
     /**
-     * §10.5 -- the bench climbs from what the ground under it already reached,
-     * which is what stops the early levels being money thrown away.
+     * §10.6 -- the land's two ladders, and what each level opens.
      */
-    public function test_the_bench_climbs_from_the_settlement_it_stands_in(): void
+    public function test_the_land_levels_open_lines_and_rungs(): void
     {
-        $this->standAt('capital');
+        $this->assertSame(0, Balance::guildLandLines(0), 'an unlevelled line ran anyway');
+        $this->assertNull(Balance::guildLandCraftCap(0), 'an unbuilt bench reached a rung');
+
+        // A line a level for five, so a guild passes a capital's four at five.
+        for ($level = 1; $level <= 5; $level++) {
+            $this->assertSame($level, Balance::guildLandLines($level));
+        }
+        $this->assertSame(5, Balance::guildLandLines(Balance::GUILD_LAND_MAX_LEVEL));
+
+        // And the rungs, ending on §8.0's own guild cap.
+        $this->assertSame('common', Balance::guildLandCraftCap(1));
+        $this->assertSame('uncommon', Balance::guildLandCraftCap(5));
+        $this->assertSame('rare', Balance::guildLandCraftCap(10));
+        $this->assertSame('epic', Balance::guildLandCraftCap(15));
+        $this->assertSame(
+            Balance::STATION_RARITY_CAP['guild'],
+            Balance::guildLandCraftCap(Balance::GUILD_LAND_MAX_LEVEL),
+            'a maxed land reaches past section 8.0 own cap',
+        );
+
+        // The curve climbs, or the treasury stops being a sink.
+        for ($level = 2; $level <= Balance::GUILD_LAND_MAX_LEVEL; $level++) {
+            $this->assertGreaterThan(
+                Balance::guildLandLevelCost($level - 1),
+                Balance::guildLandLevelCost($level),
+            );
+        }
+    }
+
+    /**
+     * §10.6/§5.2 -- a claim lands on DEAD ground and nowhere else.
+     *
+     * This is the rule that makes guild land safe for the map: a hex that never
+     * carried a seam and never will is a hex nothing is taken out of the world
+     * by building on. The wastes stop being scenery.
+     */
+    public function test_land_is_claimed_on_dead_ground_and_nowhere_else(): void
+    {
+        $this->standAt('city');
         $this->purse(Balance::GUILD_FOUNDING_COST);
-        $capitalGuild = $this->game->foundGuild($this->character->fresh(), $this->identity());
+        $guild = $this->game->foundGuild($this->character->fresh(), $this->identity());
 
-        // A capital already reaches epic (§8.0), so one level is legendary.
-        $this->assertSame('epic', $this->game->guildBenchReach($capitalGuild));
-        $this->assertSame(1, $this->game->guildBenchMaxLevel($capitalGuild));
+        // Standing on the city it was founded in, which is not dead ground.
+        $guild->gold = Balance::GUILD_LAND_COST;
+        $guild->save();
 
-        $other = $this->game->createCharacter(
-            Player::create(['wallet' => '0xcity', 'session_id' => 'city']),
+        try {
+            $this->game->claimGuildLand($this->character->fresh());
+            $this->fail('a guild built on a living hex');
+        } catch (GameException $e) {
+            $this->assertContains($e->errorCode, ['not_dead', 'occupied']);
+        }
+
+        $this->assertFalse($guild->fresh()->hasLand());
+        $this->assertSame(
+            Balance::GUILD_LAND_COST,
+            (int) $guild->fresh()->gold,
+            'a refused claim spent the treasury',
         );
-        $this->standAt('city', $other);
-        $this->purse(Balance::GUILD_FOUNDING_COST, $other);
-        $cityGuild = $this->game->foundGuild(
-            $other->fresh(),
-            $this->identity('The Second Watch', 'TSW'),
+
+        $land = $this->claimLandFor($guild);
+
+        $this->assertSame('guild', $land['tier']);
+        $this->assertSame(0, (int) $guild->fresh()->gold, 'the claim did not cost the treasury');
+        $tile = $this->game->buildTile($land['col'], $land['row'], $this->game->now());
+        $this->assertTrue($tile['dead'], 'the claim landed on living ground');
+    }
+
+    /** §10.6 -- and one to a guild, so the map cannot be bought up. */
+    public function test_a_guild_holds_one_hex(): void
+    {
+        $this->standAt('city');
+        $this->purse(Balance::GUILD_FOUNDING_COST);
+        $guild = $this->game->foundGuild($this->character->fresh(), $this->identity());
+        $this->claimLandFor($guild);
+
+        $guild->refresh();
+        $guild->gold = Balance::GUILD_LAND_COST;
+        $guild->save();
+
+        $this->expectException(GameException::class);
+        $this->game->claimGuildLand($this->character->fresh());
+    }
+
+    /**
+     * §10.6 -- the land is a PLACE, so standing on it is standing at a
+     * settlement, and every path that takes one works on it.
+     */
+    public function test_the_land_answers_as_a_settlement(): void
+    {
+        $this->standAt('city');
+        $this->purse(Balance::GUILD_FOUNDING_COST);
+        $guild = $this->game->foundGuild($this->character->fresh(), $this->identity());
+        $land = $this->claimLandFor($guild);
+
+        $here = $this->game->currentSettlement($this->character->fresh());
+
+        $this->assertNotNull($here, 'a guild land was not somewhere you can stand');
+        $this->assertSame($land['id'], $here['id']);
+        $this->assertSame('guild', $here['tier']);
+
+        // Nothing runs until it is levelled once, which is the rule that makes
+        // a claim the beginning of the work rather than the end of it.
+        $this->assertSame([], $here['lines']);
+
+        $guild->land_processing_level = 3;
+        $guild->save();
+
+        $this->assertCount(
+            3,
+            $this->game->currentSettlement($this->character->fresh())['lines'],
+        );
+    }
+
+    /**
+     * §10.6 -- the land is named by its guild, and may be renamed.
+     *
+     * Unlike a prospector's own name (§7), which is spent the first time it is
+     * used: a person is recognised by their name and a place is not.
+     */
+    public function test_a_guild_names_its_own_ground(): void
+    {
+        $this->standAt('city');
+        $this->purse(Balance::GUILD_FOUNDING_COST);
+        $guild = $this->game->foundGuild($this->character->fresh(), $this->identity());
+        $this->claimLandFor($guild);
+
+        // Unnamed, it answers to the guild's own name rather than to nothing.
+        $this->assertSame($guild->name, $guild->fresh()->landSettlement()['name']);
+
+        $this->game->nameGuildLand($this->character->fresh(), 'Hollow Reach');
+        $this->assertSame('Hollow Reach', $guild->fresh()->landSettlement()['name']);
+
+        $this->game->nameGuildLand($this->character->fresh(), 'Second Thoughts');
+        $this->assertSame('Second Thoughts', $guild->fresh()->landSettlement()['name']);
+    }
+
+    /**
+     * §10.6 -- five glyphs, so how far a guild has got is legible off the map.
+     */
+    public function test_the_glyph_steps_with_the_overall_level(): void
+    {
+        $this->assertSame(1, Balance::guildLandGlyphTier(0, 0));
+        $this->assertSame(
+            Balance::GUILD_LAND_GLYPH_TIERS,
+            Balance::guildLandGlyphTier(Balance::GUILD_LAND_MAX_LEVEL, Balance::GUILD_LAND_MAX_LEVEL),
         );
 
-        // A city reaches uncommon, so the same hall is three levels off the top.
-        $this->assertSame('uncommon', $this->game->guildBenchReach($cityGuild));
-        $this->assertSame(3, $this->game->guildBenchMaxLevel($cityGuild));
+        // It never skips and never goes backwards, which is what makes it
+        // readable as "how far along are they".
+        $seen = 1;
+        for ($p = 0; $p <= Balance::GUILD_LAND_MAX_LEVEL; $p++) {
+            for ($c = 0; $c <= Balance::GUILD_LAND_MAX_LEVEL; $c++) {
+                $tier = Balance::guildLandGlyphTier($p, $c);
+                $this->assertGreaterThanOrEqual(1, $tier);
+                $this->assertLessThanOrEqual(Balance::GUILD_LAND_GLYPH_TIERS, $tier);
+            }
+        }
 
-        $cityGuild->bench_level = 3;
-        $cityGuild->save();
-        $this->assertSame('legendary', $this->game->guildBenchReach($cityGuild->fresh()));
+        for ($total = 0; $total <= Balance::GUILD_LAND_MAX_LEVEL * 2; $total++) {
+            $tier = Balance::guildLandGlyphTier($total, 0);
+            $this->assertLessThanOrEqual($seen + 1, $tier, 'the glyph skipped a step');
+            $seen = max($seen, $tier);
+        }
+    }
 
-        // And nothing is above legendary to buy.
-        $this->assertNull($this->game->guildFacilityNextCost($cityGuild->fresh(), 'bench'));
+    /**
+     * §10.6 -- anybody may fund a guild, in it or not.
+     *
+     * Gold bridges to nothing external (§3.2), so moving it carries none of the
+     * weight §3.1's no-P2P-trade rule is protecting. What stays members-only is
+     * the CREDIT: the roster wants to know who carried it, and an outsider is
+     * not on the roster to be asked about.
+     */
+    public function test_anybody_may_fund_a_guild(): void
+    {
+        $this->standAt('city');
+        $this->purse(Balance::GUILD_FOUNDING_COST);
+        $guild = $this->game->foundGuild($this->character->fresh(), $this->identity());
+
+        $outsider = $this->game->createCharacter(
+            Player::create(['wallet' => '0xpatron', 'session_id' => 'patron']),
+        );
+        $this->purse(5000, $outsider);
+
+        $before = (int) $guild->fresh()->gold;
+        $this->game->donateToGuild($outsider->fresh(), 5000, $guild->id);
+
+        $this->assertSame($before + 5000, (int) $guild->fresh()->gold);
+        $this->assertSame(0, (int) $outsider->fresh()->gold);
+
+        // And no row on a roster they are not on.
+        $this->assertSame(
+            0,
+            GuildMember::where('guild_id', $guild->id)
+                ->where('character_id', $outsider->id)
+                ->count(),
+        );
+    }
+
+    /**
+     * §10.6 -- the fee on a guild's own land: a quarter off for a member, and
+     * half of what is actually paid into the treasury.
+     *
+     * Half of what is PAID rather than of what was charged, so a member's
+     * discount thins the guild's cut as well as their own bill -- you cannot
+     * take half of money nobody handed over. And half rather than all, because
+     * a guild taking the whole fee would make its own land free to its own
+     * members by the back door.
+     */
+    public function test_a_member_pays_less_and_half_of_it_comes_home(): void
+    {
+        $this->standAt('city');
+        $this->purse(Balance::GUILD_FOUNDING_COST);
+        $guild = $this->game->foundGuild($this->character->fresh(), $this->identity());
+        $this->claimLandFor($guild);
+
+        $guild->refresh();
+        $guild->land_processing_level = 5;
+        $guild->land_craft_level = 5;
+        $guild->gold = 0;
+        $guild->save();
+
+        $land = $guild->fresh()->landSettlement();
+        $handled = 400;
+
+        $full = Formulas::benchFee($handled);
+        $this->assertGreaterThan(0, $full, 'the bench charges nothing to be used');
+
+        $charge = new \ReflectionMethod($this->game, 'chargeBenchFee');
+
+        // A member, standing on their own guild's land.
+        $this->purse(100000);
+        $paid = $charge->invoke($this->game, $this->character->fresh(), $land, $handled, 'bench');
+
+        $this->assertSame(
+            (int) ceil($full * (1 - Balance::GUILD_LAND_MEMBER_DISCOUNT)),
+            $paid,
+            'a member paid the full fee on their own ground',
+        );
+        $this->assertLessThan($full, $paid);
+
+        $this->assertSame(
+            (int) floor($paid * Balance::GUILD_LAND_FEE_SHARE),
+            (int) $guild->fresh()->gold,
+            'the guild took the wrong share of what was paid',
+        );
+
+        // An outsider pays the full fee, and half of THAT comes home too.
+        $outsider = $this->game->createCharacter(
+            Player::create(['wallet' => '0xvisitor', 'session_id' => 'visitor']),
+        );
+        $this->purse(100000, $outsider);
+
+        $before = (int) $guild->fresh()->gold;
+        $theirs = $charge->invoke($this->game, $outsider->fresh(), $land, $handled, 'bench');
+
+        $this->assertSame($full, $theirs, 'a visitor got the member discount');
+        $this->assertSame(
+            $before + (int) floor($full * Balance::GUILD_LAND_FEE_SHARE),
+            (int) $guild->fresh()->gold,
+        );
+
+        // And the guild never takes more than it was handed.
+        $this->assertLessThan($theirs, (int) floor($theirs * Balance::GUILD_LAND_FEE_SHARE));
+    }
+
+    /**
+     * §6 -- and nowhere else pays a guild anything.
+     *
+     * A capital's fee is the NPC's, and a guild standing somewhere is not a
+     * reason for the world's gold to start flowing to it.
+     */
+    public function test_an_ordinary_bench_pays_no_guild(): void
+    {
+        $this->standAt('city');
+        $this->purse(Balance::GUILD_FOUNDING_COST + 100000);
+        $guild = $this->game->foundGuild($this->character->fresh(), $this->identity());
+
+        $guild->refresh();
+        $guild->gold = 0;
+        $guild->save();
+
+        $here = $this->game->currentSettlement($this->character->fresh());
+        $this->assertSame('city', $here['tier']);
+
+        $charge = new \ReflectionMethod($this->game, 'chargeBenchFee');
+        $paid = $charge->invoke($this->game, $this->character->fresh(), $here, 400, 'bench');
+
+        $this->assertSame(Formulas::benchFee(400), $paid, 'a city gave a member a discount');
+        $this->assertSame(0, (int) $guild->fresh()->gold, 'a city fee reached a treasury');
     }
 
     /** §10.5 -- a hall seats what it has been built to seat, and no more. */

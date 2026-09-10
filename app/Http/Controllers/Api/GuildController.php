@@ -139,8 +139,11 @@ class GuildController extends GameController
     }
 
     /**
-     * §10.5 -- put gold in the treasury. Anybody in the guild, no rank on it,
+     * §10.5/§10.6 -- put gold in a treasury. ANYBODY, no rank and no membership,
      * and it does not come back out.
+     *
+     * `guild` is optional and defaults to your own, so the common case is
+     * unchanged and funding somebody else's is a deliberate act of naming them.
      */
     public function donate(Request $request): JsonResponse
     {
@@ -148,9 +151,14 @@ class GuildController extends GameController
 
         $validated = $request->validate([
             'gold' => ['required', 'integer', 'min:1'],
+            'guild' => ['sometimes', 'integer'],
         ]);
 
-        $guild = $this->game->donateToGuild($character, (int) $validated['gold']);
+        $guild = $this->game->donateToGuild(
+            $character,
+            (int) $validated['gold'],
+            isset($validated['guild']) ? (int) $validated['guild'] : null,
+        );
 
         return $this->respond(
             $character,
@@ -159,25 +167,72 @@ class GuildController extends GameController
         );
     }
 
-    /** §10.5 -- spend it on a facility level. Owner only. */
+    /**
+     * §10.5/§10.6 -- spend the treasury on a level. Owner only.
+     *
+     * Three facilities across two places: the Hall's seats, and the land's
+     * processing and craft ladders. One endpoint because a roster reads them as
+     * one question -- what does the next level cost and what does it open.
+     */
     public function upgrade(Request $request): JsonResponse
     {
         $character = $this->character($request);
 
         $validated = $request->validate([
-            'facility' => ['required', 'string', 'in:hall,bench'],
+            'facility' => ['required', 'string', 'in:hall,processing,craft'],
         ]);
 
-        $guild = $this->game->upgradeGuildFacility($character, $validated['facility']);
+        if ($validated['facility'] === 'hall') {
+            $guild = $this->game->upgradeGuildFacility($character, 'hall');
+            $said = "The hall seats {$this->game->guildRosterCap($guild)}.";
+        } else {
+            $guild = $this->game->upgradeGuildLand($character, $validated['facility']);
+            $land = $guild->landSettlement() ?? [];
 
-        $said = $validated['facility'] === 'bench'
-            ? "The bench reaches {$this->game->guildBenchReach($guild)}."
-            : "The hall seats {$this->game->guildRosterCap($guild)}.";
+            $said = $validated['facility'] === 'craft'
+                ? ($land['craftCap'] === null
+                    ? 'The bench is not standing yet.'
+                    : "The bench reaches {$land['craftCap']}.")
+                : ($land['lines'] === []
+                    ? 'No line runs here yet.'
+                    : count($land['lines']).' of five lines run here.');
+        }
 
         return $this->respond(
             $character,
             $this->game->guildPayload($guild, true, true),
             $said,
+        );
+    }
+
+    /** §10.6 -- claim the hex under your feet. Owner only, on dead ground. */
+    public function claimLand(Request $request): JsonResponse
+    {
+        $character = $this->character($request);
+        $guild = $this->game->claimGuildLand($character);
+
+        return $this->respond(
+            $character,
+            $this->game->guildPayload($guild, true, true),
+            "{$guild->name} holds this hex.",
+        );
+    }
+
+    /** §10.6 -- and names it. Owner only, and unlike a prospector's own name it may change. */
+    public function nameLand(Request $request): JsonResponse
+    {
+        $character = $this->character($request);
+
+        $validated = $request->validate([
+            'name' => ['required', 'string'],
+        ]);
+
+        $guild = $this->game->nameGuildLand($character, $validated['name']);
+
+        return $this->respond(
+            $character,
+            $this->game->guildPayload($guild, true, true),
+            "This is {$guild->land_name} now.",
         );
     }
 

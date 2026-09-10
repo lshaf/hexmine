@@ -92,6 +92,9 @@ Route::middleware(ResolveCharacter::class)->group(function () {
     // §10.5 -- the treasury: anybody may fill it, the owner alone spends it.
     Route::post('/guilds/mine/donations', [GuildController::class, 'donate']);
     Route::post('/guilds/mine/facilities', [GuildController::class, 'upgrade']);
+    // §10.6 -- the land: claim the hex under your feet, and name it.
+    Route::post('/guilds/mine/land', [GuildController::class, 'claimLand']);
+    Route::patch('/guilds/mine/land', [GuildController::class, 'nameLand']);
     Route::post('/guilds/{guild}/members', [GuildController::class, 'join'])->whereNumber('guild');
     Route::delete('/guilds/{guild}/applications', [GuildController::class, 'withdraw'])->whereNumber('guild');
     Route::post('/guilds/mine/applications/{member}', [GuildController::class, 'decide'])->whereNumber('member');

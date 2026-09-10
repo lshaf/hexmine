@@ -184,7 +184,7 @@ export class HttpDriver implements GameApi {
     return post<ActionResult<GuildDetail>>('/guilds/mine/donations', { gold })
   }
 
-  upgradeGuildFacility(facility: 'hall' | 'bench'): Promise<ActionResult<GuildDetail>> {
+  upgradeGuildFacility(facility: 'hall' | 'processing' | 'craft'): Promise<ActionResult<GuildDetail>> {
     return post<ActionResult<GuildDetail>>('/guilds/mine/facilities', { facility })
   }
 

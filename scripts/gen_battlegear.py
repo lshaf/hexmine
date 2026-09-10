@@ -27,7 +27,12 @@ import math
 
 RUNGS = ['common', 'uncommon', 'rare', 'epic', 'legendary']
 VALUE = [0.03, 0.05, 0.08, 0.11, 0.14]
-STATION = ['village', 'city', 'capital', 'capital', 'guild']
+# §8.0/§10.6 -- the smallest bench that makes each rung, by rarity index.
+#
+# A capital stops at RARE now; epic is a guild's own land (§10.6) and legendary
+# is not crafted at all -- it drops (§9.2), so it names no bench rather than
+# naming one that cannot make it.
+STATION = ['village', 'city', 'capital', 'guild', None]
 
 GRADES = ['low', 'medium', 'high']
 
@@ -403,7 +408,12 @@ def emit_php():
         ]
         if it['goldPrice']:
             bits.append(f"'goldPrice' => {it['goldPrice']}")
-        bits += [f"'maxDurability' => {it['maxDurability']}", f"'station' => '{it['station']}'"]
+        # §8.0 -- a rung nothing reaches names no bench. Legendary drops (§9.2),
+        # so it says so by carrying nothing rather than by naming a bench that
+        # cannot make it.
+        bits += [f"'maxDurability' => {it['maxDurability']}"]
+        if it['station'] is not None:
+            bits += [f"'station' => '{it['station']}'"]
         pairs = ', '.join(f"'{k}' => {v}" for k, v in it['inputs'].items())
         bits.append(f"'inputs' => [{pairs}]")
         bits.append(f"'description' => {php_str(it['description'])}")
@@ -430,7 +440,9 @@ def emit_ts():
         ]
         if it['goldPrice']:
             bits.append(f"goldPrice: {it['goldPrice']}")
-        bits += [f"maxDurability: {it['maxDurability']}", f"station: '{it['station']}'"]
+        bits += [f"maxDurability: {it['maxDurability']}"]
+        if it['station'] is not None:
+            bits += [f"station: '{it['station']}'"]
         pairs = ', '.join(f'{k}: {v}' for k, v in it['inputs'].items())
         bits.append(f'inputs: {{ {pairs} }}')
         bits.append(f"description: {ts_str(it['description'])}")

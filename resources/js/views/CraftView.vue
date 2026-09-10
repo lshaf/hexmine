@@ -286,9 +286,17 @@ const hallNote = computed(() => {
   const guild = game.guild
   if (!guild) return null
 
-  return game.atGuildHall
-    ? `${guild.name}'s bench reaches ${guild.benchReach}.`
-    : `Legendary is ${guild.name}'s hall, once its bench is built that far.`
+  // §10.6 -- epic is made on a guild's own LAND and nowhere else, so what this
+  // says depends on whether you are standing on yours.
+  if (game.atGuildHall) {
+    return guild.land?.craftCap
+      ? `${guild.name}'s bench reaches ${guild.land.craftCap}.`
+      : `${guild.name} has not built a bench here yet.`
+  }
+
+  return guild.land
+    ? `Epic is ${guild.name}'s own land, once its bench is built that far.`
+    : `Epic is guild land. ${guild.name} holds none yet.`
 })
 
 /**

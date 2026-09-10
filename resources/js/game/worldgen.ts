@@ -23,6 +23,7 @@ import { BIOME_VARIANTS, type VariantDef } from './variants'
 import { MONSTERS_BY_BIOME_RING } from './monsters'
 import { ANIMAL_BY_BIOME_GRADE, HUNT_BIOMES, HUNT_GRADES } from './hunts'
 import { hexDistance } from '@/map/hexGeometry'
+import type { GuildLand } from './types'
 import type {
   Biome,
   MaterialKey,
@@ -573,11 +574,18 @@ function crowdedByBetter(tier: SettlementTier, col: number, row: number): boolea
 }
 
 /** §6 -- village runs 1 of 5 lines, city 2, capital all 5. */
+/**
+ * §6 -- village runs 1 of 5 lines, city 2, capital 4. Mirrors
+ * WorldGen::linesFor.
+ *
+ * A capital used to run all five; the fifth is what makes a guild's land worth
+ * a hundred thousand gold (§10.6). Drawn from the same pool rather than being
+ * "all but one", so which line a capital lacks is a fact about that capital.
+ */
 function linesFor(tier: SettlementTier, col: number, row: number): SkillKey[] {
   const c = cfg()
-  if (tier === 'capital') return [...c.skills]
 
-  const count = tier === 'city' ? 2 : 1
+  const count = tier === 'capital' ? 4 : tier === 'city' ? 2 : 1
   const pool = [...c.skills]
   const picked: SkillKey[] = []
 
@@ -858,6 +866,13 @@ export interface TileMutation {
    * another one moved to.
    */
   roaming?: { key: string; grade: string }
+  /**
+   * §10.6 -- a guild's own ground, which the seed knows nothing about.
+   *
+   * The other mutation that ADDS: worldgen puts nothing on dead ground, and a
+   * hold standing there is stored state.
+   */
+  guildLand?: GuildLand
 }
 
 /**
@@ -1018,6 +1033,9 @@ export function generateTile(
         : mutation?.huntCleared
           ? undefined
           : (huntAt(col, row, biome, ring, now) ?? roamedIn(col, row, now, mutation?.roaming)),
+    // §10.6 -- and the guild land, straight through: it is not derived, so
+    // there is nothing here to compute from it.
+    guildLand: mutation?.guildLand,
     propSeed: hash2(col, row, c.seed ^ 0xf00d),
   }
 }

@@ -818,6 +818,33 @@ export interface TravelState {
 
 // ---------------------------------------------------------------- tiles
 
+/**
+ * §10.6 -- a guild's own ground, shaped like a settlement.
+ *
+ * It answers in WorldGen's own shape so every path that takes a settlement --
+ * the processing queue, the bench, the fee, the station panel -- works on it
+ * without knowing it is different. The extra fields are the things a worldgen
+ * settlement would never carry.
+ */
+export interface GuildLand {
+  id: string
+  name: string
+  tier: 'guild'
+  col: number
+  row: number
+  /** The first n of the five, bought in a known order so a roster can plan. */
+  lines: SkillKey[]
+  guildId: number
+  guildName: string
+  guildCode: string
+  processingLevel: number
+  craftLevel: number
+  /** How far the bench reaches, or null on land nobody has built on yet. */
+  craftCap: Rarity | null
+  /** §13.2 -- 1..5, which glyph the map draws. */
+  glyphTier: number
+}
+
 export interface Tile {
   col: number
   row: number
@@ -864,6 +891,8 @@ export interface Tile {
   /** Unix ms when a depleted tile regrows; 0 when live. §5.1 */
   regrowsAt: number
   settlement?: Settlement
+  /** §10.6 -- a guild's own ground. Stored rather than derived, so it rides the map query. */
+  guildLand?: GuildLand
   /** Dungeon entrance, §9.1. Exactly five exist, in the capital ring. */
   dungeon?: { key: string; name: string }
   /** §5.3 -- standing water. Never mined, and never gathered. */

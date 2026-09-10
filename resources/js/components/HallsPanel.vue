@@ -115,6 +115,9 @@ async function donate(): Promise<void> {
 
 const HALL_MAX_LEVEL = 5
 
+/** §10.6 -- both of the land's ladders run to twenty. Mirrors Balance::GUILD_LAND_MAX_LEVEL. */
+const LAND_MAX_LEVEL = 20
+
 /**
  * §10.5 -- the two facilities, as rows.
  *
@@ -136,14 +139,29 @@ const facilities = computed(() => {
       cost: g.hallCost,
       standing: `Seats ${g.rosterCap}`,
     },
+    // §10.6 -- the land's two ladders. Drawn even with no land yet, greyed and
+    // costing nothing, because what a claim OPENS is most of the argument for
+    // making one: a row that appears out of nowhere afterwards is a worse
+    // welcome than a row that has been standing there saying what it is for.
     {
-      key: 'bench' as const,
+      key: 'processing' as const,
+      name: 'Processing',
+      what: 'How many of the five lines run on your land. Nothing until it is levelled once.',
+      level: g.land?.processingLevel ?? 0,
+      max: LAND_MAX_LEVEL,
+      cost: g.landProcessingCost,
+      standing: g.land
+        ? `${g.land.lines.length} of five lines`
+        : 'No land yet',
+    },
+    {
+      key: 'craft' as const,
       name: 'Bench',
-      what: 'How far up §8.0 it makes. Legendary is here and nowhere else.',
-      level: g.benchLevel,
-      max: g.benchMaxLevel,
-      cost: g.benchCost,
-      standing: `Reaches ${g.benchReach}`,
+      what: 'How far up §8.0 your land makes. Epic is here and nowhere else.',
+      level: g.land?.craftLevel ?? 0,
+      max: LAND_MAX_LEVEL,
+      cost: g.landCraftCost,
+      standing: g.land?.craftCap ? `Reaches ${g.land.craftCap}` : 'Nothing standing yet',
     },
   ]
 })

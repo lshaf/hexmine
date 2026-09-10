@@ -568,14 +568,26 @@ final class WorldGen
         return false;
     }
 
-    /** §6 -- village runs 1 of 5 lines, city 2, capital all 5. */
+    /**
+     * §6 -- village runs 1 of 5 lines, city 2, capital 4.
+     *
+     * A capital used to run all five, and giving the fifth away is what makes a
+     * guild's land worth a hundred thousand gold (§10.6): the only place in the
+     * world that runs every line is one a roster paid for and put there. A
+     * capital is still the best thing the map itself offers, and it is still
+     * where two of the five you happen to need are most likely to meet.
+     *
+     * Drawn from the same pool the smaller tiers draw from rather than being
+     * "all but one", so WHICH line a capital lacks is a fact about that capital
+     * and a reason to know your own map.
+     */
     private static function linesFor(string $tier, int $col, int $row): array
     {
-        if ($tier === 'capital') {
-            return Catalog::SKILLS;
-        }
-
-        $count = $tier === 'city' ? 2 : 1;
+        $count = match ($tier) {
+            'capital' => 4,
+            'city' => 2,
+            default => 1,
+        };
         $pool = Catalog::SKILLS;
         $picked = [];
 

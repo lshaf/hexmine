@@ -176,7 +176,7 @@ def rows():
             'value': None if tool else 0.14,
             'attack': TOOL_ATTACK['legendary'] if tool else lattack,
             'defense': 0 if tool else ldefense,
-            'palette': PALETTE[biome], 'station': 'guild', 'maxDurability': 240 * SOLID_SCALE,
+            'palette': PALETTE[biome], 'station': None, 'maxDurability': 240 * SOLID_SCALE,
             'inputs': legendary_inputs(slot), 'perk': None, 'description': ldesc,
         }
         yield {
@@ -297,7 +297,7 @@ if __name__ == '__main__':
 
     for i in items:
         if i['rarity'] == 'legendary':
-            assert i['station'] == 'guild', f"{i['key']} is legendary off a reachable bench"
+            assert i['station'] is None, f"{i['key']} is legendary and names a bench"
             assert i['tradeable'] and i['inputs'], f"{i['key']} is legendary and uncrafted"
             assert 'core' in i['inputs'], f"{i['key']} does not want a Core"
         else:

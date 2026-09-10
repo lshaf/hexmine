@@ -692,6 +692,133 @@ final class Balance
 
     public const GUILD_HALL_MAX_LEVEL = 5;
 
+    // --------------------------------------------------------- guild land §10.6
+
+    /**
+     * §10.6 -- what a hex costs a guild, out of the treasury and never a purse.
+     *
+     * Five times a founding (§10.0), and the difference between the two is the
+     * whole point: founding is what one patient prospector saves for, and land
+     * is what a roster buys together. §3.2 makes gold the currency that may be
+     * inflated precisely because it bridges to nothing external, which is what
+     * lets it carry a sink this size.
+     */
+    public const GUILD_LAND_COST = 100000;
+
+    /**
+     * §10.6 -- and both facilities on it climb twenty levels.
+     *
+     * Twenty rather than §10.5's five because this is the long project a guild
+     * has instead of a personal ladder: a maxed land runs to about 7.6 million
+     * across the two, which is a few times what a Hall and a Bench come to and
+     * still well under §10.4's capital bidding.
+     */
+    public const GUILD_LAND_MAX_LEVEL = 20;
+
+    public const GUILD_LAND_LEVEL_BASE = 5000;
+
+    public const GUILD_LAND_LEVEL_EXPONENT = 1.5;
+
+    /**
+     * §10.6 -- what the next level of a facility costs, at the level being
+     * bought. Rounded to the nearest hundred, like §10.5's own curve, because a
+     * figure a roster is saving toward should be a figure they can hold.
+     */
+    public static function guildLandLevelCost(int $level): int
+    {
+        if ($level < 1 || $level > self::GUILD_LAND_MAX_LEVEL) {
+            return 0;
+        }
+
+        $raw = self::GUILD_LAND_LEVEL_BASE * ($level ** self::GUILD_LAND_LEVEL_EXPONENT);
+
+        return (int) (round($raw / 100) * 100);
+    }
+
+    /**
+     * §10.6 -- how many of the five lines a processing level runs.
+     *
+     * **Nothing at all until it is levelled once**, which is the rule that makes
+     * a claim the beginning of the work rather than the end of it: a hex bought
+     * and left alone is a hex with a flag on it. Then a line a level for five
+     * levels, so a guild reaches what a capital offers (four, §6) at level 4 and
+     * passes it at 5 -- and everything above that is spent on the clock rather
+     * than on the count, because five is all there is.
+     */
+    public static function guildLandLines(int $level): int
+    {
+        return max(0, min(5, $level));
+    }
+
+    /**
+     * §10.6 -- and what a craft level reaches, up to §8.0's own guild cap.
+     *
+     * The same shape: nothing until it is levelled, then a rung at a time with
+     * real ground between them. Epic at fifteen is the last rung in the game a
+     * player can make (§8.0 -- legendary and unique are dungeon drops), so it is
+     * deliberately most of the way up the ladder.
+     */
+    public const GUILD_LAND_CRAFT_RUNG = [
+        1 => 'common',
+        5 => 'uncommon',
+        10 => 'rare',
+        15 => 'epic',
+    ];
+
+    public static function guildLandCraftCap(int $level): ?string
+    {
+        $reach = null;
+        foreach (self::GUILD_LAND_CRAFT_RUNG as $at => $rarity) {
+            if ($level >= $at) {
+                $reach = $rarity;
+            }
+        }
+
+        return $reach;
+    }
+
+    /**
+     * §10.6 -- five glyphs, so how far a guild has got is legible off the map.
+     *
+     * The overall level is the two facilities added together, and it steps the
+     * drawing every eighth of the way up. §13.2 tells settlement tiers apart by
+     * shape category rather than by size for exactly this reason: at a 58x34 hex
+     * there is usually nothing beside it to compare against.
+     */
+    public const GUILD_LAND_GLYPH_TIERS = 5;
+
+    public static function guildLandGlyphTier(int $processing, int $craft): int
+    {
+        $span = self::GUILD_LAND_MAX_LEVEL * 2;
+        $share = max(0, min($span, $processing + $craft)) / $span;
+
+        return (int) min(self::GUILD_LAND_GLYPH_TIERS, 1 + floor($share * self::GUILD_LAND_GLYPH_TIERS));
+    }
+
+    /**
+     * §10.6 -- what a member saves for working their own guild's ground.
+     *
+     * The one thing membership is worth at a bench, and it is deliberately a
+     * discount on the FEE rather than on the materials: §6 makes the fee the
+     * steady gold sink everybody who makes anything pays, and §3.2 keeps
+     * materials out of gold's reach entirely.
+     */
+    public const GUILD_LAND_MEMBER_DISCOUNT = 0.25;
+
+    /**
+     * §10.6 -- and half of what is actually paid goes back into the treasury.
+     *
+     * Half rather than all, because a guild taking the whole fee would make its
+     * own land free to its own members by the back door -- pay the fee, watch it
+     * come home. Half is a real cut of a real sink, and it is the reason a busy
+     * guild's land funds its own next level.
+     *
+     * It is taken from what was PAID, so a member's discount thins the guild's
+     * cut as well as their own bill. That is the honest order: you cannot take
+     * half of money nobody handed over.
+     */
+    public const GUILD_LAND_FEE_SHARE = 0.5;
+
     /**
      * §10.5 -- gold a facility level costs, at the level being bought.
      *
@@ -1311,17 +1438,31 @@ final class Balance
 
     /**
      * §8.0 -- how far up the ladder each workbench reaches. A village will never
-     * make an epic no matter what materials you carry to it, which is most of
+     * make a rare no matter what materials you carry to it, which is most of
      * what makes a capital worth the walk.
      *
-     * `guild` is defined but unreachable: guild halls do not exist yet (§10), and
-     * naming the gate now is what stops legendary leaking out of a capital.
+     * **A capital reaches rare and stops**, where it used to reach epic. Epic is
+     * a guild's now (§10.6) -- it is made on land a roster bought, named and
+     * levelled, and nowhere the map put there by itself. That is the whole
+     * bargain of the section: the last rung a player can craft is one other
+     * people had to help pay for.
+     *
+     * **Legendary and unique are not crafted at all**, which is why neither
+     * appears here. They come off a dungeon (§9.2) and that is their only
+     * source, so the recipes stand defined and unreachable exactly as they did
+     * before §10.5 existed. §8.1 rule 4's "every rarity below unique is
+     * reachable by crafting" is therefore true up to epic and no further, and
+     * epic is where an F2P ladder now ends.
+     *
+     * `guild` is the cap a *maxed* land reaches; what a given land reaches this
+     * afternoon is its craft level (§10.6), which climbs to this and no
+     * further.
      */
     public const STATION_RARITY_CAP = [
         'village' => 'common',
         'city' => 'uncommon',
-        'capital' => 'epic',
-        'guild' => 'legendary',
+        'capital' => 'rare',
+        'guild' => 'epic',
     ];
 
     /**

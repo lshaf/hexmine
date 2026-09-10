@@ -283,8 +283,8 @@ export const EQUIPMENT = {
   stationRarityCap: {
     village: 'common',
     city: 'uncommon',
-    capital: 'epic',
-    guild: 'legendary',
+    capital: 'rare',
+    guild: 'epic',
   } as const,
   /** §3.2/§8.0 -- a shelf stops at common. Above it, the bench. */
   shopStockCap: 'common',

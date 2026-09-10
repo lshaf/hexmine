@@ -2267,6 +2267,21 @@ class GameService
             // they are yours and the fog does not apply to them.
             'carriers' => $this->carriersInSight($character),
             /*
+             * §10.6 -- guild land, which is the one PLACE on the map that is
+             * not a function of the seed.
+             *
+             * Sent whole rather than as a subtraction, for the same reason
+             * `roaming` is: the seed says there is nothing on that hex, so
+             * anything standing there has to be named. §5.6 draws a settlement
+             * at any distance because deciding to walk somewhere has to be
+             * possible, and a guild's hold is exactly that kind of landmark --
+             * but a settlement is DERIVED and this is stored, so it rides the
+             * map query and is bounded by the same disc as everything else
+             * here. That is the honest version until there is a cheap way to
+             * hand the client every hold on the map.
+             */
+            'guildLands' => $this->guildLandsAmong($disc),
+            /*
              * §5.6 -- when to ask again, decided by the side that owns the
              * clocks.
              *
@@ -4600,50 +4615,30 @@ class GameService
         }
     }
 
-    /**
-     * §10.5 -- how far up §8.0's ladder this guild's own bench reaches.
-     *
-     * Measured from what the settlement underneath it already reaches, and
-     * climbing one rung a level. That is what stops the first levels being
-     * money thrown away: a hall in a city starts at uncommon and needs three
-     * levels to reach legendary, one in a capital starts at epic and needs one.
-     * The gap is the pull inward §5.2 puts on everything else.
-     */
-    public function guildBenchReach(Guild $guild): string
-    {
-        $tier = WorldGen::settlementById($guild->settlement_id)['tier'] ?? 'city';
-        $base = Balance::STATION_RARITY_CAP[$tier] ?? 'common';
-
-        $rank = Balance::rarityRank($base) + (int) $guild->bench_level;
-
-        return Balance::RARITIES[min($rank, Balance::rarityRank('legendary'))];
-    }
-
-    /** §10.5 -- the last Bench level worth buying, which is the one reaching legendary. */
-    public function guildBenchMaxLevel(Guild $guild): int
-    {
-        $tier = WorldGen::settlementById($guild->settlement_id)['tier'] ?? 'city';
-        $base = Balance::STATION_RARITY_CAP[$tier] ?? 'common';
-
-        return max(0, Balance::rarityRank('legendary') - Balance::rarityRank($base));
-    }
-
     /** §10.5 -- what the next level of a facility costs, or null when it is finished. */
     public function guildFacilityNextCost(Guild $guild, string $facility): ?int
     {
         $level = $this->guildFacilityLevel($guild, $facility);
-        $max = $facility === 'bench'
-            ? $this->guildBenchMaxLevel($guild)
-            : Balance::GUILD_HALL_MAX_LEVEL;
 
-        return $level >= $max ? null : Balance::guildFacilityCost($level + 1);
+        return $level >= Balance::GUILD_HALL_MAX_LEVEL
+            ? null
+            : Balance::guildFacilityCost($level + 1);
     }
 
+    /**
+     * §10.5/§10.6 -- the Hall is the only facility the HALL has left.
+     *
+     * The Bench used to stand beside it, buying rungs past whatever the
+     * settlement underneath already reached. §10.6 took that job: crafting is
+     * the land's now, on its own twenty-level ladder, and a second bench
+     * somewhere else would be two answers to one question. Seats stay here
+     * because a roster's size is a fact about the guild rather than about its
+     * ground.
+     */
     private function guildFacilityLevel(Guild $guild, string $facility): int
     {
         return match ($facility) {
             'hall' => (int) $guild->hall_level,
-            'bench' => (int) $guild->bench_level,
             default => throw new GameException('No such facility.', 'not_found'),
         };
     }
@@ -4656,19 +4651,41 @@ class GameService
      * be scouted, and a contribution you can take back is not a contribution.
      * What it buys is a facility, and a facility is the whole roster's.
      *
-     * Anybody in the guild may donate. It is the one guild action with no rank
-     * on it -- gold going the right way needs no permission.
+     * §10.6 -- ANYBODY may donate, in or out of the guild. It is the one guild
+     * action with no rank on it and no membership either: gold going the right
+     * way needs no permission.
      */
-    public function donateToGuild(Character $character, int $gold): Guild
+    public function donateToGuild(Character $character, int $gold, ?int $guildId = null): Guild
     {
-        return DB::transaction(function () use ($character, $gold) {
+        $guildId ??= $this->guildOf($character)?->id;
+        if ($guildId === null) {
+            throw new GameException('Name a guild to fund.', 'no_guild');
+        }
+
+        return DB::transaction(function () use ($character, $gold, $guildId) {
             if ($gold < 1) {
                 throw new GameException('Donate something.', 'invalid');
             }
 
-            $member = GuildMember::where('character_id', $character->id)->first();
-            if ($member === null) {
-                throw new GameException('You are not in a guild.', 'no_guild');
+            // §10.6 -- ANYBODY may fund a guild, not only its own roster.
+            //
+            // Gold is the one currency that bridges to nothing external (§3.2),
+            // so moving it between players carries none of the weight §3.1's
+            // no-P2P-trade rule is protecting: there is no laundering vector in
+            // a number that cannot leave the game. And a donation is
+            // non-retractable (§10.5), so it is one-way rather than a channel.
+            //
+            // What stays members-only is the CREDIT. §10.5 keeps a running
+            // total on the member's row because the roster wants to know who
+            // carried the hall, and an outsider is not on the roster to be
+            // asked about.
+            $member = GuildMember::where('character_id', $character->id)
+                ->where('guild_id', $guildId)
+                ->first();
+
+            $guild = Guild::lockForUpdate()->find($guildId);
+            if ($guild === null) {
+                throw new GameException('There is no such guild.', 'not_found');
             }
 
             $character->refresh();
@@ -4680,10 +4697,11 @@ class GameService
             $character->gold -= $gold;
             $character->save();
 
-            $member->donated += $gold;
-            $member->save();
+            if ($member !== null) {
+                $member->donated += $gold;
+                $member->save();
+            }
 
-            $guild = $member->guild;
             $guild->gold += $gold;
             $guild->save();
 
@@ -4713,12 +4731,7 @@ class GameService
             $cost = $this->guildFacilityNextCost($guild, $facility);
 
             if ($cost === null) {
-                throw new GameException(
-                    $facility === 'bench'
-                        ? 'The bench already reaches legendary. Nothing is above it.'
-                        : 'The hall is built out as far as it goes.',
-                    'maxed',
-                );
+                throw new GameException('The hall is built out as far as it goes.', 'maxed');
             }
 
             if ((int) $guild->gold < $cost) {
@@ -4731,13 +4744,294 @@ class GameService
             }
 
             $guild->gold -= $cost;
+            $guild->hall_level = $level + 1;
+            $guild->save();
 
-            if ($facility === 'bench') {
-                $guild->bench_level = $level + 1;
-            } else {
-                $guild->hall_level = $level + 1;
+            return $guild;
+        });
+    }
+
+    // --------------------------------------------------------- guild land §10.6
+
+    /**
+     * §10.6 -- every guild land standing among these tiles.
+     *
+     * One query for the whole disc rather than one a hex: there are very few
+     * holds in a world and thirty-seven lookups to find none of them would be
+     * thirty-six wasted.
+     *
+     * @param  array<int,array{0:int,1:int}>  $disc
+     * @return array<int,array<string,mixed>>
+     */
+    private function guildLandsAmong(array $disc): array
+    {
+        if ($disc === []) {
+            return [];
+        }
+
+        $cols = array_values(array_unique(array_column($disc, 0)));
+        $rows = array_values(array_unique(array_column($disc, 1)));
+
+        $wanted = [];
+        foreach ($disc as [$col, $row]) {
+            $wanted[$col.':'.$row] = true;
+        }
+
+        $out = [];
+        foreach (Guild::whereIn('land_col', $cols)->whereIn('land_row', $rows)->get() as $guild) {
+            if (! isset($wanted[$guild->land_col.':'.$guild->land_row])) {
+                continue;
             }
 
+            $out[] = $guild->landSettlement();
+        }
+
+        return $out;
+    }
+
+    /**
+     * §6/§8.4/§10.6 -- what a bench charges, who gets a discount, and where
+     * half of it goes.
+     *
+     * One helper for both banks, because a saw pit and an anvil charge by the
+     * same rule (§6) and the two call sites had already drifted into two copies
+     * of one paragraph.
+     *
+     * On a guild's own land two things happen that never happen anywhere else.
+     * A member of that guild pays a quarter less -- the one thing membership is
+     * worth at a bench, and deliberately a discount on the FEE rather than on
+     * the materials, because §3.2 keeps materials out of gold's reach entirely.
+     * And half of what is actually paid goes into that guild's treasury, which
+     * is what lets a busy land fund its own next level.
+     *
+     * Half of what is PAID rather than of what was charged, so a member's
+     * discount thins the guild's cut as well as their own bill. That is the
+     * honest order -- you cannot take half of money nobody handed over -- and
+     * it is why the guild does not simply take the whole fee: a guild taking
+     * all of it would make its own land free to its own members by the back
+     * door, pay the fee and watch it come home.
+     *
+     * Refused before anything is spent, which is §8.4's rule about every other
+     * refusal.
+     *
+     * @param  array<string,mixed>  $settlement
+     */
+    private function chargeBenchFee(Character $character, array $settlement, int $handled, string $what): int
+    {
+        $fee = Formulas::benchFee($handled);
+        $guild = null;
+
+        if (($settlement['tier'] ?? null) === 'guild') {
+            $guild = Guild::find($settlement['guildId'] ?? 0);
+
+            $mine = $guild !== null
+                && GuildMember::where('character_id', $character->id)
+                    ->where('guild_id', $guild->id)
+                    ->exists();
+
+            if ($mine) {
+                $fee = (int) ceil($fee * (1 - Balance::GUILD_LAND_MEMBER_DISCOUNT));
+            }
+        }
+
+        if ($fee <= 0) {
+            return 0;
+        }
+
+        if ((int) $character->gold < $fee) {
+            throw new GameException(
+                "The {$what} at {$settlement['name']} charges {$fee} gold. You have {$character->gold}.",
+                'gold',
+            );
+        }
+
+        $character->gold -= $fee;
+        $character->save();
+
+        if ($guild !== null) {
+            $cut = (int) floor($fee * Balance::GUILD_LAND_FEE_SHARE);
+            if ($cut > 0) {
+                $guild->increment('gold', $cut);
+            }
+        }
+
+        return $fee;
+    }
+
+    /**
+     * §10.6 -- the guild land standing on a hex, or none.
+     *
+     * Stored state rather than seed state, so unlike everything else about a
+     * tile this is a lookup. One row can answer because the claim is unique on
+     * (col, row) by index.
+     */
+    public function guildLandAt(int $col, int $row): ?array
+    {
+        return Guild::where('land_col', $col)->where('land_row', $row)->first()?->landSettlement();
+    }
+
+    /**
+     * §10.6 -- claim a hex for the guild, out of the treasury.
+     *
+     * Five refusals, and every one of them closes something:
+     *
+     *  - the OWNER alone, for §10.0.2's reason -- a hundred thousand gold is
+     *    the second most irreversible thing a guild can do after disbanding;
+     *  - one land to a guild, so the map cannot be bought up by whoever founded
+     *    first;
+     *  - **dead ground only** (§5.2), which is the rule that makes this safe
+     *    for the map: a claim can never take a workable seam out of the world,
+     *    and half the outer rim is ground that never carried anything anyway.
+     *    The wastes stop being scenery and start being worth walking to;
+     *  - nothing already there -- water, a settlement, a dungeon mouth, or
+     *    another guild's flag;
+     *  - and the gold, from the treasury and never a purse (§10.6).
+     *
+     * You have to be STANDING on it, like every other thing done at a place
+     * (§6). Buying a hex from four days away would make the map a spreadsheet.
+     */
+    public function claimGuildLand(Character $character): Guild
+    {
+        return DB::transaction(function () use ($character) {
+            $actor = $this->requireGuildRank($character, [GuildMember::OWNER]);
+
+            $guild = Guild::lockForUpdate()->find($actor->guild_id);
+            if ($guild === null) {
+                throw new GameException('That guild no longer exists.', 'not_found');
+            }
+
+            if ($guild->hasLand()) {
+                throw new GameException(
+                    'Your guild already holds land. There is one to a guild.',
+                    'has_land',
+                );
+            }
+
+            if ($this->isTraveling($character)) {
+                throw new GameException('You are on the road. Stop, or wait until you arrive.', 'traveling');
+            }
+
+            $col = (int) $character->col;
+            $row = (int) $character->row;
+            $tile = $this->buildTile($col, $row, $this->now());
+
+            // §5.2 -- the whole of the placement rule, and the reason it is the
+            // right one: dead ground is ground that never carried a seam and
+            // never will, so nothing is taken out of the world by building on
+            // it.
+            if (! ($tile['dead'] ?? false)) {
+                throw new GameException(
+                    'A guild builds on dead ground. This hex still has something in it.',
+                    'not_dead',
+                );
+            }
+
+            if ($tile['water'] ?? false) {
+                throw new GameException('That is open water.', 'water');
+            }
+
+            if (($tile['settlement'] ?? null) !== null || ($tile['dungeon'] ?? null) !== null) {
+                throw new GameException('Something already stands here.', 'occupied');
+            }
+
+            if ($this->guildLandAt($col, $row) !== null) {
+                throw new GameException('Another guild already holds this hex.', 'claimed');
+            }
+
+            $cost = Balance::GUILD_LAND_COST;
+            if ((int) $guild->gold < $cost) {
+                $short = $cost - (int) $guild->gold;
+
+                throw new GameException(
+                    "Land costs {$cost} gold and the treasury is {$short} short.",
+                    'poor',
+                );
+            }
+
+            $guild->gold -= $cost;
+            $guild->land_col = $col;
+            $guild->land_row = $row;
+            $guild->save();
+
+            return $guild;
+        });
+    }
+
+    /**
+     * §10.6 -- the guild names its own ground, and may name it again.
+     *
+     * Unlike a prospector's own name (§7), which is spent the first time it is
+     * used: a person is recognised by their name and a place is not. Renaming a
+     * hex costs nothing and misleads nobody, so there is no reason to make it a
+     * one-shot.
+     */
+    public function nameGuildLand(Character $character, string $name): Guild
+    {
+        return DB::transaction(function () use ($character, $name) {
+            $actor = $this->requireGuildRank($character, [GuildMember::OWNER]);
+
+            $guild = Guild::lockForUpdate()->find($actor->guild_id);
+            if ($guild === null || ! $guild->hasLand()) {
+                throw new GameException('Your guild holds no land.', 'no_land');
+            }
+
+            $clean = trim(preg_replace('/\s+/', ' ', $name) ?? '');
+            if (mb_strlen($clean) < Balance::GUILD_NAME_MIN || mb_strlen($clean) > 32) {
+                throw new GameException(
+                    'A name is between '.Balance::GUILD_NAME_MIN.' and 32 characters.',
+                    'invalid',
+                );
+            }
+
+            $guild->land_name = $clean;
+            $guild->save();
+
+            return $guild;
+        });
+    }
+
+    /**
+     * §10.6 -- spend the treasury on a level of one of the land's two
+     * facilities.
+     *
+     * The owner alone, exactly as §10.5's facilities are and for the same
+     * reason. The two level apart because they answer different questions --
+     * how many of the five lines run here, and how far the bench reaches -- and
+     * a roster that needs planks does not need an epic bench to get them.
+     */
+    public function upgradeGuildLand(Character $character, string $facility): Guild
+    {
+        return DB::transaction(function () use ($character, $facility) {
+            if (! in_array($facility, ['processing', 'craft'], true)) {
+                throw new GameException('There is no such facility.', 'invalid');
+            }
+
+            $actor = $this->requireGuildRank($character, [GuildMember::OWNER]);
+
+            $guild = Guild::lockForUpdate()->find($actor->guild_id);
+            if ($guild === null || ! $guild->hasLand()) {
+                throw new GameException('Your guild holds no land to build on.', 'no_land');
+            }
+
+            $column = $facility === 'craft' ? 'land_craft_level' : 'land_processing_level';
+            $level = (int) $guild->{$column};
+
+            if ($level >= Balance::GUILD_LAND_MAX_LEVEL) {
+                throw new GameException('That is built out as far as it goes.', 'maxed');
+            }
+
+            $cost = Balance::guildLandLevelCost($level + 1);
+            if ((int) $guild->gold < $cost) {
+                $short = $cost - (int) $guild->gold;
+
+                throw new GameException(
+                    "That costs {$cost} gold and the treasury is {$short} short.",
+                    'poor',
+                );
+            }
+
+            $guild->gold -= $cost;
+            $guild->{$column} = $level + 1;
             $guild->save();
 
             return $guild;
@@ -5007,10 +5301,14 @@ class GameService
         // response is a query nobody needs.
         $guild ??= $this->guildOf($character);
 
+        // §10.6 -- the guild's LAND, not the hex it was founded on. Founding
+        // buys an address and a roster (§10.0); the land is where the work is,
+        // and it is the only ground a guild's own rules apply to.
         return $guild !== null
+            && $guild->hasLand()
             && ! $this->isTraveling($character)
-            && (int) $character->col === $guild->col
-            && (int) $character->row === $guild->row;
+            && (int) $character->col === (int) $guild->land_col
+            && (int) $character->row === (int) $guild->land_row;
     }
 
     /**
@@ -5108,17 +5406,24 @@ class GameService
             // §10.5 -- the facilities are public, and meant to be: a bench that
             // reaches legendary is the best recruiting line a guild has.
             'hallLevel' => (int) $guild->hall_level,
-            'benchLevel' => (int) $guild->bench_level,
-            'benchReach' => $this->guildBenchReach($guild),
             'rosterCap' => $this->guildRosterCap($guild),
+            // §10.6 -- and the land, which is the best recruiting line a guild
+            // has: it is the only ground in the world that runs all five lines
+            // and the only bench that reaches epic.
+            'land' => $guild->landSettlement(),
         ];
 
         if ($own) {
             $payload += [
                 'gold' => (int) $guild->gold,
-                'benchMaxLevel' => $this->guildBenchMaxLevel($guild),
                 'hallCost' => $this->guildFacilityNextCost($guild, 'hall'),
-                'benchCost' => $this->guildFacilityNextCost($guild, 'bench'),
+                'landCost' => $guild->hasLand() ? null : Balance::GUILD_LAND_COST,
+                'landProcessingCost' => $guild->hasLand() && $guild->land_processing_level < Balance::GUILD_LAND_MAX_LEVEL
+                    ? Balance::guildLandLevelCost((int) $guild->land_processing_level + 1)
+                    : null,
+                'landCraftCost' => $guild->hasLand() && $guild->land_craft_level < Balance::GUILD_LAND_MAX_LEVEL
+                    ? Balance::guildLandLevelCost((int) $guild->land_craft_level + 1)
+                    : null,
             ];
         }
 
@@ -5373,21 +5678,15 @@ class GameService
             // there is less work.
             //
             // Refused before anything is spent, exactly as the strap above is.
-            $fee = Formulas::benchFee(Formulas::materialWorth($take));
-            if ($fee > 0 && (int) $character->gold < $fee) {
-                throw new GameException(
-                    "The line at {$settlement['name']} charges {$fee} gold. You have {$character->gold}.",
-                    'gold',
-                );
-            }
+            $fee = $this->chargeBenchFee(
+                $character,
+                $settlement,
+                Formulas::materialWorth($take),
+                'line',
+            );
 
             foreach ($take as $key => $qty) {
                 $this->takeMaterial($character, $key, $qty);
-            }
-
-            if ($fee > 0) {
-                $character->gold -= $fee;
-                $character->save();
             }
 
             $now = $this->now();
@@ -5862,6 +6161,19 @@ class GameService
             return null;
         }
 
+        // §10.6 -- a guild's land is a place you can work, so it answers in the
+        // same shape a worldgen settlement does and every path downstream --
+        // the processing queue, the bench, the fee, the station panel -- works
+        // on it without knowing it is different.
+        //
+        // Asked FIRST, and it costs nothing to: a claim only lands on dead
+        // ground (§5.2) and worldgen never puts a settlement there, so the two
+        // can never both answer for one hex.
+        $land = $this->guildLandAt((int) $character->col, (int) $character->row);
+        if ($land !== null) {
+            return $land;
+        }
+
         return WorldGen::settlementAt($character->col, $character->row);
     }
 
@@ -6178,24 +6490,23 @@ class GameService
             $atOwnHall = $this->atOwnGuildHall($character, $guild);
 
             $needsHall = ($def['station'] ?? null) === 'guild'
-                || Balance::rarityRank($def['rarity']) >= Balance::rarityRank('legendary');
+                || Balance::rarityRank($def['rarity']) >= Balance::rarityRank('epic');
 
             if ($needsHall && ! $atOwnHall) {
                 throw new GameException(
                     $guild === null
-                        ? "{$def['name']} is guild work. You would need a guild, and a hall to make it in."
-                        : "{$def['name']} is made at {$guild->name}'s own hall.",
+                        ? "{$def['name']} is guild work. You would need a guild, and land to make it on."
+                        : "{$def['name']} is made on {$guild->name}'s own land.",
                     'station',
                 );
             }
 
-            // §10.5 -- and then the reach, which at your own hall is your own
-            // guild's rather than the settlement's. A hall is built out one rung
-            // at a time from whatever the ground underneath it already reached,
-            // so a guild in a city climbs three levels to legendary and one in a
-            // capital climbs one.
+            // §10.6 -- and then the reach, which on your own guild's land is
+            // your own guild's rather than the map's. A capital stops at rare
+            // (§8.0); epic is made on ground a roster bought, named and levelled
+            // to fifteen, and nowhere the map put there by itself.
             $reach = $atOwnHall && $guild !== null
-                ? $this->guildBenchReach($guild)
+                ? (Balance::guildLandCraftCap((int) $guild->land_craft_level) ?? 'common')
                 : (Balance::STATION_RARITY_CAP[$here['tier']] ?? 'common');
 
             if (Balance::rarityRank($def['rarity']) > Balance::rarityRank($reach)) {
@@ -6279,21 +6590,15 @@ class GameService
             // Refused before a single material is spent, which is §8.4's rule
             // about everything that can refuse -- the reach, the strap, the
             // stock, and now this.
-            $fee = Formulas::benchFee(Formulas::materialWorth($inputs));
-            if ($fee > 0 && (int) $character->gold < $fee) {
-                throw new GameException(
-                    "The bench at {$here['name']} charges {$fee} gold. You have {$character->gold}.",
-                    'gold',
-                );
-            }
+            $fee = $this->chargeBenchFee(
+                $character,
+                $here,
+                Formulas::materialWorth($inputs),
+                'bench',
+            );
 
             foreach ($inputs as $key => $qty) {
                 $this->takeMaterial($character, $key, $qty);
-            }
-
-            if ($fee > 0) {
-                $character->gold -= $fee;
-                $character->save();
             }
 
             $now = $this->now();

@@ -1091,31 +1091,31 @@ export const ITEMS: ItemDef[] = [
   //    shard, so kitting out a second line means crossing the map, §4.
   {
     key: 'ironwood_axe', name: 'Ironwood Axe', slot: 'axe', rarity: 'epic', tradeable: true,
-    attack: 1400, palette: 'wood', station: 'capital', maxDurability: 20000,
+    attack: 1400, palette: 'wood', station: 'guild', maxDurability: 20000,
     inputs: { ironwood: 3, heartoak: 8, bentwood: 4, heartknot: 4, reinforced_frame: 2, shard_verdant: 1 },
     description: 'Cut from the thing it is meant to cut. Marketplace-tradeable.',
   },
   {
     key: 'mythril_pickaxe', name: 'Mythril Pickaxe', slot: 'pickaxe', rarity: 'epic',
-    tradeable: true, attack: 1400, palette: 'iron', station: 'capital', maxDurability: 20000,
+    tradeable: true, attack: 1400, palette: 'iron', station: 'guild', maxDurability: 20000,
     inputs: { mythril_ore: 3, meteoric_iron: 8, skysteel: 4, flux_salt: 4, reinforced_frame: 2, essence: 1 },
     description: 'Rings like a bell on ore. Marketplace-tradeable.',
   },
   {
     key: 'beastfang_bow', name: 'Beastfang Bow', slot: 'bow', rarity: 'epic', tradeable: true,
-    attack: 1400, palette: 'pelt', station: 'capital', maxDurability: 20000,
+    attack: 1400, palette: 'pelt', station: 'guild', maxDurability: 20000,
     inputs: { beastfang_hide: 3, dire_pelt: 8, lacquered_hide: 4, horn: 4, reinforced_frame: 2, shard_sanguine: 1 },
     description: 'Strung with something that used to run. Marketplace-tradeable.',
   },
   {
     key: 'obsidian_sledge', name: 'Obsidian Sledge', slot: 'hammer', rarity: 'epic',
-    tradeable: true, attack: 1400, palette: 'stone', station: 'capital', maxDurability: 20000,
+    tradeable: true, attack: 1400, palette: 'stone', station: 'guild', maxDurability: 20000,
     inputs: { obsidian_shard: 3, granite: 8, polished_granite: 4, whetgrit: 4, reinforced_frame: 2, shard_cinder: 1 },
     description: 'Glass that lands like iron. Marketplace-tradeable.',
   },
   {
     key: 'silkweave_sickle', name: 'Silkweave Sickle', slot: 'sickle', rarity: 'epic',
-    tradeable: true, attack: 1400, palette: 'fiber', station: 'capital', maxDurability: 20000,
+    tradeable: true, attack: 1400, palette: 'fiber', station: 'guild', maxDurability: 20000,
     inputs: { silkweave_fiber: 3, hemp: 8, canvas: 4, quench_reed: 4, reinforced_frame: 2, shard_zephyr: 1 },
     description: 'The grass parts before it arrives. Marketplace-tradeable.',
   },
@@ -1124,14 +1124,14 @@ export const ITEMS: ItemDef[] = [
 
   {
     key: 'ironwood_armor', name: 'Ironwood Armor', slot: 'armor', rarity: 'epic', tradeable: true,
-    stat: 'yield', value: 0.11, attack: 100, defense: 700, palette: 'wood', station: 'capital',
+    stat: 'yield', value: 0.11, attack: 100, defense: 700, palette: 'wood', station: 'guild',
     maxDurability: 21000,
     inputs: { ironwood: 3, heartoak: 8, bentwood: 4, pine_pitch: 4, reinforced_frame: 2, shard_verdant: 1 },
     description: 'Grown, not forged. Marketplace-tradeable.',
   },
   {
     key: 'beastfang_boots', name: 'Beastfang Boots', slot: 'boots', rarity: 'epic', tradeable: true,
-    stat: 'travelSpeed', value: 0.11, attack: 0, defense: 400, palette: 'pelt', station: 'capital',
+    stat: 'travelSpeed', value: 0.11, attack: 0, defense: 400, palette: 'pelt', station: 'guild',
     maxDurability: 19000,
     inputs: { beastfang_hide: 3, dire_pelt: 8, lacquered_hide: 4, sinew: 4, reinforced_frame: 2, relic: 1 },
     description: 'Something fast died for these. Marketplace-tradeable.',
@@ -1140,7 +1140,7 @@ export const ITEMS: ItemDef[] = [
     key: 'silkweave_gloves', name: 'Silkweave Gloves', slot: 'gloves', rarity: 'epic',
     tradeable: true,
     stat: 'processingSpeed', value: 0.11, attack: 400, defense: 100, palette: 'fiber',
-    station: 'capital', maxDurability: 19500,
+    station: 'guild', maxDurability: 19500,
     inputs: { silkweave_fiber: 3, hemp: 8, canvas: 4, beeswax: 4, reinforced_frame: 2, shard_zephyr: 1 },
     description: 'Spun so fine the work goes quicker for feeling less. Marketplace-tradeable.',
   },

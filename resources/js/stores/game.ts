@@ -146,6 +146,7 @@ export const useGame = defineStore('game', () => {
     hunted: [],
     carriers: [],
     roaming: [],
+    guildLands: [],
     nextChangeAt: null,
   })
 
@@ -203,6 +204,11 @@ export const useGame = defineStore('game', () => {
     const roaming = new Map(
       (mutations.value.roaming ?? []).map(([c, r, k, grade]) => [key(c, r), { key: k, grade }]),
     )
+    // §10.6 -- and the one PLACE the seed knows nothing about. A value rather
+    // than a subtraction for the same reason a roamer is.
+    const guildLands = new Map(
+      (mutations.value.guildLands ?? []).map((land) => [key(land.col, land.row), land]),
+    )
 
     const built: Tile[] = []
     for (const coord of visibleTiles(col, row, w, h)) {
@@ -221,6 +227,7 @@ export const useGame = defineStore('game', () => {
           packCleared: cleared.has(k),
           huntCleared: hunted.has(k),
           roaming: roaming.get(k),
+          guildLand: guildLands.get(k),
         }),
       )
     }
@@ -1180,7 +1187,7 @@ export const useGame = defineStore('game', () => {
     await loadGuilds()
   }
 
-  async function upgradeGuildFacility(facility: 'hall' | 'bench'): Promise<void> {
+  async function upgradeGuildFacility(facility: 'hall' | 'processing' | 'craft'): Promise<void> {
     await act(() => api.upgradeGuildFacility(facility))
     await loadGuilds()
   }

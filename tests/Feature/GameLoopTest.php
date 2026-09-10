@@ -3972,27 +3972,35 @@ final class GameLoopTest extends TestCase
     }
 
     /**
-     * §8.0 / §9 / §10 -- legendary and unique are defined but unreachable.
+     * §8.0 / §9 / §10 -- legendary and unique are defined and CRAFTED NOWHERE.
      *
-     * Guild halls and dungeons are not built. The gates have to exist anyway:
-     * without them a capital would quietly become the top of the ladder, and
-     * §2's hardest rule -- no grind→NFT faucet -- has no teeth if a drop rarity
-     * can leak out of a workbench.
+     * They come off a dungeon (§9.2) and that is their only source, so no
+     * station in the game reaches either. The gate has to hold from the data
+     * side as well as the code side: without it a guild land would quietly
+     * become the top of the ladder, and §2's hardest rule -- no grind→NFT
+     * faucet -- has no teeth if a drop rarity can leak out of a workbench.
+     *
+     * The recipes themselves stay written down. §8.0's ladder is easier to
+     * reason about whole than with a hole in the top, and a rung that is
+     * designed and switched off is a rung a dungeon can hand out tomorrow.
      */
     public function test_legendary_and_unique_are_reachable_from_nowhere(): void
     {
         $uniques = 0;
 
         foreach (Catalog::items() as $key => $def) {
-            // Legendary MAY be defined -- §8.5's top rung of potions is -- but
-            // the only bench that reaches it is a guild hall, and there are
-            // none. The invariant is unreachability, not absence: a legendary
-            // whose station were a capital would be forgeable today.
+            // Legendary MAY be defined -- §8.5's top rung of potions is -- and
+            // nothing in the game makes it. The invariant is unreachability,
+            // not absence: a legendary whose station were a guild land would be
+            // forgeable this afternoon.
             if ($def['rarity'] === 'legendary') {
-                $this->assertSame(
-                    'guild',
+                $this->assertNull(
                     $def['station'] ?? null,
-                    "{$key} is legendary but does not need a guild hall",
+                    "{$key} is legendary but sits at a bench",
+                );
+                $this->assertNull(
+                    Balance::stationForRarity('legendary'),
+                    'something in the game reaches legendary',
                 );
             }
 
@@ -4013,11 +4021,13 @@ final class GameLoopTest extends TestCase
 
         $this->assertGreaterThan(0, $uniques, 'the top of the ladder is missing');
 
-        // The gates themselves are defined, and point somewhere no player is.
-        $this->assertSame('guild', Balance::stationForRarity('legendary'));
+        // And no bench anywhere reaches either rung -- guild land included,
+        // which is the one that changed. §10.6 puts EPIC on a guild's ground
+        // and stops; the two rungs above it are a dungeon's (§9.2).
+        $this->assertNull(Balance::stationForRarity('legendary'), 'a bench reaches legendary');
         $this->assertNull(Balance::stationForRarity('unique'), 'a bench can reach unique');
 
-        foreach (['village', 'city', 'capital'] as $tier) {
+        foreach (['village', 'city', 'capital', 'guild'] as $tier) {
             $this->assertFalse(
                 Balance::stationReaches($tier, 'legendary'),
                 "a {$tier} can forge legendary work",
@@ -4185,6 +4195,18 @@ final class GameLoopTest extends TestCase
                 continue;
             }
 
+            // §8.0 -- a rung nothing reaches has no bench to sit at, and says
+            // so by carrying no station rather than by naming one that cannot
+            // make it. Legendary is that today (it drops, §9.2).
+            if (Balance::stationForRarity($def['rarity']) === null) {
+                $this->assertNull(
+                    $def['station'] ?? null,
+                    "{$key} names a bench for a rung nothing reaches",
+                );
+
+                continue;
+            }
+
             $station = $def['station'] ?? 'village';
             $this->assertTrue(
                 Balance::stationReaches($station, $def['rarity']),
@@ -4341,16 +4363,17 @@ final class GameLoopTest extends TestCase
      * The client generates 25 million tiles from the world seed, so this must
      * cost only the facts it cannot derive: what is worked out, who is standing
      * there, which §9.5.1 pack somebody has already fought, which §5.5 animal
-     * somebody has already taken, and where the §9.5.7 corpses are. Shipping
-     * generated tiles was ~200KB per pan; this guards against that creeping
-     * back in.
+     * somebody has already taken, where the §9.5.7 corpses are, and which hexes
+     * a guild has built on (§10.6 -- the one PLACE that is not a function of
+     * the seed). Shipping generated tiles was ~200KB per pan; this guards
+     * against that creeping back in.
      */
     public function test_the_map_endpoint_sends_mutations_only(): void
     {
         $empty = $this->game->mapMutations($this->character);
 
         $this->assertSame(
-            ['depleted', 'occupied', 'cleared', 'hunted', 'roaming', 'carriers', 'nextChangeAt'],
+            ['depleted', 'occupied', 'cleared', 'hunted', 'roaming', 'carriers', 'guildLands', 'nextChangeAt'],
             array_keys($empty),
         );
         $this->assertSame([], $empty['depleted']);
