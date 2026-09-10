@@ -284,9 +284,11 @@ The two opposing pulls (outward for resources, inward for processing + dungeons)
 force constant traffic through the contested middle ring. This is intentional.
 
 **Capitals stand in the contested ring, not the center**, and that is the
-sharpest version of the same pull: the best bench in the game, the only one that
-runs all five lines and reaches epic, sits on ground other prospectors are
-working. You cannot process at the top tier without walking into the PvP band.
+sharpest version of the same pull: the best bench the map itself puts anywhere —
+four of the five lines and a rare rung (§6, §8.0) — sits on ground other
+prospectors are working. You cannot process at the map's top tier without
+walking into the PvP band. The fifth line and the epic rung are a guild's to
+build (§10.6), on ground of its own choosing.
 No settlement of any tier stands in the center, so the last step inward is a
 raid and never an errand — it is the ban that carries that, not the emptiness.
 
@@ -906,11 +908,28 @@ Because village/city players are always missing process lines, they stay depende
 dungeon loot and the NPC gold shop. This keeps every system relevant at every tier.
 
 **On screen a settlement's lines are TABS, one each.** A tier is a count of
-lines — a village runs one of the five, a city two, a capital all five — so the
+lines — a village runs one of the five, a city two, a capital four — so the
 lines are the one axis this panel has, and merging them threw it away: at a
 capital that was five ladders in one column with nothing between them. Drawn
 only where there is a choice, since a single tab is a label pretending to be a
 control.
+
+**And the almanac carries a BUILDING section**, last in the Ground half. The
+sections above it are what a hex gives *up*; this is what somebody has put on
+it — the three settlement tiers, the dungeon mouth, and a guild's land at each
+of its five steps (§10.6).
+
+It is the only place the three tiers can be compared side by side, which is
+exactly what §13.2 says the map cannot do: it tells them apart by shape
+category *because* you usually see one at a time with nothing to hold it
+against.
+
+**Each stands on the ground it actually stands on**, not a neutral slab. A
+guild's land is drawn on **dead ground**, snags and all, because that is where
+it may be built by rule (§5.2) and it is half of what the entry is for — the
+five steps read as a waste becoming the busiest ground in the world. Putting
+them all on one green would have made the guild entries a lie about where they
+can be.
 
 **A run is named for what comes OFF it**, never for what is done to make it.
 "Saw Planks" put a verb where every other list in the game puts the thing — the
@@ -986,8 +1005,8 @@ the whole map: a run of planks left at a village four days' walk away refused
 every saw pit in the world — while §8.4 argued in the same breath that "the real
 limit on how much you have going at once is still the walking". Two rules about
 one thing, disagreeing, and the walking is the one worth keeping. A capital
-running all five lines therefore holds five of one prospector's runs, one to a
-bench, which is most of what a capital is for (§6).
+running four lines therefore holds four of one prospector's runs, one to a
+bench — and a guild's land, running all five, holds five (§10.6).
 
 **The ceiling is ten, and it is the only global number.** `OUTSTANDING_WORK_CAP`
 counts processing runs and bench crafts together, because to a player they are

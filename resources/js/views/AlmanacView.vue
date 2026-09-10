@@ -70,6 +70,7 @@ import {
 import { itemIcon, materialIcon } from '@/icons/procedural'
 import {
   animalSpecimen,
+  buildingSpecimen,
   monsterSpecimen,
   pocketSpecimen,
   variantSpecimen,
@@ -407,6 +408,24 @@ const RING_REACH: Record<string, string> = {
   inner: 'Contested ring only',
 }
 
+/**
+ * §10.6 -- the five steps, which grow by accretion: each keeps everything the
+ * one below drew and adds one thing. You are not learning five silhouettes, you
+ * are watching one get built.
+ */
+const GUILD_STEP_NAME = ['Stake', 'Camp', 'Yard', 'Works', 'Hold']
+
+const GUILD_STEP_BLURB = [
+  'A post and a pennant on empty ground. Somebody owns this and nothing else '
+    + 'is true of it yet.',
+  'The first hut. Somebody is living here now.',
+  'A second hut and a footing under them. It has a shape.',
+  'The wall closed round it and a hall behind, roofed in the cold slate a city '
+    + 'uses. This is institutional building rather than somebody’s house.',
+  'The tower, and the tallest thing a guild builds. Every line runs here and '
+    + 'the bench reaches epic — the only one in the world that does.',
+]
+
 const GRADE_LABEL: Record<string, string> = {
   common: 'Base',
   uncommon: 'Better',
@@ -524,6 +543,109 @@ const pocketEntries = computed(() =>
       }
     })
     .filter((e) => matches(e.hay)),
+)
+
+/**
+ * §6/§9.1/§10.6 -- what STANDS on a hex.
+ *
+ * The other Ground sections answer "what does this ground give up". This one
+ * answers a different question about the same hex: what somebody has built on
+ * it, and what that means for you. It is the only place the three settlement
+ * tiers can be compared side by side -- §13.2 tells them apart by shape
+ * category precisely because you usually see one at a time and have nothing to
+ * hold it against.
+ *
+ * A guild's land is five entries rather than one, because it is one place at
+ * five stages (§10.6) and the whole point of the drawing is that it grows. It
+ * stands on dead ground by rule, and the specimen says so.
+ */
+interface BuildingEntry {
+  key: string
+  kind: 'village' | 'city' | 'capital' | 'dungeon' | 'guild'
+  biome: Biome
+  step: number
+  eyebrow: string
+  name: string
+  blurb: string
+  gives: string
+  found: string
+  hay: string
+}
+
+const BUILDINGS: Array<Omit<BuildingEntry, 'hay'>> = [
+  {
+    key: 'building.village',
+    kind: 'village',
+    biome: 'forest',
+    step: 1,
+    eyebrow: 'Settlement',
+    name: 'Village',
+    blurb:
+      'A scatter of huts with no wall round them. Runs one of the five '
+      + 'processing lines, and which one is a fact about that village.',
+    gives: 'One processing line · a common bench · a shop',
+    found: 'Everywhere, thickest on the safe outer rim',
+  },
+  {
+    key: 'building.city',
+    kind: 'city',
+    biome: 'grassland',
+    step: 1,
+    eyebrow: 'Settlement',
+    name: 'City',
+    blurb:
+      'A toothed wall with a gate through it. Two lines instead of one, and a '
+      + 'bench that reaches the second rung.',
+    gives: 'Two processing lines · an uncommon bench · a shop',
+    found: 'The middle ring and inward',
+  },
+  {
+    key: 'building.capital',
+    kind: 'capital',
+    biome: 'mountain',
+    step: 1,
+    eyebrow: 'Settlement',
+    name: 'Capital',
+    blurb:
+      'One spire and a gold pennant, and the best thing the map puts there by '
+      + 'itself. Four of the five lines — the fifth is a guild’s to build.',
+    gives: 'Four processing lines · a rare bench · a shop',
+    found: 'The contested ring, one ring out from the dungeons',
+  },
+  {
+    key: 'building.dungeon',
+    kind: 'dungeon',
+    biome: 'badlands',
+    step: 1,
+    eyebrow: 'Dungeon',
+    name: 'Dungeon mouth',
+    blurb:
+      'A hole with a frame round it. No settlement stands in the centre, so '
+      + 'the last step inward is a raid and never an errand.',
+    gives: 'Shards, relics and cores · the only source of legendary and unique',
+    found: 'The centre, and nowhere else',
+  },
+  ...([1, 2, 3, 4, 5] as const).map((step) => ({
+    key: `building.guild.${step}`,
+    kind: 'guild' as const,
+    biome: 'forest' as Biome,
+    step,
+    eyebrow: `Guild land · step ${step} of 5`,
+    name: GUILD_STEP_NAME[step - 1]!,
+    blurb: GUILD_STEP_BLURB[step - 1]!,
+    gives:
+      step === 1
+        ? 'Nothing yet. A claim buys the ground and nothing standing on it.'
+        : 'Whatever the roster has paid for — up to all five lines and an epic bench',
+    found: 'Dead ground only, anywhere a guild can reach',
+  })),
+]
+
+const buildingEntries = computed<BuildingEntry[]>(() =>
+  BUILDINGS.map((b) => ({
+    ...b,
+    hay: [b.name, b.eyebrow, b.blurb, b.gives, b.found, 'building settlement'].join(' '),
+  })).filter((e) => matches(e.hay)),
 )
 
 // -------------------------------------------------------------- monsters §9.5
@@ -708,7 +830,8 @@ const tileCount = computed(
   () =>
     tileGroups.value.reduce<number>((n, g) => n + g.entries.length, 0) +
     waterEntries.value.length +
-    pocketEntries.value.length,
+    pocketEntries.value.length +
+    buildingEntries.value.length,
 )
 
 // ------------------------------------------------------------------ equipment
@@ -1271,6 +1394,49 @@ function nature(item: ItemDef): string {
                 <div class="rail out">
                   <dt class="label">Gives up</dt>
                   <dd>Nothing. Water is worked by neither verb.</dd>
+                </div>
+              </dl>
+            </article>
+          </div>
+        </section>
+      </template>
+
+      <!-- §6/§9.1/§10.6 -- what STANDS on a hex. Last in the Ground half,
+           because the sections above are what the ground GIVES UP and this is
+           what somebody has put on it. -->
+      <template v-if="half === 'tiles' && buildingEntries.length">
+        <section>
+          <div class="sect">
+            <h3>Building</h3>
+            <span class="tally">{{ buildingEntries.length }}</span>
+          </div>
+
+          <div class="entries">
+            <article v-for="b in buildingEntries" :key="b.key" class="entry">
+              <div class="head">
+                <span
+                  class="specimen"
+                  v-html="buildingSpecimen(b.kind, b.biome, b.step, 76)"
+                />
+                <div class="grow">
+                  <span class="label eyebrow">{{ b.eyebrow }}</span>
+                  <strong class="name">{{ b.name }}</strong>
+                </div>
+              </div>
+
+              <p class="tiny muted desc">{{ b.blurb }}</p>
+
+              <dl class="rails">
+                <div class="rail" :style="{ '--road': SOURCE_COLOR.craft }">
+                  <dt class="label">Offers</dt>
+                  <dd>{{ b.gives }}</dd>
+                </div>
+
+                <!-- Neutral rail: where a place stands is a fact about the map
+                     rather than a road anything arrives by. -->
+                <div class="rail out">
+                  <dt class="label">Found</dt>
+                  <dd>{{ b.found }}</dd>
                 </div>
               </dl>
             </article>

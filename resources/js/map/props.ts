@@ -1468,6 +1468,67 @@ export function deadGlyph(biome: Biome, size = 34): string {
 }
 
 /**
+ * §6/§9.1/§10.6 -- one hex of built ground, for the almanac.
+ *
+ * Everything that STANDS on a hex, drawn by the very functions that draw it on
+ * the map -- the three settlement tiers, the dungeon mouth, and a guild's land
+ * at each of its five steps. The almanac is the screen that answers "what am I
+ * looking at" (§13), and a building is the one thing on a hex a player is
+ * otherwise expected to learn by walking up to it.
+ *
+ * **The ground under each is the truthful one, not a neutral slab.** A
+ * settlement stands on any biome, so it takes one and the entry says so; a
+ * dungeon mouth is sited in the contested ring; and a guild's land is on DEAD
+ * ground by rule (§5.2/§10.6), which is half of what makes its entry worth
+ * reading. Putting them all on the same green would have made the five guild
+ * steps a lie about where they can be.
+ */
+export function buildingSpecimen(
+  kind: 'village' | 'city' | 'capital' | 'dungeon' | 'guild',
+  biome: Biome,
+  step = 1,
+  size = 66,
+): string {
+  if (kind === 'guild') {
+    // §10.6 -- on the waste it is actually built on, snags and all, so the
+    // entry shows the transformation rather than a hall on a lawn.
+    const ground = {
+      col: 0,
+      row: 0,
+      biome,
+      variant: biome as VariantKey,
+      dead: true,
+      propSeed: SPECIMEN_SEED,
+      settlement: undefined,
+      dungeon: undefined,
+      water: undefined,
+    } as unknown as Tile
+
+    // The same scatter tileProps() uses, so the waste under a hold looks like
+    // any other waste rather than like a second drawing of one.
+    const spot = (index: number) => {
+      const hx = hash2(index * 71, index * 131, SPECIMEN_SEED)
+      const hy = hash2(index * 191, index * 37, SPECIMEN_SEED)
+
+      return { x: randInt(hx, -17, 17), y: randInt(hy, -4, 9) }
+    }
+
+    return groundHex(
+      biome,
+      deadProps(ground, variantColor(biome as VariantKey), SPECIMEN_SEED, spot)
+        + guildLandProp(step),
+      size,
+    )
+  }
+
+  return groundHex(
+    biome,
+    kind === 'dungeon' ? dungeonProp() : settlementProp(kind, SPECIMEN_SEED),
+    size,
+  )
+}
+
+/**
  * §5.6 -- one hex of unscouted country: the biome's colour, and nothing on it.
  *
  * The same drawing the MAP makes out there, which is the whole argument for it.
