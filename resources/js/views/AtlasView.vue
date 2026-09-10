@@ -29,7 +29,8 @@ import type { SettlementMark } from '@/game/worldgen'
 import { ACTION_PATHS } from '@/icons/actions'
 import LineMarks from '@/components/LineMarks.vue'
 import { BIOME_COLOR, BIOME_LABEL } from '@/theme/palette'
-import type { SettlementTier } from '@/game/types'
+import type { MapTier,
+} from '@/game/types'
 
 const game = useGame()
 
@@ -85,7 +86,7 @@ const detailed = computed(
  * confetti and hides the structure the chart exists to show. Each step out
  * drops the smallest tier, the way a road atlas stops printing hamlets.
  */
-const tiersShown = computed<SettlementTier[]>(() => {
+const tiersShown = computed<MapTier[]>(() => {
   const px = pxPerCol.value
   if (px >= 4) return ['village', 'city', 'capital']
   if (px >= 1.2) return ['city', 'capital']
@@ -93,8 +94,8 @@ const tiersShown = computed<SettlementTier[]>(() => {
 })
 
 /** Villages are never labeled -- there are too many. Tap one to name it. */
-const labeledTiers = computed<Set<SettlementTier>>(() => {
-  const set = new Set<SettlementTier>(['capital'])
+const labeledTiers = computed<Set<MapTier>>(() => {
+  const set = new Set<MapTier>(['capital'])
   if (pxPerCol.value >= 1.2) set.add('city')
   return set
 })
@@ -178,7 +179,7 @@ function ensureRaster(): void {
 
 // -------------------------------------------------------------------- paint
 
-const DOT: Record<SettlementTier, { r: number; fill: string; rank: number }> = {
+const DOT: Record<MapTier, { r: number; fill: string; rank: number }> = {
   village: { r: 2.2, fill: '#ece3cd', rank: 0 },
   city: { r: 3.4, fill: '#c1793f', rank: 1 },
   capital: { r: 5, fill: '#d8b34a', rank: 2 },
@@ -293,10 +294,13 @@ function draw(): void {
   const placed: Box[] = []
   const byRank = onScreen
     .filter((s) => labeledTiers.value.has(s.mark.tier))
-    .sort((a, b) => DOT[b.mark.tier].rank - DOT[a.mark.tier].rank)
+    // The atlas charts what the MAP placed, so every tier here is one of the
+    // three (§10.6's land is not on it -- it is stored rather than derived,
+    // and the atlas draws off the seed alone).
+    .sort((a, b) => DOT[b.mark.tier as MapTier].rank - DOT[a.mark.tier as MapTier].rank)
 
   for (const { mark, x, y } of byRank) {
-    const top = y - DOT[mark.tier].r - 4
+    const top = y - DOT[mark.tier as MapTier].r - 4
     const half = ctx.measureText(mark.name).width / 2 + 3
     const box: Box = { x0: x - half, y0: top - 10, x1: x + half, y1: top + 2 }
     if (placed.some((b) => overlaps(box, b))) continue

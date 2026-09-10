@@ -1498,8 +1498,12 @@ final class Formulas
         bool $presence,
         float $equipProcessingBonus,
         ?float $presenceBonus = null,
+        // §10.6 -- guild land gets faster with its processing level, which is
+        // what the levels past the fifth buy. Nought everywhere else, where the
+        // tier is the whole answer.
+        int $tierLevel = 0,
     ): int {
-        $tierSpeed = Balance::settlementSpeed($tier);
+        $tierSpeed = Balance::settlementSpeed($tier, $tierLevel);
         $presenceSpeed = $presence ? 1 - ($presenceBonus ?? Balance::PRESENCE_SPEED_BONUS) : 1;
 
         return max(30, (int) round($baseSeconds * $tierSpeed * $presenceSpeed * (1 - $equipProcessingBonus)));

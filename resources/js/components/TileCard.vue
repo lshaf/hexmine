@@ -20,11 +20,11 @@ import { MONSTERS } from '@/game/monsters'
 import { TROPHY_BY_TIER } from '@/game/spoils'
 import { monsterSpecimen } from '@/map/props'
 import { formatDuration, formatSpan } from '@/game/formulas'
-import { MINING } from '@/game/balance'
+import { LOOT_CHANCE, LOOT_DURABILITY, LOOT_RUNGS, MINING } from '@/game/balance'
 import { groundLabel } from '@/game/ground'
 import { hexDistance } from '@/map/hexGeometry'
 import { worldParams } from '@/game/worldgen'
-import { materialIcon } from '@/icons/procedural'
+import { itemIcon, materialIcon } from '@/icons/procedural'
 import {
   animalMark,
   deadGlyph,
@@ -36,7 +36,7 @@ import {
 import HexAction from '@/shell/HexAction.vue'
 import SvgIcon from './SvgIcon.vue'
 import LineMarks from './LineMarks.vue'
-import type { MaterialKey } from '@/game/types'
+import type { MaterialKey, Rarity } from '@/game/types'
 
 const game = useGame()
 
@@ -277,6 +277,32 @@ const packDrops = computed(() => {
     .filter((k): k is string => Boolean(k))
     .map((k) => MATERIALS[k as MaterialKey])
     .filter(Boolean)
+})
+
+/**
+ * §9.5.8 -- and the kit it was using, which is the other thing a win pays.
+ *
+ * It belongs among the pips by the card's own rule: a pip promises a strap, and
+ * looted gear takes one. Gold is the exception up here precisely because it
+ * does not.
+ *
+ * A RUNG rather than a piece, because that is honestly all there is to say --
+ * the draw is uniform over every battle-gear item at that rung, so naming one
+ * would be inventing a promise. What the tier decides is which rungs are on the
+ * table, and never past rare whatever anybody is wearing (§2).
+ *
+ * Armor rather than a weapon for the silhouette: the pool is weapons and worn
+ * pieces together, and a sword would name half of it.
+ */
+const packGear = computed(() => {
+  const d = pack.value
+  if (!d) return []
+
+  return (LOOT_RUNGS[d.tier] ?? []).map((rarity) => ({
+    rarity,
+    name: `${rarity} gear`,
+    svg: itemIcon({ slot: 'armor', rarity: rarity as Rarity, palette: 'iron', size: 18 }),
+  }))
 })
 
 /**
@@ -658,6 +684,12 @@ watch(open, (isOpen) => {
               <span v-for="d in packDrops" :key="d.key" class="pip" :title="d.name">
                 <SvgIcon :svg="materialIcon(d, 18)" />{{ d.name }}
               </span>
+              <!-- §9.5.8 -- the kit it was using. A rung rather than a piece,
+                   because the draw is uniform across the rung and naming one
+                   piece would be inventing a promise. -->
+              <span v-for="g in packGear" :key="g.rarity" class="pip" :title="g.name">
+                <SvgIcon :svg="g.svg" />{{ g.name }}
+              </span>
             </div>
 
             <!-- What is behind the tap is what is behind it on every other row:
@@ -672,6 +704,16 @@ watch(open, (isOpen) => {
               <div class="row-between rate">
                 <span>Gold</span>
                 <span class="readout">{{ pack.gold[0] }}–{{ pack.gold[1] }}</span>
+              </div>
+              <!-- §9.5.8 -- how OFTEN the gear above lands, and how worn it is
+                   when it does. Two different questions from what it is, and
+                   the pips answer only the second: one column cannot say both
+                   (§8.0.1 makes the same argument about `indestructible`). -->
+              <div v-if="packGear.length" class="row-between rate">
+                <span>Gear</span>
+                <span class="readout">
+                  {{ Math.round(LOOT_CHANCE * 100) }}% of wins, {{ LOOT_DURABILITY.min }}–{{ LOOT_DURABILITY.max }}% worn
+                </span>
               </div>
               <p class="note">{{ PROFILE_NOTE[pack.profile] }}</p>
               <p v-if="wearNote" class="note">{{ wearNote }}</p>

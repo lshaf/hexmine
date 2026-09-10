@@ -3465,6 +3465,20 @@ the odds are already the order.)*
 **Gold is the one drop that is not a pip**, because it needs no strap (§7.6) and
 a pip promises one. It goes in the breakdown with the figures.
 
+**The kit it was carrying IS a pip**, by that same rule: looted gear takes a
+strap. It is drawn as a **rung** rather than a piece — *common gear*, *rare
+gear* — because that is honestly all there is to say, since the draw is uniform
+across every battle-gear item at that rung and naming one would be inventing a
+promise. What the tier decides is which rungs are on the table, and **never past
+rare** whatever anybody is wearing (§9.5.8, and it is a §2 rule rather than a
+tuning value). The silhouette is a piece of armor rather than a weapon, because
+the pool is weapons and worn pieces together and a sword would name half of it.
+
+**How often it lands, and how worn, go in the breakdown** — 18% of wins, 5–50%
+worn. Those are different questions from *what*, and the pips answer only the
+second: one column cannot say both, which is the argument §8.0.1 already makes
+about `indestructible`.
+
 **First among the rows, and that is not layout.** Nothing on the price list
 matters while something is looking at you — §9.5.3 refuses every verb on a
 pinned hex — so a seam read before the pack standing on it is a seam read in the
@@ -4414,7 +4428,16 @@ needs planks does not need an epic bench to get them.
 | 2–5 | a line a level, to all five | uncommon at 5 |
 | 10 | — | rare |
 | 15 | — | **epic** |
-| 20 | the clock, and nothing left to unlock | the clock |
+| 20 | the clock | the clock |
+
+**Levels past the fifth buy the clock**, because the count stops at five and
+five is all there is. A land starts level with a **capital** — not a village,
+which is where the fall-through used to put the most expensive place in the
+game — and gets a little faster per level from there, to 0.40 against a
+capital's 0.55. Meaningfully faster than the best thing the map offers, which
+is what a hundred thousand gold and twenty levels should feel like, and not so
+much faster that a guild-less player is playing a different game. Each ladder
+speeds **its own** bench: processing levels the pits, craft levels the anvil.
 
 **Nothing runs until it is levelled once**, and that is what makes a claim the
 beginning of the work rather than the end of it. A hex bought and left alone is
@@ -4461,6 +4484,18 @@ one-way rather than a channel.
 What stays members-only is the **credit**. §10.5 keeps a running total on the
 member's row because the roster wants to know who carried it, and an outsider is
 not on the roster to be asked about.
+
+#### On screen — the claim is where the settlement would be
+
+**The station panel opens on claimable ground**, with no settlement in it. That
+is the same question a step earlier — *what can I do at this place* — so it is
+the same panel: what this hex would become, what it costs, and the button. The
+dock offers **Claim** on ground a guild could build on, and on no other, because
+a control that appears where it cannot work is worse than one that is absent.
+
+**And the name is set from the same panel**, on your own guild's ground, by the
+owner alone (§10.0.2). It sits above the line tabs because it is what the place
+*is* rather than what it does.
 
 #### On the map — five glyphs, and it grows
 

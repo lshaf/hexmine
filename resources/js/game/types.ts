@@ -24,7 +24,25 @@ export interface Coord {
   row: number
 }
 
-export type SettlementTier = 'village' | 'city' | 'capital'
+/**
+ * §6/§10.6 -- what kind of place this is.
+ *
+ * `guild` is the odd one and is deliberately in the same union: a guild's land
+ * answers in a settlement's own shape so every path that takes a settlement --
+ * the queue, the bench, the fee, this panel -- works on it without knowing it
+ * is different. What tells it apart is that the map did not put it there.
+ */
+export type SettlementTier = 'village' | 'city' | 'capital' | 'guild'
+
+/**
+ * The three tiers the MAP itself places (§6).
+ *
+ * Kept apart from SettlementTier because a guild's land is a settlement to
+ * everything that works at one and is not a settlement worldgen ever produces:
+ * a lattice, an atlas dot and a shop rank are all facts about the map, and none
+ * of them has anything to say about a hex a roster bought.
+ */
+export type MapTier = 'village' | 'city' | 'capital'
 
 // ---------------------------------------------------------------- materials
 
@@ -347,7 +365,7 @@ export type BuffScope = SkillKey | 'travel' | 'processing' | 'battle'
  * Village, city and capital are places on the map; a guild hall is not one, and
  * legendary work is reachable only there. Mirrors Balance::stationForRarity().
  */
-export type CraftStation = SettlementTier | 'guild'
+export type CraftStation = SettlementTier
 
 export interface ItemDef {
   key: string

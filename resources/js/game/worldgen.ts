@@ -31,7 +31,7 @@ import type {
   Pack,
   Ring,
   Settlement,
-  SettlementTier,
+  MapTier,
   SkillKey,
   Tile,
   VariantKey,
@@ -450,7 +450,7 @@ function lakeAt(col: number, row: number): boolean {
  * villages on touching hexes. `siteOffset` narrows the window instead.
  */
 const LATTICE: Record<
-  SettlementTier,
+  MapTier,
   { cell: number; minGap: number; chance: number; salt: number }
 > = {
   village: { cell: 11, minGap: 8, chance: 0.8, salt: 0x1111 },
@@ -482,7 +482,7 @@ function siteOffset(cell: number, minGap: number, h: number): number {
  * bench is meant to cross ground other prospectors are working, and the center
  * is reserved for dungeon mouths alone. Both of those rings are PvP ground.
  */
-const TIER_FOR_RING: Record<Ring, SettlementTier | null> = {
+const TIER_FOR_RING: Record<Ring, MapTier | null> = {
   outer: 'village',
   mid: 'city',
   inner: 'capital', // contested, and where the best bench stands
@@ -490,15 +490,15 @@ const TIER_FOR_RING: Record<Ring, SettlementTier | null> = {
 }
 
 /** Weakest first. A tier yields to everything above it and to nothing below. */
-const TIER_ORDER: SettlementTier[] = ['village', 'city', 'capital']
+const TIER_ORDER: MapTier[] = ['village', 'city', 'capital']
 
 const TIERS_ABOVE = Object.fromEntries(
   TIER_ORDER.map((tier, i) => [tier, TIER_ORDER.slice(i + 1)]),
-) as Record<SettlementTier, SettlementTier[]>
+) as Record<MapTier, MapTier[]>
 
 /** Where a tier's candidate sits inside one cell. Position only -- this says
  *  nothing about whether the cell actually fills. */
-function siteIn(tier: SettlementTier, cellCol: number, cellRow: number): [number, number] {
+function siteIn(tier: MapTier, cellCol: number, cellRow: number): [number, number] {
   const c = cfg()
   const { cell, minGap, salt } = LATTICE[tier]
   return [
@@ -508,7 +508,7 @@ function siteIn(tier: SettlementTier, cellCol: number, cellRow: number): [number
 }
 
 /** Not every cell gets a settlement -- that is what makes density feel organic. */
-function cellFills(tier: SettlementTier, cellCol: number, cellRow: number): boolean {
+function cellFills(tier: MapTier, cellCol: number, cellRow: number): boolean {
   const c = cfg()
   const { chance, salt } = LATTICE[tier]
   return rand01(hash2(cellCol, cellRow, c.seed ^ (salt + 2))) <= chance
@@ -522,7 +522,7 @@ function cellFills(tier: SettlementTier, cellCol: number, cellRow: number): bool
  * putting it here would recurse.
  */
 function settledSite(
-  tier: SettlementTier,
+  tier: MapTier,
   cellCol: number,
   cellRow: number,
 ): [number, number] | null {
@@ -551,7 +551,7 @@ function settledSite(
  * city, and the whole barren inner ring lies between those two tiers, so that
  * pair never comes within reach. Revisit if §5.2 moves a ring boundary.
  */
-function crowdedByBetter(tier: SettlementTier, col: number, row: number): boolean {
+function crowdedByBetter(tier: MapTier, col: number, row: number): boolean {
   for (const above of TIERS_ABOVE[tier]) {
     const { cell, minGap } = LATTICE[above]
 
@@ -582,7 +582,7 @@ function crowdedByBetter(tier: SettlementTier, col: number, row: number): boolea
  * a hundred thousand gold (§10.6). Drawn from the same pool rather than being
  * "all but one", so which line a capital lacks is a fact about that capital.
  */
-function linesFor(tier: SettlementTier, col: number, row: number): SkillKey[] {
+function linesFor(tier: MapTier, col: number, row: number): SkillKey[] {
   const c = cfg()
 
   const count = tier === 'capital' ? 4 : tier === 'city' ? 2 : 1
@@ -596,7 +596,7 @@ function linesFor(tier: SettlementTier, col: number, row: number): SkillKey[] {
   return picked
 }
 
-function nameFor(col: number, row: number, tier: SettlementTier): string {
+function nameFor(col: number, row: number, tier: MapTier): string {
   const c = cfg()
   const hp = hash2(col, row, c.seed ^ 0x7ae1)
   const hs = hash2(row, col, c.seed ^ 0x7ae2)
@@ -648,7 +648,8 @@ export function settlementAt(col: number, row: number): Settlement | undefined {
 export interface SettlementMark {
   col: number
   row: number
-  tier: SettlementTier
+  /** The map's own three: a mark is something worldgen placed (§10.6). */
+  tier: MapTier
   name: string
   /** §6 -- which of the five lines it runs. Two hashes, so the chart affords it. */
   lines: SkillKey[]
@@ -671,7 +672,7 @@ export function settlementMarksIn(
   colMax: number,
   rowMin: number,
   rowMax: number,
-  tiers: SettlementTier[] = ['village', 'city', 'capital'],
+  tiers: MapTier[] = ['village', 'city', 'capital'],
 ): SettlementMark[] {
   const out: SettlementMark[] = []
 

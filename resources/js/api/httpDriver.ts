@@ -313,6 +313,19 @@ export class HttpDriver implements GameApi {
     return post<ActionResult<RepairResult>>(`/equipment/${ownedId}/repair`, { coin })
   }
 
+  /** §10.6 -- claim the hex under your feet for the guild. */
+  claimGuildLand(): Promise<ActionResult<GuildDetail>> {
+    return post<ActionResult<GuildDetail>>('/guilds/mine/land')
+  }
+
+  /** §10.6 -- and name it. A place may be renamed; a person may not (§7). */
+  nameGuildLand(name: string): Promise<ActionResult<GuildDetail>> {
+    return request<ActionResult<GuildDetail>>('/guilds/mine/land', {
+      method: 'PATCH',
+      body: JSON.stringify({ name }),
+    })
+  }
+
   getBattleSkills(): Promise<Record<string, BattleSkillRow[]>> {
     return request<Record<string, BattleSkillRow[]>>('/jobs-tree/skills')
   }

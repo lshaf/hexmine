@@ -447,6 +447,19 @@ onMounted(() => {
         </PanelOverlay>
       </Transition>
 
+      <!-- §10.6 -- ground a guild could build on. The same panel a step
+           earlier: there is no settlement here yet, and this is what makes
+           one. -->
+      <Transition name="fade">
+        <PanelOverlay
+          v-if="game.claiming && !panel"
+          title="Unclaimed ground"
+          @close="game.closeClaim()"
+        >
+          <StationPanel :settlement="null" />
+        </PanelOverlay>
+      </Transition>
+
       <!-- §10.0.4 -- getting a guild and running one, both at the settlement. -->
       <Transition name="fade">
         <PanelOverlay

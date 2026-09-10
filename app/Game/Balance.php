@@ -820,6 +820,20 @@ final class Balance
     public const GUILD_LAND_FEE_SHARE = 0.5;
 
     /**
+     * §10.6 -- what a processing level past the fifth buys: the clock.
+     *
+     * The count of lines stops at five because five is all there is, so
+     * everything above it goes here. A maxed land runs at GUILD_LAND_SPEED_FLOOR
+     * against a capital's 0.55 -- meaningfully faster than the best thing the
+     * map offers, which is what a hundred thousand gold and twenty levels
+     * should feel like, and not so much faster that a guild-less player is
+     * playing a different game.
+     */
+    public const GUILD_LAND_SPEED_PER_LEVEL = 0.008;
+
+    public const GUILD_LAND_SPEED_FLOOR = 0.40;
+
+    /**
      * §10.5 -- gold a facility level costs, at the level being bought.
      *
      * Rounded to the nearest hundred, because a price with two significant
@@ -1996,11 +2010,28 @@ final class Balance
         );
     }
 
-    public static function settlementSpeed(string $tier): float
+    /**
+     * Speed multiplier for a place's benches -- lower is faster.
+     *
+     * §10.6 -- guild land starts level with a capital and gets faster from
+     * there, a little per processing level. That is what levels 6 to 20 buy:
+     * the count stops at five because five is all there is, and everything
+     * above it goes on the clock. A hundred thousand gold and a maxed ladder
+     * should feel different from walking into somebody else's capital.
+     *
+     * Capital's speed as the FLOOR rather than village's, which is where the
+     * fall-through used to put it -- the most expensive place in the game
+     * running at the rate of the cheapest.
+     */
+    public static function settlementSpeed(string $tier, int $level = 0): float
     {
         return match ($tier) {
             'capital' => self::SPEED_CAPITAL,
             'city' => self::SPEED_CITY,
+            'guild' => max(
+                self::GUILD_LAND_SPEED_FLOOR,
+                self::SPEED_CAPITAL - max(0, $level) * self::GUILD_LAND_SPEED_PER_LEVEL,
+            ),
             default => self::SPEED_VILLAGE,
         };
     }

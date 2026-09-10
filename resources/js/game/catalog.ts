@@ -54,6 +54,7 @@ import type {
   Skill,
   SkillKey,
   StatKey,
+  MapTier,
 } from './types'
 
 // ------------------------------------------------------------- materials §4
@@ -1150,8 +1151,13 @@ export const ITEM_BY_KEY: Record<string, ItemDef> = Object.fromEntries(
   ITEMS.map((i) => [i.key, i]),
 )
 
-/** Settlement tiers, ordered. A station satisfies anything at or below its rank. */
-export const STATION_RANK: Record<SettlementTier, number> = {
+/**
+ * Settlement tiers, ordered. A station satisfies anything at or below its rank.
+ *
+ * The MAP's three only: this ranks what a shelf stocks (§3.2), and a guild's
+ * land keeps no shop -- there is no NPC standing on a waste a roster bought.
+ */
+export const STATION_RANK: Record<MapTier, number> = {
   village: 1,
   city: 2,
   capital: 3,

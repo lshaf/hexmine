@@ -931,6 +931,11 @@ export interface GuildMemberRow {
 export interface GuildStateSummary extends GuildSummary, GuildTreasury {
   /** §10.0.2 -- how many are waiting at the door. Nil unless you are an officer. */
   pending: number
+  /**
+   * §10.6 -- what YOU may do about this guild, which is a fact about you rather
+   * than about it. Claiming land and levelling it are the owner's alone.
+   */
+  role: GuildRole
 }
 
 export interface GuildDetail extends GuildSummary, GuildTreasury {
@@ -1011,6 +1016,9 @@ export interface GameApi {
   donateToGuild(gold: number): Promise<ActionResult<GuildDetail>>
   /** §10.5 -- spend it on a facility level. Owner only. */
   upgradeGuildFacility(facility: 'hall' | 'processing' | 'craft'): Promise<ActionResult<GuildDetail>>
+  /** §10.6 -- claim the hex under your feet, and name it. */
+  claimGuildLand(): Promise<ActionResult<GuildDetail>>
+  nameGuildLand(name: string): Promise<ActionResult<GuildDetail>>
   /** §9.5.5 -- starts a fight and answers with the JOB; the report is on collect. */
   fight(): Promise<ActionResult<Job>>
 

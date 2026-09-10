@@ -42,7 +42,7 @@ import {
   HUNT_JUNK,
   HUNT_LEAVING,
 } from './hunts'
-import type { Biome, ItemDef, Material, MaterialKey, SettlementTier } from './types'
+import type { Biome, ItemDef, MapTier, Material, MaterialKey, SettlementTier } from './types'
 
 /** The five roads. Nothing in the world arrives by a sixth. */
 export type SourceKind = 'mine' | 'process' | 'trade' | 'craft' | 'dungeon'
@@ -613,7 +613,9 @@ export const stocksAt = (item: ItemDef): SettlementTier[] => {
 
   const need = item.station ?? 'village'
 
-  return (Object.keys(STATION_RANK) as SettlementTier[]).filter(
+  // §10.6 -- the map's own three. A guild's land is not somewhere a shelf
+  // stands, and "which settlements sell this" is a question about shelves.
+  return (Object.keys(STATION_RANK) as MapTier[]).filter(
     (tier) => STATION_RANK[tier] >= STATION_RANK[need],
   )
 }

@@ -550,6 +550,21 @@ function hunted(): void {
 
         </template>
 
+        <!-- §10.6 -- and the one thing offered on empty ground: a guild owner
+             standing on a waste their roster could build on. Absent for
+             everybody else rather than grayed, because for everybody else it
+             is not a thing that could happen here. -->
+        <template v-if="game.canClaimHere">
+          <span v-if="working || seam" class="rule" aria-hidden="true" />
+          <HexAction
+            small
+            icon="guild"
+            label="Claim"
+            hint="Dead ground. Your guild can build here."
+            @activate="game.openClaim()"
+          />
+        </template>
+
         <!-- Settlement-only. Absent in the field rather than grayed: the point
              is that these people are not out here. -->
         <template v-if="here">

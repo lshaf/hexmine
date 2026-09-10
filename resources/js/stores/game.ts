@@ -1218,8 +1218,56 @@ export const useGame = defineStore('game', () => {
   /** §10 -- the guild on the player state, which every screen reads. */
   const guild = computed(() => state.value?.guild ?? null)
 
-  /** §8.0 -- standing in your own hall, which is what opens the top rung. */
+  /** §8.0/§10.6 -- standing on your own guild's land, which opens the top rung. */
   const atGuildHall = computed(() => Boolean(state.value?.atGuildHall))
+
+  /** §10.0.2 -- and whether you are the one who may spend the treasury. */
+  const guildOwner = computed(() => guild.value?.role === 'owner')
+
+  /**
+   * §10.6 -- may this guild build on the hex under your feet?
+   *
+   * Derived here rather than asked for, because every term is already on the
+   * client: the tile is a pure function of the seed (§5), and whether the guild
+   * holds land is on the player state. The server refuses for the same reasons
+   * and says which -- this only decides whether to OFFER, and a control that
+   * appears where it cannot work is worse than one that is simply absent.
+   */
+  const canClaimHere = computed(() => {
+    const g = guild.value
+    const char = character.value
+    if (!g || !guildOwner.value || g.land || !char || travel.value) return false
+
+    const tile = tileAt(char.col, char.row)
+
+    return Boolean(
+      tile && tile.dead && !tile.water && !tile.settlement && !tile.dungeon && !tile.guildLand,
+    )
+  })
+
+  /** §10.6 -- the claim plate, opened from the dock and closed by pressing it. */
+  const claiming = ref(false)
+
+  function openClaim(): void {
+    claiming.value = true
+  }
+
+  function closeClaim(): void {
+    claiming.value = false
+  }
+
+  async function claimLand(): Promise<void> {
+    const done = await act(() => api.claimGuildLand())
+    if (done) {
+      claiming.value = false
+      await refreshMutations()
+    }
+  }
+
+  async function nameLand(name: string): Promise<void> {
+    await act(() => api.nameGuildLand(name))
+    await refreshMutations()
+  }
 
   async function abandon(jobId: string): Promise<void> {
     // Read before the call: the job is gone from the state afterwards, so
@@ -1358,7 +1406,8 @@ export const useGame = defineStore('game', () => {
     select, clearSelection,
     haul, clearHaul, battle, fight, clearBattle, carriers,
     liveBattle, finishLiveBattle,
-    guilds, guild, atGuildHall, halls, openHalls, closeHalls,
+    guilds, guild, atGuildHall, guildOwner, halls, openHalls, closeHalls,
+    canClaimHere, claiming, openClaim, closeClaim, claimLand, nameLand,
     loadGuilds, foundGuild, joinGuild, leaveGuild,
     updateGuild, removeGuildMember, setGuildRole, withdrawApplication, decideApplication,
     donateToGuild, upgradeGuildFacility,

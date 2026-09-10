@@ -109,7 +109,17 @@ export const PROCESSING = {
   /** Five open slots per feature, first-come-first-served, §6.1. */
   publicSlots: 5,
   /** Speed multiplier by settlement tier -- lower is faster, §6. */
-  speed: { village: 1, city: 0.75, capital: 0.55 } as const,
+  /**
+   * §6/§10.6 -- speed multiplier by place, lower is faster.
+   *
+   * `guild` is the FLOOR a guild land starts at, level with a capital, and it
+   * gets faster from there -- see guildSpeed(). Mirrors
+   * Balance::settlementSpeed.
+   */
+  speed: { village: 1, city: 0.75, capital: 0.55, guild: 0.55 } as const,
+  /** §10.6 -- what a processing level past the fifth buys. */
+  guildSpeedPerLevel: 0.008,
+  guildSpeedFloor: 0.4,
   /** Presence bonus, §6.2. Presence alone produces nothing; it only
    *  accelerates an already-capped queue, so bot value is near zero. */
   presenceSpeedBonus: 0.2,
@@ -416,6 +426,32 @@ export const EQUIPMENT = {
  * Derived from the rung and never stored on the item: a column on a hundred
  * catalog rows is a hundred chances to disagree with the ladder.
  */
+/**
+ * §9.5.8 -- the kit a pack was using, and which rungs of it you may take.
+ *
+ * Mirrors Drops::LOOT_RUNGS. **Never past rare**, whatever the monster is
+ * wearing or the player is: epic is where gear becomes mintable (§8.0), and a
+ * monster that dropped one would be precisely the grind→NFT faucet §2 exists
+ * to close. That is a rule rather than a tuning value, which is why the client
+ * carries the table at all -- the card promises what a fight pays, and a
+ * promise the server would not keep is worse than saying nothing.
+ *
+ * Battle gear only. A monster is not carrying a sickle, and a looted gathering
+ * tool would put combat on the mining ladder (§8 rule 5).
+ */
+export const LOOT_RUNGS: Record<number, string[]> = {
+  1: ['common'],
+  2: ['common', 'uncommon'],
+  3: ['uncommon', 'rare'],
+  4: ['rare'],
+}
+
+/** §9.5.8 -- how often a win pays gear at all. Mirrors Drops::LOOT_CHANCE. */
+export const LOOT_CHANCE = 0.18
+
+/** §9.5.8 -- and how worn it comes off the body. Mirrors Balance::LOOT_DURABILITY_*. */
+export const LOOT_DURABILITY = { min: 5, max: 50 } as const
+
 export const EQUIP_LEVEL: Record<string, number> = {
   common: 1,
   uncommon: 8,

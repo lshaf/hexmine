@@ -4358,6 +4358,84 @@ final class GameLoopTest extends TestCase
     }
 
     /**
+     * §9.5.8 -- the card promises what a fight pays, so it carries the same
+     * loot table the server rolls from.
+     *
+     * The tile card draws a pip per RUNG a pack may drop gear at, which means
+     * the client holds Drops::LOOT_RUNGS. A promise the server would not keep
+     * is worse than saying nothing -- and the cap is a §2 rule rather than a
+     * tuning value, so a drift here would advertise an epic off a road pack,
+     * which is precisely the grind→NFT faucet the threat model exists to close.
+     */
+    public function test_the_client_carries_the_same_loot_table(): void
+    {
+        $mirror = file_get_contents(base_path('resources/js/game/balance.ts'));
+
+        foreach (Drops::LOOT_RUNGS as $tier => $rungs) {
+            $said = "  {$tier}: ['".implode("', '", $rungs)."'],";
+            $this->assertStringContainsString(
+                $said,
+                $mirror,
+                "balance.ts disagrees with Drops::LOOT_RUNGS[{$tier}]",
+            );
+        }
+
+        $this->assertStringContainsString(
+            'export const LOOT_CHANCE = '.Drops::LOOT_CHANCE,
+            $mirror,
+            'balance.ts disagrees with Drops::LOOT_CHANCE',
+        );
+
+        $this->assertStringContainsString(
+            'min: '.Balance::LOOT_DURABILITY_MIN_PERCENT.', max: '.Balance::LOOT_DURABILITY_MAX_PERCENT,
+            $mirror,
+            'balance.ts disagrees with the looted wear band',
+        );
+    }
+
+    /**
+     * §2/§9.5.8 -- and no rung above rare is on that table, at any tier.
+     *
+     * Epic is where gear becomes mintable (§8.0). This is the one assertion in
+     * the file that would still matter if every other loot rule changed.
+     */
+    public function test_no_pack_anywhere_drops_past_rare(): void
+    {
+        foreach (Drops::LOOT_RUNGS as $tier => $rungs) {
+            foreach ($rungs as $rarity) {
+                $this->assertLessThanOrEqual(
+                    Balance::rarityRank('rare'),
+                    Balance::rarityRank($rarity),
+                    "a tier {$tier} pack drops {$rarity}",
+                );
+            }
+        }
+
+        // And the pool it draws from is battle gear only -- a looted sickle
+        // would put combat on the mining ladder (§8 rule 5).
+        foreach (Monsters::ROSTER as $key => $monster) {
+            for ($seed = 0; $seed < 60; $seed++) {
+                $looted = Drops::lootedGear($monster, $seed);
+                if ($looted === null) {
+                    continue;
+                }
+
+                $def = Catalog::item($looted);
+                $this->assertNotNull($def, "{$key} dropped an item that is not in the catalog");
+                $this->assertLessThanOrEqual(
+                    Balance::rarityRank('rare'),
+                    Balance::rarityRank($def['rarity']),
+                    "{$key} dropped a {$def['rarity']}",
+                );
+                $this->assertNull(
+                    Catalog::skillForSlot($def['slot'] ?? ''),
+                    "{$key} dropped a gathering tool",
+                );
+            }
+        }
+    }
+
+    /**
      * §5 -- the map response carries no terrain.
      *
      * The client generates 25 million tiles from the world seed, so this must

@@ -5372,6 +5372,11 @@ class GameService
             'pending' => $officer
                 ? GuildApplication::where('guild_id', $guild->id)->count()
                 : 0,
+            // §10.6 -- what this character may DO about the guild, which is a
+            // fact about them rather than about the guild. Claiming land and
+            // levelling it are the owner's alone (§10.0.2), so the screens that
+            // offer either have to be able to ask.
+            'role' => $role,
         ];
     }
 
@@ -5701,6 +5706,10 @@ class GameService
                 // `processing` on the line the recipe belongs to.
                 $this->bonuses($character, 'processing', $line)['processingSpeed'],
                 $presenceBonus,
+                // §10.6 -- and the land's own level, which is what a
+                // processing level past the fifth buys. Nought everywhere
+                // else, where the tier is the whole answer.
+                (int) ($settlement['processingLevel'] ?? 0),
             );
 
             $job = GameJob::create([
@@ -6614,6 +6623,10 @@ class GameService
                 // §7.4 -- the bench category, so a Smith's tree speeds the
                 // weapon bench and leaves the tannery alone.
                 $this->bonuses($character, 'processing', Catalog::category($def))['processingSpeed'],
+                null,
+                // §10.6 -- the CRAFT level here, since this is the craft bench.
+                // The two ladders are bought apart and each speeds its own.
+                (int) ($here['craftLevel'] ?? 0),
             );
 
             return GameJob::create([

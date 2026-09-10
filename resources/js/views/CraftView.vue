@@ -306,9 +306,20 @@ const hallNote = computed(() => {
 function hasStation(item: ItemDef): boolean {
   const here = station.value
   if (!here) return false
+
+  // §10.6 -- a guild's own land is its own question. What it reaches is what
+  // the roster has BUILT (craftCap), not what the tier could reach in
+  // principle, and standing on somebody else's makes none of it yours.
+  if (here.tier === 'guild') {
+    if (!game.atGuildHall) return false
+
+    const cap = game.guild?.land?.craftCap
+    return Boolean(cap && RARITY_RANK[item.rarity] <= RARITY_RANK[cap])
+  }
+
   if (!stationReaches(here.tier, item.rarity)) return false
-  // §8.0 -- the guild hall is a building a guild puts inside a settlement, so
-  // nothing that needs one is craftable from a settlement alone.
+  // §8.0 -- epic is guild land and nowhere else, so nothing that needs one is
+  // craftable from a settlement the map put there.
   if (item.station === 'guild') return false
 
   return !item.station || STATION_RANK[here.tier] >= STATION_RANK[item.station]

@@ -18,7 +18,15 @@ import JobCard from './JobCard.vue'
 import SlateMark from './SlateMark.vue'
 import type { MaterialKey, Recipe, Settlement, SkillKey } from '@/game/types'
 
-const props = defineProps<{ settlement: Settlement }>()
+/**
+ * §10.6 -- `settlement` is null on ground a guild could BUILD on.
+ *
+ * A claimable hex has no settlement by definition, so there is nothing to run
+ * a queue for and the panel is a single plate: what this ground would become,
+ * and the button that starts it. It is the same panel because it is the same
+ * question asked a step earlier -- what can I do at this place.
+ */
+const props = defineProps<{ settlement: Settlement | null }>()
 const game = useGame()
 
 const batches = ref(1)
@@ -27,12 +35,12 @@ const station = computed(() => game.station)
 
 const onSite = computed(() => {
   const char = game.character
-  return Boolean(char && char.col === props.settlement.col && char.row === props.settlement.row)
+  return Boolean(char && char.col === props.settlement?.col && char.row === props.settlement?.row)
 })
 
-const present = computed(() => game.state?.presenceAt === props.settlement.id)
+const present = computed(() => game.state?.presenceAt === props.settlement?.id)
 
-const available = computed(() => recipesForLines(props.settlement.lines))
+const available = computed(() => recipesForLines(props.settlement?.lines ?? []))
 
 /**
  * §6 -- one tab per line this settlement runs.
@@ -47,7 +55,7 @@ const available = computed(() => recipesForLines(props.settlement.lines))
  * two lines sit in the same order at every city that runs them.
  */
 const lines = computed(() =>
-  SKILL_LIST.filter((s) => props.settlement.lines.includes(s.key)),
+  SKILL_LIST.filter((s) => (props.settlement?.lines ?? []).includes(s.key)),
 )
 
 const line = ref<SkillKey>(lines.value[0]?.key ?? 'woodcutting')
@@ -75,7 +83,7 @@ const affordable = (recipe: Recipe) => (game.state?.character.gold ?? 0) >= fee(
  *  the line twice reads as a bug. */
 const missingLines = computed(() => {
   const absent = new Set(RECIPES.map((r) => r.skill))
-  for (const line of props.settlement.lines) absent.delete(line)
+  for (const line of props.settlement?.lines ?? []) absent.delete(line)
   return [...absent]
 })
 
@@ -107,7 +115,7 @@ const helpingHere = computed(() => mine.value.some((j) => j.endsAt > game.now))
  */
 const mine = computed(() =>
   game.benchJobs
-    .filter((j) => j.kind === 'processing' && j.settlementId === props.settlement.id)
+    .filter((j) => j.kind === 'processing' && j.settlementId === props.settlement?.id)
     .sort((a, b) => a.endsAt - b.endsAt),
 )
 
@@ -146,30 +154,138 @@ function maxBatches(recipe: Recipe): number {
 function duration(recipe: Recipe, count: number): string {
   const seconds = processingTime(
     recipe.baseSeconds * count,
-    props.settlement.tier,
+    props.settlement?.tier ?? 'village',
     present.value,
     game.bonuses?.processingSpeed ?? 0,
   )
   return formatSpan((seconds * 1000) / game.timeScale)
 }
 
-const TIER_NOTE: Record<Settlement['tier'], string> = {
+const TIER_NOTE: Record<string, string> = {
   village: 'Runs one line. Slowest, cheapest.',
   city: 'Runs two lines. Moderate speed.',
-  capital: 'Runs all five lines. Fastest, and next to the dungeons.',
+  capital: 'Runs four of the five. Fastest, and next to the dungeons.',
+  // §10.6 -- what it runs depends on what the roster has paid for, so the note
+  // says what it is FOR rather than what it does.
+  guild: 'Your guild built this. All five lines, and the only bench that reaches epic.',
 }
 
 // Reset the batch stepper whenever the player opens a different settlement.
-watch(() => props.settlement.id, () => { batches.value = 1 })
+watch(() => props.settlement?.id, () => { batches.value = 1 })
+
+/* ------------------------------------------------------- §10.6 guild land */
+
+/** Standing on your OWN guild's ground, which is what the naming needs. */
+const ownLand = computed(
+  () => props.settlement?.tier === 'guild' && game.atGuildHall,
+)
+
+const land = computed(() => game.guild?.land ?? null)
+
+/** §10.6 -- what a hex costs a guild. Mirrors Balance::GUILD_LAND_COST. */
+const LAND_COST = 100000
+
+const naming = ref(false)
+const draftName = ref('')
+
+watch(naming, (on) => {
+  if (on) draftName.value = land.value?.name ?? ''
+})
+
+async function saveName(): Promise<void> {
+  const name = draftName.value.trim()
+  if (!name) return
+
+  await game.nameLand(name)
+  naming.value = false
+}
 </script>
 
 <template>
-  <div class="stack">
+  <!--
+    §10.6 -- ground a guild could build on. No settlement means no queue and no
+    bench, so the panel is one plate: what this hex would become, and the button
+    that starts it. Same panel because it is the same question a step earlier --
+    what can I do at this place.
+  -->
+  <div v-if="!settlement" class="stack">
+    <div class="head-row">
+      <span class="chip">unclaimed</span>
+      <span class="tiny muted">Dead ground. Nothing grows here and nothing ever will.</span>
+    </div>
+
+    <!-- §13 -- `.plate > *` styles EVERY direct child, so a plate handed
+         several draws several stacked slabs. One wrapper, always. -->
+    <div class="plate">
+      <div class="claim">
+      <p class="tiny">
+        Your guild can build here. A claim takes the hex out of the waste and
+        makes it somewhere people work — all five processing lines once the
+        ladder is paid for, and the only bench in the world that reaches epic.
+      </p>
+      <p class="tiny muted">
+        It buys the ground and nothing standing on it. Both facilities start at
+        nothing and are levelled out of the treasury.
+      </p>
+
+      <div class="row-between">
+        <span class="tiny muted">Out of the treasury</span>
+        <span class="mono" :class="{ short: (game.guild?.gold ?? 0) < LAND_COST }">
+          {{ LAND_COST.toLocaleString() }}g
+        </span>
+      </div>
+      <div class="row-between">
+        <span class="tiny muted">The treasury holds</span>
+        <span class="mono">{{ (game.guild?.gold ?? 0).toLocaleString() }}g</span>
+      </div>
+
+      <button
+        class="btn wide"
+        type="button"
+        :disabled="game.busy || (game.guild?.gold ?? 0) < LAND_COST"
+        @click="game.claimLand()"
+      >
+        Claim this hex
+      </button>
+      </div>
+    </div>
+  </div>
+
+  <div v-else class="stack">
     <div class="head-row">
       <span class="chip" :class="settlement.tier === 'capital' ? 'chip-gold' : ''">
         {{ settlement.tier }}
       </span>
       <span class="tiny muted">{{ TIER_NOTE[settlement.tier] }}</span>
+    </div>
+
+    <!--
+      §10.6 -- and on your own guild's ground, what it is called.
+      Owner only, because naming the place is the guild's own business and
+      §10.0.2 keeps that with them. Unlike a prospector's name (§7) it may be
+      changed: a person is recognised by their name and a place is not.
+    -->
+    <div v-if="ownLand && game.guildOwner" class="plate">
+      <div class="naming">
+      <div v-if="!naming" class="row-between">
+        <span class="tiny muted">Named by {{ game.guild?.name }}</span>
+        <button class="btn btn-sm" type="button" @click="naming = true">Rename</button>
+      </div>
+      <div v-else class="row-between">
+        <input
+          v-model="draftName"
+          class="field grow"
+          type="text"
+          maxlength="32"
+          placeholder="Hollow Reach"
+          @keyup.enter="saveName()"
+        />
+        <button class="btn btn-sm" type="button" :disabled="game.busy" @click="saveName()">
+          Save
+        </button>
+        <button class="btn btn-sm" type="button" @click="naming = false">Cancel</button>
+      </div>
+      </div>
     </div>
 
     <!-- Public queue, §6.1 -->
@@ -326,6 +442,44 @@ watch(() => props.settlement.id, () => { batches.value = 1 })
 </template>
 
 <style scoped>
+/* §10.6 -- the claim plate and the name row. */
+.claim,
+.naming {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 9px 10px;
+}
+
+.claim .btn.wide {
+  width: 100%;
+  justify-content: center;
+}
+
+.claim p {
+  margin: 0;
+}
+
+/* §13.3 -- ember is a state to deal with, and a price the treasury cannot
+   meet is one. */
+.mono.short {
+  color: var(--ember);
+}
+
+.field {
+  width: 100%;
+  padding: 6px 8px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--vellum);
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--line);
+}
+
+.naming .row-between {
+  gap: 6px;
+}
+
 /* Your own work, set apart from the shared queue above it: one is a fact about
    the building, the other is a list of things to pick up. */
 .mine {
