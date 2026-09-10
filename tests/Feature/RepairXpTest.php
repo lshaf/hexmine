@@ -39,6 +39,35 @@ final class RepairXpTest extends TestCase
         $this->character = $this->game->createCharacter(
             Player::create(['wallet' => '0xmend', 'session_id' => 'mend']),
         );
+
+        // §8.2 -- a mend is bench work and happens where the bench is, so every
+        // test here stands at one. §5.4 guarantees a village inside the spawn
+        // radius, which is what makes that cheap to arrange.
+        $this->standAtASettlement();
+    }
+
+    /** The nearest settlement to the spawn. Searched, like everything else. */
+    private function standAtASettlement(): void
+    {
+        $range = \App\Game\Balance::SPAWN_VILLAGE_RADIUS;
+
+        for ($dc = -$range; $dc <= $range; $dc++) {
+            for ($dr = -$range; $dr <= $range; $dr++) {
+                $s = \App\Game\WorldGen::settlementAt(
+                    (int) $this->character->col + $dc,
+                    (int) $this->character->row + $dr,
+                );
+
+                if ($s !== null) {
+                    $this->character->update(['col' => $s['col'], 'row' => $s['row']]);
+                    $this->character = $this->character->fresh();
+
+                    return;
+                }
+            }
+        }
+
+        $this->fail('spawn guarantee broken: no settlement in spawn radius');
     }
 
     private function give(array $stock): void

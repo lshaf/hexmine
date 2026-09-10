@@ -505,12 +505,14 @@ final class Balance
      * Straight subtraction makes armor an on/off switch: one point of defense
      * either side of an attack turns a fight from routine into impossible,
      * which is how every matchup ended up 0% or 100%. A striker always gets
-     * this fraction of its attack through, so a heavy hitter still hurts a wall
-     * and a light one still cannot -- the difference stays a slope instead of a
-     * cliff, and it is what separates a rare kit from an epic one against the
-     * same Barrow Knight.
+     * this fraction of its attack through, so a wall is never a locked door --
+     * the difference stays a slope instead of a cliff. It was a tenth, which
+     * was most of a hit: 2,860 of guard against a 2,100 attack still took 210 a
+     * round, so building defense past the crossover bought almost nothing. A
+     * hundredth keeps the slope and lets a guard that clears the attack be felt
+     * as one; BATTLE_CHIP above is the floor under it.
      */
-    public const BATTLE_CHIP_FRACTION = 0.10;
+    public const BATTLE_CHIP_FRACTION = 0.01;
 
     /**
      * §9.5.5 -- how far one strike wanders from its arithmetic.

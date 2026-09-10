@@ -42,7 +42,7 @@ import {
   STAT_LABEL,
   slotForSkill,
 } from '@/game/catalog'
-import { formatPercent, formatStat, optionStatLine, repairBill, repairCoinTierAt, swapChanges } from '@/game/formulas'
+import { formatPercent, formatStat, optionStatLine, swapChanges } from '@/game/formulas'
 import { EQUIPMENT } from '@/game/balance'
 import { itemIcon, skillIcon } from '@/icons/procedural'
 import GearCell from '@/components/GearCell.vue'
@@ -195,24 +195,14 @@ async function act(run: Promise<unknown>): Promise<void> {
   close()
 }
 
-/**
- * §8.2 -- what the counter under your feet would cover of this mend.
- *
- * The same derivation RepairCost draws, so the figure on the button is the
- * figure on the plate. Nothing is offered out in the field, and nothing is
- * offered on a bill made entirely of things a trader will not touch.
- */
-const coinMend = computed(() => {
+/** §8.2 -- is this piece short of its ceiling? Only then is there a mend to name. */
+const mending = computed(() => {
   const item = picked.value?.item
-  if (!item) return null
+  if (!item) return false
 
-  const bill = repairBill(
-    picked.value?.def ?? undefined,
-    item,
-    repairCoinTierAt(game.currentSettlement?.tier),
-  )
+  const ceiling = item.maxDurability || picked.value?.def?.maxDurability || 0
 
-  return bill.coinOffered ? bill : null
+  return ceiling > 0 && item.durability < ceiling
 })
 
 /**
@@ -464,27 +454,17 @@ const ceilings = computed(() =>
                 Broken — this slot is paying nothing until it is mended.
               </p>
 
+              <!-- §8.2 -- what it needs, and where. The bill is still said
+                   here because this is the screen opened to find out WHICH
+                   piece is about to break; what is not here is the button,
+                   because mending is bench work and this plate is a condition
+                   read-out. -->
               <RepairCost :item="picked.item" />
+              <p v-if="mending" class="tiny muted mend-note">
+                Mended at a workbench, on the Repair tab.
+              </p>
 
               <div class="acts">
-                <GearAction
-                  action="repair"
-                  label="Repair"
-                  wide
-                  :disabled="game.busy"
-                  @click="act(game.repair(picked.item.id))"
-                />
-                <!-- §8.2 -- the same verb, paid at the counter instead. It
-                     carries the figure because the two buttons differ by the
-                     price and by nothing else. -->
-                <GearAction
-                  v-if="coinMend"
-                  action="repair"
-                  :label="`Buy parts · ${coinMend.gold}g`"
-                  wide
-                  :disabled="game.busy"
-                  @click="act(game.repair(picked.item.id, true))"
-                />
                 <GearAction
                   action="stow"
                   label="Stow"
@@ -516,16 +496,11 @@ const ceilings = computed(() =>
                     :same="picked.item ? 'Same stats as the one on the belt.' : 'No stats to speak of.'"
                   />
                 </div>
-                <!-- §8.2 -- a broken spare cannot be put on, so the button
-                     that would refuse becomes the button that fixes it. One
-                     action per row, and it is never the one that does nothing. -->
-                <GearAction
-                  v-if="c.item.durability <= 0"
-                  action="repair"
-                  label="Repair"
-                  :disabled="game.busy"
-                  @click="act(game.repair(c.item.id))"
-                />
+                <!-- §8.2 -- a broken spare cannot be put on, and mending is
+                     bench work now, so the row says what it needs rather than
+                     offering a button that would only refuse. A plate must
+                     never offer the thing that does nothing. -->
+                <span v-if="c.item.durability <= 0" class="tiny broken">Broken</span>
                 <GearAction
                   v-else
                   action="equip"
@@ -554,6 +529,11 @@ const ceilings = computed(() =>
 </template>
 
 <style scoped>
+/* §8.2 -- where the button used to be. */
+.mend-note {
+  margin: 3px 0 0;
+}
+
 .page {
   /* Sizing and scrolling belong to PanelOverlay. */
   padding: 0;

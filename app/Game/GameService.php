@@ -7705,6 +7705,16 @@ class GameService
                 throw new GameException('Nothing to repair.', 'noop');
             }
 
+            // §8.2 -- a mend is BENCH work, so it happens where the bench is.
+            //
+            // The same anvil, the same job and a bill in the same materials,
+            // and it teaches the craft job that could have made the piece --
+            // which is the whole argument, and it was being made from the
+            // middle of a forest. The coin path already asked for a counter
+            // (§10.6); the material path asked for nothing, which left the one
+            // place a mend is actually done the one place it was not offered.
+            $this->requireSettlement($character, 'mend that');
+
             $gold = 0;
 
             if (isset($def['inputs'])) {
@@ -7716,6 +7726,7 @@ class GameService
                 $split = ['coin' => [], 'materials' => $cost];
 
                 if ($withCoin) {
+                    // Already known to be somewhere, by the check above.
                     $settlement = $this->requireSettlement($character, 'buy repair parts');
                     $reach = Balance::REPAIR_COIN_TIER[$settlement['tier']] ?? 0;
                     $split = Formulas::repairCoinSplit($cost, $reach);

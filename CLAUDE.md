@@ -2648,11 +2648,37 @@ the game, §11.1.)*
   risk while you are down a mine.
 - Nothing minted can be destroyed, because minting takes it out of the game
   (§3.3). Destruction reaches every rung that is actually *in* a bag.
-- **A stowed piece mends, and so does a broken one.** Repair asks what a piece
-  is missing and never where it is being carried: an axe in the pack is the same
-  axe. It was only ever offered on the prospector sheet, which lists what you
-  are *wearing*, so a spare tool had to be put on before it could be fixed —
-  a rule nobody wrote, enforced by a missing button.
+- **A mend happens at a bench, and it is a tab on the craft panel.** The same
+  anvil, the same job and a bill in the same materials — and it teaches the
+  craft job that could have made the piece, which is the whole argument and was
+  being made from the middle of a forest. So it is offered where the anvil is:
+  a fifth tab beside Tools, Weapons, Armor and Drafts, listing what you own and
+  what it is short of.
+
+  **A tab and not a shelf.** Nothing there is being chosen between — it is a
+  list of your own pieces and their bills — which is why it takes no rung
+  filter and counts what you *own* where the others count stock.
+
+  **Shown even at a bench that makes nothing.** Mending is not making: a village
+  anvil that reaches no recipe you want will still put an edge back on your axe.
+
+  **A stowed piece mends, and so does a broken one.** Repair asks what a piece
+  is missing and never where it is being *carried*: an axe in the pack is the
+  same axe, and §8.0.1's `indestructible` line is the one thing that can sit at
+  zero and still be yours. Worst first, which is the order the question is asked
+  in.
+
+  **The gear plates keep the bill and lose the button.** The prospector sheet is
+  a condition read-out (§8.2) and the bag is a picture of what you hold; both
+  say what a mend would take, because that is the decision, and neither offers
+  it, because neither is a bench. A broken spare says *Broken* rather than
+  offering a button that would only refuse — a plate must never offer the thing
+  that does nothing.
+
+  *(It used to be offered from anywhere at all, which made the one place a mend
+  is actually done the one place it was not offered — and left the paid mend
+  (§10.6's counter, which needs a settlement) sitting on a plate you can open in
+  the middle of a forest.)*
 - **The bill is said before the button, everywhere the button is.** What a mend
   takes is the decision (§11.1 makes it the largest continuous sink in the
   game), not a footnote to it, so the parts are listed under the wear bar with
@@ -3701,7 +3727,7 @@ itsHp  = the monster's own `hp`
 
 each round, you strike first and it strikes back if it is still standing:
   hit = max(strikeFloor(attacker), attacker.attack - defender.defense) * swing
-  strikeFloor(a) = max(1, ceil(a * BATTLE_CHIP_FRACTION))     // 10%
+  strikeFloor(a) = max(BATTLE_CHIP, ceil(a * BATTLE_CHIP_FRACTION))  // 1%, never under one whole point
   swing = U(1 - BATTLE_SWING, 1 + BATTLE_SWING)               // ±15%, seeded
 
 you win  if its pool empties first
@@ -3726,12 +3752,16 @@ into armor.
 
 Four numbers hold the shape, and each of them had to be what it is:
 
-- **`BATTLE_CHIP_FRACTION` = 10%.** Straight subtraction makes armor an on/off
+- **`BATTLE_CHIP_FRACTION` = 1%.** Straight subtraction makes armor an on/off
   switch — one point either side of an attack turns routine into impossible,
   which is exactly how every matchup came out 0% or 100%. A striker always gets
-  a tenth of its attack through, so a heavy hitter still hurts a wall and a
-  light one still cannot. That slope is the whole difference between a rare kit
-  and an epic one against the same Barrow Knight.
+  a hundredth of its attack through, so a wall is never a locked door and a
+  fight against one is still a race — but a guard that clears the attack is
+  now *felt* as one. It was a tenth, and a tenth was most of a hit: a kit with
+  2,860 defense against a 2,100 attack still took 210 a round, which made
+  over-building defense worth almost nothing past the crossover. Under one
+  whole point (`BATTLE_CHIP`, 100 at §7.3's scale) the chip is that point
+  instead, so a light hitter still lands *something*.
 - **`BATTLE_MAX_ROUNDS` = 60, and the bell is a LOSS.** Pools are far larger
   than anything a pack carries, so a long enough fight is won by whoever brought
   more durability — a wall could be ground down by a kit with no business

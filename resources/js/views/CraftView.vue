@@ -10,6 +10,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useGame } from '@/stores/game'
 import {
+  ITEM_BY_KEY,
   MATERIALS,
   RARITIES,
   RARITY_LABEL,
@@ -24,7 +25,7 @@ import {
   stationForRarity,
   stationReaches,
 } from '@/game/catalog'
-import { benchFee, formatDuration, makeCost, placeLabel } from '@/game/formulas'
+import { benchFee, formatDuration, makeCost, placeLabel, repairBill, repairCoinTierAt } from '@/game/formulas'
 import { CRAFT, PROCESSING } from '@/game/balance'
 import { itemIcon, materialIcon } from '@/icons/procedural'
 import SvgIcon from '@/components/SvgIcon.vue'
@@ -32,7 +33,9 @@ import StatChips from '@/components/StatChips.vue'
 import SlateMark from '@/components/SlateMark.vue'
 import QueueBar from '@/components/QueueBar.vue'
 import JobCard from '@/components/JobCard.vue'
-import type { BuffScope, EquipSlot, ItemDef, MaterialKey, Rarity } from '@/game/types'
+import RepairCost from '@/components/RepairCost.vue'
+import GearAction from '@/components/GearAction.vue'
+import type { BuffScope, EquipSlot, ItemDef, MaterialKey, OwnedItem, Rarity } from '@/game/types'
 
 const game = useGame()
 
@@ -45,16 +48,32 @@ const game = useGame()
  * what to carry into a fight -- and the axe rung was buried in the middle of the
  * shield rungs. The tab strip is a filter, not a claim about buildings.
  */
-type Tab = 'tool' | 'weapon' | 'armor' | 'consumable'
+type Tab = 'tool' | 'weapon' | 'armor' | 'consumable' | 'repair'
 
-const TABS: Tab[] = ['tool', 'weapon', 'armor', 'consumable']
+const TABS: Tab[] = ['tool', 'weapon', 'armor', 'consumable', 'repair']
 
 const TAB_LABEL: Record<Tab, string> = {
   tool: 'Tools',
   weapon: 'Weapons',
   armor: 'Armor',
   consumable: 'Drafts',
+  repair: 'Repair',
 }
+
+/**
+ * §8.2 -- mending is a fifth tab rather than a button on a gear plate.
+ *
+ * A mend is bench work: the same anvil, the same job, a bill in the same
+ * materials, and it teaches the craft job that could have made the piece. So it
+ * belongs where the anvil is. It used to be offered from the prospector sheet
+ * and the bag -- from anywhere at all -- which made the one place it is
+ * actually done the one place it was not offered, and left the paid mend
+ * (§10.6's counter, which needs a settlement) sitting on a plate you can open
+ * in the middle of a forest.
+ *
+ * It is a tab and not a group, because it is not a shelf: nothing here is being
+ * chosen between, it is a list of what you already own and what it needs.
+ */
 
 const tab = ref<Tab>('tool')
 
@@ -133,7 +152,9 @@ function tabFor(item: ItemDef): Tab {
 }
 
 const byTab = computed(() => {
-  const out = { tool: [], weapon: [], armor: [], consumable: [] } as Record<Tab, ItemDef[]>
+  const out = {
+    tool: [], weapon: [], armor: [], consumable: [], repair: [],
+  } as Record<Tab, ItemDef[]>
   for (const item of reachable.value) out[tabFor(item)].push(item)
   return out
 })
@@ -233,6 +254,46 @@ function order(scope: BuffScope | 'global'): number {
   const all = Object.keys(SCOPE_ACTION) as Array<BuffScope | 'global'>
 
   return all.indexOf(scope)
+}
+
+/**
+ * §8.2 -- everything you own that is short of its ceiling, worn or stowed.
+ *
+ * Both, because a mend asks what a piece is MISSING and never where it is being
+ * carried: an axe in the pack is the same axe. A broken one is here too --
+ * §8.0.1's `indestructible` line is the one thing that can sit at zero and
+ * still be yours, and it is exactly the piece somebody came to a bench for.
+ *
+ * Worst first, which is the order the question is asked in.
+ */
+const damaged = computed(() =>
+  game.equipment
+    .map((item) => ({ item, def: ITEM_BY_KEY[item.key] }))
+    .filter((row): row is { item: OwnedItem; def: ItemDef } => {
+      if (!row.def) return false
+      const ceiling = row.item.maxDurability || row.def.maxDurability || 0
+
+      return ceiling > 0 && row.item.durability < ceiling
+    })
+    .sort((a, b) => {
+      const share = (r: { item: OwnedItem; def: ItemDef }) =>
+        r.item.durability / (r.item.maxDurability || r.def.maxDurability || 1)
+
+      return share(a) - share(b)
+    }),
+)
+
+/**
+ * §10.6 -- what the counter here would sell you of a mend, if anything.
+ *
+ * Read off the settlement rather than assumed, so the button and the server
+ * agree: a village stocks raw and a city the refined half as well, and no
+ * counter anywhere sells a capped rare.
+ */
+const coinTier = computed(() => repairCoinTierAt(station.value?.tier))
+
+function mendBill(item: OwnedItem) {
+  return repairBill(ITEM_BY_KEY[item.key], item, coinTier.value)
 }
 
 const nothingHere = computed(() => reachable.value.length === 0)
@@ -460,7 +521,10 @@ const emptyNote = computed(() => {
       </QueueBar>
     </header>
 
-    <nav v-if="!nothingHere" class="tabs">
+    <!-- §8.2 -- shown even at a bench that makes nothing, because mending is
+         not making: a village anvil that reaches no recipe you want will still
+         put an edge back on your axe. -->
+    <nav class="tabs">
       <button
         v-for="t in TABS"
         :key="t"
@@ -470,7 +534,10 @@ const emptyNote = computed(() => {
         @click="tab = t"
       >
         <span>{{ TAB_LABEL[t] }}</span>
-        <span class="count mono">{{ byTab[t].length }}</span>
+        <!-- §8.2 -- the repair tab counts what you OWN and is short, where the
+             other four count a shelf. Same figure in the same place, answering
+             the question the tab is actually about. -->
+        <span class="count mono">{{ t === 'repair' ? damaged.length : byTab[t].length }}</span>
       </button>
     </nav>
 
@@ -478,7 +545,11 @@ const emptyNote = computed(() => {
          shelf. A row of its own because it composes with the one above rather
          than replacing it: Tools AND rare, not Tools OR rare. Only the rungs
          this bench reaches, so no tab here can answer "nothing". -->
-    <nav v-if="!nothingHere && rungs.length > 1" class="tabs rung-row" role="tablist">
+    <nav
+      v-if="!nothingHere && tab !== 'repair' && rungs.length > 1"
+      class="tabs rung-row"
+      role="tablist"
+    >
       <button
         v-for="r in (['all', ...rungs] as const)"
         :key="r"
@@ -493,8 +564,77 @@ const emptyNote = computed(() => {
       </button>
     </nav>
 
+    <!--
+      §8.2 -- the mend list: what you own, what it is missing, and the two ways
+      to pay for it.
+    -->
+    <template v-if="tab === 'repair'">
+      <div v-if="!damaged.length" class="inset empty">
+        <p class="tiny muted" style="margin: 0">
+          Nothing you are carrying needs mending.
+        </p>
+      </div>
+
+      <article
+        v-for="row in damaged"
+        :key="row.item.id"
+        class="recipe"
+        :data-rarity="row.def.rarity"
+      >
+        <div class="head">
+          <SvgIcon
+            :svg="itemIcon({ slot: row.def.slot, family: row.def.family, rarity: row.def.rarity, palette: row.def.palette, size: 32 })"
+            boxed
+            :size="32"
+          />
+          <div class="grow">
+            <div class="row-between">
+              <strong class="name" :class="`rarity-${row.def.rarity}`">{{ row.def.name }}</strong>
+              <!-- What it is missing, which is the whole question here. -->
+              <span class="rung mono">
+                {{ row.item.durability }}/{{ row.item.maxDurability || row.def.maxDurability }}
+              </span>
+            </div>
+            <div class="row tiny stats">
+              <StatChips
+                :def="row.def"
+                :options="row.item.options ?? []"
+                :quality="row.item.quality"
+                :level="game.state?.character.level"
+                :job-levels="game.jobLevelMap"
+              />
+              <span v-if="row.item.equipped" class="chip tiny">worn</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- §8.2 -- the bill before the button, both ways of paying it. -->
+        <RepairCost :item="row.item" />
+
+        <div class="acts">
+          <GearAction
+            action="repair"
+            label="Repair"
+            wide
+            :disabled="game.busy"
+            @click="game.repair(row.item.id)"
+          />
+          <!-- §10.6 -- and the counter's price, where the counter stocks any
+               part of it. The same verb, paid differently. -->
+          <GearAction
+            v-if="mendBill(row.item).coinOffered"
+            action="repair"
+            :label="`Buy parts · ${mendBill(row.item).gold}g`"
+            wide
+            :disabled="game.busy"
+            @click="game.repair(row.item.id, true)"
+          />
+        </div>
+      </article>
+    </template>
+
     <!-- Nothing reachable here. Say where to go, not just that there is nothing. -->
-    <div v-if="nothingHere" class="inset empty">
+    <div v-else-if="nothingHere" class="inset empty">
       <p class="tiny muted" style="margin: 0">
         <template v-if="station">
           A {{ station.tier }} workbench cannot make any of these. Bigger
@@ -510,7 +650,7 @@ const emptyNote = computed(() => {
       <p class="tiny muted" style="margin: 0">{{ emptyNote }}</p>
     </div>
 
-    <section v-for="group in groups" :key="group.key" class="group">
+    <section v-for="group in tab === 'repair' ? [] : groups" :key="group.key" class="group">
       <div class="eyebrow">
         <h3 class="g-label">{{ group.label }}</h3>
         <span class="hair" aria-hidden="true" />
@@ -594,6 +734,14 @@ const emptyNote = computed(() => {
 </template>
 
 <style scoped>
+/* §8.2 -- the two ways of paying for a mend, side by side. */
+.acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 7px;
+}
+
 /* The mark and the button are one cluster on the right of the foot: what you
    can do about this recipe now, and what you can do about it later. */
 .acts {
