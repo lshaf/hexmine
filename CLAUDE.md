@@ -5357,6 +5357,29 @@ place, finished*. Cracks in the pan are the one thing all five share.
 defeated the purpose: the wastes were legible from across the map, so there was
 nothing left to go and find out.)*
 
+**What sits in front of what is one ladder, written down once.** Every overlay
+in the app names a rung (`--z-*` in app.css) and none of them carries a bare
+number:
+
+| | |
+|---|---|
+| **hud** | the corner blocks and the dock |
+| **hud drop** | what falls out of the HUD — the menu, the coordinate jump |
+| **panel** | a screen opened over the map |
+| **plate** | a plate opened from inside a panel — a bag strap, a gear slot |
+| **modal** | anything that covers the map: a fight, a haul, a receipt |
+| **toast** | and nothing goes above a toast |
+
+**The toast is top because most failures happen inside a panel** — the trader
+refusing a sale, a craft short a material — and the reason for a failure must
+never open behind the thing that caused it.
+
+**A literal is the bug this ladder exists to prevent.** The live fight once took
+a raw `60`, which was exactly what the toast rung was, so the two tied and
+source order settled it — a toast raised during a fight opened *behind* the
+fight. A tie is not an order, and a number sitting between two named rungs is
+invisible to anybody reading them.
+
 **Ember and sap are a pair, and neither may do the other's job.** Ember marks a
 state to deal with — a full bag, a broken tool, a destructive button. Sap marks
 one worth crossing the screen for: a finished quest, a good toast. A payout in

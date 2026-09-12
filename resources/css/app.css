@@ -68,10 +68,18 @@
    * order, and the one thing this ladder exists to prevent is exactly that.
    *
    * Anything that covers the map belongs on --z-modal. Nothing belongs above
-   * --z-toast.
+   * --z-toast. And nothing belongs on a raw number: a literal between two rungs
+   * is invisible to anybody reading the ladder, which is how the tie above went
+   * unnoticed in the first place.
    */
   --z-hud: 20;
+  /* What drops out of the HUD: the corner menu, the coordinate jump. Above the
+     cells that opened it and below anything that covers the map. */
+  --z-hud-drop: 30;
   --z-panel: 40;
+  /* A plate opened from inside a panel -- a bag strap, a gear slot. Above the
+     panel it belongs to and below anything that covers the map. */
+  --z-plate: 50;
   --z-modal: 60;
   --z-toast: 80;
 

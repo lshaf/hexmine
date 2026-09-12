@@ -768,7 +768,10 @@ onMounted(() => {
      Both plates hang from the same line, which is why only one may be open. */
   top: calc(var(--cell-h) * 3 + 10px);
   right: 0;
-  z-index: 30;
+  /* §13.3 -- a rung rather than a literal (app.css). It hangs off the HUD and
+     has to clear the cells that dropped it, which is a real tier and was a
+     number nobody reading the ladder could see. */
+  z-index: var(--z-hud-drop);
   width: 208px;
 }
 

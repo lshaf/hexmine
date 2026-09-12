@@ -1255,7 +1255,11 @@ function mendBill(item: OwnedItem) {
 .pop-wrap {
   position: fixed;
   inset: 0;
-  z-index: 50;
+  /* §13.3 -- a rung of the ladder rather than a literal (app.css). It was a
+     raw 50, which is correct and says so nowhere: a number between two named
+     rungs is invisible to anybody reading them, which is exactly how the toast
+     came to tie with the fight modal. */
+  z-index: var(--z-plate);
   display: grid;
   place-items: center;
   padding: 18px;
