@@ -5167,14 +5167,26 @@ sampled colour with the settlements marked on it.
 
 | | |
 |---|---|
-| **The board** | `MAP_PX_CHART` up to four times full size. Hexes, props, labels, everything |
+| **The board** | `MAP_PX_CHART` up to full size. Hexes, props, labels, everything |
 | **The handover** | a **detent** — a press that would cross it stops on it, so the board's widest view is somewhere you land rather than pass through |
 | **The chart** | from there out to the whole world in one window |
+
+**It runs one way, out.** The near end is the scale the board is *drawn* at, so
+the view the map opens on is the closest the camera goes and everything the zoom
+adds is beyond it. 58×34 is not an arbitrary size the map happens to be
+displayed at — it is what the props, the labels, the slab depth and every mark
+on a hex were drawn for, so past it there is nothing more to see, only the same
+picture bigger. It went to four times that for a while, and the far end of it
+was one hex filling a phone: a magnifier over a board that had already said
+everything it had to say.
 
 **The far end is the world, not a number.** How far out you can go is "this map
 across this window", so it falls out of the map radius (§5.1) and the viewport
 rather than being a constant — a fixed floor would frame a small world against a
 void and clip a large one.
+
+Three presses across the board and seven across the chart, and a press back in
+lands exactly where the map opened — which is what the detent buys.
 
 **What the board sheds on the way out is what stops being a shape.** A prop
 eight pixels tall is a smudge and a settlement name at that size is a line of

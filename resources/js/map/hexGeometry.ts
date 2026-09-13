@@ -39,13 +39,30 @@ export const HEX_DEPTH = 11
  * affordable -- and it lands where a hex is about a third of its drawn size,
  * which is already past the point where anything on one can be read or acted
  * on. Below it the chart draws the same world as sampled colour.
+ *
+ * It runs ONE WAY, out. MAP_PX_MAX is the scale the board is drawn at, so the
+ * view the map opens on is the near end of the ladder and everything the zoom
+ * adds is beyond it.
  */
 
 /** The scale the board has always been drawn at: one hex column, full size. */
 export const MAP_PX_DEFAULT = HEX_W * 0.75
 
-/** As close as the camera goes. Four times the board, and no further. */
-export const MAP_PX_MAX = MAP_PX_DEFAULT * 4
+/**
+ * As close as the camera goes, and it is the scale the board is DRAWN at.
+ *
+ * The tie is deliberate. 58x34 is not an arbitrary size the map happens to be
+ * displayed at -- it is what the props, the labels, the slab depth and every
+ * mark on a hex were drawn for (§13.2), so past it there is nothing more to
+ * see, only the same picture bigger. It went to four times this for a while and
+ * the far end was one hex filling a phone: a magnifier over a board that had
+ * already said everything it had to say.
+ *
+ * So the zoom runs one way. Where the map opens is the near end, and every
+ * step is a step OUT -- which also means the default view is the one this game
+ * has always had, with the new range added beyond it rather than around it.
+ */
+export const MAP_PX_MAX = MAP_PX_DEFAULT
 
 /**
  * Where the board hands over to the chart.

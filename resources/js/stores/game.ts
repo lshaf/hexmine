@@ -385,17 +385,17 @@ export const useGame = defineStore('game', () => {
   /**
    * One press of the zoom, and there are two of them.
    *
-   * The ladder runs from a board you can count the grain on to the whole world
-   * in one window -- on a phone a factor of about twelve hundred. No single
-   * ratio serves that: fine enough for the board and it takes thirty-four
-   * presses to cross, coarse enough to cross and the board is one press wide.
+   * The ladder runs from the scale the board is drawn at to the whole world in
+   * one window -- on a phone a factor of about three hundred. No single ratio
+   * serves that: fine enough for the board and it takes twenty-odd presses to
+   * cross, coarse enough to cross and the board is one press wide.
    *
-   * So the step is the regime's. On the board a press is "a bit further" and
-   * the useful range is a dozen-fold; on the chart a press is "much further"
-   * and the range is hundreds. Six presses across each, thirteen end to end.
-   * Both are coarser than a wheel notch, which is the other half of the same
-   * argument: a wheel is a nudge at a view you are already looking at, a press
-   * is a decision to go somewhere else.
+   * So the step is the regime's. The board is a short stretch and a press there
+   * is "a bit further"; the chart is hundreds and a press is "much further".
+   * Three presses across the board, seven across the chart. Both are coarser
+   * than a wheel notch, which is the other half of the same argument: a wheel
+   * is a nudge at a view you are already looking at, a press is a decision to
+   * go somewhere else.
    */
   const ZOOM_NOTCH_BOARD = 1.5
 
