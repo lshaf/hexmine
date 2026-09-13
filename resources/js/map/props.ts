@@ -8,13 +8,13 @@
  * painter's-algorithm sort (§13.2): a mountain has to occlude the hexes behind it.
  */
 import { hash2, rand01, randInt } from '@/game/hash'
-import { BIOME_COLOR, desaturate, shade, variantColor, waterColor } from '@/theme/palette'
+import { BIOME_COLOR, RARITY_TREATMENT, desaturate, shade, variantColor, waterColor } from '@/theme/palette'
 import { HEX_H, HEX_SIDE_PATH, HEX_TOP_PATH, HEX_W, ROW_STEP } from './hexGeometry'
 import { VARIANT_PROPS } from '@/game/variants'
 import { MONSTERS } from '@/game/monsters'
 import { ANIMALS } from '@/game/hunts'
 import { MONSTER_VIEW, monsterBody } from '@/icons/combatants'
-import type { Biome, SettlementTier, Tile, VariantKey, WaterKind } from '@/game/types'
+import type { Biome, Rarity, SettlementTier, Tile, VariantKey, WaterKind } from '@/game/types'
 
 /** Escape nothing -- all values are numbers we generate. Kept tiny on purpose. */
 const poly = (points: string, fill: string, stroke?: string) =>
@@ -1806,6 +1806,110 @@ export function monsterSpecimen(key: string, size = 66): string {
 
 export function corpseProp(mine: boolean): string {
   return corpse(0, 4, mine)
+}
+
+/* ----------------------------------------------------------- the prospector */
+
+/**
+ * §13.1 -- you, wearing what you are wearing.
+ *
+ * It was a vellum pennant and a vellum ball: a marker that said *somebody is
+ * here* and, on a map where the whole point of the last hundred hours is the
+ * kit you assembled, nothing whatsoever about who. The figure carries two of
+ * the nine slots now, and they are the two a fight is decided by (§9.5.4) --
+ * the coat you are standing in and the thing in your hand.
+ *
+ * RARITY IS THE CHANNEL, which is §13.1's own rule: rarity owns the colour and
+ * the material owns the accent, because the rung is what a player reads at a
+ * glance across the shop, the bag and the hero sheet. Here there is room for
+ * exactly one reading per piece, so it is the rung.
+ *
+ * The five gathering tools are deliberately absent. All five may be worn at
+ * once (§8 rule 3), so a figure carrying them would be carrying an axe, a pick,
+ * a bow, a hammer and a sickle at the same time -- and which of them is in your
+ * hand is a thing the map never has to say, because §8.0 rule 1 picks it off
+ * the ground you are standing on. What is in the weapon slot is a CHOICE, and
+ * choices are what a marker is worth drawing.
+ *
+ * Bare is vellum. An unarmoured torso is the same tone as the head, so wearing
+ * nothing reads as skin and cloth rather than as a rung -- and the first coat
+ * you put on is the first colour that appears.
+ */
+export function prospectorProp(
+  armor: string | null,
+  weapon: { family: 'shield' | 'sword' | 'dagger'; rarity: string } | null,
+): string {
+  const ink = '#141b18'
+  const skin = '#ece3cd'
+  const cloth = armor ? RARITY_TREATMENT[armor as Rarity]?.fill ?? skin : skin
+
+  // Darker below the waist, and it is doing real work rather than shading: one
+  // flat fill from shoulder to foot came out as a kite with a dot over it. A
+  // figure needs a join somewhere, and the waist is where a coat ends anyway.
+  const skirt = shade(cloth, -0.28)
+
+  // §13 -- nothing in the interface is round, and the head was the one mark on
+  // this map still made of a circle. Flat-top, like everything the map is tiled
+  // and framed with.
+  const head =
+    `<polygon points="-1.6,-19.6 -0.8,-21.1 0.8,-21.1 1.6,-19.6 0.8,-18.1 -0.8,-18.1"` +
+    ` fill="${skin}" stroke="${ink}" stroke-width="1.3" stroke-linejoin="round"/>`
+
+  // UPRIGHT AND NARROW, which is the whole of what makes it a person at twenty
+  // pixels. The first draft was as wide as it was tall and read as an
+  // arrowhead -- the map already draws one of those at the end of a road, and
+  // two marks that look alike on one screen is one too many.
+  const body =
+    `<path d="M-3.9,-16.4 L3.9,-16.4 L3.1,-7.2 L-3.1,-7.2 Z" fill="${cloth}"` +
+    ` stroke="${ink}" stroke-width="1.3" stroke-linejoin="round"/>` +
+    `<path d="M-3.1,-7.2 L3.1,-7.2 L0,4.2 Z" fill="${skirt}"` +
+    ` stroke="${ink}" stroke-width="1.3" stroke-linejoin="round"/>`
+
+  // Drawn BEFORE the body, so the grip tucks behind the shoulder and only the
+  // blade stands past it. Laid over the top it read as a thing floating beside
+  // a figure rather than one being carried.
+  return (weapon ? held(weapon.family, weapon.rarity) : '') + body + head
+}
+
+/**
+ * §9.5.4 -- the thing in the hand, and the family owns the shape.
+ *
+ * The same three reads the icon set already uses (icons/procedural.ts), cut
+ * down to what survives at marker size: the shield is one broad mass wider at
+ * the top than the bottom, the sword is one long line, and the daggers are a
+ * PAIR of anything at all. At this size the pair is the whole tell -- two short
+ * marks where the others have one -- which is the argument the icon makes at
+ * 26px, made again at nine.
+ */
+function held(family: 'shield' | 'sword' | 'dagger', rarity: string): string {
+  const ink = '#141b18'
+  const metal = RARITY_TREATMENT[rarity as Rarity]?.fill ?? '#c9bd9e'
+  const edge = (d: string) =>
+    `<path d="${d}" fill="${metal}" stroke="${ink}" stroke-width="1.2" stroke-linejoin="round"/>`
+
+  if (family === 'shield') {
+    // Wider at the top than the bottom: the one thing that stops it reading as
+    // a blade, which is the icon set's own note on the heater shield. It
+    // overlaps the shoulder, because a shield is carried in front of you.
+    return edge('M-8.8,-16 L-2.6,-16 L-2.6,-8.6 L-5.7,-4.8 L-8.8,-8.6 Z')
+  }
+
+  if (family === 'sword') {
+    // Long enough to clear the figure at both ends: the silhouette is the tell,
+    // so a blade that stopped level with the shoulders would be a shield drawn
+    // thinner.
+    return (
+      edge('M-5.7,-21.4 L-4.2,-19.2 L-4.2,-6.4 L-5.7,-4.6 L-7.2,-6.4 L-7.2,-19.2 Z') +
+      `<rect x="-9.5" y="-7.6" width="7.6" height="1.7" fill="${ink}"/>`
+    )
+  }
+
+  // Held out to both sides, since a knifedancer carries no guard to hide
+  // behind (§9.5.4) -- and because a pair on one side is a thicker sword.
+  return (
+    edge('M-9.6,-17.4 L-7.9,-16.4 L-4.6,-9.8 L-6.5,-8.8 L-9.8,-15.4 Z') +
+    edge('M9.6,-17.4 L7.9,-16.4 L4.6,-9.8 L6.5,-8.8 L9.8,-15.4 Z')
+  )
 }
 
 export { dungeonProp }

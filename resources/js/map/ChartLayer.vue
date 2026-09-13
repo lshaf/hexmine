@@ -397,11 +397,51 @@ function draw(): void {
    * hex until the road ends (§5.6).
    */
   const me = toCanvas(props.characterCol, props.characterRow)
-  ctx.beginPath()
-  ctx.arc(me.x, me.y, 4, 0, Math.PI * 2)
+
+  // A RETICLE, which is a different KIND of mark rather than a bigger one.
+  //
+  // Every settlement on this sheet is a filled dot and the smallest of them is
+  // vellum, so the prospector -- also a filled vellum dot, only wider -- was a
+  // village you had to measure. Size is not a shape, and a chart whose whole
+  // middle is dots gives the eye nothing to measure against.
+  //
+  // Two rings and a centre is unmistakable at five pixels because nothing else
+  // here is hollow: a dot has one edge and this has three. Hexagons rather than
+  // circles, per §13 -- at this size that is a rule about which primitive to
+  // reach for more than a thing anybody counts the sides of.
+  //
+  // Vellum on ink rather than the coat's rung (§13.1). Out here a mark is a few
+  // pixels across, so it says ONE thing, and the thing it is for is "you are
+  // here" -- a common coat's grey would say it badly on half the biomes. What
+  // you are wearing is the board's to draw, at a size that can.
+  const ring = (r: number) => {
+    ctx.beginPath()
+    for (let i = 0; i < 6; i++) {
+      const a = (Math.PI / 3) * i
+      const x = me.x + Math.cos(a) * r
+      const y = me.y + Math.sin(a) * r * ROW_RATIO
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)
+    }
+    ctx.closePath()
+  }
+
+  ctx.lineJoin = 'miter'
+
+  // The ink first and fattest, so the whole mark carries its own contrast on
+  // any of the five biome fills rather than only on the dark ones.
+  ring(7)
+  ctx.lineWidth = 4.4
+  ctx.strokeStyle = '#141b18'
+  ctx.stroke()
+
+  ctx.lineWidth = 2
+  ctx.strokeStyle = '#ece3cd'
+  ctx.stroke()
+
+  ring(2.6)
   ctx.fillStyle = '#ece3cd'
   ctx.fill()
-  ctx.lineWidth = 1.6
+  ctx.lineWidth = 1.4
   ctx.strokeStyle = '#141b18'
   ctx.stroke()
 }

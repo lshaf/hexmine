@@ -5268,6 +5268,37 @@ The working approach, after several failed attempts:
   (§5.5) and the one entry in that payload which **adds** rather than
   subtracts: the seed says the destination is empty, so what walked in has to
   be named.
+- **The prospector wears what you are wearing**, and it is the only mark on the
+  map that is about the player rather than the ground. Two of the nine slots —
+  the **coat** on the body and the **weapon** in the hand — because those are
+  the two a fight is decided by (§9.5.4), and **rarity is the channel**, which
+  is §13.1's own rule: there is room for one reading per piece and the rung is
+  what a piece is read by everywhere else.
+
+  It was a vellum pennant and a vellum ball, which said *somebody is here* and,
+  on a map whose whole point is the kit you assembled, nothing about who.
+
+  **The five gathering tools are deliberately absent.** All five are worn at
+  once (§8 rule 3), so a figure carrying them carries an axe, a pick, a bow, a
+  hammer and a sickle at the same time — and which is in use is picked off the
+  ground you are standing on (§8.0 rule 1) rather than chosen. What is in the
+  weapon slot is a **choice**, and choices are what a marker is worth drawing.
+
+  **Bare is vellum and empty-handed is empty** (§9.5.9): both are ordinary
+  states, and the first coat you put on is the first colour that appears. The
+  family owns the weapon's shape, cut down to what survives at marker size —
+  the shield is one broad mass, the sword one long line, the daggers a **pair**
+  of anything at all.
+- **On the chart the same prospector is a reticle**, not a figure and not a dot.
+  Every settlement out there is a filled dot and the smallest of them is vellum,
+  so a wider vellum dot was a village you had to measure — and **size is not a
+  shape**. Two rings and a centre is unmistakable at five pixels because nothing
+  else on that sheet is hollow: a dot has one edge and this has three.
+
+  It carries no rung, and that is the split. Out there a mark is a few pixels
+  and has to say one thing, and the thing it says is *you are here* — a common
+  coat's grey would say it badly on half the biomes. What you are wearing is
+  the board's to draw, at a size that can.
 - Tiling: flat-top hexes, `colStep = W * 0.75`, `rowStep = H`, odd columns offset by `H/2`.
 - **Layout with inline styles, not Tailwind arbitrary values** (`w-[390px]` etc. silently
   failed in the artifact sandbox and collapsed the viewport to zero height). Use a flex

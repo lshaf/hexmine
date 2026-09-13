@@ -380,6 +380,7 @@ onMounted(() => {
         :jobs="game.jobs"
         :travel="game.travel"
         :carriers="game.carriers"
+        :worn="game.worn"
         :now="game.now"
         @select="game.select"
         @recenter="onRecenter"

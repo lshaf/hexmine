@@ -43,6 +43,7 @@ import type {
   Tile,
   TravelState,
 } from '@/game/types'
+import { ITEM_BY_KEY } from '@/game/catalog'
 import {
   configureWorld,
   generateTile,
@@ -625,6 +626,36 @@ export const useGame = defineStore('game', () => {
 
   const inventory = computed(() => state.value?.inventory ?? {})
   const equipment = computed(() => state.value?.equipment ?? [])
+
+  /**
+   * §13.1 -- the two slots the map's own marker wears.
+   *
+   * The coat you are standing in and the thing in your hand, as RUNGS: rarity
+   * is what a piece is read by at a glance, and a marker has room for one
+   * reading per piece. The five gathering tools are deliberately not here --
+   * all five are worn at once (§8 rule 3), so a figure carrying them carries
+   * every one, and which is in use is picked off the ground rather than chosen.
+   *
+   * Nulls are honest: no coat and no weapon are both ordinary states, and §9.5.9
+   * makes an empty hand a real one -- no family, so no class and no skills.
+   */
+  const worn = computed(() => {
+    const at = (slot: string) => {
+      const held = equipment.value.find((i) => i.equipped && ITEM_BY_KEY[i.key]?.slot === slot)
+
+      return held ? ITEM_BY_KEY[held.key]! : null
+    }
+
+    const weapon = at('weapon')
+
+    return {
+      armor: at('armor')?.rarity ?? null,
+      weapon:
+        weapon && weapon.family
+          ? { family: weapon.family, rarity: weapon.rarity }
+          : null,
+    }
+  })
   const skills = computed(() => state.value?.skills ?? null)
   const bonuses = computed(() => state.value?.bonuses ?? null)
   /** §8 -- yield is per gathering line now, never one number. */
@@ -1560,7 +1591,7 @@ export const useGame = defineStore('game', () => {
     // state
     state, station, bench, preview, panel, selected, busy, booted, log, now, view, tiles,
     // derived
-    character, timeScale, bag, bagFull, inventory, equipment, skills, bonuses, toolYield, jobs, readyJobs,
+    character, timeScale, bag, bagFull, inventory, equipment, worn, skills, bonuses, toolYield, jobs, readyJobs,
     consumables, buffs,
     tree, skillPoints, jobLevels, jobLevelMap, ownedNodes, skillRanks, rankOf,
     rename,

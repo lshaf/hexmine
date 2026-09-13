@@ -31,6 +31,7 @@ import ChartLayer from './ChartLayer.vue'
 import {
   corpseProp,
   dungeonGlyph,
+  prospectorProp,
   huntProp,
   packProp,
   pocketProp,
@@ -71,6 +72,15 @@ const props = defineProps<{
    * and the hex underneath it is unchanged.
    */
   carriers: Carrier[]
+  /**
+   * §13.1 -- the two slots the marker wears: the coat and the thing in the
+   * hand, as rungs. Both nullable, because bare and empty-handed are both
+   * ordinary (§9.5.9).
+   */
+  worn: {
+    armor: string | null
+    weapon: { family: 'shield' | 'sword' | 'dagger'; rarity: string } | null
+  }
 }>()
 
 const carrierAt = computed(() => {
@@ -644,6 +654,9 @@ const SLOT_GAP = 5.5
 /** §4 -- the contested-ring tell, cut from the same stone as the marks. */
 const RARE_MARK = groundMark(6)
 
+/** §13.1 -- you, wearing the coat and carrying the weapon. */
+const prospector = computed(() => prospectorProp(props.worn.armor, props.worn.weapon))
+
 </script>
 
 <template>
@@ -832,11 +845,15 @@ const RARE_MARK = groundMark(6)
 
       <!-- The player marker draws last so nothing occludes it, but it sits ON
            the tile rather than floating above it -- hovering put it straight
-           through the settlement name label. -->
-      <g :transform="`translate(${characterScreen.x},${characterScreen.y + 3}) ${markScale}`">
-        <path d="M0,4 L-6,-8 L0,-5 L6,-8 Z" fill="#ece3cd" stroke="#141b18" stroke-width="1.4" stroke-linejoin="round" />
-        <circle cy="-13" r="4.4" fill="#ece3cd" stroke="#141b18" stroke-width="1.4" />
-      </g>
+           through the settlement name label.
+
+           §13.1 -- and it wears what you are wearing: the coat's rung on the
+           mantle, the weapon's family in the hand. It was a vellum pennant and
+           a vellum ball, which said somebody is here and nothing about who. -->
+      <g
+        :transform="`translate(${characterScreen.x},${characterScreen.y + 3}) ${markScale}`"
+        v-html="prospector"
+      />
     </svg>
   </div>
 </template>
