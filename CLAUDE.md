@@ -189,20 +189,28 @@ cross-map travel — same design pressure as biome-locked mining.
 ## 5. Map
 
 ### 5.1 Structure
-- Hex grid, ~5000×5000 at ship scale
+- Hex grid, **10001 × 10001** at ship scale — 5000 of ground in every
+  direction from the origin
 
-> **Currently set to a 200×200 test map** — `Balance::MAP_COLS/MAP_ROWS` are 200,
-> and that is the only value that differs from ship. Everything else is a
-> fraction of the map radius or an absolute hex count, so it scales on its own.
-> Ship value: 5000 × 5000.
+> **The map is measured from the middle out, and the radius is the quarter.**
+> `Balance::SHIP_MAP_RADIUS` is **5000** — every column and every row from
+> −5000 to 5000, so the sheet is 10001 a side and a hundred million hexes.
+> Everything else is a fraction of that radius or an absolute hex count, so it
+> scales on its own.
 >
-> The client is handed `cols`/`rows` by `/api/world` at boot rather than
-> compiling them in, so this constant is the single source of truth and the
-> TypeScript generator needs no matching edit. What it *does* need is a
-> regenerated fixture: `php artisan game:worldgen-fixture`, then `npm run
-> parity`. At 200×200 the world keeps its shape — 5 dungeons, and 161 villages
-> to 26 cities to 4 capitals, which holds the §6 ordering with the capital
-> count thin enough to be worth watching.
+> The client is handed the radius by `/api/world` at boot rather than compiling
+> it in, so `config/game.php` is the single source of truth and the TypeScript
+> generator needs no matching edit. What it *does* need is a regenerated
+> fixture: `php artisan game:worldgen-fixture`, then `npm run parity`.
+>
+> **The suite runs on a small map and the fixture is frozen there**
+> (`Balance::FIXTURE_MAP_RADIUS`, 200). Generation is scale-relative, so a
+> small sheet runs the same code; what it saves is the clock, since several
+> tests sweep every hex on a stride and on the real map that is tens of
+> millions of tiles apiece. The one test that does **not** move is the per-ring
+> share of workable ground (§5.2): that share is a promise about the world
+> players get, and `BARREN_THRESHOLD` is calibrated against that world, so
+> checking it on a 401-hex sheet would pin it to a map nobody plays.
 
 - **Exactly 2 mining slots per hex.** When both are full, the tile is closed to others.
 - Tiles are **depletable**, then **regrow after ~9h** (tune). Depleted tiles keep their
@@ -231,7 +239,7 @@ biome's own variant and its own fill, and carries a `dead` flag instead. What
 tells you is **what stands on it** — and §13.2 draws props inside sight and
 nowhere else. So a waste is *invisible at a distance and obvious underfoot*,
 which is the whole design: finding workable ground is something you do by
-walking, not by reading the map from four days away.
+walking, not by reading the map from the far side of it.
 
 **Five dead grounds, one per biome**, each its own silhouette with the life
 taken out of it — a snag is a conifer stripped to the trunk, scree is a peak
@@ -256,6 +264,12 @@ teeth.** `Balance::BARREN_CELL` is 5, and the field is smooth noise rather than
 a per-hex roll — §5.3 makes the same argument about biomes, and half a ring of
 independently-rolled dead hexes would be speckle rather than country.
 
+**Open: 5 is small against a 50-hex country** (§5.3). It was over half a biome
+cell when the cell was 9 and is a tenth of one now, so a waste reads as a patch
+inside a country rather than as a stretch of it. The share is right and the
+grain is arguably too fine; raising it means recalibrating
+`BARREN_THRESHOLD`, which is one run of `scripts/calibrate_barren.php`.
+
 What keeps it from being a trap is that **you are never blind about where you
 are standing**: the disc of seven always tells you which of your neighbours can
 be worked. What you cannot do is see the answer from the far side of the map.
@@ -265,7 +279,7 @@ free; finding the live ground inside it is the walk.
 Two consequences worth stating, because both are deliberate:
 
 - **A village can stand in a waste.** Settlement sites are placed on their own
-  lattice and know nothing about the field, so some of the 698 villages have
+  lattice and know nothing about the field, so a share of villages have
   little workable ground around them. That is a place with a bench and no seam,
   which is a real thing for a map to have.
 - **Spawning refuses dead ground** (§5.4), and has to: §12 step 1 is *bring back
@@ -295,6 +309,13 @@ raid and never an errand — it is the ban that carries that, not the emptiness.
 ### 5.3 Biomes
 Clustered regions (Voronoi-style from seed points), **not** random noise — players need a
 mentally navigable map. Rare-material biome variants sit inside/near the PvP ring.
+
+**A country is 50 hexes across** (`Balance::BIOME_CELL`), which at five seconds
+a hex (§5.6) is about four minutes of walking to cross one. It is also the
+**settlement** lattice: a country carries **at most one** settlement (§6), so
+the cell answers both "how far to a different material" and "how far to a
+bench" with the same number — which is the point of tying them together rather
+than tuning two.
 
 **Four grades a biome, and the grade is a rung of the equipment ladder.** Base,
 Better, Best, Contested — each named for a tool rung, each giving up a better
@@ -348,7 +369,7 @@ the tool that grade is named for* over the common rung's:
 | Contested | epic | 14 | **×4⅔** |
 
 So **every grade of ground takes its own rung exactly as long as base ground
-takes the common one** — fifteen minutes to thirty, all the way up. There is a
+takes the common one** — ten minutes to twenty, all the way up. There is a
 test pinning that sentence, and another pinning the other half of it: at a
 *fixed* rung, better ground is strictly more work.
 
@@ -373,6 +394,21 @@ them.
 - **Auto-assigned**, not player-chosen (prevents spot-sniping and landgrabbing)
 - Placement favors **under-populated regions** by local density (hexes per active wallet
   in a radius). Fills outward naturally.
+
+**It walks the VILLAGES, not the hexes.** A spawn has to satisfy §12 step 1 —
+forest, outer ring, live ground, and a village running *woodcutting* within
+`SPAWN_VILLAGE_RADIUS` — and with one settlement to a country (§6) a village is
+a hex in a couple of thousand. Scanning tiles outward and asking each whether a
+bench is near it asks the rare question of the common thing, which is exactly
+how most spawns came to fall through to a fallback that guaranteed nothing.
+The lattice hands over every village in a box for the cost of the cells; the
+ones that run woodcutting are the only starting points that can satisfy the arc
+at all, and the search is *from* them.
+
+**The reach is half a country**, not a hex count of its own — what decides how
+far apart benches are is the cell they sit one to, so the slack around one is
+written in the same unit. About two minutes of walking, which is what "a short
+walk" is worth at five seconds a hex (§5.6).
 
 ### 5.5 Hunting is mining, and there is no herd
 
@@ -425,8 +461,8 @@ of what that ground would have carried.
 says the destination is empty. So unlike every other live fact on the map it is
 stored as a **value** rather than as a subtraction: what walked in, and which
 rung it is. Same machinery as the cleared flag, same expiry, and sight-bounded
-like the rest of it (§5.6) — watching a country empty out from four days away
-was never on offer, and neither is watching one refill.
+like the rest of it (§5.6) — watching a country empty out from the far side
+of the map was never on offer, and neither is watching one refill.
 
 **One flag per hex, over whichever animal is standing there.** A roamer keeps
 the clock of the **ground it is standing on** rather than the ground it left,
@@ -486,8 +522,9 @@ carrying both.
 
 Live state on the pack's own bucket, so it obeys the fog for the same reason a
 pack does: **which hexes can be hunted is something you find out by standing
-near them**, never by reading the map from four days away. That is §5.6's rule
-and this is the one thing on huntable country that most wanted breaking it.
+near them**, never by reading the map from the far side of it. That is
+§5.6's rule, and this is the one thing on huntable country that most wanted
+breaking it.
 
 **Two axes, and the second one is what §13.1's usual pair could not carry
 alone.** The grade owns the hide, tan climbing to near-black — and it owns the
@@ -572,11 +609,12 @@ map worth walking.
 | **Sight** | **1 hex.** Base `Balance::SIGHT_RADIUS`, up to 3 through the Explorer tree (§7.5). |
 | **Sight while traveling** | **The same, and it follows you.** The disc is centred on the hex under your feet right now, not the one you set off from. |
 | **Travel range** | **None.** Any hex on the map is walkable from any other. |
+| **Travel cost** | **5 seconds a hex** (`Balance::TRAVEL_MS_PER_HEX`), before `travelSpeed` divides it. |
 
 **The road does not close the eye.** It used to — sight went to zero the moment
 a journey started, on the reasoning that you are between hexes watching your
 feet. What that actually bought was a promise about *queries*; what it cost was
-the walk. A two-hundred-hex road was four days of a blank map, which is the
+the walk. A two-hundred-hex road was a blank map the whole way, which is the
 least interesting thing this game can do with its own distance. A prospector
 crossing a country now sees the country they are crossing.
 
@@ -586,9 +624,9 @@ wait until you arrive* — so what the open eye buys is a **scouting report**,
 never an action. A hex you pass is read, not worked.
 
 **Travel has no reach limit and must not grow one.** Distance already costs the
-one currency an idle game cannot inflate — hours, at five minutes a hex — so a
-level gate on top of it would be a second answer to a question the clock has
-already answered.
+one currency an idle game cannot inflate — the clock, at five seconds a hex —
+so a level gate on top of it would be a second answer to a question the clock
+has already answered.
 
 There is exactly **one refusal**, and it is not a distance: the edge of the map.
 
@@ -636,7 +674,7 @@ the warnings — and it is dropped the moment the selection moves, so the last
 hex's refusal never sits over this hex's name while a request is in flight.
 
 **The clock is on the card and the hex count is not.** Two readouts for one
-journey, and the one that decides anything is the clock: at five minutes a hex
+journey, and the one that decides anything is the clock: at five seconds a hex
 the count is the same fact in a unit nobody plans in. The Travel button beside
 it still names both.
 
@@ -654,7 +692,7 @@ there. Hiding a fact and inventing one are not the same move.)*
 
 **A place's identity is terrain, and the fog was never entitled to it.** Name,
 tier and the lines it runs (§6) all fall out of `(col, row, seed)`, and the
-atlas has charted every one of them at any distance since it was built — off
+chart has drawn every one of them at any distance since it was built — off
 the same bundle, in the same session. Withholding them on the play map was a
 fiction rather than a fog: the client knew and pretended not to. A scouted name
 is drawn in vellum and an unscouted one dim, so the ring still means something;
@@ -711,9 +749,9 @@ Three consequences, all deliberate:
 2. **A journey costs one query a hex**, and that is the bill for the paragraph
    above. It used to cost two in total however far it went, because the eye
    was shut — the disc moves with the walker now, so it is re-asked as each hex
-   is crossed. Five minutes of game time apart, which is cheaper per hour than
-   the fixed poll this codebase ran until recently, and it is bounded by the
-   same thirty-seven-tile disc as everything else. The saving was real and it
+   is crossed. Five seconds of game time apart, and it is still bounded by the
+   same thirty-seven-tile disc as everything else — and by the walker being one
+   person rather than a scanner. The saving the shut eye bought was real, and it
    was paid for with the most interesting thing about a long walk.
 3. **Costing a hex is bounded by the same disc**, and by the same *centre*. The
    per-tile preview endpoint refuses anything unscouted — otherwise it would be
@@ -731,9 +769,9 @@ never *what is happening* there, which is what makes arriving worth something.
 keeps a character's `col`/`row` on the **departure** hex for the whole journey
 and only writes a new one when you land or stop — so every readout that asked
 the character where it was got the place it set off from. Three days into a
-walk the dock still named the forest you left, the atlas dot had not moved, the
-distance to a bench was measured from the wrong end, and the one hex sight-zero
-lights was the one behind you.
+walk the dock still named the forest you left, the chart's dot had not moved,
+the distance to a bench was measured from the wrong end, and the one hex
+sight-zero lights was the one behind you.
 
 So the client derives it: `path[floor(elapsed / perHex)]`, clamped to where the
 road actually ends. **That is not the client having an opinion about where it
@@ -858,8 +896,26 @@ cognitive load from an idle game.
 | Capital | **4 of 5** | Inner (contested) ring | Fastest, most expensive, one ring out from the dungeons |
 | **Guild land** | **all 5** | any dead ground (§5.2) | §10.6 — bought, named and levelled by a roster |
 
-Village count > City count > Capital count. This is a **cost curve outcome**, not a map-slot
-system — no extra implementation needed, just tune upgrade costs.
+Village count > City count > Capital count. This is a **ring-area outcome**,
+not a map-slot system: a settled country holds one settlement (§5.3), and its
+tier is whichever ring it landed in — so the ordering falls out of the outer
+ring being the largest of the three, and needs no per-tier tuning at all.
+
+**A country, and at most one settlement in it.** The settlement lattice *is*
+the biome lattice (`Balance::BIOME_CELL`), so a country can never hold two. It
+used to be three lattices of different sizes with a fill chance each, which
+made density a property of the tier rather than of the ground: a country with
+two villages in it and a country with none were both ordinary, and neither said
+anything about the place.
+
+**Half the countries have nobody in them** (`Balance::SETTLED_COUNTRY_SHARE`),
+and the half is the point rather than a thinning. With every country settled,
+*is there a bench here* had one answer everywhere and stopped being a question
+worth asking — a map whose answer is always yes has nothing to find out. At a
+half, a country with a bench and a country without are both ordinary, and which
+one you are standing in is a fact about the place. It is also the one number
+that sets the density of the settled world, so it is what to move if the map
+ever reads crowded or empty.
 
 **A capital runs four of the five, and giving the fifth away is the point.**
 The only place in the world that runs every line is one a roster paid a hundred
@@ -889,9 +945,11 @@ close on each other past the leftover margin. A site free to roam its whole cell
 can sit against the shared edge of two cells, which is what previously put
 villages on touching hexes.
 
-The floor sets the ceiling on density: raising a gap thins that tier out, and
-the only lever left is the per-cell spawn chance. Village spacing costs about
-40% of the village count, which is the intended trade.
+**The gap no longer sets the density, and that is the change.** With at most
+one settlement to a country the count is the cell's and the share's, not the
+gap's — so the floor is doing the one job it was written for, keeping two towns
+off each other's doorstep at a cell boundary, and the window is wide enough the
+rest of the time that the lattice reads as country rather than as a grid.
 
 **Where two tiers could crowd, the higher tier's gap wins and the lower tier is
 the one that yields** — a village keeps a city's 11 hexes, not its own 8, and a
@@ -1001,8 +1059,8 @@ reeve who keeps a second pit going has earned it on that line and on no other.
 ever was, and what changed is how much of the congestion one prospector may be.
 
 **Per settlement and per line, not per character.** It was the latter, across
-the whole map: a run of planks left at a village four days' walk away refused
-every saw pit in the world — while §8.4 argued in the same breath that "the real
+the whole map: a run of planks left at a village half a map away refused every
+saw pit in the world — while §8.4 argued in the same breath that "the real
 limit on how much you have going at once is still the walking". Two rules about
 one thing, disagreeing, and the walking is the one worth keeping. A capital
 running four lines therefore holds four of one prospector's runs, one to a
@@ -1189,7 +1247,7 @@ rate      = attack + skill_attack + skill_bite
 trip_time = clamp(hp / rate, 1min, 60min)
 ```
 
-- `hp`: **2,700–5,400**, rolled per tile, then **scaled by the tile's grade**
+- `hp`: **1,800–3,600**, rolled per tile, then **scaled by the tile's grade**
   (§5.3) — base ground untouched, up to ×4⅔ on contested
 - `attack`: **the whole base rate**, and it is the tool's — or, for gathering
   alone, `BARE_HAND_ATTACK` (**3**, the common rung's own — see below)
@@ -1237,8 +1295,8 @@ rounding error, where `+100 to 200` is a hundred and one of them and reads as
 luck. §8.0.1 asks luck to be legible, and two values cannot be.
 
 **The figures below are written at the old scale on purpose**, because that is
-the scale they are legible at: 2,700 hp and attack 3 are the sentence *fifteen
-minutes at the common rung*, and 270,000 over 300 is the same sentence in a
+the scale they are legible at: 1,800 hp and attack 3 are the sentence *ten
+minutes at the common rung*, and 180,000 over 300 is the same sentence in a
 worse font. Multiply by the scale to get what is in the code.
 
 **The thing to watch is a number left behind**, because it does not fail — it
@@ -1262,10 +1320,10 @@ duration and once as a pile, with a constant between them waiting to drift. How
 long a hex takes is `hp / rate`, and that is nobody's business but the
 character's.
 
-The range is **calibrated once and then left alone**: 2,700 is fifteen minutes
+The range is **calibrated once and then left alone**: 1,800 is ten minutes
 for somebody holding the common rung (attack 3) with nothing learned yet, and
-5,400 is thirty. That is the *base* grade of ground; §5.3 scales the roll by the
-rung a better grade is named for, so those same fifteen-to-thirty minutes are
+3,600 is twenty. That is the *base* grade of ground; §5.3 scales the roll by the
+rung a better grade is named for, so those same ten-to-twenty minutes are
 what every grade costs the rung it belongs to. That is the whole of what the numbers mean and the only reason
 they are these numbers — there is a test pinning it. Seconds appear nowhere in
 the model.
@@ -1305,8 +1363,8 @@ payoff is the haul, not the clock.
 
 So **the ladder is felt from the second rung up**, and the first rung is felt in
 the bag. They were **4** for a while, which was worse than either reading: hands
-beat the axe outright, twelve minutes against fifteen. A test pins the tie at
-the bottom and pins every rung above it as strictly faster.
+beat the axe outright, seven and a half minutes against ten. A test pins the
+tie at the bottom and pins every rung above it as strictly faster.
 
 *(It used to say hands must stay strictly under the cheapest tool, on the
 grounds that a bought tool should always be felt. That fought §4.0 rather than
@@ -1321,19 +1379,19 @@ hardest.)*
 
 The measured ladder, unskilled:
 
-| Rung | Attack | 2,700 HP | 5,400 HP |
+| Rung | Attack | 1,800 HP | 3,600 HP |
 |---|---|---|---|
-| Bare hands *(gather only)* | 3 | **15m** | **30m** |
-| Village | 3 | **15m** | **30m** |
-| Crafted starter | 4 | 11m | 22.5m |
-| City | 6 | 7.5m | 15m |
-| Crafted uncommon | 8 | 5.6m | 11m |
-| Rare | 10 | 4.5m | 9m |
-| Epic (NFT) | 14 | 3.2m | 6.4m |
-| Legendary | 17 | 2.6m | 5.3m |
-| Unique | 19 | 2.4m | 4.7m |
+| Bare hands *(gather only)* | 3 | **10m** | **20m** |
+| Village | 3 | **10m** | **20m** |
+| Crafted starter | 4 | 7.5m | 15m |
+| City | 6 | 5m | 10m |
+| Crafted uncommon | 8 | 3.8m | 7.5m |
+| Rare | 10 | 3m | 6m |
+| Epic (NFT) | 14 | 2.1m | 4.3m |
+| Legendary | 17 | 1.8m | 3.5m |
+| Unique | 19 | 1.6m | 3.2m |
 
-Best tool, maxed skill and best-in-slot gear on the hardest hex: **3.3 minutes**.
+Best tool, maxed skill and best-in-slot gear on the hardest hex: **2.2 minutes**.
 
 **Gathering is this same arithmetic with your hands in the tool's place** (§4.0).
 Not a separate verb with a separate schedule — the identical hex, the identical
@@ -1730,9 +1788,11 @@ The `40` floor is there so the first level costs about three mines rather
 than half of one.
 
 **Open, and it is the one thing §7.3 knocked over.** That income was measured
-when a mine clamped at 30 minutes. A geared prospector now works a hex in five
-to ten, so the late-career mine rate is several times what the curve was sized
-against and six months is no longer what it buys. The curve has deliberately
+when a mine clamped at 30 minutes. The clamp is a guard at one minute now, the
+HP band is ten minutes to twenty at the common rung rather than fifteen to
+thirty, and a geared prospector works a hex in three to eight — so the
+late-career mine rate is several times what the curve was sized against and six
+months is no longer what it buys. The curve has deliberately
 **not** been re-fitted: how fast a well-equipped character should level is a
 pacing decision, not a consequence of removing a timer.
 
@@ -3053,9 +3113,9 @@ happen to be. The walk back is what makes *which* capital you use a decision.
 
 Two consequences follow, and both are the point:
 
-- **A haul you cannot reach is not a haul.** "Ready" at a village four days away
-  is a route to plan, which is why the ledger names the bench and the distance
-  rather than only the clock.
+- **A haul you cannot reach is not a haul.** "Ready" at a village half a map
+  away is a route to plan, which is why the ledger names the bench and the
+  distance rather than only the clock.
 - **The strap is asked for twice** — before the work and again when the thing is
   handed over (§7.6). An hour is long enough to fill a bag, and the answer is a
   refusal rather than a lost item: it stays on the bench until there is room.
@@ -3466,8 +3526,8 @@ arranged. It reaches **any hex in sight**, where the plate only ever reached the
 one under your feet — so a pack two hexes off can be read before you walk into
 it, which is exactly what a card is for. And it is **sight-bounded** for free,
 by the same rule the map draws a pack under (§13.2): live state is read by
-standing near it, and a monster legible from four days away is the scanner §5.6
-exists to refuse.
+standing near it, and a monster legible from the far side of the map is the
+scanner §5.6 exists to refuse.
 
 **A fight is a verb this hex answers to, so it is priced like one.** The same
 row as Mine and Gather — a word on the left, a leader, a figure on the right, a
@@ -3924,7 +3984,7 @@ what losing costs.)*
 What it costs:
 
 1. You wake at the **nearest settlement**. The walk back is the first bill, and
-   at five minutes a hex it is a real one.
+   at five seconds a hex it is a real one.
 2. The pack takes **one row from your bag** — truly random, gear or material.
 3. **The pack does not despawn.** It becomes a **carrier**, named for what it
    took, drawn as a `XXX's corpse` glyph. It lives **24h**, and the clock is on
@@ -5085,6 +5145,64 @@ is no plate — under one it was invisible, which is how the plate was found out
 
 ### 13.2 Map rendering (critical implementation notes)
 
+**One continuous zoom, and it replaced the atlas.** There used to be a separate
+chart behind a button in the corner — its own canvas, its own pan, its own four
+named steps, its own readout for whatever you tapped. Everything it knew is the
+**far end of the map's own zoom** now. One control, one map, and *how far out am
+I* has one answer instead of two.
+
+**Measured in pixels per hex column**, which is the unit that makes that
+possible: the board is drawn in map units through a viewBox and the chart is
+drawn in pixels off the seed, and pixels-per-column is the one number both mean
+the same thing by. `Balance`'s own `COL_STEP` is the scale the board has always
+been drawn at, so every other scale is read against it.
+
+**Two renderers, because the cost is nodes.** The board is one `<g>` per hex, so
+what it costs goes as the *square* of how far out the camera is — about 700
+tiles on a desktop window at full size, two thousand at half, seven thousand at
+a quarter. `MAP_PX_CHART` is where that stops being affordable, and it lands
+where a hex is already too small to read or act on. Below it the board is not
+drawn at all and the chart takes over: the same world, from the same seed, as
+sampled colour with the settlements marked on it.
+
+| | |
+|---|---|
+| **The board** | `MAP_PX_CHART` up to four times full size. Hexes, props, labels, everything |
+| **The handover** | a **detent** — a press that would cross it stops on it, so the board's widest view is somewhere you land rather than pass through |
+| **The chart** | from there out to the whole world in one window |
+
+**The far end is the world, not a number.** How far out you can go is "this map
+across this window", so it falls out of the map radius (§5.1) and the viewport
+rather than being a constant — a fixed floor would frame a small world against a
+void and clip a large one.
+
+**What the board sheds on the way out is what stops being a shape.** A prop
+eight pixels tall is a smudge and a settlement name at that size is a line of
+grey, so both go; a corpse and a job pip do not, because those are about *you*
+rather than about the ground, and they keep one size on screen while the board
+under them changes size. Strokes are in map units, so every one of them is
+divided by the scale or a hairline becomes a third of a pixel.
+
+**A tap on the chart selects a hex**, and the tile card answers — the same
+grammar the board uses. The atlas had a readout of its own naming whatever
+settlement was nearest; two screens answering *what am I pointing at* in two
+different ways is one too many. That works because terrain is a pure function
+of `(col, row, seed)` (§5), so the store generates the tile for any hex rather
+than looking it up among the drawn ones.
+
+**A dot has to be smaller than the gap between dots.** Settlements stand about
+one to a country (§6), so their spacing on screen is roughly `BIOME_CELL × px` —
+and at the far end that is a couple of pixels, where a five-pixel capital
+overlaps its neighbours in every direction. The whole inner ring came out as one
+gold mass, which says *something is here* and nothing else; §5.2's actual shape,
+a ring of them in the contested band, only appears once the dots stop touching.
+
+**And the chart names a dozen places, not every place that fits.** An overlap
+test alone was enough when a world had four capitals; a shipping map has them in
+the thousands, and a few dozen non-overlapping names strewn across the middle is
+a wall of text with no landmark in it. A budget spreads them, and the separation
+is what makes a budget a spread rather than a list down one edge.
+
 **Settlement tiers are told apart by shape category, not by size.** At a 58x34 hex
 you often see only one settlement, so there is nothing to compare a height
 against. Village is a *scatter* of unaligned huts, city is an *enclosure* — a wide
@@ -5178,15 +5296,60 @@ a biome fill and is not either of them.
 
 **The top-right corner holds the map's own controls and a burger.** What stays
 out where it can be pressed without a tap first is what is about **the map** —
-recenter, since the camera pans anywhere and costs nothing, and the atlas — and
-everything you open from *any hex* is behind the menu beside them. What you are
+recenter, since the camera pans anywhere and costs nothing, and **how far out
+the camera is** — and everything you open from *any hex* is behind the menu
+beside them. What you are
 standing on is the bottom-centre stack's business (§5.6) and is not in here
 either.
 
-**Three cells zigzagging down**, nested the way §13.2 tiles the map — three
+**Five cells zigzagging down**, nested the way §13.2 tiles the map — three
 quarters of a width between the two columns, the left one dropped half a height
-so the points interlock. The burger is last and therefore lowest and rightmost:
-nearest the thumb, and directly over the list it drops.
+so the points interlock.
+
+**The order is the argument.** The two ends of the zoom are the two ends of the
+column, and everything that is not a direction sits between them:
+
+| | |
+|---|---|
+| **Closer** | in, at the top |
+| **Here** | the camera back to your prospector |
+| **Go to** | the camera to a hex you name |
+| **Menu** | everything you can open from any hex |
+| **Further** | out, at the foot — the whole world at the end of it |
+
+Side by side the zoom was two buttons that happened to be adjacent; at the ends
+of the column the column itself says which way is which, the way a slider does.
+
+**The zoom took the atlas's cell**, and that is the whole shape of §13.2's
+change: a separate chart behind a button, with its own pan and its own four
+named steps, became the far end of one continuous zoom on the map itself. A
+place to go became a direction to go in, and the corner spends the same room on
+it.
+
+**Go to is by COORDINATES, because a name is not an address.** Two villages can
+share one (§6), which is why the dock writes a place as *Redhollow −412,88* in
+the first place; this is the other half of that sentence — the dock says where
+somewhere is, and this reads it back. It opens on where you are, so the field is
+a nudge as readily as an address, and a number past the edge lands on the edge
+rather than nowhere.
+
+**And it moves the CAMERA, never the prospector.** That is the rule the whole
+corner is drawn by: these are controls about the map, and looking at somewhere
+costs nothing because terrain is a function of `(col, row, seed)` (§5). Walking
+there costs hours and is the tile card's offer (§5.6) — which is what the card
+puts in front of you the moment the jump lands, since the hex you typed is the
+hex it selects.
+
+**Its glyph is an arrow into a hexagon, and that is not decoration.** It sits one
+cell from *Here*, which is a ring with crosshair ticks, and a hexagon with
+crosshair ticks beside it read as the same glyph twice. §13.2 makes exactly this
+argument about the settlement tiers: tell them apart by shape **category**, not
+by what is inside the shape. One is a ring closing on you; the other is a line
+arriving somewhere else.
+
+**The burger is no longer last, and it keeps what mattered about being last:**
+it is still in the left column, still directly over the list it drops. What is
+below it is a zoom step, not a screen.
 
 **Down rather than across, because down is the free direction.** It ran across
 for a while and that spent the one thing this corner has least of: the top edge

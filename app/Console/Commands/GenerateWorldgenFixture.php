@@ -24,6 +24,15 @@ class GenerateWorldgenFixture extends Command
 
     public function handle(): int
     {
+        // The fixture is frozen at the radius the SUITE runs at, never at the
+        // deployment's own. tests/TestCase.php installs the same number, so a
+        // fixture regenerated from a developer's .env cannot quietly describe a
+        // different world from the one the tests check it against. Generation
+        // is scale-relative (see Balance::FIXTURE_MAP_RADIUS), so this pins the
+        // same code paths the shipping map runs.
+        config(['game.map.radius' => Balance::FIXTURE_MAP_RADIUS]);
+        WorldGen::forget();
+
         $path = base_path('tests/Fixtures/worldgen.txt');
 
         // The generation parameters the client is handed at boot. Frozen next to

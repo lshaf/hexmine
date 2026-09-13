@@ -11,8 +11,10 @@
  *  - `comb` packs them into a settlement's PORTRAIT, on the same nested lattice
  *    the map tiles with (§13.2). It is what the tile card puts where a seam
  *    puts its material icon -- the slot that says what this hex is about.
- *  - `row` lays them along a line, for the atlas readout, which has a column of
- *    text and no portrait slot to fill.
+ *  - `row` lays them along a line, for a caller with a column of text and no
+ *    portrait slot to fill. Nothing uses it since the atlas readout went
+ *    (§13.2 folded that screen into the map's own zoom); it stays because it
+ *    is the default and costs nothing to keep.
  */
 import { computed } from 'vue'
 import { LINE_OUTPUT, MATERIALS } from '@/game/catalog'

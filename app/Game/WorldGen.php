@@ -423,19 +423,37 @@ final class WorldGen
 
     /**
      * Settlements sit on a jittered lattice: one candidate site per cell, so a
-     * region can be enumerated without storing anything. Cell size per tier is
-     * what produces "villages > cities > capitals" in count -- §6 calls that a
-     * cost curve outcome, and this is the generation half of it.
+     * region can be enumerated without storing anything.
+     *
+     * The cell IS the biome cell (Balance::BIOME_CELL), so a country carries at
+     * most one settlement -- and `chance` is what decides whether it carries
+     * any. Tier is then decided by the ring the site lands in
+     * (self::TIER_FOR_RING) rather than by a lattice of its own, which is what
+     * produces "villages > cities > capitals" in count: the outer ring is the
+     * largest of the three.
+     *
+     * HALF THE COUNTRIES HAVE ONE, and that is the point of the chance rather
+     * than a thinning. With every cell filled, "is there a bench here" had one
+     * answer everywhere and the question stopped being worth asking; at a half
+     * a country with a bench and a country without are both ordinary, and which
+     * one you are standing in is a fact about the place.
+     *
+     * It used to be three lattices of DIFFERENT sizes with a chance each, which
+     * made density a property of the tier rather than of the ground -- a
+     * country with two villages in it was as ordinary as one with none, and
+     * neither said anything.
      *
      * `minGap` is the guaranteed floor on the distance between two settlements
-     * of the same tier, in hexes. A cell alone does not give one: a site free to
-     * land anywhere in its cell can sit against the shared edge of two cells,
-     * which put villages on touching hexes. self::siteOffset narrows the window.
+     * of the same tier, in hexes (§6.0). A cell alone does not give one: a site
+     * free to land anywhere in its cell can sit against the shared edge of two
+     * cells, which put villages on touching hexes. self::siteOffset narrows the
+     * window, and the window is wide here because the cell is -- jitter is what
+     * keeps one-per-country from reading as a grid.
      */
     private const LATTICE = [
-        'village' => ['cell' => 11, 'minGap' => 8, 'chance' => 0.8, 'salt' => 0x1111],
-        'city' => ['cell' => 14, 'minGap' => 11, 'chance' => 0.45, 'salt' => 0x2222],
-        'capital' => ['cell' => 26, 'minGap' => 15, 'chance' => 0.7, 'salt' => 0x3333],
+        'village' => ['cell' => Balance::BIOME_CELL, 'minGap' => 8, 'chance' => Balance::SETTLED_COUNTRY_SHARE, 'salt' => 0x1111],
+        'city' => ['cell' => Balance::BIOME_CELL, 'minGap' => 11, 'chance' => Balance::SETTLED_COUNTRY_SHARE, 'salt' => 0x2222],
+        'capital' => ['cell' => Balance::BIOME_CELL, 'minGap' => 15, 'chance' => Balance::SETTLED_COUNTRY_SHARE, 'salt' => 0x3333],
     ];
 
     /**
@@ -661,6 +679,69 @@ final class WorldGen
             'row' => $row,
             'lines' => self::linesFor($tier, $col, $row),
         ];
+    }
+
+    /**
+     * Every settlement inside a box of hexes, without visiting a single tile.
+     *
+     * Sites live on a lattice -- one candidate per cell -- so a region is
+     * enumerated by walking CELLS instead of the tiles they are scattered
+     * across. With at most one settlement to a country and half of them empty
+     * (§6) a village is a hex in several thousand, so asking every tile whether
+     * it is one is the wrong question asked several thousand times.
+     *
+     * Equivalent to calling settlementAt() on every hex in the box -- there is
+     * a test sweeping a whole map for it, because pickSpawn() leans on this and
+     * a lattice walk that quietly missed a village would show up as a spawn
+     * guarantee that silently stopped holding. The TypeScript twin
+     * (settlementMarksIn) is the same walk, pinned by the parity fixture.
+     *
+     * @param  list<string>  $tiers
+     * @return list<array<string,mixed>>
+     */
+    public static function settlementsIn(
+        int $colMin,
+        int $colMax,
+        int $rowMin,
+        int $rowMax,
+        array $tiers = ['village', 'city', 'capital'],
+    ): array {
+        $out = [];
+
+        foreach ($tiers as $tier) {
+            $cell = self::LATTICE[$tier]['cell'];
+
+            for ($cx = (int) floor($colMin / $cell); $cx <= (int) floor($colMax / $cell); $cx++) {
+                for ($cy = (int) floor($rowMin / $cell); $cy <= (int) floor($rowMax / $cell); $cy++) {
+                    $site = self::settledSite($tier, $cx, $cy);
+                    if ($site === null) {
+                        continue;
+                    }
+
+                    [$col, $row] = $site;
+                    if ($col < $colMin || $col > $colMax || $row < $rowMin || $row > $rowMax) {
+                        continue;
+                    }
+                    if (! self::inBounds($col, $row)) {
+                        continue;
+                    }
+                    if (self::crowdedByBetter($tier, $col, $row)) {
+                        continue;
+                    }
+
+                    $out[] = [
+                        'id' => "s_{$col}_{$row}",
+                        'name' => self::nameFor($col, $row, $tier),
+                        'tier' => $tier,
+                        'col' => $col,
+                        'row' => $row,
+                        'lines' => self::linesFor($tier, $col, $row),
+                    ];
+                }
+            }
+        }
+
+        return $out;
     }
 
     /** Parse a settlement id back to its tile and re-derive it. */
@@ -1023,8 +1104,8 @@ final class WorldGen
     /**
      * §5.3 -- a hex's HP, scaled by the grade of ground it turned out to be.
      *
-     * The roll is the same 2,700-5,400 it always was; what the grade decides is
-     * the rung that roll is measured at. Base ground is the common rung, so it
+     * The roll is TILE_HP_MIN..TILE_HP_MAX, ten minutes to twenty at the common
+     * rung; what the grade decides is the rung that roll is measured at. Base ground is the common rung, so it
      * comes through untouched, and an Ironwood Grove is four and two thirds
      * times the work because that is the ratio between an Ironwood Axe and a
      * Stone one -- the better ground asks for the better tool by costing what

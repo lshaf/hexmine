@@ -18,6 +18,7 @@
  * the same expected output. `composer parity` checks PHP against it and
  * `npm run parity` checks this file against the very same fixture; run both.
  */
+import { MAP } from './balance'
 import { hash2, rand01, randInt } from './hash'
 import { BIOME_VARIANTS, type VariantDef } from './variants'
 import { MONSTERS_BY_BIOME_RING } from './monsters'
@@ -85,6 +86,7 @@ let config: WorldConfig | null = null
 /** Install the server's generation parameters. Called once, at boot. */
 export function configureWorld(next: WorldConfig): void {
   config = next
+  latticeCache = null
   biomeCache.clear()
   cellCache.clear()
 }
@@ -107,7 +109,7 @@ function cfg(): WorldConfig {
  * §5.1 -- is this hex on the map at all? The mirror of WorldGen::inBounds().
  *
  * The one place the client decides where the edge is, so the render loop and
- * the atlas cannot disagree about it.
+ * the chart cannot disagree about it.
  */
 export function inBounds(col: number, row: number): boolean {
   const c = cfg()
@@ -204,7 +206,7 @@ export function biomeOf(col: number, row: number): Biome {
 /**
  * The same answer without touching the per-tile cache.
  *
- * The atlas samples tens of thousands of scattered points in one pass, which
+ * The chart samples tens of thousands of scattered points in one pass, which
  * would evict the play map's warm tiles for entries it will never ask for
  * twice. The cell seeds underneath are still shared, and those are the
  * expensive half.
@@ -440,22 +442,49 @@ function lakeAt(col: number, row: number): boolean {
 
 /**
  * Settlements sit on a jittered lattice: one candidate site per cell, so a
- * region can be enumerated without storing anything. Cell size per tier is what
- * produces "villages > cities > capitals" in count -- §6 calls that a
- * cost-curve outcome, and this is the generation half of it.
+ * region can be enumerated without storing anything.
+ *
+ * The cell IS the biome cell, so a country carries at most one settlement --
+ * and `chance` is what decides whether it carries any. Half of them do, so a
+ * country with a bench and a country without are both ordinary. Tier is decided
+ * by the ring the site lands in (TIER_FOR_RING) rather than by a lattice of its
+ * own, which is what produces "villages > cities > capitals" in count: the
+ * outer ring is the largest of the three.
  *
  * `minGap` is the guaranteed floor on the distance between two settlements of
- * the same tier, in hexes. A cell alone does not give one: a site free to land
- * anywhere in its cell can sit against the shared edge of two cells, which put
- * villages on touching hexes. `siteOffset` narrows the window instead.
+ * the same tier, in hexes (§6.0). A cell alone does not give one: a site free
+ * to land anywhere in its cell can sit against the shared edge of two cells,
+ * which put villages on touching hexes. `siteOffset` narrows the window
+ * instead, and the window is wide here because the cell is -- jitter is what
+ * keeps one-per-country from reading as a grid.
+ *
+ * Mirrors WorldGen::LATTICE. The cell comes off the world config because
+ * Balance::BIOME_CELL is what the server reads for it.
  */
-const LATTICE: Record<
-  MapTier,
-  { cell: number; minGap: number; chance: number; salt: number }
-> = {
-  village: { cell: 11, minGap: 8, chance: 0.8, salt: 0x1111 },
-  city: { cell: 14, minGap: 11, chance: 0.45, salt: 0x2222 },
-  capital: { cell: 26, minGap: 15, chance: 0.7, salt: 0x3333 },
+const LATTICE_GAP: Record<MapTier, { minGap: number; chance: number; salt: number }> = {
+  village: { minGap: 8, chance: MAP.settledCountryShare, salt: 0x1111 },
+  city: { minGap: 11, chance: MAP.settledCountryShare, salt: 0x2222 },
+  capital: { minGap: 15, chance: MAP.settledCountryShare, salt: 0x3333 },
+}
+
+type Lattice = { cell: number; minGap: number; chance: number; salt: number }
+
+/**
+ * Memoised, because this is read once per candidate cell and the chart walks
+ * tens of thousands of them at the far end of the zoom. `configureWorld` clears it, which is
+ * the only moment the cell can change.
+ */
+let latticeCache: Record<MapTier, Lattice> | null = null
+
+const lattice = (tier: MapTier): Lattice => {
+  latticeCache ??= Object.fromEntries(
+    (Object.keys(LATTICE_GAP) as MapTier[]).map((t) => [
+      t,
+      { cell: cfg().biomeCell, ...LATTICE_GAP[t] },
+    ]),
+  ) as Record<MapTier, Lattice>
+
+  return latticeCache[tier]
 }
 
 /**
@@ -500,7 +529,7 @@ const TIERS_ABOVE = Object.fromEntries(
  *  nothing about whether the cell actually fills. */
 function siteIn(tier: MapTier, cellCol: number, cellRow: number): [number, number] {
   const c = cfg()
-  const { cell, minGap, salt } = LATTICE[tier]
+  const { cell, minGap, salt } = lattice(tier)
   return [
     cellCol * cell + siteOffset(cell, minGap, hash2(cellCol, cellRow, c.seed ^ salt)),
     cellRow * cell + siteOffset(cell, minGap, hash2(cellRow, cellCol, c.seed ^ (salt + 1))),
@@ -510,7 +539,7 @@ function siteIn(tier: MapTier, cellCol: number, cellRow: number): [number, numbe
 /** Not every cell gets a settlement -- that is what makes density feel organic. */
 function cellFills(tier: MapTier, cellCol: number, cellRow: number): boolean {
   const c = cfg()
-  const { chance, salt } = LATTICE[tier]
+  const { chance, salt } = lattice(tier)
   return rand01(hash2(cellCol, cellRow, c.seed ^ (salt + 2))) <= chance
 }
 
@@ -553,7 +582,7 @@ function settledSite(
  */
 function crowdedByBetter(tier: MapTier, col: number, row: number): boolean {
   for (const above of TIERS_ABOVE[tier]) {
-    const { cell, minGap } = LATTICE[above]
+    const { cell, minGap } = lattice(above)
 
     // Hex distance is never below the larger axial difference, so anything
     // within minGap hexes is also within minGap columns and rows -- these are
@@ -619,7 +648,7 @@ export function settlementAt(col: number, row: number): Settlement | undefined {
   const tier = TIER_FOR_RING[ring]
   if (!tier) return undefined
 
-  const { cell } = LATTICE[tier]
+  const { cell } = lattice(tier)
   const cellCol = Math.floor(col / cell)
   const cellRow = Math.floor(row / cell)
 
@@ -661,7 +690,7 @@ export interface SettlementMark {
  * Sites live on a lattice -- one candidate per cell per tier -- so a region can
  * be enumerated by walking cells instead of the tiles they are scattered
  * across. A chart covering 600 columns costs a few thousand hashes rather than
- * 300,000 tile tests, which is what lets the atlas pan freely while asking the
+ * 300,000 tile tests, which is what lets the chart pan freely while asking the
  * server for nothing.
  *
  * Equivalent to calling settlementAt() on every hex in the box, and the parity
@@ -677,7 +706,7 @@ export function settlementMarksIn(
   const out: SettlementMark[] = []
 
   for (const tier of tiers) {
-    const { cell } = LATTICE[tier]
+    const { cell } = lattice(tier)
 
     for (let cx = Math.floor(colMin / cell); cx <= Math.floor(colMax / cell); cx++) {
       for (let cy = Math.floor(rowMin / cell); cy <= Math.floor(rowMax / cell); cy++) {
@@ -911,10 +940,10 @@ export function variantOf(
 /**
  * §5.3 -- a hex's HP, scaled by the grade of ground it turned out to be.
  *
- * Mirrors WorldGen::tileHp(). The roll is the same 2,700-5,400 it always was;
- * what the grade decides is the rung that roll is measured at, so an Ironwood
- * Grove is four and two thirds times the work an ordinary forest is -- the
- * ratio between an Ironwood Axe and a Stone one.
+ * Mirrors WorldGen::tileHp(). The roll is hpMin..hpMax -- ten minutes to twenty
+ * at the common rung -- and what the grade decides is the rung that roll is
+ * measured at, so an Ironwood Grove is four and two thirds times the work an
+ * ordinary forest is: the ratio between an Ironwood Axe and a Stone one.
  *
  * Integer arithmetic, because a float multiplier would be two generators
  * rounding a repeating decimal and hoping (scripts/parity.ts).

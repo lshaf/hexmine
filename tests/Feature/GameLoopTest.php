@@ -13,12 +13,13 @@ use App\Game\Drops;
 use App\Game\Formulas;
 use App\Game\GameException;
 use App\Game\GameService;
-use App\Game\Hunts;
 use App\Game\Hash;
 use App\Game\HexGeometry;
+use App\Game\Hunts;
 use App\Game\Jobs;
 use App\Game\Monsters;
 use App\Game\Quests;
+use App\Game\Skills;
 use App\Game\Spoils;
 use App\Game\Tiles;
 use App\Game\Variants;
@@ -30,7 +31,6 @@ use App\Models\Character;
 use App\Models\CharacterBuff;
 use App\Models\CharacterItem;
 use App\Models\CharacterMaterial;
-use App\Game\Skills;
 use App\Models\CharacterSkillRank;
 use App\Models\GameJob;
 use App\Models\Player;
@@ -281,9 +281,30 @@ final class GameLoopTest extends TestCase
 
         // §8.0 -- an axe is on the belt, so the hex gives up what it holds.
         $result = $this->game->collectJob($this->character->fresh(), $job->id);
-        $this->assertGreaterThan(0, $result['gained']['wood']);
-        $this->assertArrayNotHasKey('branch', $result['gained']);
+        $this->assertNotEmpty($result['gained'], 'a worked hex gave up nothing');
         $this->assertSame(0, GameJob::count());
+
+        // §4.0 -- and the whole of what a tool buys: not one unit of scrap.
+        // This is the assertion the test exists for, and it is about every
+        // haul rather than about a lucky one.
+        $this->assertArrayNotHasKey('branch', $result['gained']);
+
+        // §5.3 -- what it does NOT promise is wood in this particular haul. A
+        // grade is what a hex MOSTLY carries, so a five-unit split across the
+        // seam, the herbs, the components and the critter can honestly come
+        // back without any. Asserting it on one roll passed for as long as the
+        // spawn hash happened to cooperate and failed the day the settlement
+        // lattice moved every character somewhere else.
+        //
+        // What the tool actually changes is the TABLE, so that is what is
+        // pinned: wood is on it, it is the heaviest thing on it, and the scrap
+        // the bare hand would have brought back is not on it at all.
+        $table = Drops::table(Drops::MINING, WorldGen::generateTile($col, $row, 0), 0);
+        arsort($table);
+
+        $this->assertArrayHasKey('wood', $table);
+        $this->assertArrayNotHasKey('branch', $table);
+        $this->assertSame('wood', array_key_first($table), 'the seam is not what this hex mostly gives up');
     }
 
     /**
@@ -669,17 +690,66 @@ final class GameLoopTest extends TestCase
 
     // ------------------------------------------------------------- drops §4
 
-    /** A tile of a known grade in a known biome, for exercising a table. */
+    /**
+     * A hex of one biome at one of §5.3's four grades, for exercising a table.
+     *
+     * It reads the SHIPPING map. The contested grade stands in the inner ring
+     * and nowhere else, and on the suite's small map (Balance::FIXTURE_MAP_RADIUS)
+     * that ring is barely two countries across -- so a biome can simply be
+     * absent from it, and the sweep fails on the map rather than on the code.
+     * Every caller here is a drop-table test that uses nothing about where the
+     * character is standing, so the swap costs them nothing.
+     *
+     * It walks COUNTRIES rather than hexes, and asks variantOf() rather than
+     * building a whole tile: a sweep of the real map looking for one contested
+     * mountain hex is a hundred million tiles.
+     */
     private function tileOfGrade(string $biome, int $grade): array
     {
+        if (Balance::mapRadius() !== Balance::SHIP_MAP_RADIUS) {
+            config(['game.map.radius' => Balance::SHIP_MAP_RADIUS]);
+            WorldGen::forget();
+        }
+
         $want = Variants::BIOME_VARIANTS[$biome][$grade]['key'];
+        $cell = Balance::BIOME_CELL;
         $radius = Balance::mapRadius();
 
-        for ($col = -$radius; $col <= $radius; $col += 1) {
-            for ($row = -$radius; $row <= $radius; $row += 1) {
-                $tile = WorldGen::generateTile($col, $row, 0);
-                if (($tile['variant'] ?? null) === $want) {
-                    return $tile;
+        // Out from the origin a country at a time. The contested grade is
+        // inner-ring, and the origin is the middle of the map, so the grade
+        // that is hardest to find is the one nearest the start of the walk.
+        for ($shell = 0; $shell * $cell <= $radius; $shell++) {
+            for ($cx = -$shell; $cx <= $shell; $cx++) {
+                for ($cy = -$shell; $cy <= $shell; $cy++) {
+                    if (max(abs($cx), abs($cy)) !== $shell) {
+                        continue;
+                    }
+
+                    $col0 = $cx * $cell;
+                    $row0 = $cy * $cell;
+                    if (abs($col0) + $cell > $radius || abs($row0) + $cell > $radius) {
+                        continue;
+                    }
+                    if (WorldGen::biomeOf($col0 + intdiv($cell, 2), $row0 + intdiv($cell, 2)) !== $biome) {
+                        continue;
+                    }
+
+                    for ($col = $col0; $col < $col0 + $cell; $col++) {
+                        for ($row = $row0; $row < $row0 + $cell; $row++) {
+                            if (WorldGen::biomeOf($col, $row) !== $biome) {
+                                continue;
+                            }
+                            $ring = WorldGen::ringOf($col, $row);
+                            if (WorldGen::variantOf($col, $row, $biome, $ring)['key'] !== $want) {
+                                continue;
+                            }
+
+                            $tile = WorldGen::generateTile($col, $row, 0);
+                            if (($tile['variant'] ?? null) === $want) {
+                                return $tile;
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -1021,9 +1091,16 @@ final class GameLoopTest extends TestCase
     {
         $radius = Balance::mapRadius();
 
+        // Both windows are measured in COUNTRIES, because that is the unit a
+        // settlement is one of (§6). They were forty columns by forty-one rows
+        // -- which is smaller than one country, so half the time the window
+        // inside the rim held nothing and the assertion below failed on the
+        // size of the box rather than on the bounds guard.
+        $band = Balance::BIOME_CELL * 5;
+
         $found = 0;
-        for ($col = $radius + 1; $col <= $radius + 40; $col++) {
-            for ($row = -20; $row <= 20; $row++) {
+        for ($col = $radius + 1; $col <= $radius + $band; $col++) {
+            for ($row = -$band; $row <= $band; $row++) {
                 if (WorldGen::settlementAt($col, $row) !== null) {
                     $found++;
                 }
@@ -1033,17 +1110,11 @@ final class GameLoopTest extends TestCase
         $this->assertSame(0, $found, 'the lattice placed settlements past the rim');
 
         // And the guard did not cost anything inside the map: the rim still
-        // carries the villages §6 puts there.
-        $inside = 0;
-        for ($col = $radius - 40; $col <= $radius; $col++) {
-            for ($row = -20; $row <= 20; $row++) {
-                if (WorldGen::settlementAt($col, $row) !== null) {
-                    $inside++;
-                }
-            }
-        }
+        // carries the villages §6 puts there. Walked on the lattice, since the
+        // window is now several countries across.
+        $inside = WorldGen::settlementsIn($radius - $band, $radius, -$band, $band);
 
-        $this->assertGreaterThan(0, $inside, 'the rim lost its settlements to the bounds guard');
+        $this->assertNotEmpty($inside, 'the rim lost its settlements to the bounds guard');
     }
 
     /**
@@ -2399,12 +2470,12 @@ final class GameLoopTest extends TestCase
      * §7.3 -- the HP range is calibrated once, and this is where that is written
      * down.
      *
-     * 2,700 is fifteen minutes for the common rung with nothing learned yet,
-     * and 5,400 is thirty. Nothing at runtime derives those seconds -- HP is
-     * the fact the world rolls -- so if the numbers are ever retuned it should
-     * have to argue with this test rather than drift quietly.
+     * 1,800 is TEN minutes for the common rung with nothing learned yet, and
+     * 3,600 is twenty. Nothing at runtime derives those seconds -- HP is the
+     * fact the world rolls -- so if the numbers are ever retuned it should have
+     * to argue with this test rather than drift quietly.
      */
-    public function test_the_hp_range_is_fifteen_to_thirty_minutes_at_the_common_rung(): void
+    public function test_the_hp_range_is_ten_to_twenty_minutes_at_the_common_rung(): void
     {
         $fresh = 1;
 
@@ -2415,8 +2486,8 @@ final class GameLoopTest extends TestCase
             Balance::TILE_HP_MAX, $fresh, Balance::MINING_COMMON_ATTACK,
         );
 
-        $this->assertSame(15 * 60, $easy['total']);
-        $this->assertSame(30 * 60, $hard['total']);
+        $this->assertSame(10 * 60, $easy['total']);
+        $this->assertSame(20 * 60, $hard['total']);
     }
 
     /**
@@ -2427,9 +2498,9 @@ final class GameLoopTest extends TestCase
      * decoration: an Ironwood Grove was the same afternoon's work as the plain
      * forest beside it. Every grade of ground now takes ITS rung exactly as
      * long as base ground takes the common one, which is the sentence this
-     * pins -- fifteen minutes to thirty, all the way up the ladder.
+     * pins -- ten minutes to twenty, all the way up the ladder.
      */
-    public function test_each_grade_of_ground_costs_its_own_rung_the_base_fifteen_to_thirty(): void
+    public function test_each_grade_of_ground_costs_its_own_rung_the_base_ten_to_twenty(): void
     {
         $fresh = 1;
 
@@ -2442,8 +2513,8 @@ final class GameLoopTest extends TestCase
                 Balance::MINING_COMMON_ATTACK,
             )['total'];
 
-            $this->assertGreaterThanOrEqual(15 * 60, $base);
-            $this->assertLessThanOrEqual(30 * 60, $base);
+            $this->assertGreaterThanOrEqual(10 * 60, $base);
+            $this->assertLessThanOrEqual(20 * 60, $base);
 
             foreach (Balance::TILE_HP_GRADE_ATTACK as $grade => $attack) {
                 $own = Formulas::mineTime(
@@ -4666,8 +4737,14 @@ final class GameLoopTest extends TestCase
      */
     public function test_travel_reaches_any_hex_on_the_map_however_far(): void
     {
+        // INWARD, not blindly east. A spawn sits near the rim (§5.4), so
+        // `col + 120` walked off the edge whenever that rim happened to be the
+        // eastern one -- and which rim a character spawns on moved the day the
+        // settlement lattice did. Toward the origin is on the map by
+        // construction, and just as far.
+        $col = (int) $this->character->col;
         $far = [
-            'col' => (int) $this->character->col + 120,
+            'col' => $col - (int) (120 * ($col <=> 0)),
             'row' => (int) $this->character->row,
         ];
 
@@ -5301,31 +5378,66 @@ final class GameLoopTest extends TestCase
 
     /** Walk the character to the village the spawn rule guarantees is in range. */
     /** @return array{col:int,row:int} */
+    /**
+     * A hex beside this one that can actually be worked, in the SAME country.
+     *
+     * Nobody lives on it, it is not a lake, and it carries a seam (§5.2 gives
+     * half the outer rim none). It used to ask only the first of those, which
+     * was fine while a settlement's neighbours were settlements or ordinary
+     * ground -- with at most one town to a country the hex next door is as
+     * likely to be water as anything else, and a caller that wanted somewhere
+     * to dig got a waterway and the refusal that goes with it.
+     *
+     * The biome test is the half that is easy to lose. Callers say "step off
+     * the town and work the ground" and then assert on what that ground gives
+     * up -- branches off a forest, §12 step 1 -- so a search that wandered into
+     * the grassland next door handed back chaff and failed on the drop table
+     * rather than on anything it was testing. The old version could not have
+     * this bug, because it only ever looked at the six touching hexes.
+     */
     private function openNeighbor(int $col, int $row): array
     {
-        foreach ([[1, 0], [0, 1], [-1, 0], [0, -1], [1, 1], [-1, -1]] as [$dc, $dr]) {
-            if (WorldGen::settlementAt($col + $dc, $row + $dr) === null) {
-                return ['col' => $col + $dc, 'row' => $row + $dr];
+        $biome = WorldGen::biomeOf($col, $row);
+
+        for ($ring = 1; $ring <= 8; $ring++) {
+            for ($dc = -$ring; $dc <= $ring; $dc++) {
+                for ($dr = -$ring; $dr <= $ring; $dr++) {
+                    if (max(abs($dc), abs($dr)) !== $ring) {
+                        continue;
+                    }
+
+                    $tile = WorldGen::generateTile($col + $dc, $row + $dr, 0);
+                    if ($tile['biome'] !== $biome
+                        || $tile['settlement'] !== null
+                        || $tile['water'] !== null
+                        || $tile['dungeon'] !== null
+                        || $tile['material'] === null) {
+                        continue;
+                    }
+
+                    return ['col' => $col + $dc, 'row' => $row + $dr];
+                }
             }
         }
 
-        $this->fail('a settlement completely surrounded by settlements');
+        $this->fail("no workable {$biome} hex anywhere around {$col},{$row}");
     }
 
     private function standAtWoodcuttingVillage(): array
     {
         $range = Balance::SPAWN_VILLAGE_RADIUS;
+        $col = (int) $this->character->col;
+        $row = (int) $this->character->row;
 
-        for ($dc = -$range; $dc <= $range; $dc++) {
-            for ($dr = -$range; $dr <= $range; $dr++) {
-                $s = WorldGen::settlementAt($this->character->col + $dc, $this->character->row + $dr);
-                if ($s && in_array('woodcutting', $s['lines'], true)) {
-                    $this->character->update(['col' => $s['col'], 'row' => $s['row']]);
-                    $this->character->refresh();
-
-                    return $s;
-                }
+        foreach (WorldGen::settlementsIn($col - $range, $col + $range, $row - $range, $row + $range) as $s) {
+            if (! in_array('woodcutting', $s['lines'], true)) {
+                continue;
             }
+
+            $this->character->update(['col' => $s['col'], 'row' => $s['row']]);
+            $this->character->refresh();
+
+            return $s;
         }
 
         $this->fail('spawn guarantee broken: no woodcutting village in spawn radius');
@@ -5545,6 +5657,16 @@ final class GameLoopTest extends TestCase
      */
     public function test_ten_lots_of_work_is_the_ceiling(): void
     {
+        // Eleven settlements running one line is a fact about a big world, and
+        // the suite's map is not one: at FIXTURE_MAP_RADIUS it holds twenty-odd
+        // settlements in total, of which eight run wood. The cap is what is
+        // under test and it is map-independent, so this reads the shipping map
+        // rather than pinning the suite's to a size it was not chosen for.
+        config(['game.map.radius' => Balance::SHIP_MAP_RADIUS]);
+        WorldGen::forget();
+        $this->character->update($this->game->pickSpawn(1));
+        $this->character->refresh();
+
         $this->standAtWoodcuttingVillage();
         $this->give(['wood' => 400]);
 
@@ -5580,22 +5702,49 @@ final class GameLoopTest extends TestCase
      *
      * @return list<array<string,mixed>>
      */
+    /**
+     * Settlements of any tier that run the wood line, nearest first.
+     *
+     * Walked on the lattice, because at most one town stands to a country (§6): a
+     * hex-by-hex scan out to a hundred is tens of thousands of tiles and finds
+     * a handful of settlements, which is the rare question asked of the common
+     * thing.
+     *
+     * @return list<array<string,mixed>>
+     */
     private function woodcuttingSettlements(int $want): array
     {
+        $col = (int) $this->character->col;
+        $row = (int) $this->character->row;
+        $edge = Balance::mapRadius();
         $found = [];
 
-        for ($radius = 0; $radius <= 100 && count($found) < $want; $radius++) {
-            for ($dc = -$radius; $dc <= $radius; $dc++) {
-                for ($dr = -$radius; $dr <= $radius; $dr++) {
-                    $s = WorldGen::settlementAt((int) $this->character->col + $dc, (int) $this->character->row + $dr);
-                    if ($s && in_array('woodcutting', $s['lines'], true)) {
-                        $found[$s['id']] = $s;
-                    }
+        for ($reach = Balance::BIOME_CELL * 2; ; $reach *= 2) {
+            $reach = min($reach, $edge * 2);
+
+            foreach (WorldGen::settlementsIn(
+                max(-$edge, $col - $reach),
+                min($edge, $col + $reach),
+                max(-$edge, $row - $reach),
+                min($edge, $row + $reach),
+            ) as $s) {
+                if (in_array('woodcutting', $s['lines'], true)) {
+                    $found[$s['id']] = $s;
                 }
+            }
+
+            if (count($found) >= $want || $reach >= $edge * 2) {
+                break;
             }
         }
 
         $this->assertGreaterThanOrEqual($want, count($found), 'not enough woodcutting settlements to test the ceiling');
+
+        usort(
+            $found,
+            fn (array $a, array $b) => HexGeometry::distance($col, $row, $a['col'], $a['row'])
+                <=> HexGeometry::distance($col, $row, $b['col'], $b['row']),
+        );
 
         return array_slice(array_values($found), 0, $want);
     }
@@ -5608,14 +5757,26 @@ final class GameLoopTest extends TestCase
      */
     private function anotherWoodcuttingSettlement(array $not): array
     {
-        for ($radius = 1; $radius <= 40; $radius++) {
-            for ($dc = -$radius; $dc <= $radius; $dc++) {
-                for ($dr = -$radius; $dr <= $radius; $dr++) {
-                    $s = WorldGen::settlementAt((int) $not['col'] + $dc, (int) $not['row'] + $dr);
-                    if ($s && $s['id'] !== $not['id'] && in_array('woodcutting', $s['lines'], true)) {
-                        return $s;
-                    }
+        $col = (int) $not['col'];
+        $row = (int) $not['row'];
+        $edge = Balance::mapRadius();
+
+        for ($reach = Balance::BIOME_CELL * 2; ; $reach *= 2) {
+            $reach = min($reach, $edge * 2);
+
+            foreach (WorldGen::settlementsIn(
+                max(-$edge, $col - $reach),
+                min($edge, $col + $reach),
+                max(-$edge, $row - $reach),
+                min($edge, $row + $reach),
+            ) as $s) {
+                if ($s['id'] !== $not['id'] && in_array('woodcutting', $s['lines'], true)) {
+                    return $s;
                 }
+            }
+
+            if ($reach >= $edge * 2) {
+                break;
             }
         }
 
@@ -6307,11 +6468,17 @@ final class GameLoopTest extends TestCase
             Formulas::resaleValue($def, $def['maxDurability']),
         );
 
-        // Half worn, so half of half.
-        $item->durability = (int) ($def['maxDurability'] / 2);
+        // Half worn, so half of half -- measured against THIS COPY's ceiling
+        // and not the recipe's (§8.2). A bought piece is rolled a quality
+        // (§8.0.2), so its max is a few per cent either side of the catalog's,
+        // and halving the catalog figure leaves a copy that is not half worn.
+        // The sale reads the object, so an expectation read off the catalog
+        // disagreed with it by a coin whenever the roll came in high enough.
+        $max = (int) ($item->max_durability ?: $def['maxDurability']);
+        $item->durability = intdiv($max, 2);
         $item->save();
 
-        $expected = Formulas::resaleValue($def, (int) $item->durability);
+        $expected = Formulas::resaleValue($def, (int) $item->durability, $max);
         $this->assertGreaterThan(0, $expected);
 
         $sale = $this->game->sellItem($this->character->fresh(), $item->id);

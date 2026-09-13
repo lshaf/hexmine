@@ -81,7 +81,7 @@ const kind = (job: BenchJob) => (job.kind === 'craft' ? 'Bench' : 'Processing li
  * They belong on the same page because they are the same question asked a step
  * apart: this panel plans a route, and a recipe you cannot afford yet plans a
  * gather. It is also the one screen the slate has to be readable from, since
- * being four days from a bench is exactly when a shopping list is worth having.
+ * being half a map from a bench is exactly when a shopping list is worth having.
  *
  * The shortfall is worked out here rather than stored (§8.4), because the bag
  * moves with every haul and a written-down answer would be stale by the time

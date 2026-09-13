@@ -108,9 +108,13 @@ class RebuildWorld extends Command
             }
         });
 
+        // No tile count: depletion stopped being a table and became cache
+        // (Game\Tiles), and the flush above has no number to report. The
+        // sprintf still asked for one, so the command did all of its work and
+        // then died on its own summary -- which is the worst place to fail,
+        // because the operator is told nothing happened when everything did.
         $this->info(sprintf(
-            'Cleared %d tile state(s), abandoned %d job(s), re-placed %d character(s).',
-            $tiles,
+            'Abandoned %d job(s), re-placed %d character(s).',
             $jobs,
             count($moves),
         ));

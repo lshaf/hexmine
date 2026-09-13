@@ -669,7 +669,7 @@ export interface FieldJob {
  *
  * Both kinds carry where they are, because a claim now needs you standing at
  * the bench that holds it: "ready" on its own would be a cruel word for
- * something waiting four days' walk away.
+ * something waiting half a map away.
  */
 export interface BenchJob {
   id: string
@@ -887,7 +887,7 @@ export interface Tile {
    * only one that looks like ordinary country. A lake and a town announce
    * themselves; this wears the biome's own colour on purpose, so that finding
    * workable ground is something you do by walking rather than by reading the
-   * map from four days away.
+   * map from the far side of it.
    */
   dead: boolean
   /** §7.3 -- how much work this hex is. The world rolls HP and nothing else. */

@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Game\Balance;
 use App\Game\Catalog;
 use App\Game\Drops;
 use App\Game\GameException;
 use App\Game\GameService;
 use App\Game\HexGeometry;
 use App\Game\Hunts;
-use App\Game\Packs;
 use App\Game\WorldGen;
 use App\Models\Character;
 use App\Models\CharacterItem;
@@ -353,28 +353,45 @@ final class HuntTest extends TestCase
         // Asked through the service rather than off `generateTile(.., 0)`: a
         // pack is bucketed on the CURRENT clock, so a hex that carries one at
         // time zero need not carry one now.
-        for ($i = 0; $i < 3000; $i++) {
-            $col = ($i * 7919) % 400 - 200;
-            $row = ($i * 104729) % 400 - 200;
+        //
+        // A sweep on two coprime strides, and it has to be a real one. This
+        // used to walk `(i * 7919) % 400` against `(i * 104729) % 400` for
+        // three thousand steps -- both of period 400, so the pair advanced in
+        // lockstep down a single line of the torus and visited FOUR HUNDRED
+        // distinct hexes, seven and a half times each. A hex carrying both a
+        // pack and an animal is about one in a hundred and fifty, so it skipped
+        // whenever that one line held none, which is often.
+        //
+        // It never failed, it just quietly stopped testing -- and the skip used
+        // to heal itself, back when GAME_TIME_SCALE was 10 and a pack bucket
+        // was twelve minutes. At scale 1 a bucket is two hours, so the same
+        // line of hexes answers the same way all morning.
+        //
+        // The sweep finds eleven to twenty-two of them across a bucket, which
+        // is what makes a miss a FAILURE rather than a shrug.
+        $edge = Balance::mapRadius();
 
-            $character->update(['col' => $col, 'row' => $row]);
-            $fresh = $character->fresh();
+        for ($col = -$edge; $col <= $edge; $col += 7) {
+            foreach (range(-$edge, $edge, 11) as $row) {
+                $character->update(['col' => $col, 'row' => $row]);
+                $fresh = $character->fresh();
 
-            if ($this->game->huntHere($fresh) === null || $this->game->packHere($fresh) === null) {
-                continue;
+                if ($this->game->huntHere($fresh) === null || $this->game->packHere($fresh) === null) {
+                    continue;
+                }
+
+                $preview = $this->game->previewTile($fresh, $col, $row, Drops::HUNTING);
+
+                $this->assertFalse($preview['canMine'], 'hunted a hex with a pack on it');
+                $this->assertTrue($preview['pinned']);
+                // And it still describes the ANIMAL, not the seam underneath.
+                $this->assertNotNull($preview['animal']);
+
+                return;
             }
-
-            $preview = $this->game->previewTile($fresh, $col, $row, Drops::HUNTING);
-
-            $this->assertFalse($preview['canMine'], 'hunted a hex with a pack on it');
-            $this->assertTrue($preview['pinned']);
-            // And it still describes the ANIMAL, not the seam underneath.
-            $this->assertNotNull($preview['animal']);
-
-            return;
         }
 
-        $this->markTestSkipped('found no hex with both a pack and an animal');
+        $this->fail('found no hex with both a pack and an animal in a sweep of the map');
     }
 
     // ------------------------------------------------------------------ helpers

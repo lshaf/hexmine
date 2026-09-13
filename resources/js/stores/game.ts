@@ -43,8 +43,23 @@ import type {
   Tile,
   TravelState,
 } from '@/game/types'
-import { configureWorld, generateTile, inBounds, worldParams } from '@/game/worldgen'
-import { hexDistance, visibleTiles } from '@/map/hexGeometry'
+import {
+  configureWorld,
+  generateTile,
+  inBounds,
+  isWorldConfigured,
+  worldParams,
+} from '@/game/worldgen'
+import {
+  COL_STEP,
+  ROW_STEP,
+  MAP_PX_CHART,
+  MAP_PX_DEFAULT,
+  MAP_PX_MAX,
+  hexDistance,
+  mapPxMin,
+  visibleTiles,
+} from '@/map/hexGeometry'
 
 /** Which overlay is open over the map, if any. */
 export type PanelKey =
@@ -52,7 +67,6 @@ export type PanelKey =
   | 'craft'
   | 'shop'
   | 'hero'
-  | 'atlas'
   | 'skills'
   | 'quests'
   // §8.4 -- what is on a bench somewhere, and which bench.
@@ -137,7 +151,15 @@ export const useGame = defineStore('game', () => {
    * Out there the map shows what the seed says and no more: the lie of the
    * land, and whether anybody lives on it.
    */
-  const view = ref({ col: 0, row: 0, w: 900, h: 620 })
+  /**
+   * The camera: where it is, how much room it has, and how close it is.
+   *
+   * `px` is PIXELS PER HEX COLUMN, which is the one unit that means the same
+   * thing to both renderers (§13.2). COL_STEP is what the board is drawn at, so
+   * `px === COL_STEP` is the scale the map has always had and everything else
+   * is read against it.
+   */
+  const view = ref({ col: 0, row: 0, w: 900, h: 620, px: MAP_PX_DEFAULT })
 
   const mutations = ref<MapMutations>({
     depleted: [],
@@ -187,8 +209,13 @@ export const useGame = defineStore('game', () => {
    */
   const nextTileChange = ref(Number.POSITIVE_INFINITY)
 
-  function rebuildTiles(): void {
-    const { col, row, w, h } = view.value
+  /**
+   * The server's half of the map, indexed by hex.
+   *
+   * Hoisted out of the sweep so ONE tile can be built without building the
+   * whole window around it -- see buildTile below.
+   */
+  const mutationIndex = computed(() => {
     const depleted = new Map(mutations.value.depleted.map(([c, r, at]) => [key(c, r), at]))
     const occupied = new Map(
       mutations.value.occupied.map(([c, r, bodies, seats]) => [key(c, r), { bodies, seats }]),
@@ -210,26 +237,57 @@ export const useGame = defineStore('game', () => {
       (mutations.value.guildLands ?? []).map((land) => [key(land.col, land.row), land]),
     )
 
-    const built: Tile[] = []
-    for (const coord of visibleTiles(col, row, w, h)) {
-      // §5.1 -- the map ends, and the render must end with it. visibleTiles()
-      // returns a rectangle around the camera without knowing where the edge
-      // is, so tiles past it used to be generated and drawn: terrain outside
-      // the world, on ground travelTo() would refuse to walk to.
-      if (!inBounds(coord.col, coord.row)) continue
+    return { depleted, occupied, cleared, hunted, roaming, guildLands }
+  })
 
-      const k = key(coord.col, coord.row)
-      built.push(
-        generateTile(coord.col, coord.row, now.value, {
-          regrowsAt: depleted.get(k) ?? 0,
-          slotsUsed: occupied.get(k)?.seats ?? 0,
-          workers: occupied.get(k)?.bodies ?? 0,
-          packCleared: cleared.has(k),
-          huntCleared: hunted.has(k),
-          roaming: roaming.get(k),
-          guildLand: guildLands.get(k),
-        }),
-      )
+  /**
+   * One hex, generated rather than looked up.
+   *
+   * §5 -- terrain is a pure function of (col, row, seed), so a hex does not
+   * have to be on screen to be described. That matters at the far end of the
+   * zoom (§13.2): the board is not drawn out there, so the visible list is
+   * empty, and a tap on the chart would otherwise select a hex the store could
+   * say nothing about -- the card read "Unsurveyed" over ordinary forest,
+   * which is the one thing §5.6 says the fog does not withhold.
+   */
+  function buildTile(col: number, row: number): Tile | undefined {
+    // §5.1 -- the map ends, and the render must end with it. visibleTiles()
+    // returns a rectangle around the camera without knowing where the edge is,
+    // so tiles past it used to be generated and drawn: terrain outside the
+    // world, on ground travelTo() would refuse to walk to.
+    if (!inBounds(col, row)) return undefined
+
+    const m = mutationIndex.value
+    const k = key(col, row)
+
+    return generateTile(col, row, now.value, {
+      regrowsAt: m.depleted.get(k) ?? 0,
+      slotsUsed: m.occupied.get(k)?.seats ?? 0,
+      workers: m.occupied.get(k)?.bodies ?? 0,
+      packCleared: m.cleared.has(k),
+      huntCleared: m.hunted.has(k),
+      roaming: m.roaming.get(k),
+      guildLand: m.guildLands.get(k),
+    })
+  }
+
+  function rebuildTiles(): void {
+    const { col, row, w, h, px } = view.value
+
+    // §13.2 -- below the handover the board is not drawn at all, so generating
+    // its tiles would be several thousand objects a frame for a renderer that
+    // never looks at them. The chart reads the seed directly.
+    if (px < MAP_PX_CHART) {
+      tiles.value = []
+
+      return
+    }
+
+    const scale = px / COL_STEP
+    const built: Tile[] = []
+    for (const coord of visibleTiles(col, row, w / scale, h / scale)) {
+      const tile = buildTile(coord.col, coord.row)
+      if (tile) built.push(tile)
     }
     tiles.value = built
 
@@ -261,21 +319,127 @@ export const useGame = defineStore('game', () => {
    * render rather than as an edge.
    */
   function setView(col: number, row: number): void {
-    const { radius } = worldParams()
-    view.value = {
-      ...view.value,
-      col: Math.max(-radius, Math.min(radius, col)),
-      row: Math.max(-radius, Math.min(radius, row)),
-    }
+    view.value = { ...view.value, ...clampView(col, row, view.value.px) }
     rebuildTiles()
+  }
+
+  /**
+   * Keep the window full of world.
+   *
+   * §5.1 clamps the camera to the map, which is enough while the window is a
+   * few hexes across -- but the zoom goes out until the whole world fits, and a
+   * camera merely on the map can still sit at a corner with three quarters of
+   * the screen showing nothing. A sheet framed against a void is a sheet you
+   * have to fight to read.
+   *
+   * So the clamp is the edge less HALF A WINDOW, in whatever the window is
+   * worth at this scale -- and once the world is narrower than the window there
+   * is no choice left to make, so it simply sits centerd. At the scale the
+   * board is played at this is a couple of hexes of slack and changes nothing;
+   * it only bites where it is needed.
+   */
+  function clampView(col: number, row: number, px: number): { col: number; row: number } {
+    const { radius, size } = worldParams()
+    const halfCols = view.value.w / 2 / px
+    const halfRows = view.value.h / 2 / (px * (ROW_STEP / COL_STEP))
+    const hold = (v: number, half: number) =>
+      half * 2 >= size ? 0 : Math.round(Math.max(half - radius, Math.min(radius - half, v)))
+
+    return { col: hold(col, halfCols), row: hold(row, halfRows) }
   }
 
   /** The map reports how much room it has. Also local. */
   function setViewport(w: number, h: number): void {
     if (Math.abs(w - view.value.w) < 1 && Math.abs(h - view.value.h) < 1) return
-    view.value = { ...view.value, w, h }
+
+    // The far end of the zoom is "the whole world across this viewport", so a
+    // narrower window moves the floor and can leave the camera standing under
+    // it -- a phone rotating to portrait, or a panel opening beside the map.
+    const px = Math.max(mapPxMin(worldParams().size, w), view.value.px)
+
+    view.value = { ...view.value, w, h, px }
+    view.value = { ...view.value, ...clampView(view.value.col, view.value.row, px) }
     rebuildTiles()
   }
+
+  /**
+   * How close the camera is, in pixels per hex column.
+   *
+   * Clamped at both ends and nowhere else: the near end is a board you could
+   * count the grain on, and the far end is the whole world edge to edge, which
+   * is what replaced the atlas. Everything between is continuous, because a
+   * viewBox scales continuously and a ladder of named steps would be a second
+   * vocabulary for a thing the map already does smoothly.
+   */
+  function setScale(px: number): void {
+    const floor = mapPxMin(worldParams().size, view.value.w)
+    const next = Math.max(floor, Math.min(MAP_PX_MAX, px))
+    if (Math.abs(next - view.value.px) < 1e-4) return
+
+    // Pulling back at the edge of the world has to pull the camera in with it,
+    // or the last notch of the zoom frames half a screen of nothing.
+    view.value = { ...view.value, px: next, ...clampView(view.value.col, view.value.row, next) }
+    rebuildTiles()
+  }
+
+  /**
+   * One press of the zoom, and there are two of them.
+   *
+   * The ladder runs from a board you can count the grain on to the whole world
+   * in one window -- on a phone a factor of about twelve hundred. No single
+   * ratio serves that: fine enough for the board and it takes thirty-four
+   * presses to cross, coarse enough to cross and the board is one press wide.
+   *
+   * So the step is the regime's. On the board a press is "a bit further" and
+   * the useful range is a dozen-fold; on the chart a press is "much further"
+   * and the range is hundreds. Six presses across each, thirteen end to end.
+   * Both are coarser than a wheel notch, which is the other half of the same
+   * argument: a wheel is a nudge at a view you are already looking at, a press
+   * is a decision to go somewhere else.
+   */
+  const ZOOM_NOTCH_BOARD = 1.5
+
+  const ZOOM_NOTCH_CHART = 2.5
+
+  function zoomBy(steps: number): void {
+    const px = view.value.px
+    const charted = px < MAP_PX_CHART
+    const next = px * (charted ? ZOOM_NOTCH_CHART : ZOOM_NOTCH_BOARD) ** steps
+
+    // The handover is a DETENT: a press that would cross it stops on it
+    // instead, so the board's widest view is somewhere you land rather than
+    // somewhere you pass through -- and a press out followed by a press back
+    // returns you where you were rather than overshooting by the difference
+    // between the two ratios.
+    //
+    // It catches you ONCE. Standing on the detent already, the next press goes
+    // through: a stop that re-arms itself every time is not a detent, it is a
+    // wall, and the camera simply could not reach the chart.
+    const crossing = charted !== next < MAP_PX_CHART
+    setScale(crossing && px !== MAP_PX_CHART ? MAP_PX_CHART : next)
+  }
+
+  /*
+   * Whether there is anywhere left to go, so a cell that cannot do anything
+   * says so rather than swallowing the press. The far end depends on the
+   * viewport, since it is "the whole world across this window".
+   */
+  const canZoomIn = computed(() => view.value.px < MAP_PX_MAX - 1e-4)
+  const canZoomOut = computed(
+    () => view.value.px > mapPxMin(worldParams().size, view.value.w) + 1e-4,
+  )
+
+  /** §13.2 -- which renderer the camera is over: the board, or the chart. */
+  const charting = computed(() => view.value.px < MAP_PX_CHART)
+
+  /**
+   * §5.1 -- how far the world runs from the middle out.
+   *
+   * Published because the map is a deployment setting rather than a constant
+   * (config/game.php), so anything that has to say where the edge is -- the
+   * coordinate jump, for one -- has to ask rather than assume.
+   */
+  const mapRadius = computed(() => (isWorldConfigured() ? worldParams().radius : 0))
 
   function centerOnCharacter(): void {
     // §5.6 -- where the walker IS, not where they set off from. `here` is
@@ -421,8 +585,16 @@ export const useGame = defineStore('game', () => {
     )
   }
 
+  /**
+   * The tile at a hex: the drawn one if it is on screen, generated if it is not.
+   *
+   * The list is what the board is rendering, so a lookup answers fastest and
+   * keeps one object per hex for the common case. The fallback is what makes
+   * "any hex can be pointed at" (§5.6) true at every scale rather than only
+   * where the board happens to be drawn.
+   */
   const tileAt = (col: number, row: number): Tile | undefined =>
-    tiles.value.find((t) => t.col === col && t.row === row)
+    tiles.value.find((t) => t.col === col && t.row === row) ?? buildTile(col, row)
 
   // -------------------------------------------------------------- derived
 
@@ -644,7 +816,7 @@ export const useGame = defineStore('game', () => {
    * Finished AND under your feet, which is the only kind you can take (§8.4).
    *
    * Two numbers rather than one, because they say different things: the first
-   * is news, the second is a thing to tap. A cell that lit for work four days'
+   * is news, the second is a thing to tap. A cell that lit for work half a map
    * walk away would be crying wolf every time.
    */
   const benchHere = computed(
@@ -1402,7 +1574,8 @@ export const useGame = defineStore('game', () => {
     // helpers
     tileAt, held, note,
     // actions
-    boot, setView, setViewport, centerOnCharacter, refreshMutations, refreshState,
+    boot, setView, setViewport, setScale, zoomBy, canZoomIn, canZoomOut, charting, mapRadius,
+    centerOnCharacter, refreshMutations, refreshState,
     select, clearSelection,
     haul, clearHaul, battle, fight, clearBattle, carriers,
     liveBattle, finishLiveBattle,

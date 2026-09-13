@@ -22,7 +22,6 @@ export const ACTION_PATHS: Record<string, string> = {
   drop: 'M12 3v10 M8 9.5 12 13.5 16 9.5 M4 19h16',
   bag: 'M4 8h16l-1.2 12H5.2Z M8.5 8V6a3.5 3.5 0 0 1 7 0v2',
   hero: 'M12 4.5 19 8v5c0 4-3 6.4-7 7.5-4-1.1-7-3.5-7-7.5V8Z M9.5 12l1.8 1.8 3.4-3.6',
-  atlas: 'M3 6.5 9 4l6 2.5L21 4v13.5L15 20l-6-2.5L3 20Z M9 4v13.5 M15 6.5V20',
   recenter: 'M12 5a7 7 0 1 0 0 14 7 7 0 0 0 0-14 M12 2v3 M12 19v3 M2 12h3 M19 12h3',
   /*
    * The rest of the screens, §13.3.
@@ -41,6 +40,18 @@ export const ACTION_PATHS: Record<string, string> = {
   zoomIn: 'M6 12h12 M6 10.4v3.2 M18 10.4v3.2 M12 6v12',
   zoomOut: 'M6 12h12 M6 10.4v3.2 M18 10.4v3.2',
   locate: 'M7 12 9.5 7.7h5L17 12l-2.5 4.3h-5Z M12 2.6v2.8 M12 18.6v2.8 M2.6 12h2.8 M18.6 12h2.8',
+  /*
+   * §5.1 -- take the camera to a hex you name.
+   *
+   * An arrow INTO the map's own shape, and it has to be that rather than
+   * another marker: it sits one cell from `recenter`, which is a ring with
+   * crosshair ticks, and a hexagon with crosshair ticks beside it read as the
+   * same glyph twice at 46px. §13.2 makes exactly this argument about the
+   * settlement tiers -- tell them apart by shape CATEGORY, not by what is
+   * inside the shape. One is a ring closing on you; this is a line arriving
+   * somewhere else.
+   */
+  goto: 'M13.5 4.5 19.5 8v7l-6 3.5-6-3.5V8Z M2 11.5h5 M4.4 9.1 6.8 11.5 4.4 13.9',
   close: 'M6 6l12 12 M18 6 6 18',
   // §2 -- the way out. A door you are already through, not a cross: closing a
   // panel and ending the session are not the same gesture and must not share a

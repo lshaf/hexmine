@@ -18,7 +18,9 @@ namespace App\Game;
  */
 final class Balance
 {
-    public const MINUTE = 60_000;
+    public const SECOND = 1_000;
+
+    public const MINUTE = 60 * self::SECOND;
 
     public const HOUR = 60 * self::MINUTE;
 
@@ -28,22 +30,54 @@ final class Balance
      * §5.1 -- the map is measured from the middle out, and (0,0) is the middle.
      *
      * One radius, because the map is square and always has been. A radius of
-     * 200 means every column and every row from -200 to 200 inclusive, so the
-     * grid is 401 a side. Signed coordinates are what make the ring maths honest:
-     * a ring is a distance from the origin rather than from an arbitrary point
-     * halfway along an unsigned axis, and the dead center of the world is the
-     * one coordinate you never have to look up.
+     * 5000 means every column and every row from -5000 to 5000 inclusive, so
+     * the grid is 10001 a side -- 5000 of ground in each direction from the
+     * origin, which is the quarter the world is measured in.
+     *
+     * Signed coordinates are what make the ring maths honest: a ring is a
+     * distance from the origin rather than from an arbitrary point halfway
+     * along an unsigned axis, and the dead center of the world is the one
+     * coordinate you never have to look up.
      *
      * Read from config/game.php, so the size and the seed of the world are
      * deployment settings rather than a code edit. Methods and not constants
-     * for exactly that reason -- a const cannot ask config() anything.
-     *
-     * Ship value: 2500, for the 5000x5000 of §5.
+     * for exactly that reason -- a const cannot ask config() anything. What the
+     * config defaults TO is a const, self::SHIP_MAP_RADIUS, so the shipping map
+     * has a name the tests can hold something up against.
      */
     public static function mapRadius(): int
     {
-        return self::$mapRadius ??= max(1, (int) config('game.map.radius', 200));
+        return self::$mapRadius ??= max(1, (int) config('game.map.radius', self::SHIP_MAP_RADIUS));
     }
+
+    /**
+     * The map the game actually ships on, and config/game.php's default.
+     *
+     * Written here rather than only in the config because two things have to be
+     * able to name it: the deployment, and the handful of tests that check a
+     * promise the design makes about the SHIPPING world rather than about
+     * generation in the abstract -- the per-ring share of workable ground is
+     * the one that matters (§5.2), since BARREN_THRESHOLD is calibrated against
+     * this map and no other.
+     */
+    public const SHIP_MAP_RADIUS = 5000;
+
+    /**
+     * The radius the frozen world fixture and the test suite both run at.
+     *
+     * Generation is scale-RELATIVE: every ring boundary is a fraction of the
+     * map radius and every lattice is an absolute hex count, so a small map
+     * exercises the same code paths as the shipping one. What it does not
+     * exercise is the clock -- a stride-2 sweep of the real map is 25 million
+     * tiles, which is an hour and a half of a test that used to take seconds.
+     *
+     * So the suite runs here and the fixture is frozen here, and both read this
+     * one number: tests/TestCase.php installs it, and the fixture command
+     * forces it, so a fixture regenerated from a developer's own .env cannot
+     * quietly describe a different world from the one the tests check it
+     * against.
+     */
+    public const FIXTURE_MAP_RADIUS = 200;
 
     /** Tiles per axis, both ends included. Derived -- never configure this. */
     public static function mapSize(): int
@@ -93,10 +127,38 @@ final class Balance
         self::$mapSeed = null;
     }
 
-    /** Biome lattice, §5.3. Cell size in tiles, and cells per coherent region. */
-    public const BIOME_CELL = 9;
+    /**
+     * Biome lattice, §5.3. Cell size in tiles, and cells per coherent region.
+     *
+     * It is ALSO the settlement lattice: WorldGen::LATTICE reads this for every
+     * tier's cell, so one biome cell holds exactly one settlement site. That is
+     * a structural fact rather than two numbers that happen to agree -- §6
+     * wants a settlement per country, and a country is what this cell draws.
+     */
+    public const BIOME_CELL = 50;
 
     public const BIOME_REGION_CELLS = 5;
+
+    /**
+     * §6 -- what share of countries have anybody living in them.
+     *
+     * The settlement lattice is the biome lattice (BIOME_CELL), so a country
+     * carries at most one settlement; this is whether it carries any. One share
+     * for all three tiers, because which tier a site turns out to be is decided
+     * by the ring it lands in and not by a lattice of its own.
+     *
+     * A HALF rather than all of them. With every cell filled, "is there a bench
+     * in this country" had one answer everywhere and stopped being a question
+     * worth asking -- and a map where the answer is always yes is a map with
+     * nothing to find out. At a half, a country with a bench and a country
+     * without are both ordinary, and which one you are standing in is a fact
+     * about the place.
+     *
+     * It sets the density of the whole settled world, so it is what to move if
+     * the map ever feels crowded or empty. The gap floors (§6.0) do not: with
+     * one town to a country the count is the cell's and the share's.
+     */
+    public const SETTLED_COUNTRY_SHARE = 0.5;
 
     /** Normalised radius boundaries for the ring layout, §5.2. */
     public const RING_CENTER = 0.08;
@@ -141,12 +203,19 @@ final class Balance
      *
      * Recalibrate with scripts/calibrate_barren.php if a share or the map seed
      * moves. The test is what actually holds the shares honest.
+     *
+     * These are calibrated against the SHIPPING map, which is what the shares
+     * are a promise about. The suite runs on a small one
+     * (Balance::FIXTURE_MAP_RADIUS) and checks the same numbers there, which
+     * works because the field is stationary noise and the ring boundaries are
+     * fractions of the radius -- what the two maps disagree about is only how
+     * much ground the water and the towns have taken, and that is under a point.
      */
     public const BARREN_THRESHOLD = [
-        'outer' => 0.4896,
-        'mid' => 0.4141,
-        'inner' => 0.3659,
-        'center' => 0.2733,
+        'outer' => 0.4940,
+        'mid' => 0.4284,
+        'inner' => 0.3656,
+        'center' => 0.3312,
     ];
 
     /**
@@ -159,8 +228,8 @@ final class Balance
      *
      * Large regions are safe here for a reason particular to this map: dead
      * ground is TERRAIN, so §5.6 draws it at any distance through the fog. A
-     * waste you can see from four days away is a route to plan around, not a
-     * trap to walk into.
+     * waste you can see from the far side of the map is a route to plan around,
+     * not a trap to walk into.
      */
     public const BARREN_CELL = 5;
 
@@ -175,10 +244,15 @@ final class Balance
      * in between them waiting to drift. HP is the fact. How long it takes you
      * is `hp / rate`, and it is nobody's business but the character's.
      *
-     * Calibrated once, here, and then left alone: 2,700 is fifteen minutes for
+     * Calibrated once, here, and then left alone: 1,800 is TEN minutes for
      * somebody holding the common rung (attack 3) with nothing learned yet, and
-     * 5,400 is thirty. That is the whole of what the numbers mean and the only
+     * 3,600 is twenty. That is the whole of what the numbers mean and the only
      * reason they are these numbers -- there is a test pinning it.
+     *
+     * It was 2,700-5,400, which was fifteen to thirty. The band kept its shape
+     * (the top is still twice the bottom) and every grade of ground still takes
+     * its own rung exactly as long as base ground takes the common one -- what
+     * moved is how long that is.
      */
     /**
      * Every solid number in the game is quoted at this scale.
@@ -203,9 +277,9 @@ final class Balance
      */
     public const SOLID_SCALE = 100;
 
-    public const TILE_HP_MIN = 270000;
+    public const TILE_HP_MIN = 180000;
 
-    public const TILE_HP_MAX = 540000;
+    public const TILE_HP_MAX = 360000;
 
     /**
      * §5.3 -- what a grade of ground costs, as the rung it is named for.
@@ -218,7 +292,7 @@ final class Balance
      * These are the attacks of the gathering tools each grade is named for, and
      * a hex's HP is scaled by its own over the common rung's. So every grade of
      * ground takes ITS rung exactly as long as base ground takes the common
-     * one -- fifteen minutes to thirty, all the way up.
+     * one -- ten minutes to twenty, all the way up.
      *
      * Gold per hour comes out flat across the four, because the price ladder
      * (2-3g / 4-5g / 7-9g) and this one are the same ladder. That is the
@@ -241,8 +315,8 @@ final class Balance
      *
      * It used to be fifteen minutes and it used to bind, which made the top of
      * the tool ladder wasted ground: past a certain rung every hex took exactly
-     * as long as it had before. Fifteen minutes is where the common rung lands
-     * now, not where the game stops.
+     * as long as it had before. Ten minutes is where the common rung lands now,
+     * not where the game stops.
      *
      * One minute rather than three, because the tool IS the rate: with no flat
      * base underneath it a Mythril Pickaxe works six times faster than a Stone
@@ -266,9 +340,9 @@ final class Balance
      * number was the floor every verb stood on -- shared by hands and tool
      * alike, so it could sit above the common rung without meaning anything.
      * Now that it is gathering's whole rate it competes with the tool ladder
-     * directly, and at four it BEAT it: bare hands worked a hex in twelve
-     * minutes against a Stone Axe's fifteen, which made §12's step 5 -- buy the
-     * axe, work the same hex, see the payoff -- a hex that got slower.
+     * directly, and at four it BEAT it: bare hands worked a hex in seven and a
+     * half minutes against a Stone Axe's ten, which made §12's step 5 -- buy
+     * the axe, work the same hex, see the payoff -- a hex that got slower.
      */
     public const BARE_HAND_ATTACK = 300;
 
@@ -595,7 +669,6 @@ final class Balance
     /** §9.5.4 -- a battle job's level is worth this fraction of itself, in both halves. */
     public const BATTLE_JOB_DIVISOR = 3;
 
-
     public const WEAR_PER_GAP = 0.4;
 
     public const WEAR_PER_EXCESS = 0.4;
@@ -617,11 +690,20 @@ final class Balance
     /**
      * §9.5.7 -- how far a death looks for a roof.
      *
-     * Villages sit on an 8-hex lattice (§6.0) and cities on an 11, so anything
-     * short of the barren center finds one well inside this. It is a search
-     * bound rather than a rule: past it there is genuinely nowhere to wake.
+     * SIX COUNTRIES. Half of them are settled (SETTLED_COUNTRY_SHARE), so the
+     * nearest roof is a couple of countries off on average and occasionally
+     * several -- and this has to cover the tail rather than the average, because
+     * the failure is not a long walk, it is `wokeAt` coming back null and
+     * "nowhere to wake up" is not one of the outcomes §9.5.7 describes.
+     *
+     * It was 24 flat, from when villages sat eight hexes apart. At three
+     * countries it was already leaving about one hex in four hundred with no
+     * roof at all; at six, a sweep of the shipping map finds none.
+     *
+     * It is a search bound rather than a rule: past it there is genuinely
+     * nowhere to wake, and the walk back is the first bill either way.
      */
-    public const DEATH_WAKE_RADIUS = 24;
+    public const DEATH_WAKE_RADIUS = self::BIOME_CELL * 6;
 
     /**
      * §9.5.7 -- how long a corpse stands with somebody's row on it.
@@ -1013,7 +1095,7 @@ final class Balance
      * The per-settlement rules say how much you may leave in ONE building; this
      * says how much you may have scattered over all of them. It used to be
      * neither: a processing run was capped at one PER CHARACTER anywhere, which
-     * meant a run left at a village four days' walk away closed every saw pit
+     * meant a run left at a village half a map away closed every saw pit
      * on the map -- while §8.4 was arguing in the same breath that "the real
      * limit on how much you have going at once is still the walking". Two rules
      * about the same thing, disagreeing.
@@ -1705,7 +1787,6 @@ final class Balance
      * What a deeper shelf buys is therefore straps rather than hoard: the same
      * hundred drafts on fewer of them.
      */
-
     public static function stationReaches(string $stationTier, string $rarity): bool
     {
         $reach = self::STATION_RARITY_CAP[$stationTier] ?? 'common';
@@ -1939,7 +2020,7 @@ final class Balance
      * the one currency an idle game cannot inflate -- hours. A gate on top of
      * that would be a second answer to a question distance already answers.
      */
-    public const TRAVEL_MS_PER_HEX = 5 * self::MINUTE;
+    public const TRAVEL_MS_PER_HEX = 5 * self::SECOND;
 
     // ------------------------------------------------------------------- sight
 
@@ -1964,10 +2045,18 @@ final class Balance
      *
      * This is a *generation* constraint, not a rule the player ever meets. It
      * was level-1 reach back when reach existed; it stays a number of its own
-     * so that shrinking sight cannot quietly strand every new character six
-     * hexes from the only place that turns their wood into planks.
+     * so that shrinking sight cannot quietly strand a new character from the
+     * only place that turns their wood into planks.
+     *
+     * HALF A COUNTRY, rather than a hex count of its own. It was six, from when
+     * villages stood eleven hexes apart -- with one settlement to a country
+     * (§6) a woodcutting bench is several countries away on average, and six
+     * hexes of slack around one meant most spawns quietly fell through to a
+     * fallback that guaranteed nothing at all. Half a cell is about two minutes
+     * of walking at TRAVEL_MS_PER_HEX, which is what "a short walk" is worth
+     * now that a hex costs five seconds rather than five minutes.
      */
-    public const SPAWN_VILLAGE_RADIUS = 6;
+    public const SPAWN_VILLAGE_RADIUS = self::BIOME_CELL >> 1;
 
     // ------------------------------------------------------------------ curves
 
@@ -1980,10 +2069,12 @@ final class Balance
      * roughly 182 days of unbroken play, which is the six-month target.
      *
      * OPEN: that income was measured when §7.3 clamped a mine at 30 minutes.
-     * The clamp is a guard at 3 minutes now and a geared prospector works a hex
-     * in 5-10, so the late-career mine rate is several times what this was
-     * sized against. The curve has not been re-fitted -- doing so is a
-     * deliberate pacing decision, not a side effect of the mining change.
+     * The clamp is a guard at 1 minute now, the HP band is ten minutes to
+     * twenty at the common rung rather than fifteen to thirty, and a geared
+     * prospector works a hex in 3-8 -- so the late-career mine rate is several
+     * times what this was sized against. The curve has not been re-fitted:
+     * doing so is a deliberate pacing decision, not a side effect of a mining
+     * change.
      *
      * The flat 40 is a floor so the first level costs about three mines
      * rather than half of one.

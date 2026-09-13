@@ -1745,7 +1745,7 @@ export function packProp(tile: Tile): string {
  * them away is what says this one is not looking at you.
  *
  * `mine` puts the marker in ember, which is §13.3's color for a state to deal
- * with -- and a row of yours sitting on a hex four days out is exactly that.
+ * with -- and a row of yours sitting on a hex half a map out is exactly that.
  * Somebody else's is bone, which is a fact rather than a task.
  */
 function corpse(x: number, y: number, mine: boolean): string {

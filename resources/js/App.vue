@@ -17,7 +17,7 @@
  * §13.2 -- sizing is real CSS, not utility classes with arbitrary values, which
  * silently collapsed the viewport to zero height when tried.
  */
-import { onMounted, onBeforeUnmount, computed, ref, watch } from 'vue'
+import { onMounted, onBeforeUnmount, computed, nextTick, ref, watch } from 'vue'
 import { useGame } from '@/stores/game'
 import { logout } from '@/wallet/wax'
 import HexMap from '@/map/HexMap.vue'
@@ -41,7 +41,6 @@ import BagView from '@/views/BagView.vue'
 import CraftView from '@/views/CraftView.vue'
 import ShopView from '@/views/ShopView.vue'
 import HeroView from '@/views/HeroView.vue'
-import AtlasView from '@/views/AtlasView.vue'
 import SkillsView from '@/views/SkillsView.vue'
 import QuestView from '@/views/QuestView.vue'
 import QuestRewardModal from '@/shell/QuestRewardModal.vue'
@@ -109,7 +108,6 @@ const PANELS = {
   craft: { title: 'Workshop', component: CraftView, wide: false },
   shop: { title: 'Trader', component: ShopView, wide: false },
   hero: { title: 'Character', component: HeroView, wide: false },
-  atlas: { title: 'Atlas', component: AtlasView, wide: true },
   // §7.4 -- six trees of thirty. Wide, because a seam of nodes needs room.
   skills: { title: 'Skill', component: SkillsView, wide: false },
   // §12.1 -- what is owed and what has been paid. Two tabs, no third.
@@ -222,9 +220,69 @@ const menuGood = computed(() => !menuAlert.value && screens.value.some((s) => s.
 
 const menuOpen = ref(false)
 
+/*
+ * §5.1 -- the coordinate jump.
+ *
+ * Held as TEXT rather than as numbers, so a half-typed "-" or an emptied field
+ * is a thing you are in the middle of writing rather than a zero the camera
+ * has already flown to. It becomes two integers once, on submit.
+ */
+const gotoOpen = ref(false)
+const gotoCol = ref('')
+const gotoRow = ref('')
+const gotoColEl = ref<HTMLInputElement | null>(null)
+
 /** Everything that shuts it: a pick, the scrim, Escape. */
 function closeMenu(): void {
   menuOpen.value = false
+  gotoOpen.value = false
+}
+
+/*
+ * One plate at a time. Both hang from the same line under the block, so two
+ * open at once would be one on top of the other -- and they are two answers to
+ * the same tap anyway: where do I want to go.
+ */
+function toggleMenu(): void {
+  gotoOpen.value = false
+  menuOpen.value = !menuOpen.value
+}
+
+function toggleGoto(): void {
+  menuOpen.value = false
+  gotoOpen.value = !gotoOpen.value
+
+  if (!gotoOpen.value) return
+
+  // Opens on where you are, because that is the only pair of numbers anybody
+  // has to hand -- and it makes the field a nudge ("two hundred east") as well
+  // as an address.
+  gotoCol.value = String(game.hereCol)
+  gotoRow.value = String(game.hereRow)
+  void nextTick(() => gotoColEl.value?.select())
+}
+
+/**
+ * Take the camera there, and point at the hex while you are at it.
+ *
+ * The SELECTION is exact and the camera is clamped (§13.2 keeps the window full
+ * of world), so asking for a hex on the rim names that hex and sits the camera
+ * just inside it. Nothing in the world moves: this is the corner's rule, and
+ * walking there is the tile card's offer once you can see what is there.
+ */
+function jumpToHex(): void {
+  const radius = game.mapRadius
+  const clamp = (raw: string) =>
+    Math.max(-radius, Math.min(radius, Math.trunc(Number(raw.trim()) || 0)))
+
+  // A number nobody can reach is worse than an honest no, so a typo lands on
+  // the edge of the map rather than nowhere.
+  const col = clamp(gotoCol.value)
+  const row = clamp(gotoRow.value)
+
+  gotoOpen.value = false
+  game.setView(col, row)
+  void game.select(col, row)
 }
 
 function openScreen(key: keyof typeof PANELS): void {
@@ -233,7 +291,7 @@ function openScreen(key: keyof typeof PANELS): void {
 }
 
 function onMenuKey(e: KeyboardEvent): void {
-  if (e.key === 'Escape' && menuOpen.value) {
+  if (e.key === 'Escape' && (menuOpen.value || gotoOpen.value)) {
     closeMenu()
   }
 }
@@ -285,6 +343,18 @@ function onRecenter(col: number, row: number) {
   game.setView(col, row)
 }
 
+/**
+ * §13.2 -- a new scale and the hex to hold under the anchor, applied together.
+ *
+ * One handler rather than two, because zooming about a point is one move: the
+ * camera slides so the thing you were pointing at has not gone anywhere, and
+ * applying half of that would drag the view sideways every notch.
+ */
+function onZoom(px: number, col: number, row: number) {
+  game.setView(col, row)
+  game.setScale(px)
+}
+
 onMounted(() => {
   void openGate()
   if (import.meta.env.DEV) {
@@ -302,6 +372,7 @@ onMounted(() => {
         :tiles="game.tiles"
         :center-col="game.view.col"
         :center-row="game.view.row"
+        :px="game.view.px"
         :character-col="game.hereCol"
         :character-row="game.hereRow"
         :sight="game.sight"
@@ -313,6 +384,7 @@ onMounted(() => {
         @select="game.select"
         @recenter="onRecenter"
         @resize="onMapResize"
+        @zoom="onZoom"
       />
 
       <!-- ------------------------------------------------------- top left -->
@@ -330,26 +402,54 @@ onMounted(() => {
         and the wrong amount of it: nine cells reached a third of the way down a
         phone, standing over the one thing the game is about. What the corner
         keeps is what is about *the map* — the way back to your prospector, and
-        the atlas — and the rest is behind the burger.
+        how far out the camera is — and the rest is behind the burger.
+
+        The zoom took the atlas's cell. That was a separate chart with its own
+        pan and its own four named steps, and everything it drew is the far end
+        of one continuous zoom now (§13.2), so a place to go became a direction
+        to go in.
       -->
       <div class="corner top-right">
         <div class="screens">
+          <!--
+            §13.2 -- the two ends of the zoom are the top and the bottom of the
+            block, and everything else is between them.
+
+            They are a pair on one axis, so they are drawn as one: in at the
+            top, out at the foot, the way a slider runs. Side by side they were
+            two buttons that happened to be adjacent; at the ends of the column
+            the column itself says which way is which.
+          -->
+          <HexAction
+            icon="zoomIn"
+            label="Closer"
+            hint="Zoom in"
+            :disabled="!game.canZoomIn"
+            @activate="game.zoomBy(1)"
+          />
           <!-- The camera pans anywhere and costs nothing, so the way back is
                the one control that has to stay in reach without a tap first. -->
           <HexAction
             icon="recenter"
-            label="Recenter"
+            label="Here"
             hint="Center the map on your prospector"
             @activate="game.centerOnCharacter()"
           />
-          <!-- The atlas is about the map too, so it keeps a cell of its own
-               rather than a row in the menu: this corner is where the map's own
-               controls live, and the burger is where the screens went. -->
+          <!--
+            And its opposite. One takes the camera back to YOU, the other takes
+            it to a HEX, which is why the first wears a ring and this wears the
+            map's own shape.
+
+            It moves the camera and nothing else. Travel is the tile card's
+            (§5.6) and costs hours; this costs nothing, because terrain is a
+            pure function of (col, row, seed) and looking at somewhere is free.
+            That is the rule this whole corner is drawn by.
+          -->
           <HexAction
-            icon="atlas"
-            label="Atlas"
-            hint="The whole map, and everything charted on it"
-            @activate="game.openPanel('atlas')"
+            icon="goto"
+            label="Go to"
+            :hint="gotoOpen ? 'Close' : 'Take the camera to a hex'"
+            @activate="toggleGoto"
           />
           <!-- The roll-up: ember if anything behind it needs dealing with, sap
                if anything is worth crossing the screen for. Without it a full
@@ -362,9 +462,56 @@ onMounted(() => {
             :alert="menuAlert"
             :good="menuGood"
             :hint="menuOpen ? 'Close' : 'Bag, benches, ledger, jobs and the rest'"
-            @activate="menuOpen = !menuOpen"
+            @activate="toggleMenu"
+          />
+          <HexAction
+            icon="zoomOut"
+            label="Further"
+            hint="Zoom out — the whole world, at the end of it"
+            :disabled="!game.canZoomOut"
+            @activate="game.zoomBy(-1)"
           />
         </div>
+
+        <!--
+          §5.1 -- a hex, by the two numbers a hex is said with.
+
+          Coordinates rather than a name, because a name is not an address: two
+          villages can share one (§6), which is why the dock writes a place as
+          "Redhollow -412,88" in the first place. This is the other half of that
+          sentence -- the dock says where somewhere is, and this reads it back.
+        -->
+        <Transition name="fade">
+          <form v-if="gotoOpen" class="goto plate" @submit.prevent="jumpToHex">
+            <div class="goto-inner">
+              <label class="field">
+                <span>col</span>
+                <input
+                  ref="gotoColEl"
+                  v-model="gotoCol"
+                  type="text"
+                  inputmode="numeric"
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+              </label>
+              <label class="field">
+                <span>row</span>
+                <input
+                  v-model="gotoRow"
+                  type="text"
+                  inputmode="numeric"
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+              </label>
+              <button type="submit" class="go">Go</button>
+            </div>
+            <!-- Where the numbers run, because a map measured from the middle
+                 out (§5.1) is not what anybody assumes. -->
+            <p class="tiny">−{{ game.mapRadius }} to {{ game.mapRadius }}, from the middle out</p>
+          </form>
+        </Transition>
 
         <!-- The list. A plate rather than more honeycomb: a flower is a shape
              to take in at a glance and this is a thing to read down, and nine
@@ -415,9 +562,10 @@ onMounted(() => {
         </Transition>
       </div>
 
-      <!-- Shuts the menu from anywhere on the map without swallowing the tap
-           that opened it. Under the plate, over everything else. -->
-      <div v-if="menuOpen" class="menu-scrim" @click="closeMenu" />
+      <!-- Shuts whichever plate is open from anywhere on the map, without
+           swallowing the tap that opened it. Under the plate, over everything
+           else. -->
+      <div v-if="menuOpen || gotoOpen" class="menu-scrim" @click="closeMenu" />
 
       <!-- -------------------------------------------------- bottom center -->
       <div ref="bottomStack" class="corner bottom-center">
@@ -566,7 +714,8 @@ onMounted(() => {
    * along their flat edges and read as three separate buttons in a row. The
    * zigzag is what makes them a piece of lattice — the same shape the map is
    * made of, which is the whole argument §13 makes for the hexagon in the first
-   * place. Two cells tall and under two wide, so it costs the corner nothing.
+   * place. Three cells tall at five of them and under two wide, so it still
+   * costs the corner almost nothing.
    */
   display: grid;
   grid-template-columns: calc(var(--cell-w) * 0.75) var(--cell-w);
@@ -575,13 +724,25 @@ onMounted(() => {
 }
 
 /*
- * The right column holds the first and last, the left one hangs between them.
- * The burger is last and therefore lowest and rightmost — nearest the thumb,
- * and directly over the list it drops.
+ * Five cells, alternating: the right column holds the first, third and fifth,
+ * the left one hangs between them.
+ *
+ * The ORDER is the argument. The two ends of the zoom are the two ends of the
+ * column — in at the top, out at the foot, the way a slider runs — and the
+ * three things that are not a direction sit between them: where you are, where
+ * you want to look, and everything else. Side by side the zoom was two buttons
+ * that happened to be adjacent; at the ends the column itself says which way is
+ * which.
+ *
+ * The burger is no longer last and keeps the half of that which mattered: it is
+ * still in the left column and still directly over the list it drops. What is
+ * below it is a zoom step rather than a screen.
  */
 .screens :deep(.cell:nth-child(1)) { grid-column: 2; grid-row: 1 / span 2; }
 .screens :deep(.cell:nth-child(2)) { grid-column: 1; grid-row: 2 / span 2; }
 .screens :deep(.cell:nth-child(3)) { grid-column: 2; grid-row: 3 / span 2; }
+.screens :deep(.cell:nth-child(4)) { grid-column: 1; grid-row: 4 / span 2; }
+.screens :deep(.cell:nth-child(5)) { grid-column: 2; grid-row: 5 / span 2; }
 
 /* Nested cells overlap at the tips, so hit-testing has to follow the hexagon
    rather than the box, or the pointed corner of one cell would swallow clicks
@@ -614,13 +775,70 @@ onMounted(() => {
  * glance, and this is a thing you read down. Nine hexagons unfolding out of a
  * corner would be exactly the drawing this replaced.
  */
-.menu {
+.menu,
+.goto {
   position: absolute;
-  /* The zigzag is two cells tall, plus the corner's own gap. */
-  top: calc(var(--cell-h) * 2 + 10px);
+  /* The zigzag is three cells tall at five cells, plus the corner's own gap.
+     Both plates hang from the same line, which is why only one may be open. */
+  top: calc(var(--cell-h) * 3 + 10px);
   right: 0;
   z-index: 30;
   width: 208px;
+}
+
+.goto-inner {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  padding: 7px;
+}
+
+.goto .field {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.goto .field span {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--vellum-dim);
+}
+
+.goto input {
+  width: 100%;
+  min-width: 0;
+  padding: 6px 7px;
+  font: inherit;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--vellum);
+  background: var(--ink-raised);
+  border: 0;
+  clip-path: var(--plate-clip);
+}
+
+.goto input:focus {
+  outline: 1px solid var(--copper);
+  outline-offset: -1px;
+}
+
+.goto .go {
+  flex: 0 0 auto;
+  padding: 7px 11px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink);
+  background: var(--copper);
+  clip-path: var(--plate-clip);
+}
+
+.goto .tiny {
+  padding: 0 7px 7px;
+  font-size: 10px;
+  color: var(--vellum-dim);
 }
 
 .menu-inner {

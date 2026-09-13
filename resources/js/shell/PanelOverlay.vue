@@ -5,7 +5,8 @@
  */
 defineProps<{
   title: string
-  /** For content that wants the room and does its own scrolling -- the atlas. */
+  /** For content that wants the room and does its own scrolling. Nothing asks
+   *  for it since the atlas folded into the map (§13.2). */
   wide?: boolean
 }>()
 defineEmits<{ (e: 'close'): void }>()

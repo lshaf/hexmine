@@ -709,7 +709,7 @@ const emptyNote = computed(() => {
             <!-- §8.4 -- the note to yourself, beside the thing that acts. It
                  is the answer to a recipe you cannot afford yet: the shortfall
                  above names what to go and get, and this is what remembers it
-                 four days' walk from here. -->
+                 half a map from here. -->
             <SlateMark :recipe="item.key" />
             <button
               class="btn btn-sm"

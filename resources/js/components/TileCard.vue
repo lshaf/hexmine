@@ -155,7 +155,7 @@ const deadFace = computed(() => Boolean(tile.value?.dead) && !unseen.value)
  *
  * Not sight-gated, and neither is the name above: what a settlement RUNS falls
  * out of (col, row, seed) exactly as its tier does, and the map draws the same
- * billets on a fogged glyph. A walk of four days is a decision, and deciding it
+ * billets on a fogged glyph. A walk across the map is a decision, and deciding it
  * blind was never the fog protecting anything.
  */
 const refines = computed(() => tile.value?.settlement?.lines ?? [])
@@ -216,7 +216,7 @@ const animal = computed(() => preview.value?.hunt?.animal ?? null)
  * to be stale.
  *
  * Gated on sight for the same reason the map gates the drawing (§13.2): a pack
- * is live state, and reading one from four days away is the scanner §5.6 exists
+ * is live state, and reading one from the far side of the map is the scanner §5.6 exists
  * to refuse.
  */
 const pack = computed(() =>
@@ -424,7 +424,7 @@ const travelHint = computed(() => {
  *
  * Everything derived from (col, row, seed) is fair: the lie of the land, water,
  * and WHO LIVES THERE -- their name, their tier and the lines they run. The
- * atlas has always charted all of it at any distance, and the same bundle
+ * chart has always drawn all of it at any distance, and the same bundle
  * computes it here, so withholding it on this card was a fiction rather than a
  * fog. What is actually held back is the server's half: depletion, who is
  * working the ground, what a hex would pay.
@@ -552,12 +552,12 @@ watch(open, (isOpen) => {
           <!-- §5.6 -- what the walk COSTS, on a hex that is not the one
                underfoot. Distance is the whole price of going anywhere, so the
                card owes it wherever it can be answered: a settlement two hexes
-               off and one four days away are the same tap and very different
+               off and one half a map away are the same tap and very different
                decisions.
 
                The hex COUNT is gone from beside it. Two readouts for one
                journey, and the one that decides anything is the clock -- five
-               minutes a hex means the count is the same fact in a unit nobody
+               seconds a hex means the count is the same fact in a unit nobody
                plans in. The Travel button under this row still names both. -->
           <span v-else-if="distance > 0" class="stats">
             <span class="stat">

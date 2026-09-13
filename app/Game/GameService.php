@@ -13,9 +13,9 @@ use App\Models\CharacterDaily;
 use App\Models\CharacterItem;
 use App\Models\CharacterJob;
 use App\Models\CharacterMaterial;
-use App\Models\CharacterSkillRank;
 use App\Models\CharacterQuest;
 use App\Models\CharacterSkill;
+use App\Models\CharacterSkillRank;
 use App\Models\GameJob;
 use App\Models\Guild;
 use App\Models\GuildApplication;
@@ -68,66 +68,112 @@ class GameService
         $startRow = (int) round(sin($angle) * $radius * Balance::mapRadius());
 
         $edge = Balance::mapRadius();
-        $fallback = ['col' => $startCol, 'row' => $startRow];
         $range = Balance::SPAWN_VILLAGE_RADIUS;
 
-        for ($ring = 0; $ring < 70; $ring++) {
+        // Walk the VILLAGES, not the hexes. With at most one settlement to a
+        // country and only half of them settled (§6), a village is a hex in
+        // several thousand -- so scanning tiles
+        // outward and asking each whether a bench is near it asks the rare
+        // question of the common thing. The lattice hands over every village in
+        // a box for the cost of the cells, and the ones that run woodcutting
+        // are the only starting points that can satisfy §12 at all.
+        //
+        // The box widens until it finds some. It is sized in COUNTRIES rather
+        // than in hexes, because what decides how far apart benches are is the
+        // cell they sit one to.
+        $country = Balance::BIOME_CELL;
+        $fallback = null;
+
+        for ($reach = $country * 3; $reach <= $country * 24; $reach *= 2) {
+            $benches = WorldGen::settlementsIn(
+                max(-$edge, $startCol - $reach),
+                min($edge, $startCol + $reach),
+                max(-$edge, $startRow - $reach),
+                min($edge, $startRow + $reach),
+                ['village'],
+            );
+
+            $benches = array_values(array_filter(
+                $benches,
+                fn (array $s) => in_array('woodcutting', $s['lines'], true),
+            ));
+
+            usort(
+                $benches,
+                fn (array $a, array $b) => HexGeometry::distance($startCol, $startRow, $a['col'], $a['row'])
+                    <=> HexGeometry::distance($startCol, $startRow, $b['col'], $b['row']),
+            );
+
+            foreach ($benches as $bench) {
+                $hex = $this->forestNear($bench['col'], $bench['row'], $range);
+                if ($hex !== null) {
+                    return $hex;
+                }
+                // A village with no workable forest around it is still better
+                // than the raw start point, which may be anywhere at all.
+                $fallback ??= $this->forestNear($bench['col'], $bench['row'], $range, false);
+            }
+        }
+
+        return $fallback ?? ['col' => $startCol, 'row' => $startRow];
+    }
+
+    /**
+     * §12 step 1 -- a hex the opening arc can actually be started on, within
+     * `$range` of a bench.
+     *
+     * Forest, on the outer ring, with nobody living on it, not a lake, and not
+     * dead ground: §5.2 gives half the rim no seam at all, so an unguarded
+     * spawn opens "bring back branches bare-handed" on a hex that has no
+     * branches and never will.
+     *
+     * `$live` false drops the dead-ground test alone, which is the fallback
+     * this has when a bench's whole neighbourhood is waste -- a spawn beside a
+     * saw pit on poor ground is a short walk from better, where the raw start
+     * point is a coin flip about the entire map.
+     *
+     * @return array{col:int,row:int}|null
+     */
+    private function forestNear(int $col, int $row, int $range, bool $live = true): ?array
+    {
+        $edge = Balance::mapRadius();
+
+        for ($ring = 1; $ring <= $range; $ring++) {
             for ($dc = -$ring; $dc <= $ring; $dc++) {
                 for ($dr = -$ring; $dr <= $ring; $dr++) {
                     if (max(abs($dc), abs($dr)) !== $ring) {
                         continue;
                     }
-                    $col = min($edge, max(-$edge, $startCol + $dc));
-                    $row = min($edge, max(-$edge, $startRow + $dr));
 
-                    if (WorldGen::biomeOf($col, $row) !== 'forest') {
+                    $c = $col + $dc;
+                    $r = $row + $dr;
+                    if (abs($c) > $edge || abs($r) > $edge) {
                         continue;
                     }
-                    if (WorldGen::ringOf($col, $row) !== 'outer') {
+                    if (HexGeometry::distance($col, $row, $c, $r) > $range) {
                         continue;
                     }
-                    if (WorldGen::settlementAt($col, $row) !== null) {
+                    if (WorldGen::biomeOf($c, $r) !== 'forest') {
+                        continue;
+                    }
+                    if (WorldGen::ringOf($c, $r) !== 'outer') {
+                        continue;
+                    }
+                    if (WorldGen::settlementAt($c, $r) !== null) {
                         continue;
                     }
                     // §5.3 -- nobody starts in a lake. Water refuses both
                     // verbs, so a spawn on it would open the game on a hex
                     // with nothing to do and no explanation of why.
-                    if (WorldGen::waterAt($col, $row) !== null) {
+                    if (WorldGen::waterAt($c, $r) !== null) {
                         continue;
                     }
-                    // §5.2 -- and nobody starts on dead ground, for exactly the
-                    // same reason and a sharper one: half the outer rim has no
-                    // seam in it now, so an unguarded spawn opens §12 step 1 --
-                    // "bring back branches bare-handed" -- on a hex that has no
-                    // branches and never will.
-                    if (WorldGen::isBarren($col, $row, 'outer')) {
+                    if ($live && WorldGen::isBarren($c, $r, 'outer')) {
                         continue;
                     }
 
-                    $fallback = ['col' => $col, 'row' => $row];
-                    if ($this->findNearbySettlement($col, $row, $range, 'woodcutting') !== null) {
-                        return ['col' => $col, 'row' => $row];
-                    }
+                    return ['col' => $c, 'row' => $r];
                 }
-            }
-        }
-
-        return $fallback;
-    }
-
-    private function findNearbySettlement(int $col, int $row, int $range, ?string $requiredLine = null): ?array
-    {
-        for ($dc = -$range; $dc <= $range; $dc++) {
-            for ($dr = -$range; $dr <= $range; $dr++) {
-                $s = WorldGen::settlementAt($col + $dc, $row + $dr);
-                if ($s === null || HexGeometry::distance($col, $row, $s['col'], $s['row']) > $range) {
-                    continue;
-                }
-                if ($requiredLine !== null && ! in_array($requiredLine, $s['lines'], true)) {
-                    continue;
-                }
-
-                return $s;
             }
         }
 
@@ -1144,14 +1190,15 @@ class GameService
      * moment a journey started, on the reasoning that you are between hexes
      * watching your feet. What that actually bought was a promise about
      * QUERIES ("a journey costs no queries at all"), and what it cost was the
-     * walk: a two-hundred-hex road was four days of a blank map, which is the
+     * walk: a two-hundred-hex road was a blank map the whole way, which is the
      * least interesting thing this game can do with its own distance. A
      * prospector crossing a country now sees the country they are crossing.
      *
      * The query budget is paid where it was always going to be paid instead:
      * the disc follows the walker, so it is re-asked as each hex is crossed --
-     * five minutes apart, and cheaper per hour than the fixed poll this
-     * codebase ran until recently.
+     * five seconds apart, and still bounded by the same thirty-seven-tile disc
+     * as everything else, and by the walker being one person rather than a
+     * scanner.
      */
     public function sightRadius(Character $character): int
     {
@@ -1172,7 +1219,7 @@ class GameService
      *
      * It became load-bearing when the road stopped closing the eye: a disc
      * centred on the departure hex would have shown a walker the country
-     * behind them for four days, which is worse than showing them nothing.
+     * behind them for the whole walk, which is worse than showing them nothing.
      *
      * @return array{0:int,1:int}
      */
@@ -2258,8 +2305,8 @@ class GameService
              * a subtraction: what walked in, and which rung it is.
              *
              * Sight-bounded like the rest of it (§5.6). Watching a country
-             * empty out from four days away was never on offer, and neither is
-             * watching one refill.
+             * empty out from the far side of the map was never on offer, and
+             * neither is watching one refill.
              */
             'roaming' => Packs::roamersAmong($roamers),
             // §9.5.7 -- other people's corpses, and only inside sight like
@@ -3110,8 +3157,8 @@ class GameService
         if ($died) {
             $stolen = $this->takeRowForCarrier($character, $key, $seed, $now);
 
-            // The walk back is the first bill, and at ten minutes a hex it is
-            // a real one.
+            // The walk back is the first bill, and with a settlement to a
+            // country (§6) it is a real one.
             $woke = $this->wakeAtNearestSettlement($character);
         }
 
@@ -3277,7 +3324,7 @@ class GameService
      * This rides the player state rather than the map, and the split is what
      * makes the two endpoints mean exactly one thing each: the state is what is
      * YOURS and is bounded by nothing, the map is what is AROUND you and is
-     * bounded by sight (§5.6). A corpse of yours is a row on a clock four days
+     * bounded by sight (§5.6). A corpse of yours is a row on a clock half a map
      * away -- plainly the first kind, and it was on the wrong endpoint.
      *
      * A debt you cannot find is a fine with extra steps, which is the whole
@@ -3500,32 +3547,39 @@ class GameService
     {
         $col = (int) $character->col;
         $row = (int) $character->row;
+        $edge = Balance::mapRadius();
         $best = null;
         $bestDistance = PHP_INT_MAX;
 
-        for ($range = 0; $range <= Balance::DEATH_WAKE_RADIUS; $range++) {
-            for ($dc = -$range; $dc <= $range; $dc++) {
-                for ($dr = -$range; $dr <= $range; $dr++) {
-                    if (max(abs($dc), abs($dr)) !== $range) {
-                        continue;
-                    }
+        // Widening boxes, walked on the LATTICE rather than hex by hex. With
+        // at most one settlement to a country and half of them empty (§6), the
+        // nearest roof is a couple of countries off, and a shell scan out to
+        // that asks tens of thousands of tiles
+        // whether they are the one hex in twenty-five hundred that is a town.
+        //
+        // The box is square and the answer is by hex distance, so it widens one
+        // more step after the first hit: a settlement in the corner of a box is
+        // further away than one just outside its edge.
+        for ($reach = Balance::BIOME_CELL; ; $reach *= 2) {
+            $reach = min($reach, Balance::DEATH_WAKE_RADIUS);
 
-                    $s = WorldGen::settlementAt($col + $dc, $row + $dr);
-                    if ($s === null) {
-                        continue;
-                    }
-
-                    $distance = HexGeometry::distance($col, $row, (int) $s['col'], (int) $s['row']);
-                    if ($distance < $bestDistance) {
-                        $best = $s;
-                        $bestDistance = $distance;
-                    }
+            foreach (WorldGen::settlementsIn(
+                max(-$edge, $col - $reach),
+                min($edge, $col + $reach),
+                max(-$edge, $row - $reach),
+                min($edge, $row + $reach),
+            ) as $settlement) {
+                $distance = HexGeometry::distance($col, $row, (int) $settlement['col'], (int) $settlement['row']);
+                if ($distance < $bestDistance) {
+                    $best = $settlement;
+                    $bestDistance = $distance;
                 }
             }
 
-            // A whole shell further out cannot beat something already this
-            // close, so the first shell that finds anything settles it.
-            if ($best !== null && $bestDistance <= $range) {
+            if ($best !== null && $bestDistance <= $reach) {
+                break;
+            }
+            if ($reach >= Balance::DEATH_WAKE_RADIUS) {
                 break;
             }
         }
@@ -4932,7 +4986,7 @@ class GameService
      *  - and the gold, from the treasury and never a purse (§10.6).
      *
      * You have to be STANDING on it, like every other thing done at a place
-     * (§6). Buying a hex from four days away would make the map a spreadsheet.
+     * (§6). Buying a hex from the far side of the map would make the map a spreadsheet.
      */
     public function claimGuildLand(Character $character): Guild
     {
@@ -5684,7 +5738,7 @@ class GameService
             //
             // Per settlement and per line, not per character. It was per
             // character across the whole map, which meant a run of planks left
-            // at a village four days away closed every saw pit in the world --
+            // at a village half a map away closed every saw pit in the world --
             // and §8.4 was arguing in the same breath that the real limit on
             // how much you have going at once is the walking. The walking is
             // the limit now, up to Balance::OUTSTANDING_WORK_CAP.
@@ -7985,8 +8039,18 @@ class GameService
             ];
         }
 
+        // Read LENIENTLY, never through self::settlement(): a settlement id is
+        // a coordinate (`s_col_row`), so a change to GAME_MAP_RADIUS or
+        // GAME_MAP_SEED can leave a parked run naming a town that no longer
+        // stands. The three `?? null` fallbacks below were already written for
+        // a bench that cannot be resolved -- and a throwing lookup above them
+        // meant one orphaned row answered the WHOLE of /api/state with a 422,
+        // which locks a player out of everything rather than out of one job.
+        //
+        // `game:rebuild-world` is what clears these; this is what keeps the
+        // game playable until somebody runs it.
         $bench = $job->settlement_id !== null
-            ? $this->settlement((string) $job->settlement_id)
+            ? WorldGen::settlementById((string) $job->settlement_id)
             : null;
 
         return $payload + [

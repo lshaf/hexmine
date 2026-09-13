@@ -195,28 +195,76 @@ final class WorldParityTest extends TestCase
      * moves, or when anything else starts competing for the same hexes. The fix
      * is to re-run the calibrator and paste, never to widen the tolerance.
      *
-     * Sampled on a stride rather than tile by tile: a quarter of 160,801 hexes
-     * is forty thousand, which pins a percentage far tighter than one point.
+     * This is the one test that runs on the SHIPPING map rather than on the
+     * suite's small one. The share is a promise about the world players get,
+     * and the thresholds are calibrated against that world -- checking them on
+     * a 401-hex sheet would pin them to a map nobody plays, and it is exactly
+     * how the center ring came to miss its share by seven points while a green
+     * suite said otherwise.
+     *
+     * Sampled on a stride, and the stride is COPRIME with every lattice the
+     * world is built on. A stride sharing a factor with the dead-ground field's
+     * cell reads one fractional slice of the field and calls it the field.
+     *
+     * The center gets a sweep of its own because it is well under a per cent of
+     * the map: at the coarse stride it would be a few hundred hexes, which is
+     * not enough to hold a percentage to a point and a half.
      */
     public function test_every_ring_carries_the_share_of_workable_ground_it_promises(): void
     {
+        config(['game.map.radius' => Balance::SHIP_MAP_RADIUS]);
+        WorldGen::forget();
+
         $radius = Balance::mapRadius();
         $total = [];
         $seams = [];
 
-        for ($col = -$radius; $col <= $radius; $col += 2) {
-            for ($row = -$radius; $row <= $radius; $row += 2) {
-                $tile = WorldGen::generateTile($col, $row, 0);
-                $ring = $tile['ring'];
-                $total[$ring] = ($total[$ring] ?? 0) + 1;
-                if ($tile['material'] !== null) {
-                    $seams[$ring] = ($seams[$ring] ?? 0) + 1;
+        $count = function (int $col, int $row) use (&$total, &$seams): void {
+            $tile = WorldGen::generateTile($col, $row, 0);
+            $ring = $tile['ring'];
+            $total[$ring] = ($total[$ring] ?? 0) + 1;
+            if ($tile['material'] !== null) {
+                $seams[$ring] = ($seams[$ring] ?? 0) + 1;
+            }
+        };
+
+        // Coprime with every lattice the world is built on, and checked rather
+        // than asserted in a comment: a stride sharing a factor with one of
+        // them samples the same fractional position inside every cell forever,
+        // which does not fail, it just quietly measures one slice.
+        $stride = 29;
+        foreach ([Balance::BARREN_CELL, Balance::BIOME_CELL, Balance::LAKE_CELL] as $lattice) {
+            for ($a = $stride, $b = $lattice; $b !== 0;) {
+                [$a, $b] = [$b, $a % $b];
+            }
+            $this->assertSame(1, $a, "the sample stride shares a factor with a lattice of {$lattice}");
+        }
+
+        for ($col = -$radius; $col <= $radius; $col += $stride) {
+            for ($row = -$radius; $row <= $radius; $row += $stride) {
+                $count($col, $row);
+            }
+        }
+
+        // The center ring alone, at a fine stride. Its boundary is a fraction
+        // of the radius (§5.2), so the box is derived rather than pinned.
+        $centerBox = (int) ceil(Balance::RING_CENTER * $radius) + 1;
+        for ($col = -$centerBox; $col <= $centerBox; $col += 3) {
+            for ($row = -$centerBox; $row <= $centerBox; $row += 3) {
+                if (WorldGen::ringOf($col, $row) !== 'center') {
+                    continue;
                 }
+                $count($col, $row);
             }
         }
 
         foreach (Balance::MINEABLE_SHARE as $ring => $share) {
             $this->assertArrayHasKey($ring, $total, "no {$ring} ring tiles were sampled");
+            $this->assertGreaterThan(
+                2000,
+                $total[$ring],
+                "the {$ring} ring sample is too thin to hold a percentage to a point and a half",
+            );
 
             $actual = ($seams[$ring] ?? 0) / $total[$ring];
 
@@ -232,6 +280,53 @@ final class WorldParityTest extends TestCase
                 ),
             );
         }
+    }
+
+    /**
+     * The lattice walk and the tile-by-tile answer are the same settlements.
+     *
+     * WorldGen::settlementsIn() enumerates CELLS rather than hexes, which is
+     * the only tractable way to ask "where are the villages" now that one
+     * stands to a country and half of them are empty (§6) -- a village is a hex
+     * in several thousand.
+     * GameService::pickSpawn() leans on it to guarantee §12's opening arc, so a
+     * walk that quietly missed one would show up as a spawn guarantee that had
+     * silently stopped holding rather than as anything that looked wrong.
+     *
+     * Swept over the whole map rather than sampled, because the thing it could
+     * get wrong is a boundary: a site sitting on the edge of a cell, or a cell
+     * index that rounds the wrong way west and north of the origin.
+     */
+    public function test_the_lattice_walk_finds_exactly_the_settlements_the_tiles_do(): void
+    {
+        $radius = Balance::mapRadius();
+
+        $byTile = [];
+        for ($col = -$radius; $col <= $radius; $col++) {
+            for ($row = -$radius; $row <= $radius; $row++) {
+                $settlement = WorldGen::settlementAt($col, $row);
+                if ($settlement !== null) {
+                    $byTile[$settlement['id']] = $settlement['tier'];
+                }
+            }
+        }
+
+        $byCell = [];
+        foreach (WorldGen::settlementsIn(-$radius, $radius, -$radius, $radius) as $settlement) {
+            $byCell[$settlement['id']] = $settlement['tier'];
+        }
+
+        ksort($byTile);
+        ksort($byCell);
+
+        $this->assertNotEmpty($byTile, 'the sweep found no settlements at all');
+        $this->assertSame($byTile, $byCell);
+
+        // §6 -- and the ordering the tier table promises, which is now a
+        // consequence of ring area rather than of three lattice sizes.
+        $counts = array_count_values($byTile);
+        $this->assertGreaterThan($counts['city'], $counts['village']);
+        $this->assertGreaterThan($counts['capital'], $counts['city']);
     }
 
     /**

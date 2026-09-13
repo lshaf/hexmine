@@ -1,5 +1,7 @@
 <?php
 
+use App\Game\Balance;
+
 return [
 
     /*
@@ -58,8 +60,9 @@ return [
     | Change either and every hex on it changes with it.
     |
     | The map is square, so one radius covers it. Measured from the middle out
-    | (§5.1): 200 means every column and every row from -200 to 200 inclusive,
-    | so the grid is 401 a side. Ship value is 2500, for the 5000x5000 of §5.
+    | (§5.1): 5000 means every column and every row from -5000 to 5000
+    | inclusive, so the grid is 10001 a side -- 5000 of ground in each
+    | direction from the origin, which is the quarter the world is measured in.
     |
     | The client is handed all three by GET /api/world at boot rather than
     | compiling them in, so this file is the single source of truth and no
@@ -72,7 +75,7 @@ return [
     |
     */
     'map' => [
-        'radius' => (int) env('GAME_MAP_RADIUS', 200),
+        'radius' => (int) env('GAME_MAP_RADIUS', Balance::SHIP_MAP_RADIUS),
         'seed' => env('GAME_MAP_SEED', '0x5eed1a3f'),
     ],
 

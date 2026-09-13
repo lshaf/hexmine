@@ -15,9 +15,11 @@
 import { computed, ref } from 'vue'
 import type { ComponentPublicInstance } from 'vue'
 import {
+  COL_STEP,
   HEX_H,
   HEX_SIDE_PATH,
   HEX_TOP_PATH,
+  MAP_PX_CHART,
   groundMark,
   hexDistance,
   paintersSort,
@@ -25,6 +27,7 @@ import {
   screenToTile,
   tileToScreen,
 } from './hexGeometry'
+import ChartLayer from './ChartLayer.vue'
 import {
   corpseProp,
   dungeonGlyph,
@@ -48,6 +51,14 @@ const props = defineProps<{
   characterRow: number
   /** §5.6 -- hexes of sight. One to start with, three at the top of the tree. */
   sight: number
+  /**
+   * §13.2 -- how close the camera is, in pixels per hex column.
+   *
+   * COL_STEP is the scale the board has always been drawn at. Above
+   * MAP_PX_CHART this is a viewBox divisor; below it the board is not drawn at
+   * all and the chart takes over.
+   */
+  px: number
   selected: { col: number; row: number } | null
   jobs: Job[]
   travel: TravelState | null
@@ -74,6 +85,14 @@ const emit = defineEmits<{
   (e: 'recenter', col: number, row: number): void
   /** Measured viewport, so the parent can generate exactly the tiles it needs. */
   (e: 'resize', width: number, height: number): void
+  /**
+   * A new scale, and the hex to keep under the anchor while taking it.
+   *
+   * Both together, because zooming about a point is one move: the scale changes
+   * and the camera slides so the thing you were pointing at has not gone
+   * anywhere. Sent as one event so the parent cannot apply half of it.
+   */
+  (e: 'zoom', px: number, col: number, row: number): void
 }>()
 
 /*
@@ -105,12 +124,131 @@ let dragDistance = 0
 
 const origin = computed(() => tileToScreen(props.centerCol, props.centerRow))
 
+/** Map units per screen pixel's worth of board. 1 at the scale it has always been. */
+const scale = computed(() => props.px / COL_STEP)
+
+/** Past this the board is not drawn at all -- see hexGeometry's zoom note. */
+const charting = computed(() => props.px < MAP_PX_CHART)
+
 const viewBox = computed(() => {
-  const { w, h } = viewport.value
+  const w = viewport.value.w / scale.value
+  const h = viewport.value.h / scale.value
   const x = origin.value.x - w / 2 + pan.value.x
   const y = origin.value.y - h / 2 + pan.value.y
   return `${x} ${y} ${w} ${h}`
 })
+
+/*
+ * ------------------------------------------------------------------- detail
+ *
+ * What the board stops drawing on the way out, §13.2.
+ *
+ * Shedding is not decoration-trimming, it is what keeps the SVG affordable:
+ * cost is nodes, and nodes are per tile. It also happens to be honest -- a prop
+ * eight pixels tall is a smudge, and a settlement name at that size is a line
+ * of grey. Two steps rather than a curve, because a thing either survives being
+ * small or it does not.
+ */
+const LABELS_ABOVE = COL_STEP * 0.55
+const PROPS_ABOVE = COL_STEP * 0.4
+
+const showLabels = computed(() => props.px >= LABELS_ABOVE)
+const showProps = computed(() => props.px >= PROPS_ABOVE)
+
+/**
+ * Strokes are in MAP units, so the viewBox shrinks them along with everything
+ * else. A hairline drawn at 1 is a third of a pixel when the camera is a third
+ * of the way out, which is a line nobody can see -- so every stroke the board
+ * draws is divided by the scale and keeps the weight it was chosen at.
+ */
+const hairline = computed(() => 1 / scale.value)
+
+/**
+ * A counter-scale, for the handful of marks that are about YOU rather than
+ * about the ground: the prospector, the destination pin, work waiting on a
+ * hex. Those are HUD in everything but where they are drawn, so they keep one
+ * size on screen while the board they sit on changes size underneath them.
+ *
+ * The terrain deliberately does not get this. A hex is a place, and a place is
+ * meant to get smaller as you pull away from it.
+ */
+const markScale = computed(() => `scale(${hairline.value})`)
+
+// -------------------------------------------------------------------- zoom
+
+/**
+ * Zoom about a point, keeping that point of the world under it.
+ *
+ * The wheel and a pinch both anchor on the pointer, so zooming reads as moving
+ * through the world rather than jumping to a different view of it. A button
+ * press anchors on the middle, because pressing a button implies no position.
+ */
+function zoomAbout(nextPx: number, clientX?: number, clientY?: number): void {
+  if (clientX === undefined || clientY === undefined) {
+    emit('zoom', nextPx, props.centerCol, props.centerRow)
+
+    return
+  }
+
+  const ratio = props.px / nextPx
+
+  // The chart has no viewBox to project through, so it is done in hexes: the
+  // pointer's offset from the middle, divided by what a hex is worth on screen.
+  // Same gesture, same behaviour -- anchoring on the cursor over one renderer
+  // and on the middle over the other would make the wheel mean two things.
+  if (charting.value) {
+    const rect = wrapEl.value?.getBoundingClientRect()
+    if (!rect) return
+
+    const dx = (clientX - rect.left - rect.width / 2) / props.px
+    const dy = (clientY - rect.top - rect.height / 2) / (props.px * (HEX_H / COL_STEP))
+
+    emit(
+      'zoom',
+      nextPx,
+      Math.round(props.centerCol + dx * (1 - ratio)),
+      Math.round(props.centerRow + dy * (1 - ratio)),
+    )
+
+    return
+  }
+
+  const anchor = toMapSpace(clientX, clientY)
+  if (!anchor) {
+    emit('zoom', nextPx, props.centerCol, props.centerRow)
+
+    return
+  }
+
+  // Where the anchor sits relative to the camera now, in map units, and what
+  // that same offset is worth at the scale we are arriving at.
+  const here = { x: origin.value.x + pan.value.x, y: origin.value.y + pan.value.y }
+  const target = screenToTile(
+    anchor.x - (anchor.x - here.x) * ratio,
+    anchor.y - (anchor.y - here.y) * ratio,
+  )
+
+  pan.value = { x: 0, y: 0 }
+  emit('zoom', nextPx, target.col, target.row)
+}
+
+/**
+ * One notch of the wheel is a fixed ratio, so the ladder feels even.
+ *
+ * Finer than the buttons' step on purpose -- see `ZOOM_NOTCH` in the store. A
+ * wheel notch is a nudge at a view you are already looking at; a press is a
+ * decision to go somewhere else.
+ */
+const WHEEL_STEP = 1.25
+
+function onWheel(event: WheelEvent) {
+  event.preventDefault()
+  zoomAbout(
+    props.px * (event.deltaY > 0 ? 1 / WHEEL_STEP : WHEEL_STEP),
+    event.clientX,
+    event.clientY,
+  )
+}
 
 function onResize(el: Element | null) {
   if (!el) return
@@ -130,14 +268,29 @@ function onResize(el: Element | null) {
 const svgEl = ref<SVGSVGElement | null>(null)
 let observer: ResizeObserver | null = null
 
-function mountSvg(el: Element | ComponentPublicInstance | null) {
-  const svg = el as SVGSVGElement | null
-  svgEl.value = svg
+/**
+ * The WRAP is what gets measured, not the board.
+ *
+ * Both renderers live inside it and only one of them is mounted at a time, so
+ * measuring the board would lose the viewport the moment the chart took over --
+ * and the chart is sized in pixels, so it would be handed a stale width for
+ * the whole of the far end of the zoom.
+ */
+const wrapEl = ref<Element | null>(null)
+
+function mountWrap(el: Element | ComponentPublicInstance | null) {
+  const wrap = el as Element | null
+  wrapEl.value = wrap
   observer?.disconnect()
-  if (!svg) return
-  observer = new ResizeObserver(() => onResize(svg))
-  observer.observe(svg)
-  onResize(svg)
+  if (!wrap) return
+  observer = new ResizeObserver(() => onResize(wrap))
+  observer.observe(wrap)
+  onResize(wrap)
+}
+
+/** The board itself, kept only so a pointer can be put back into map space. */
+function mountSvg(el: Element | ComponentPublicInstance | null) {
+  svgEl.value = el as SVGSVGElement | null
 }
 
 function onPointerDown(event: PointerEvent) {
@@ -179,7 +332,12 @@ function onPointerUp(event: PointerEvent) {
   // window around wherever we now are. The new origin lands where the pan
   // already put us, so the handover is invisible -- and it is free, because
   // generating tiles is local.
-  if (Math.abs(pan.value.x) > 120 || Math.abs(pan.value.y) > 120) {
+  // The threshold is SCREEN pixels, not map units. It was map units, which
+  // meant the same drift triggered a handover after a finger's width when the
+  // camera was close and never at all when it was far out -- the camera pulls
+  // back, the world shrinks, and a fixed distance in world units stops being a
+  // distance you can drag.
+  if (Math.abs(pan.value.x) * scale.value > 120 || Math.abs(pan.value.y) * scale.value > 120) {
     const target = screenToTile(origin.value.x + pan.value.x, origin.value.y + pan.value.y)
     pan.value = { x: 0, y: 0 }
     emit('recenter', target.col, target.row)
@@ -397,7 +555,7 @@ const renderTiles = computed<RenderTile[]>(() =>
       slots: slotMarks(tile, inSight),
       // §5.6 -- a place is named whether or not you have stood in it. Identity
       // is terrain: name, tier and lines all fall out of (col, row, seed), and
-      // the atlas has always drawn them at any distance. What the fog holds
+      // the chart has always drawn them at any distance. What the fog holds
       // back is the server's half -- depletion, who is working here, what the
       // hex would pay -- so an unscouted name is dimmed rather than withheld.
       // §10.6 -- a hold is named by its guild, and the name is what a
@@ -489,8 +647,27 @@ const RARE_MARK = groundMark(6)
 </script>
 
 <template>
-  <div class="map-wrap">
+  <div class="map-wrap" :ref="mountWrap" @wheel="onWheel">
+    <!-- §13.2 -- the far end of the zoom. The board is one <g> per hex, so
+         past MAP_PX_CHART it stops being affordable and the chart draws the
+         same world as sampled colour. It is the atlas, folded in: same seed,
+         same camera, and a tap still selects a hex. -->
+    <ChartLayer
+      v-if="charting"
+      :center-col="centerCol"
+      :center-row="centerRow"
+      :px="px"
+      :width="viewport.w"
+      :height="viewport.h"
+      :character-col="characterCol"
+      :character-row="characterRow"
+      :selected="selected"
+      @select="(c, r) => emit('select', c, r)"
+      @recenter="(c, r) => emit('recenter', c, r)"
+    />
+
     <svg
+      v-else
       :ref="mountSvg"
       class="map-svg"
       :viewBox="viewBox"
@@ -509,7 +686,7 @@ const RARE_MARK = groundMark(6)
       >
         <!-- Extruded slab side, drawn first so the top face sits on it. -->
         <path :d="HEX_SIDE_PATH" :fill="t.side" />
-        <path :d="HEX_TOP_PATH" :fill="t.top" :stroke="t.edge" stroke-width="1" />
+        <path :d="HEX_TOP_PATH" :fill="t.top" :stroke="t.edge" :stroke-width="hairline" />
 
         <!-- Sight boundary: a stroked hex ring, no fill, no alpha. -->
         <path
@@ -517,24 +694,32 @@ const RARE_MARK = groundMark(6)
           :d="HEX_TOP_PATH"
           fill="none"
           stroke="#c1793f"
-          stroke-width="1.6"
-          stroke-dasharray="4 4"
+          :stroke-width="1.6 * hairline"
+          :stroke-dasharray="`${4 * hairline} ${4 * hairline}`"
         />
 
-        <!-- Terrain and settlement props stand above the tile, in sight only. -->
-        <g v-if="t.props" v-html="t.props" />
+        <!-- Terrain and settlement props stand above the tile, in sight only,
+             and only while they are big enough to be a shape rather than a
+             smudge. -->
+        <g v-if="showProps && t.props" v-html="t.props" />
         <!-- §5.7 -- the critter that found the rich ground. It stands with the
              pack because it is the same kind of news: something alive is on
              this hex, and it is worth looking at. -->
         <!-- §5.5 -- the animal is the hunting line's SEAM rather than news,
              so it stands with the scenery and behind both of the things that
              are: a hare in the foreground, a stag back among the trees. -->
-        <g v-if="t.hunt" v-html="t.hunt" />
-        <g v-if="t.pocket" v-html="t.pocket" />
-        <g v-if="t.pack" v-html="t.pack" />
+        <template v-if="showProps">
+          <g v-if="t.hunt" v-html="t.hunt" />
+          <g v-if="t.pocket" v-html="t.pocket" />
+          <g v-if="t.pack" v-html="t.pack" />
+        </template>
+        <!-- §9.5.7 -- a corpse is a debt on a clock and holds a row of yours,
+             so it is the one mark that survives every shedding step. -->
         <g v-if="t.corpse" v-html="t.corpse" />
 
-        <!-- Beyond sight: is anybody there. Nothing else is knowable. -->
+        <!-- Beyond sight: is anybody there. Nothing else is knowable. §5.6
+             makes this the one thing the fog never withholds, so it outlives
+             the props: zoomed out, a settlement glyph is the map. -->
         <g v-if="t.glyph" v-html="t.glyph" />
 
         <!-- Rare-material tell, §4: gold, only in the contested ring. -->
@@ -549,15 +734,17 @@ const RARE_MARK = groundMark(6)
              ember when the two mining seats are gone and the hex is shut. An
              empty hex is left alone: bare stone is what open looks like. -->
         <path
-          v-for="(fill, i) in t.slots"
+          v-for="(fill, i) in showProps ? t.slots : []"
           :key="`slot${i}`"
           :d="SLOT_MARK"
           :transform="`translate(${t.slots.length === 1 ? 0 : -SLOT_GAP + i * SLOT_GAP * 2},${SLOT_Y})`"
           :fill="fill"
         />
 
-        <!-- Your own job on this tile. -->
-        <g v-if="t.jobState !== 'none'" :transform="`translate(0,${-HEX_H / 2 - 12})`">
+        <!-- Your own job on this tile. Kept at every scale the board draws:
+             where your work is waiting is the one thing on the map that is
+             about you rather than about the ground. -->
+        <g v-if="t.jobState !== 'none'" :transform="`translate(0,${-HEX_H / 2 - 12}) ${markScale}`">
           <circle r="6.5" :fill="t.jobState === 'ready' ? '#d8b34a' : '#1d2622'" stroke="#d8b34a" stroke-width="1.6" />
           <path
             v-if="t.jobState === 'active'"
@@ -584,7 +771,7 @@ const RARE_MARK = groundMark(6)
           :d="HEX_TOP_PATH"
           fill="none"
           :stroke="VELLUM"
-          stroke-width="2.2"
+          :stroke-width="2.2 * hairline"
           stroke-linejoin="round"
         />
 
@@ -592,30 +779,30 @@ const RARE_MARK = groundMark(6)
              one label on the map that is not a place. -->
         <text
           v-if="t.corpseLabel"
-          y="-34"
+          :y="-34 * hairline"
           text-anchor="middle"
           :fill="VELLUM"
-          font-size="8"
+          :font-size="8 * hairline"
           font-weight="700"
           letter-spacing="0.3"
           paint-order="stroke"
           stroke="#141b18"
-          stroke-width="3"
+          :stroke-width="3 * hairline"
         >
           {{ t.corpseLabel }}
         </text>
 
         <text
-          v-if="t.label"
-          y="-26"
+          v-if="showLabels && t.label"
+          :y="-26 * hairline"
           text-anchor="middle"
           :fill="t.labelLit ? VELLUM : VELLUM_DIM"
-          font-size="9"
+          :font-size="9 * hairline"
           font-weight="700"
           letter-spacing="0.4"
           paint-order="stroke"
           stroke="#141b18"
-          stroke-width="3"
+          :stroke-width="3 * hairline"
         >
           {{ t.label }}
         </text>
@@ -627,12 +814,12 @@ const RARE_MARK = groundMark(6)
           :d="roadAhead"
           fill="none"
           stroke="#c1793f"
-          stroke-width="2"
+          :stroke-width="2 * hairline"
           stroke-linecap="round"
           stroke-linejoin="round"
-          stroke-dasharray="5 5"
+          :stroke-dasharray="`${5 * hairline} ${5 * hairline}`"
         />
-        <g :transform="`translate(${destinationScreen.x},${destinationScreen.y + 3})`">
+        <g :transform="`translate(${destinationScreen.x},${destinationScreen.y + 3}) ${markScale}`">
           <path
             d="M0,-11 L9,-5.5 L9,5.5 L0,11 L-9,5.5 L-9,-5.5 Z"
             fill="none"
@@ -646,7 +833,7 @@ const RARE_MARK = groundMark(6)
       <!-- The player marker draws last so nothing occludes it, but it sits ON
            the tile rather than floating above it -- hovering put it straight
            through the settlement name label. -->
-      <g :transform="`translate(${characterScreen.x},${characterScreen.y + 3})`">
+      <g :transform="`translate(${characterScreen.x},${characterScreen.y + 3}) ${markScale}`">
         <path d="M0,4 L-6,-8 L0,-5 L6,-8 Z" fill="#ece3cd" stroke="#141b18" stroke-width="1.4" stroke-linejoin="round" />
         <circle cy="-13" r="4.4" fill="#ece3cd" stroke="#141b18" stroke-width="1.4" />
       </g>

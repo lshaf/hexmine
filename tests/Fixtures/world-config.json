@@ -2,15 +2,15 @@
     "seed": 1592597055,
     "size": 401,
     "radius": 200,
-    "biomeCell": 9,
+    "biomeCell": 50,
     "biomeRegionCells": 5,
     "rings": {
         "center": 0.08,
         "inner": 0.34,
         "mid": 0.64
     },
-    "hpMin": 270000,
-    "hpMax": 540000,
+    "hpMin": 180000,
+    "hpMax": 360000,
     "hpGradeAttack": {
         "common": 300,
         "uncommon": 600,
@@ -26,15 +26,15 @@
     "slotsPerTile": 2,
     "barrenCell": 5,
     "barrenThreshold": {
-        "outer": 0.4896,
-        "mid": 0.4141,
-        "inner": 0.3659,
-        "center": 0.2733
+        "outer": 0.494,
+        "mid": 0.4284,
+        "inner": 0.3656,
+        "center": 0.3312
     },
-    "pocketLifetimeMs": 1440000,
+    "pocketLifetimeMs": 14400000,
     "pocketChance": 0.04,
     "pocketYield": 1.5,
-    "packLifetimeMs": 720000,
+    "packLifetimeMs": 7200000,
     "huntChance": 0.35,
     "packChance": {
         "outer": 0.04,

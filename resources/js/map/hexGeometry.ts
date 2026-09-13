@@ -16,6 +16,58 @@ export const HEX_H = 34
 /** Extruded thickness of the tile slab. */
 export const HEX_DEPTH = 11
 
+/*
+ * ---------------------------------------------------------------- the zoom
+ *
+ * §13.2 -- one continuous zoom, measured in PIXELS PER HEX COLUMN.
+ *
+ * That unit is the whole trick. The board is drawn in map units and scaled by a
+ * viewBox; the chart is drawn in pixels off the seed. Pixels-per-column is the
+ * one number both of them mean the same thing by, so the two renderers are two
+ * stretches of one ladder rather than two screens with a door between them.
+ *
+ * It replaced the atlas. There used to be a separate chart behind a button --
+ * its own canvas, its own pan, its own four named zoom steps, its own readout
+ * for what you tapped -- and the thing it was for is simply the far end of this
+ * ladder. One control, one map, and the question "how far out am I" has one
+ * answer instead of two.
+ *
+ * The HANDOVER is a tile budget rather than a taste. The board is one <g> per
+ * hex, so its cost goes as the square of how far out the camera is: a 900x620
+ * viewport holds about 700 tiles at COL_STEP, two thousand at half of it and
+ * seven thousand at a quarter. MAP_PX_CHART is where that stops being
+ * affordable -- and it lands where a hex is about a third of its drawn size,
+ * which is already past the point where anything on one can be read or acted
+ * on. Below it the chart draws the same world as sampled colour.
+ */
+
+/** The scale the board has always been drawn at: one hex column, full size. */
+export const MAP_PX_DEFAULT = HEX_W * 0.75
+
+/** As close as the camera goes. Four times the board, and no further. */
+export const MAP_PX_MAX = MAP_PX_DEFAULT * 4
+
+/**
+ * Where the board hands over to the chart.
+ *
+ * A tile budget: see above. Roughly a third of COL_STEP, which is about three
+ * thousand tiles on a desktop viewport and the most the SVG should be asked
+ * for.
+ */
+export const MAP_PX_CHART = 15
+
+/**
+ * As far out as the camera goes: the whole world edge to edge.
+ *
+ * Not a constant, because "the whole world" is a deployment setting (§5.1) --
+ * the map is 10001 a side at ship scale and 401 in the suite, and a fixed floor
+ * would frame one of them against a void. A little under the exact fit, so the
+ * far end is the world with a margin rather than the world jammed to the glass.
+ */
+export function mapPxMin(mapSize: number, viewportWidth: number): number {
+  return Math.min(MAP_PX_CHART, (viewportWidth * 0.9) / Math.max(1, mapSize))
+}
+
 /** Tiling, §13.2. Flat-top: columns overlap by a quarter width. */
 export const COL_STEP = HEX_W * 0.75 // 43.5
 export const ROW_STEP = HEX_H // 34

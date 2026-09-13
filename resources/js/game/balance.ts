@@ -19,7 +19,8 @@
  */
 export const SOLID_SCALE = 100
 
-export const MINUTE = 60_000
+export const SECOND = 1_000
+export const MINUTE = 60 * SECOND
 export const HOUR = 60 * MINUTE
 
 /**
@@ -35,18 +36,25 @@ export const HOUR = 60 * MINUTE
 export const MAP = {
   /** §5.1. Server-authoritative: the client is handed these by GET /api/world,
    *  so they are documentation, not the source of truth. The map is square and
-   *  centerd on the origin -- a radius of 200 is every column and every row
-   *  from -200 to 200, so `size` is `radius * 2 + 1`. */
-  radius: 2500,
-  size: 5001,
+   *  centerd on the origin -- a radius of 5000 is every column and every row
+   *  from -5000 to 5000, so `size` is `radius * 2 + 1`. */
+  radius: 5000,
+  size: 10001,
   seed: 0x5eed_1a3f,
   /** Biome lattice, §5.3. Cell size in tiles, and how many cells make up one
    *  coherent region. Patches must be small enough that a second biome is a
    *  short walk from a fresh spawn -- there is no reach limit (§5.6), but there
    *  is a clock, and a new character should not owe it a day for a second
-   *  material. */
-  biomeCell: 9,
+   *  material. It is also the SETTLEMENT lattice: one country, one settlement
+   *  (§6), which is why worldgen.ts reads its cell off this. */
+  biomeCell: 50,
   biomeRegionCells: 5,
+  /** §6 -- what share of countries have anybody living in them. The settlement
+   *  lattice is the biome lattice, so a country carries at most one settlement
+   *  and this is whether it carries any. A half rather than all, because a map
+   *  where "is there a bench here" always answers yes has nothing to find out.
+   *  Mirrors Balance::SETTLED_COUNTRY_SHARE. */
+  settledCountryShare: 0.5,
   /** Normalised radius boundaries for the ring layout, §5.2. */
   rings: { center: 0.08, inner: 0.34, mid: 0.64 },
   /**
@@ -56,15 +64,15 @@ export const MAP = {
    * and the server end up disagreeing.
    */
   sightRadius: 1,
-  /** §5 -- five minutes of ground per hex, before travelSpeed divides it. */
-  travelMsPerHex: 5 * MINUTE,
+  /** §5 -- five seconds of ground per hex, before travelSpeed divides it. */
+  travelMsPerHex: 5 * SECOND,
 } as const
 
 export const MINING = {
   /** §7.3 -- a hex's HP, which is the only thing the world rolls for it.
-   *  2,700 is fifteen minutes for the common rung with nothing learned yet. */
-  hpMin: 270000,
-  hpMax: 540000,
+   *  1,800 is ten minutes for the common rung with nothing learned yet. */
+  hpMin: 180000,
+  hpMax: 360000,
   /** §5.3 -- the tool rung each grade of ground is measured at. Base ground is
    *  the common rung and comes through untouched; every grade above it costs
    *  what its own rung is worth, so better ground asks for a better tool. */
