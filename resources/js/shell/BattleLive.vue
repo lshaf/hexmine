@@ -269,7 +269,10 @@ onBeforeUnmount(stop)
 .scrim {
   position: fixed;
   inset: 0;
-  z-index: 60;
+  /* A rung of the ladder rather than a number. It was a raw 60, which tied with
+     --z-toast and lost to it only by accident of source order -- so a toast
+     raised mid-fight opened behind the fight (app.css). */
+  z-index: var(--z-modal);
   display: grid;
   place-items: center;
   padding: 18px;

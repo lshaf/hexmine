@@ -63,9 +63,25 @@ const visible = computed(() =>
 </template>
 
 <style scoped>
-/* Top of the stacking ladder -- see --z-toast in app.css. */
+/*
+ * Top of the stacking ladder (--z-toast in app.css), and FIXED to the window
+ * rather than to whatever happens to be around it.
+ *
+ * One place, at every width, whatever else is on screen. It used to dodge:
+ * absolute inside the app shell, and on a phone it rode --stack-h so it sat
+ * above the bottom dock and moved as that dock grew and shrank with what you
+ * were standing on. The reasoning was that a phone has no free top edge -- the
+ * gauge cluster owns the left and the corner strip the right -- so the toast
+ * went looking for a clear band.
+ *
+ * A toast does not need a clear band. It is the topmost thing in the app and it
+ * is gone in a few seconds, so overlapping the HUD costs nothing and moving
+ * costs the one thing a notification cannot afford: you have to FIND it. A
+ * message that appears somewhere different depending on which hex you are
+ * standing on is a message you read late.
+ */
 .toasts {
-  position: absolute;
+  position: fixed;
   top: 12px;
   left: 50%;
   transform: translateX(-50%);
@@ -182,21 +198,16 @@ const visible = computed(() =>
 }
 
 /*
- * Phones have no free top edge at all: the gauge cluster owns the left, the
- * screen strip owns the right, and tucking under the strip landed toasts on top
- * of the two cells below it. The clear band is above the bottom stack -- next to
- * where the acting happens, and the one place nothing else sits. --stack-h is
- * that stack measured (App.vue), so the toasts ride it as the dock grows and
- * shrinks with location. Newest sits nearest the dock.
+ * A phone changes the WIDTH and nothing else. There is no room at 390px for a
+ * toast to be a neat centred pill, so it spans the width -- but it spans it in
+ * the same place it always is, because where a notification appears is the one
+ * thing about it that must not depend on anything.
  */
 @media (max-width: 560px) {
   .toasts {
-    top: auto;
-    bottom: calc(var(--stack-h, 150px) + 12px + env(safe-area-inset-bottom, 0px));
     left: 8px;
     right: 8px;
     transform: none;
-    flex-direction: column-reverse;
     align-items: stretch;
     gap: 6px;
   }

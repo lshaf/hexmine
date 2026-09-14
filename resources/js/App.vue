@@ -17,7 +17,7 @@
  * §13.2 -- sizing is real CSS, not utility classes with arbitrary values, which
  * silently collapsed the viewport to zero height when tried.
  */
-import { onMounted, onBeforeUnmount, computed, nextTick, ref, watch } from 'vue'
+import { onMounted, onBeforeUnmount, computed, nextTick, ref } from 'vue'
 import { useGame } from '@/stores/game'
 import { logout } from '@/wallet/wax'
 import HexMap from '@/map/HexMap.vue'
@@ -302,32 +302,17 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onMenuKey))
 /** The station opens for whichever settlement the player is standing on. */
 const station = computed(() => game.station)
 
-/**
- * The bottom stack is the one plate whose height changes with where you are --
- * a settlement dock under an open tile card is twice an empty one -- and on a
- * phone the toasts have to sit clear of it (§13.2). Measured rather than
- * guessed, and published as --stack-h for anything that needs to ride it.
+/*
+ * The bottom stack used to be MEASURED, and published as --stack-h so the
+ * toasts could sit clear of it on a phone. A ResizeObserver, a ref, a watcher
+ * and a style binding, for one consumer.
+ *
+ * The toast does not dodge any more (Toasts.vue): it is the topmost thing in
+ * the app and it is gone in seconds, so it floats in one place and overlaps
+ * whatever is under it. That left this measuring a height nobody read, which is
+ * worse than not measuring it -- it ran on every dock resize and looked like it
+ * was for something.
  */
-const bottomStack = ref<HTMLElement | null>(null)
-const stackHeight = ref(0)
-let stackWatcher: ResizeObserver | undefined
-
-watch(bottomStack, (el) => {
-  stackWatcher?.disconnect()
-  stackWatcher = undefined
-
-  if (!el) {
-    stackHeight.value = 0
-    return
-  }
-
-  stackWatcher = new ResizeObserver(([entry]) => {
-    stackHeight.value = Math.round(entry!.contentRect.height)
-  })
-  stackWatcher.observe(el)
-})
-
-onBeforeUnmount(() => stackWatcher?.disconnect())
 
 /**
  * The map tells the store how much room it has, and where the camera has
@@ -364,7 +349,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="app" :style="stackHeight ? { '--stack-h': `${stackHeight}px` } : undefined">
+  <div class="app">
     <LoginView v-if="gate === 'login'" @connected="onConnected" />
 
     <template v-else-if="game.booted && game.character">
@@ -569,7 +554,7 @@ onMounted(() => {
       <div v-if="menuOpen || gotoOpen" class="menu-scrim" @click="closeMenu" />
 
       <!-- -------------------------------------------------- bottom center -->
-      <div ref="bottomStack" class="corner bottom-center">
+      <div class="corner bottom-center">
         <TileCard />
         <ActionDock />
       </div>
