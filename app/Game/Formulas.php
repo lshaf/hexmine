@@ -937,6 +937,15 @@ final class Formulas
      * still hurts a wall and a light one still cannot. That slope is what makes
      * the difference between a rare kit and an epic one against the same
      * carapace, where straight subtraction made both of them chip for one.
+     *
+     * THE SLOPE ONLY STARTED WORKING WHEN BATTLE_CHIP CAME DOWN TO ONE. While
+     * the chip was 100 -- one whole point at the pre-SOLID_SCALE scale, carried
+     * up with everything else -- it sat above a hundredth of every attack in
+     * the game (the fraction only overtakes it at 10,000 units, and the
+     * strongest kit carries about 4,100), so this max() picked the chip every
+     * time and bare hands chipped a wall for exactly as much as a legendary kit
+     * did. The paragraph above described the intent and the arithmetic did the
+     * opposite.
      */
     public static function strikeFloor(int $attack): int
     {

@@ -564,13 +564,29 @@ final class Balance
     public const BATTLE_BAND = 2000;
 
     /**
-     * §9.5.5 -- the smallest a strike can ever be.
+     * §9.5.5 -- the smallest a strike can ever be. ONE, the smallest thing the
+     * model can express.
      *
      * Never hopeless and never certain, which is the same instinct as §7.3's
      * floor. A wall you cannot scratch would be a locked hex, and §9.5.3 says
-     * fighting is always one of the two ways out.
+     * fighting is always one of the two ways out. That is the whole job, and
+     * one unit does it.
+     *
+     * It was 100 -- one whole point at the pre-SOLID_SCALE scale, multiplied up
+     * with everything else and left there. That was a number doing a second job
+     * nobody asked it to do. A hundredth of an attack only overtakes a flat
+     * 100 at 10,000 units -- a hundred whole points -- and the strongest kit in
+     * the game carries about 41. So `max(chip, 1% of attack)` picked the chip
+     * for EVERY attack in the game and BATTLE_CHIP_FRACTION below never once
+     * governed a blow. The slope it describes -- a heavy hitter still hurts a
+     * wall and a light one still cannot -- was documented, tested around, and
+     * inert.
+     *
+     * At one unit the floor is what it says it is: the guard against a locked
+     * hex, and nothing else. The fraction decides what gets through a wall,
+     * which is what §9.5.5 always said it did.
      */
-    public const BATTLE_CHIP = 100;
+    public const BATTLE_CHIP = 1;
 
     /**
      * §9.5.5 -- and the floor scales with what is swinging, not just with the

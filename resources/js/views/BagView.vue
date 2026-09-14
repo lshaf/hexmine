@@ -64,7 +64,7 @@ import {
   SCOPE_LABEL,
   SLOT_LABEL,
 } from '@/game/catalog'
-import { statLine, swapCeilingNote, swapChanges } from '@/game/formulas'
+import { repairBill, repairCoinTierAt, statLine, swapCeilingNote, swapChanges } from '@/game/formulas'
 import type { SwapChange } from '@/game/formulas'
 import GearAction from '@/components/GearAction.vue'
 import RepairCost from '@/components/RepairCost.vue'
@@ -685,6 +685,52 @@ async function scrap(item: OwnedItem): Promise<void> {
   close()
 }
 
+/**
+ * §8.2 -- mend it, out of the bag or out of the purse.
+ *
+ * The plate closes afterwards like every other verb here: what you opened it to
+ * find out is answered, and the comb behind it has the piece's new bar on it.
+ */
+async function mend(item: OwnedItem, coin = false): Promise<void> {
+  await game.repair(item.id, coin)
+  close()
+}
+
+/** §8.2 -- is this piece short of its ceiling? Only then is there a mend. */
+const mending = computed(() => {
+  const item = picked.value?.kind === 'gear' ? picked.value.item : null
+  if (!item) return false
+
+  const ceiling = item.maxDurability || ITEM_BY_KEY[item.key]?.maxDurability || 0
+
+  return ceiling > 0 && item.durability < ceiling
+})
+
+/**
+ * §8.2 -- whether the Repair button can do anything from where you stand.
+ *
+ * A piece with a recipe is mended out of your own bag with your own parts, so
+ * it mends anywhere. A piece with NO recipe is the trader's -- basic gear, paid
+ * for in coin (§3.2) -- so it needs a counter, and offering the button in a
+ * forest would be offering a refusal. A plate must never offer the thing that
+ * does nothing.
+ */
+const canMend = computed(() => {
+  const item = picked.value?.kind === 'gear' ? picked.value.item : null
+  if (!mending.value || !item) return false
+
+  return Object.keys(mendBill(item).cost).length > 0 || game.currentSettlement !== null
+})
+
+/**
+ * §8.2 -- the same bill RepairCost draws, so the plate and the button beside it
+ * cannot disagree. `coinOffered` is where the settlement gating lives: out in
+ * the field there is no counter, so the coin half is not on offer (§3.2).
+ */
+function mendBill(item: OwnedItem) {
+  return repairBill(ITEM_BY_KEY[item.key], item, repairCoinTierAt(game.currentSettlement?.tier))
+}
+
 </script>
 
 <template>
@@ -949,9 +995,9 @@ async function scrap(item: OwnedItem): Promise<void> {
                 <p v-if="ceilingNote" class="tiny ceiling">{{ ceilingNote }}</p>
               </section>
 
-              <!-- §8.2 -- what a mend would take. The bill is said here and
-                   the button is not: mending is bench work, so it is offered
-                   on the Repair tab at a workbench and nowhere else. -->
+              <!-- §8.2 -- what a mend would take, with the button for it in
+                   the band below. The bag is where you find out a piece is
+                   worn; doing something about it belongs in the same place. -->
               <section class="band">
                 <RepairCost :item="picked.item" />
               </section>
@@ -1026,6 +1072,28 @@ async function scrap(item: OwnedItem): Promise<void> {
                   class="grow"
                   :disabled="game.busy || picked.item.durability <= 0"
                   @click="equip(picked.item)"
+                />
+                <!-- §8.2 -- out of your own bag with your own parts, wherever
+                     you are standing. A broken axe in a forest is a thing to
+                     deal with where you are. -->
+                <GearAction
+                  v-if="canMend"
+                  action="repair"
+                  label="Repair"
+                  wide
+                  :disabled="game.busy"
+                  @click="mend(picked.item)"
+                />
+                <!-- §3.2 -- buying the parts is the half that needs somebody to
+                     buy them from, so it appears at a counter and nowhere
+                     else. -->
+                <GearAction
+                  v-if="mending && mendBill(picked.item).coinOffered"
+                  action="repair"
+                  :label="`Buy parts · ${mendBill(picked.item).gold}g`"
+                  wide
+                  :disabled="game.busy"
+                  @click="mend(picked.item, true)"
                 />
                 <GearAction
                   action="scrap"

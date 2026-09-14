@@ -42,7 +42,14 @@ import {
   STAT_LABEL,
   slotForSkill,
 } from '@/game/catalog'
-import { formatPercent, formatStat, optionStatLine, swapChanges } from '@/game/formulas'
+import {
+  formatPercent,
+  formatStat,
+  optionStatLine,
+  repairBill,
+  repairCoinTierAt,
+  swapChanges,
+} from '@/game/formulas'
 import { EQUIPMENT } from '@/game/balance'
 import { itemIcon, skillIcon } from '@/icons/procedural'
 import GearCell from '@/components/GearCell.vue'
@@ -195,6 +202,18 @@ async function act(run: Promise<unknown>): Promise<void> {
   close()
 }
 
+/**
+ * §8.2 -- the same bill RepairCost draws, so the price on the plate and the
+ * price on the button beside it cannot disagree.
+ *
+ * `coinOffered` is where the settlement gating lives: the tier is read off
+ * wherever you are standing, and out in the field there is no counter, so the
+ * coin half of the bill is simply not on offer (§3.2).
+ */
+function mendBill(item: OwnedItem) {
+  return repairBill(ITEM_BY_KEY[item.key], item, repairCoinTierAt(game.currentSettlement?.tier))
+}
+
 /** §8.2 -- is this piece short of its ceiling? Only then is there a mend to name. */
 const mending = computed(() => {
   const item = picked.value?.item
@@ -204,6 +223,27 @@ const mending = computed(() => {
 
   return ceiling > 0 && item.durability < ceiling
 })
+
+/**
+ * §8.2 -- whether the Repair button can do anything from where you stand.
+ *
+ * A piece with a recipe is mended out of your own bag with your own parts, so
+ * it mends anywhere. A piece with NO recipe is the trader's -- basic gear, paid
+ * for in coin (§3.2) -- so it needs a counter, and offering the button in a
+ * forest would be offering a refusal. A plate must never offer the thing that
+ * does nothing.
+ */
+const canMend = computed(() => {
+  const item = picked.value?.item
+  if (!mending.value || !item) return false
+
+  return spareMendable(item)
+})
+
+/** The same question for a spare on a row, which has no `picked` to read. */
+function spareMendable(item: OwnedItem): boolean {
+  return Object.keys(mendBill(item).cost).length > 0 || game.currentSettlement !== null
+}
 
 /**
  * §8.1 rule 1 -- the load-bearing number on this page.
@@ -454,17 +494,32 @@ const ceilings = computed(() =>
                 Broken — this slot is paying nothing until it is mended.
               </p>
 
-              <!-- §8.2 -- what it needs, and where. The bill is still said
-                   here because this is the screen opened to find out WHICH
-                   piece is about to break; what is not here is the button,
-                   because mending is bench work and this plate is a condition
-                   read-out. -->
+              <!-- §8.2 -- what it needs, and then the button that does it.
+                   This is the screen opened to find out WHICH piece is about to
+                   break, so the thing to do about it belongs here rather than
+                   four countries away. -->
               <RepairCost :item="picked.item" />
-              <p v-if="mending" class="tiny muted mend-note">
-                Mended at a workbench, on the Repair tab.
-              </p>
 
               <div class="acts">
+                <GearAction
+                  v-if="canMend"
+                  action="repair"
+                  label="Repair"
+                  wide
+                  :disabled="game.busy"
+                  @click="act(game.repair(picked.item.id))"
+                />
+                <!-- §3.2 -- and the counter's price, only where there is a
+                     counter. Buying the parts is the half of a mend that needs
+                     somebody to buy them from. -->
+                <GearAction
+                  v-if="mending && mendBill(picked.item).coinOffered"
+                  action="repair"
+                  :label="`Buy parts · ${mendBill(picked.item).gold}g`"
+                  wide
+                  :disabled="game.busy"
+                  @click="act(game.repair(picked.item.id, true))"
+                />
                 <GearAction
                   action="stow"
                   label="Stow"
@@ -496,11 +551,21 @@ const ceilings = computed(() =>
                     :same="picked.item ? 'Same stats as the one on the belt.' : 'No stats to speak of.'"
                   />
                 </div>
-                <!-- §8.2 -- a broken spare cannot be put on, and mending is
-                     bench work now, so the row says what it needs rather than
-                     offering a button that would only refuse. A plate must
-                     never offer the thing that does nothing. -->
-                <span v-if="c.item.durability <= 0" class="tiny broken">Broken</span>
+                <!-- §8.2 -- a broken spare cannot be put on, so the row offers
+                     the one thing that CAN be done with it. A plate must never
+                     offer the thing that does nothing, which is also why the
+                     button gives way to a word when the mend is the trader's
+                     and there is no trader here. -->
+                <template v-if="c.item.durability <= 0">
+                  <GearAction
+                    v-if="spareMendable(c.item)"
+                    action="repair"
+                    label="Repair"
+                    :disabled="game.busy"
+                    @click="act(game.repair(c.item.id))"
+                  />
+                  <span v-else class="tiny broken">Broken</span>
+                </template>
                 <GearAction
                   v-else
                   action="equip"
@@ -529,11 +594,6 @@ const ceilings = computed(() =>
 </template>
 
 <style scoped>
-/* §8.2 -- where the button used to be. */
-.mend-note {
-  margin: 3px 0 0;
-}
-
 .page {
   /* Sizing and scrolling belong to PanelOverlay. */
   padding: 0;

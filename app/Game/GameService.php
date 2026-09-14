@@ -7759,16 +7759,24 @@ class GameService
                 throw new GameException('Nothing to repair.', 'noop');
             }
 
-            // §8.2 -- a mend is BENCH work, so it happens where the bench is.
+            // §8.2 -- MATERIALS MEND ANYWHERE, COIN NEEDS A COUNTER.
             //
-            // The same anvil, the same job and a bill in the same materials,
-            // and it teaches the craft job that could have made the piece --
-            // which is the whole argument, and it was being made from the
-            // middle of a forest. The coin path already asked for a counter
-            // (§10.6); the material path asked for nothing, which left the one
-            // place a mend is actually done the one place it was not offered.
-            $this->requireSettlement($character, 'mend that');
-
+            // The split is who is doing the work. Out of your own bag it is
+            // your own hands and your own parts, and a bill you can already
+            // pay is not a reason to walk four countries; this is an idle game
+            // and a broken axe in a forest is a thing to deal with where you
+            // are standing.
+            //
+            // Buying the parts is the half that needs somebody to buy them
+            // FROM. §3.2 keeps gold NPC-facing, and a counter is a place (§6),
+            // so both paid paths -- the split bill below and the no-recipe
+            // trader mend further down -- ask for a settlement and the material
+            // path does not.
+            //
+            // It briefly asked for one either way, on the argument that a mend
+            // is bench work because it teaches the bench's job. That argument
+            // is about what a mend TEACHES and this is about what it COSTS, and
+            // the two do not have to answer together.
             $gold = 0;
 
             if (isset($def['inputs'])) {
@@ -7780,7 +7788,9 @@ class GameService
                 $split = ['coin' => [], 'materials' => $cost];
 
                 if ($withCoin) {
-                    // Already known to be somewhere, by the check above.
+                    // §3.2 -- gold buys the parts, so there has to be somebody
+                    // selling them. This is the only place the mend asks where
+                    // you are standing.
                     $settlement = $this->requireSettlement($character, 'buy repair parts');
                     $reach = Balance::REPAIR_COIN_TIER[$settlement['tier']] ?? 0;
                     $split = Formulas::repairCoinSplit($cost, $reach);

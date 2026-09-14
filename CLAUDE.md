@@ -2727,12 +2727,24 @@ the game, §11.1.)*
   risk while you are down a mine.
 - Nothing minted can be destroyed, because minting takes it out of the game
   (§3.3). Destruction reaches every rung that is actually *in* a bag.
-- **A mend happens at a bench, and it is a tab on the craft panel.** The same
-  anvil, the same job and a bill in the same materials — and it teaches the
-  craft job that could have made the piece, which is the whole argument and was
-  being made from the middle of a forest. So it is offered where the anvil is:
-  a fifth tab beside Tools, Weapons, Armor and Drafts, listing what you own and
-  what it is short of.
+- **Materials mend anywhere; coin needs a counter.** The split is who is doing
+  the work. Out of your own bag it is your own hands and your own parts, and a
+  bill you can already pay is not a reason to walk four countries — this is an
+  idle game, and a broken axe in a forest is a thing to deal with where you are
+  standing. **Buying** the parts is the half that needs somebody to buy them
+  *from*: §3.2 keeps gold NPC-facing and a counter is a place (§6), so both paid
+  paths — the split bill, and the trader's mend of a piece with no recipe — ask
+  where you are standing.
+
+  *(It briefly asked for a settlement either way, on the argument that a mend is
+  bench work because it teaches the bench's job. That is about what a mend
+  TEACHES and this is about what it COSTS, and the two do not have to answer
+  together.)*
+- **It is also a tab on the craft panel.** The same anvil, the same job and a
+  bill in the same materials, gathered in one place: a fifth tab beside Tools,
+  Weapons, Armor and Drafts, naming what you own and what it is short of. That
+  is the screen for working through a whole kit; the plates are for the piece in
+  front of you.
 
   **A tab and not a shelf.** Nothing there is being chosen between — it is a
   list of your own pieces and their bills — which is why it takes no rung
@@ -2747,17 +2759,18 @@ the game, §11.1.)*
   zero and still be yours. Worst first, which is the order the question is asked
   in.
 
-  **The gear plates keep the bill and lose the button.** The prospector sheet is
-  a condition read-out (§8.2) and the bag is a picture of what you hold; both
-  say what a mend would take, because that is the decision, and neither offers
-  it, because neither is a bench. A broken spare says *Broken* rather than
-  offering a button that would only refuse — a plate must never offer the thing
-  that does nothing.
+  **The gear plates carry the bill AND the button.** The prospector sheet is the
+  screen you open to find out which piece is about to break, and the bag is
+  where you find out a piece is worn — so the thing to do about it belongs in
+  the same place rather than four countries away.
 
-  *(It used to be offered from anywhere at all, which made the one place a mend
-  is actually done the one place it was not offered — and left the paid mend
-  (§10.6's counter, which needs a settlement) sitting on a plate you can open in
-  the middle of a forest.)*
+  **A plate must never offer the thing that does nothing**, and that rule
+  decides which button appears rather than whether any does. Repair shows where
+  it can work: a piece with a recipe mends out of the bag anywhere, a piece with
+  none is the trader's and needs a counter, and *Buy parts* appears only where
+  there is a counter stocking some of the bill. A broken spare offers Repair
+  where Equip would only refuse, and gives way to the word *Broken* where the
+  mend is the trader's and there is no trader here.
 - **The bill is said before the button, everywhere the button is.** What a mend
   takes is the decision (§11.1 makes it the largest continuous sink in the
   game), not a footnote to it, so the parts are listed under the wear bar with
@@ -3806,7 +3819,7 @@ itsHp  = the monster's own `hp`
 
 each round, you strike first and it strikes back if it is still standing:
   hit = max(strikeFloor(attacker), attacker.attack - defender.defense) * swing
-  strikeFloor(a) = max(BATTLE_CHIP, ceil(a * BATTLE_CHIP_FRACTION))  // 1%, never under one whole point
+  strikeFloor(a) = max(BATTLE_CHIP, ceil(a * BATTLE_CHIP_FRACTION))  // 1%, never under one unit
   swing = U(1 - BATTLE_SWING, 1 + BATTLE_SWING)               // ±15%, seeded
 
 you win  if its pool empties first
@@ -3838,9 +3851,22 @@ Four numbers hold the shape, and each of them had to be what it is:
   fight against one is still a race — but a guard that clears the attack is
   now *felt* as one. It was a tenth, and a tenth was most of a hit: a kit with
   2,860 defense against a 2,100 attack still took 210 a round, which made
-  over-building defense worth almost nothing past the crossover. Under one
-  whole point (`BATTLE_CHIP`, 100 at §7.3's scale) the chip is that point
-  instead, so a light hitter still lands *something*.
+  over-building defense worth almost nothing past the crossover.
+
+  **`BATTLE_CHIP` is ONE** — the smallest thing the model can express — and it
+  is the guard against a locked hex (§9.5.3) and nothing else. It was **100**,
+  which is one whole point at the scale everything was quoted in before §7.3's
+  `SOLID_SCALE`, multiplied up with the rest and left there. That made it a
+  number doing a second job nobody asked for. The fraction only overtakes a
+  flat 100 at **10,000 units of attack** — a hundred whole points — and the
+  strongest kit in the game carries about **41**. So the `max()` above picked
+  the flat chip for *every* attack in the game and the fraction never once
+  governed a blow: in 77 of the 120 kit-against-monster matchups, bare hands
+  chipped a wall for exactly as much as a legendary kit did.
+
+  The slope this section describes was documented, tested around, and inert.
+  At one unit the fraction decides what gets through a wall, which is what it
+  was always said to do.
 - **`BATTLE_MAX_ROUNDS` = 60, and the bell is a LOSS.** Pools are far larger
   than anything a pack carries, so a long enough fight is won by whoever brought
   more durability — a wall could be ground down by a kit with no business

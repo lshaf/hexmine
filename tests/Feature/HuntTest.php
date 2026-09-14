@@ -136,19 +136,60 @@ final class HuntTest extends TestCase
         [$character, $hunt] = $this->standOnAnimal();
 
         $bare = $this->takeIt($character);
-        $this->assertArrayHasKey(Catalog::HUNT_SCRAP, $bare['gained'], 'bare hands paid no scrap');
+        $this->assertNotEmpty($bare['gained'], 'a bare-handed kill brought nothing home');
+
+        // The table rather than the roll, for the reason spelled out below: a
+        // haul is a SPLIT, so no one kind is guaranteed to be in it. Scrap is
+        // 82% of the bare-handed table against 55% for the hide on the armed
+        // one, so this half was only ever a slow flake rather than a fast one.
+        $bareTable = Drops::tableFor(
+            Drops::HUNTING,
+            WorldGen::generateTile((int) $character->col, (int) $character->row, 0),
+            Catalog::HUNT_SCRAP,
+        );
+        arsort($bareTable);
+
+        $this->assertSame(
+            Catalog::HUNT_SCRAP,
+            array_key_first($bareTable),
+            'bare hands are not mostly paid in scrap',
+        );
+        $this->assertArrayNotHasKey($hunt['animal']['material'], $bareTable, 'bare hands took the hide');
 
         // And the same animal, with a bow on the belt.
         [$armedCharacter, $armedHunt] = $this->standOnAnimal('0xbow');
         $this->equipBow($armedCharacter);
 
         $armed = $this->takeIt($armedCharacter);
-        $this->assertArrayHasKey(
-            $armedHunt['animal']['material'],
-            $armed['gained'],
-            'a bow did not bring the pelt home',
-        );
+        $this->assertNotEmpty($armed['gained'], 'an armed kill brought nothing home');
+
+        // §4.0 -- the whole of what the bow buys, and it is true of EVERY kill
+        // rather than of a lucky one.
         $this->assertArrayNotHasKey(Catalog::HUNT_SCRAP, $armed['gained']);
+
+        // §5.5/§5.3 -- what it does NOT promise is the hide in this particular
+        // haul. A grade is what an animal MOSTLY gives up, so a kill split
+        // across the hide, the horn, the sinew, the two herbs and the critter
+        // can honestly come back without any -- this asserted it on one roll
+        // and passed only while the seed happened to cooperate.
+        //
+        // So the TABLE is what is pinned, which is what the bow actually
+        // changes: the hide is on it, it heads it, and the scrap a bare hand
+        // would have brought back is not on it at all.
+        $table = Drops::tableFor(
+            Drops::HUNTING,
+            WorldGen::generateTile((int) $armedCharacter->col, (int) $armedCharacter->row, 0),
+            $armedHunt['animal']['material'],
+        );
+        arsort($table);
+
+        $this->assertArrayHasKey($armedHunt['animal']['material'], $table);
+        $this->assertArrayNotHasKey(Catalog::HUNT_SCRAP, $table);
+        $this->assertSame(
+            $armedHunt['animal']['material'],
+            array_key_first($table),
+            'the hide is not what this animal mostly gives up',
+        );
     }
 
     /**

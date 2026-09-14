@@ -217,16 +217,19 @@ final class RepairCoinTest extends TestCase
     }
 
     /**
-     * §8.2 -- and a mend of ANY kind happens where the bench is.
+     * §8.2 -- MATERIALS MEND ANYWHERE, and that is the half this pins.
      *
-     * The same anvil, the same job and a bill in the same materials, and it
-     * teaches the craft job that could have made the piece -- which is the
-     * whole argument, and it was being made from the middle of a forest. The
-     * coin path always asked for a counter; the material path asked for
-     * nothing, which left the one place a mend is actually done the one place
-     * it was not offered.
+     * The split is who is doing the work. Out of your own bag it is your own
+     * hands and your own parts, and a bill you can already pay is not a reason
+     * to walk four countries -- this is an idle game, and a broken axe in a
+     * forest is a thing to deal with where you are standing.
+     *
+     * It briefly asked for a settlement either way, on the argument that a mend
+     * is bench work because it teaches the bench's job. That argument is about
+     * what a mend TEACHES and this is about what it COSTS, and the two do not
+     * have to answer together -- the test below is the half that still does.
      */
-    public function test_a_mend_of_any_kind_is_refused_in_the_field(): void
+    public function test_a_material_mend_works_in_the_field(): void
     {
         $this->assertNull(
             $this->game->currentSettlement($this->character),
@@ -234,18 +237,25 @@ final class RepairCoinTest extends TestCase
         );
 
         $item = $this->worn('hewn_axe');
-        $this->give(array_map(static fn () => 200, $this->fullMend('hewn_axe')));
+        $bill = $this->fullMend('hewn_axe');
+        $this->give(array_map(static fn () => 200, $bill));
 
-        try {
-            $this->game->repairItem($this->character->fresh(), $item->id);
-            $this->fail('an axe was mended in a field');
-        } catch (GameException $e) {
-            $this->assertSame('not_at_settlement', $e->errorCode);
+        $out = $this->game->repairItem($this->character->fresh(), $item->id);
+
+        $this->assertSame(
+            Catalog::item('hewn_axe')['maxDurability'],
+            $item->fresh()->durability,
+            'the axe came back from the field unmended',
+        );
+
+        // The parts came out of the bag rather than out of a purse.
+        $this->assertSame(0, $out['gold'], 'a field mend charged gold');
+        foreach ($bill as $key => $qty) {
+            $this->assertSame(200 - $qty, $this->held($key), "{$key} was not spent");
         }
 
-        // And nothing was spent finding that out (§8.4).
-        $this->assertSame(1, $item->fresh()->durability);
-        $this->assertSame(200, $this->held('wood'));
+        // §8.2 -- and it still teaches: the mending was yours either way.
+        $this->assertGreaterThan(0, $out['jobXp'], 'a field mend taught nothing');
     }
 
     /** §6 -- there is nobody out here to buy parts from. */
