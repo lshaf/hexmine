@@ -3266,11 +3266,21 @@ dungeon that survived the plains biome going.
 | Windhollow | Grassland | Zephyr Shard |
 
 ### 9.2 Floor tiers
-| Floors | Party | Loot |
-|---|---|---|
-| 1–3 | Solo, gear-score gated | Essence + occasional Shard |
-| 4–6 | Solo-hard or duo | Reliable Shard, Relic chance |
-| 7–10 | 2–4 party required | Relic; **boss at 10 drops Core** |
+
+**Ten floors, and what changes with depth is the table, not the roster.** §9.6
+is the design; this is the shape it fills in.
+
+| Floors | Loot |
+|---|---|
+| 1–3 | Essence off every guardian; the dungeon's Shard from 4, or from 2 on hard |
+| 4–6 | the Shard reliably; Relic from 5 on hard |
+| 7–10 | Relic; a Core chance from 8 on hard, and **always off the floor-10 guardian** |
+
+*(The party column is gone. It read solo · duo · 2–4 required, and gear-score
+gated the first three floors — a number invented to answer a question the rest of
+the game answers by refusing nothing: §5.3's epic hex worked with a stone axe
+simply takes an hour. A roster is 1 to 6 at every depth now (§9.6.1), and what
+stops a solo on floor eight is the arithmetic rather than a door.)*
 
 ### 9.3 Entry cost
 - **Raid charge** — consumable crafted from refined materials (gives Planks/Ingots a sink
@@ -4312,6 +4322,385 @@ five where it never did. Monster `attack`/`defense`/`hp` and `BATTLE_SWING` are
 the levers for putting that back where it belongs, and neither has been touched
 yet: how hard the eight *should* be once every fighter has three skills is a
 tuning decision, not a consequence of adding them.
+
+### 9.6 Dungeons — a session, a party, and twelve hours
+
+**A dungeon is the one place in the game that is not the map.** Everything else
+in the world is a pure function of `(col, row, seed)` and is there whether
+anybody walks to it or not; a dungeon happens inside a **session** — a second
+coordinate space that stands for twelve hours, holds one to six named people, and
+then closes with all of them outside it.
+
+Every rule below falls out of that one sentence, and so does the reason this is
+the largest thing in the game: it is the first system with a roster, a wall
+clock, and state two players can change for each other.
+
+**It is also the first grind→external-value path the game has ever had**, since
+§8.0 makes legendary both a drop and mintable. §9.6.8 is what holds that shut,
+and it is not a tuning section — it is the price of the whole feature.
+
+#### 9.6.1 The session — a code, a roster, and a clock
+
+| | |
+|---|---|
+| **Opened by** | one prospector, standing at a dungeon mouth (§9.1) |
+| **Joined by** | anybody holding the **code**, standing at the same mouth |
+| **Roster** | **1 to 6.** Two or more is the shape it is built for; one is a challenge |
+| **Lifetime** | **12 hours** (`DUNGEON_SESSION_MS`), through `Balance::scaled()` |
+| **At the bell** | the session closes and everybody is outside, wherever they stood |
+
+**Twelve hours is long enough that the clock stops being what stops you**, and
+that is the point of it rather than a side effect. It was three, and at three the
+session was the binding constraint on everything: you could rush the guardians or
+sweep the floors and never both, and the clock rather than the kit decided how
+far down anybody got. At twelve, what runs out first is **durability and straps**
+(§9.6.5) — which is the right answer, because those are sinks the economy is
+balanced on (§11.1) and a clock is not. The session ends the run; it no longer
+shapes it.
+
+**It also spans a night, and that is what makes a party assemblable at all.** A
+session opened and left standing at the entrance is a rally point for half a day,
+which is the only answer this design has so far to the problem below — six people
+scattered across a 10001-hex map cannot be in one place inside an evening, and
+they can inside twelve hours. It does not solve it; it makes it possible.
+
+**What it does NOT change is the faucet** (§9.6.8). There are ten guardians and
+a longer clock does not make an eleventh, so the legendary arithmetic is capped
+by the floor count and is exactly what it was.
+
+**The code is how you let people in, not how you start.** A session is opened
+the same way whoever opens it intends to play it, and a prospector who tells
+nobody the code has soloed one without there being a solo mode to build. One
+path, and the roster is whatever walks through it.
+
+**The roster locks at the first descent**, and that is a §2 rule rather than a
+convenience. A session joinable at any depth is a **carry**: a maxed party
+clears to floor nine, a fresh wallet walks in on the code, and collects the
+floor-ten roll having fought nothing. That is a legendary faucet for wallets
+that did no work, which is exactly the shape the threat model exists to close.
+Before the first stair anybody with the code walks in; after it, the roster is
+what it is.
+
+**You must be standing at the mouth to join**, which is §10.0.4's rule — the
+verbs happen at the place — and it is the expensive half of this design. The
+mouths are in the centre ring, some five thousand hexes out, and at five seconds
+a hex (§5.6) getting six people to one is a logistics problem measured in days.
+That is the walk being the commitment, and it is also the single biggest reason
+a six-party will be rare. **Open**, and deliberately unresolved: a join that
+reaches across the map would make the mouth's position mean nothing, and the
+present rule may simply make six-parties not happen. Both answers cost
+something real.
+
+**Solo is a challenge by arithmetic, never by a mode.** Nothing below
+special-cases a roster of one; it comes out harder five ways on its own:
+
+- **No role coverage.** You are one family (§9.5.4). A knifedancer carries no
+  guard anywhere in the kit, and a party is what puts a shield in front of one.
+- **The whole bill lands on four pieces.** Across six people the wear spreads
+  over twenty-four and nothing approaches zero; alone, §8.2's destruction is a
+  live risk on every floor.
+- **Full variance.** One striker takes the whole ±15% `BATTLE_SWING`; six
+  average to about a sixth of it. Over ten guardians the solo loses one to luck
+  far more often.
+- **Down ends the run** (§9.6.6). A party fights on one member short.
+- **The floor alone.** Monsters never come back (§9.6.2), so a party splits up
+  and clears six times faster. With twelve hours that is no longer a race against
+  the bell — it is a race against the **kit**, since clearing six times slower
+  means six times the mines' worth of wear off four pieces instead of
+  twenty-four, out of one bag of parts.
+
+**And solo may never pay better than a party.** That is §2 and not tuning: a bot
+farm has infinite solo players and no friends, so a solo premium would make
+botting strictly optimal and turn the cost of finding five humans into
+decoration. Same rates, no safety net. Any prestige for it has to be a mark on
+a record and never a multiplier.
+
+#### 9.6.2 The floor — fifty by fifty, and the monsters are the fog
+
+**Ten floors, each a 50×50 field of hexes** (`DUNGEON_FLOOR_SIZE`), with a
+**guardian standing on the stair** and nothing else gating the way down.
+
+**The stair is drawn from the moment you land, and the monsters are not.** A
+dungeon is a built thing somebody made stairs in; it is not unexplored country,
+and §5.6's fog is a rule about a *world* that has to be walked to be known. So
+the geometry is known and the **creatures** are the unknown, which turns a floor
+from a search into a **route**: which fights do I take on the way to the stair?
+
+The arithmetic agrees but is no longer what decides it. Swept at sight one to
+three, twenty-five hundred hexes is about three hundred and fifty moves — half an
+hour a floor, five hours across ten, spent looking for a staircase. Against
+twelve hours that is survivable rather than fatal, which is exactly why the
+argument above has to carry itself: a dungeon has known stairs because somebody
+built them, not because the clock could not afford the search.
+
+*(Hiding the stair was the first reading of "a dungeon is a dark place", and it
+is the one thing in this section that would have made the whole of it unplayable.
+A 50×50 field is a wonderful thing to route across and a miserable thing to
+comb.)*
+
+**Monsters never respawn.** A floor holds what it holds, and a cleared hex stays
+cleared for the life of the session — same machinery as §9.5.1's cleared flag,
+the same `Cache::` key with a TTL, expiring with the session rather than with a
+bucket.
+
+Two things follow, and both are the point:
+
+- **§2 — a floor cannot be farmed, because there is nothing to farm twice.**
+  Supply inside a session is capped by the floor rather than by patience, which
+  is §9.5.1's own argument arriving in a room with a door on it.
+- **A party spreads out to clear and converges to fight.** Six people sweeping
+  one field separately is six times the ground; a guardian needs everybody on
+  one hex (§9.6.4). That is a party game with no party interface, produced
+  entirely by the two rules above standing next to each other.
+
+**What stocks a floor is the dungeon's own country** (§9.5.2), climbing tiers
+with depth. Four of the five dungeons belong to a biome and field that biome's
+five. **Beastwarren belongs to none** — §9.1 says it is where the things you hunt
+den — so it fields the hunt's own roster (§5.5) instead, which is the drawing
+already being right about what the place is.
+
+**The guardians are a tier the roster does not have.** Five of them, one per
+dungeon, above §9.5.2's tier four. They are the only new creatures this section
+needs.
+
+#### 9.6.3 The contract — which dungeon, what for, and how hard
+
+A mouth is **one site offering six contracts**, never six sites. Three axes, and
+each owns exactly one thing:
+
+| Axis | Owns |
+|---|---|
+| **Which dungeon** (5) | the Shard, and which country's five stock the floors |
+| **Category** (3) | which slots the top-tier table may roll — tools · armor · weapons |
+| **Difficulty** (2) | monster tier, guardian strength, and **twice** the legendary and unique rate |
+
+**The category is what makes a dungeon worth choosing rather than enduring.**
+Sixteen top-tier pieces against a flat table is a lottery nobody can aim at; a
+weapons run and a tools run are two different reasons to organise six people,
+and §4 already puts the same pressure on Shards for the same reason.
+
+**Weapons is the category with a hole in it.** `TopTier::ITEMS` covers eight
+slots and skips `weapon` on purpose, because battle gear runs its own ladder in
+`gen_battlegear.py` — which already emits **legendary** for all three families
+and stops there. So a weapons contract's unique roll currently has nothing to
+hand over, and the rung has to be generated before the category exists.
+
+**Hard is the same dungeon with the rate doubled**, and it wants a key of its
+own (§9.6.7) so the harder run has a foot in the loop it feeds.
+
+#### 9.6.4 Fighting together — offense sums, defense does not
+
+**A fight is joined by everybody standing on the hex when it is opened**, and by
+nobody else. This is the only place in the game where a fight has more than one
+side to it, and §9.5's exchange is otherwise untouched — the same
+`resolveBattle()`, the same ±15% swing, the same skills on the same cooldowns.
+
+```
+each round:
+  1. every member on the hex strikes, and the hits ADD
+       hit_i = max(strikeFloor(i), attack_i - G.defense) * swing
+
+  2. the guardian answers ONCE PER LIVING MEMBER, each answer against
+     that member's OWN defense, into that member's OWN pool
+
+  3. which member is weighted by DEFENSE — it swings at whoever is in the way
+
+  4. a pool at zero is DOWN, not dead: that member leaves the fight, and the
+     guardian answers one fewer time a round from then on
+```
+
+**Only one of the three sums, and which one is the whole design.** Summing the
+pair outright is catastrophic and it is the obvious thing to do: six people's
+defense against one attack drives `attack - defense` deep under the floor, so
+the guardian chips for one unit a round forever and a six-party is
+unkillable. Offense adds because **that is what a party is for**; defense stays
+personal because six people standing together are not individually harder to
+hit.
+
+**The guardian answers once per living member**, which is what keeps the bill
+per head flat — otherwise a six-party would split one monster's output six ways
+and pay a third of what a duo pays for the same kill.
+
+**Targeting by defense is how the shield family gets a job.** §9.5.4 gives the
+shieldbearer the slowest kill and the most expensive win, which alone is a
+miserable thing to be; the thing that swings at whoever is in the way makes them
+the one standing in it. **With no taunt button**, which matters — §9.5.9 says
+nothing in a fight is steered, and a party that could choose its target would be
+a bar of buttons in a game that has none.
+
+**Down is not dead**, and it is what makes a long fight worth watching: a party
+loses people, the answers thin out, and the spiral is visible in the same two
+pools §9.5.5 already draws. A member who goes down wakes at the entrance
+(§9.6.6) and the fight carries on without them.
+
+Two properties fall out rather than being arranged:
+
+- **A party is reliable and a solo is a lottery.** Six ±15% swings average to
+  about ±6%, so the same matchup is a coin flip alone and a near-certainty in
+  company. Nothing was tuned to produce that.
+- **Party size buys composition, not power.** With the guardian's pool scaled
+  by the roster and its answers counted by it, rounds-to-kill and damage-per-head
+  are flat across every roster size. What six gets over two is a **tank, a burst
+  and a sustain in the same fight**, which is the interesting version of the
+  question. `hp × N^0.9` is the one lever if size itself should ever pay.
+
+**The tuning anchor is a single measurement: solo, floor ten, best-in-slot, a
+coin flip.** Everything else reads off it, and a six-party lands at the same
+difficulty per head by construction.
+
+**Nothing splits.** Every member rolls the table for themselves, which is what
+lets §9.6.8 quote a rate a player can read. §10.2's split-by-contribution was
+written for a raid shape that does not exist yet and does not describe this one.
+
+#### 9.6.5 The strap budget — what you carried in is what you fight on
+
+**There is no counter inside**, so §8.2's rule already decides this and needs
+nothing added: **materials mend anywhere; coin needs a counter.** A prospector
+mends their own kit out of their own bag, on any floor, and the gold half of
+that section is closed by geography rather than by a special case.
+
+What it creates is the decision the whole session is built on. The bag is fifty
+straps (§7.6), eighty at a maxed Explorer, and it has to hold three things at
+once:
+
+| | |
+|---|---|
+| the key | one |
+| repair stock | a full mend is one recipe's worth of parts |
+| **what you came for** | everything left |
+
+**Loot lands as it drops, and the strap is asked for then.** Not banked to the
+exit — a session ending against a full bag would have to discard, and §7.6
+forbids exactly that: the refusal comes before the work and never after it. So
+the bag fills as you descend, and at some point the choice is between carrying
+the parts that keep you alive and carrying the thing you came down for.
+
+**That is the tension this section exists for.** Durability is the health bar
+(§9.5.5), the repair bill is the same number read twice (§9.5.6), and the bag is
+what decides how much of either you may bring. Three systems already in the game,
+meeting for the first time in a room with a clock on it.
+
+**A raid drains four times a mine** (`DRAIN_PER_RAID`, 400 against
+`DRAIN_PER_MINE`'s 100). It has been defined since §9.3 was written and nothing
+has ever read it; ten floors of fighting at that rate is the whole repair
+economy, and it should be measured before a guardian is tuned on top of it.
+
+#### 9.6.6 Death inside — an empty pool, and the walk back to fill it
+
+**A pool at zero wakes you at the entrance of the first floor**, with everything
+you were carrying.
+
+**It takes nothing from the bag**, which is the opposite of §9.5.7 and is right
+for the same reason that section gives. Out on the road a death leaves a carrier
+on a hex with a 24-hour clock, because the hex and the clock both outlive it; a
+session closes and the ground it happened on stops existing, so there is nothing
+for a debt to stand on.
+
+**What it costs is the pool, and the pool is the kit.** You are at the entrance
+with an empty bar, and the only thing in the world that will fill it is the
+repair stock you chose to carry down (§9.6.5). Bring none and the session is over
+for you with nine hours left on it; bring enough and you have spent straps that
+were going to hold loot. That is the bill, it is paid in the sink §11.1 is built
+on, and it is the same decision the whole descent is made of.
+
+**The walk back is the smaller half, and at twelve hours it is meant to be.** It
+was the whole punishment when a session ran three, and a clock that generous
+would have made dying an inconvenience — so the cost moved to the thing that was
+always really being spent. What the walk still does is scale with how deep you
+were, safely, through floors that stay cleared: visible before it is spent, and
+never a surprise (§8.2).
+
+**Worn gear is still destroyed at zero**, because that is §8.2 and a dungeon is
+not an exception to it. The pool emptying and a *piece* emptying are two
+different events, and only the second one loses you something.
+
+#### 9.6.7 The key
+
+**A session is opened with a key**, crafted at the consumable bench out of
+refined stock — which is §9.3's raid charge, and it is what gives Planks and
+Ingots a sink outside equipment.
+
+**One generic key rather than five**, because §4 already forces cross-map travel
+through the Shard types and a second friction answering the same question is a
+second answer. **A hard key** wants the same parts plus an Essence, so hard mode
+is gated on having been down once.
+
+#### 9.6.8 What drops, and the three things holding §2 shut
+
+Per guardian, and the rung the category allows (§9.6.3):
+
+| | Easy | Hard |
+|---|---|---|
+| **Legendary** | **2.5%**, and ramped — see below | 5% |
+| **Unique** | **0.25%** | 0.5% |
+| Core | floor 10, always | floor 10 always; a chance from 8 |
+| Relic | floor 7+, pity-timered (§9.3) | floor 5+ |
+| the dungeon's Shard | floor 4+ | floor 2+ |
+| Essence | every guardian | every guardian |
+
+Ordinary monsters pay §9.5.8's spoils exactly as a road pack does. Nothing on
+this table needs a new drop system; what it needs is a category filter and a
+floor gate.
+
+**Unique is free of consequence and may be generous.** It is soulbound (§8.0),
+so it can never leave the game and it is not a faucet in the §2 sense at all.
+It is the one thing in this section that is purely prestige.
+
+**Legendary is not**, and this is the load-bearing paragraph of §9.6. §8.0 makes
+it mintable, so a dropped legendary is a path from grind time to external value —
+the exact thing §2's first line forbids. At a flat 2.5% across ten guardians a
+full clear is `1 - 0.975¹⁰` = **22.4%**, hard is **40.1%**, and six people each
+rolling their own means a hard session produces about **2.4 legendaries**. Five
+hundred players running one hard session a week is on the order of two hundred
+mintable legendaries a week, out of grinding.
+
+Three things hold it shut, and all three are needed:
+
+1. **The rate ramps with depth.** 2.5% is the **floor-ten** guardian and floor
+   one is 0.25%. A full clear comes to about 12.9% easy and 24% hard — half the
+   flat figure — and descending starts meaning something beyond another roll.
+   The headline number is untouched; it is quoted where it matters.
+2. **Sessions are capped per wallet per week** (`DUNGEON_SESSIONS_PER_WEEK`).
+   §12.2 makes this argument in full: **the cap is a rate, not a total**, so the
+   faucet's lifetime yield is wallets × weeks and §2 has already priced both
+   ends of that.
+3. **A party costs six sybil wallets to run.** Six rolls need six characters,
+   six mint fees and six seven-day balance holds — so the faucet scales
+   *linearly* with the cost of opening it rather than freely with patience. This
+   is the one of the three that was already true, and it is why §9.6.1 refuses a
+   solo premium.
+
+**Nothing here is negotiable downward without one of the other two going up.**
+They are a single guard written three ways.
+
+**Open: §2 and §8.0 need a matching edit.** §2's table still says NFTs are never
+dropped by mining or raiding, and that sentence is now false — it is *rate-capped*
+rather than absent. Either the row says so, or legendary drops bound and is
+minted later for a Core, which is the version that keeps the old sentence
+literally true.
+
+#### 9.6.9 What this costs to build
+
+It is the largest thing in the document, and phasing it is not optional:
+
+| | |
+|---|---|
+| **1. The instance** | a session, a code, one 50×50 floor, seeded monsters, cleared state. No party, no guardian. Proves the second coordinate space. |
+| **2. The descent** | guardians, stairs, ten floors, the session clock, death and respawn. **Playable solo, and worth shipping here.** |
+| **3. The party** | the §9.6.4 model, party positions exempt from the fog, and push. The biggest single piece. |
+| **4. The contracts** | categories, difficulties, unique weapons, keys, the session cap. |
+| **5. Repair inside** | the smallest, because §8.2 already permits it. |
+
+**Party members see each other through the fog**, and step 3 cannot work without
+it. Sight is one hex to three (§5.6); "stand on the same hex to fight together"
+is impossible if you cannot see where anybody is. It is the same exemption a
+player's own corpse already has (§9.5.7) — bounded to one session rather than to
+one wallet.
+
+**And there is no realtime in the game yet.** §16 has said SSE + POST since the
+start and `routes/` has no stream in it; packs push nothing and get away with it
+because a cleared flag can be discovered late. Six people sharing a floor cannot.
+Step 3 is where that bill comes due.
 
 ---
 
@@ -5488,8 +5877,10 @@ a corner should be.
 Ordered roughly by leverage:
 
 1. **Crafting recipe tree in full** — the chokepoint every other system feeds into
-2. **Dungeon combat** — §9.5 answers resolution for a pack on a hex; floors, parties and
-   a boss are a different shape and are not designed yet
+2. **Dungeon assembly** — §9.6 designs the session, the floor and the party fight.
+   What is not designed is how six people reach a centre-ring mouth to open one
+   (§9.6.1), and whether §2's faucet row is amended or a dropped legendary arrives
+   bound and is minted later for a Core (§9.6.8)
 3. **Loot table math** — drop odds per floor, pity-timer thresholds
 4. **NPC shop catalog** — full gold-sink list and price curve
 5. **Championship trigger thresholds** — what telemetry values prompt an admin event
