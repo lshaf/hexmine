@@ -4459,9 +4459,89 @@ five. **Beastwarren belongs to none** — §9.1 says it is where the things you 
 den — so it fields the hunt's own roster (§5.5) instead, which is the drawing
 already being right about what the place is.
 
-**The guardians are a tier the roster does not have.** Five of them, one per
-dungeon, above §9.5.2's tier four. They are the only new creatures this section
-needs.
+**Where everything on a floor stands is drawn from the SESSION, never from the
+world.** The seed folds five things together once: the session code, when the
+session was opened, the floor number, the `player_id` of whoever walked in first
+— and **a secret**.
+
+**The secret is the whole of what keeps the fog a fog.** The other four are all
+things the player is holding: they know their own code, they know when they
+opened it, they know which floor they are on and they know who they are. A seed
+made of those alone is a seed the client can compute, and a client that can
+compute the seed can compute where every monster on the floor is standing and
+walk a clean line between them.
+
+So a session is issued `seed_secret` when it is opened — 128 bits out of a
+CSPRNG, kept on the session row, folded into every placement draw on every
+floor, and **handed to nobody**.
+
+Three rules about it, and each closes a different way of losing it:
+
+- **It is generated, never derived.** A secret computed from the code and the
+  timestamp is not a secret, it is those two things wearing a hash.
+- **It is per session.** Reuse would make one leak retroactive across every
+  floor anybody ever ran under it.
+- **It appears in no payload, no error, no log line and no debug route.** That
+  is worth a test of its own, because this is the one thing the design cannot
+  survive: a salt does not fail loudly when it leaks, it just quietly stops
+  being one.
+
+**And the secret alone is not enough, because there are two ways a client learns
+where a monster is.** It can **derive** the layout, which the secret stops — or
+it can simply be **told**, which only §5.6's sight bound stops. A floor is
+answered a disc at a time exactly as the world is, and a creature outside sight
+is not in the response at all. Either half on its own is a fog with a window in
+it.
+
+*(This is a shape of mistake worth writing down, because the instruction that
+produces it is a reasonable one. "Seed it from the session" is right, and every
+ingredient anybody would name first is one the player is already holding.)*
+
+**The stair is rolled from the same seed**, so where a floor lets out is part of
+the same draw rather than a fixed corner. It is still *shown* from the landing,
+which is the paragraph above — where it is, is random; that you know where it
+is, is not.
+
+**The floor opens at six.**
+
+A floor does not let anybody down until **six of its monsters have fallen**
+(`DUNGEON_FLOOR_KILLS`), and **the guardian is the sixth of them.**
+
+**Summed across the roster, never per member.** Six is what the *floor* costs,
+so six people paying one apiece is a floor opened in a sixth of the time — the
+same bargain the rest of this section strikes everywhere else, where what a
+party buys is that fewer of them have to do each thing. A solo pays all six
+alone.
+
+**The guardian will not rouse until five have fallen, and the ordering is what
+that buys.** Left to a bare counter a party could walk past everything, put the
+guardian down with a tally of one, and find the stair still shut — the climax of
+the floor followed by five errands. Roused instead, the requirement is met at the
+moment a player would bump into it, the refusal names itself where it can be
+acted on, and the boss is the last thing that happens on a floor rather than the
+middle thing.
+
+**What makes a counter safe is DENSITY, and that is a constraint on placement
+rather than a footnote to it.** A kill gate on a thin floor is the worst thing
+this section could do: it would send a player combing a fifty-by-fifty field at
+sight one to three looking for something to hit, which is precisely the failure
+the known stair exists to prevent, arriving through a number instead of through
+the dark. So the scatter is **thick** — six are met on the way, never hunted —
+and `DUNGEON_FLOOR_KILLS` against the floor's monster count is the ratio to
+watch whenever either is tuned. **There is a test worth writing and it is about
+the seed rather than the average: on every seed, six reachable inside a short
+walk of the entrance.** A density that is right on average and thin one time in
+fifty is a floor that strands somebody.
+
+*(A minimum cut was the alternative, and it is worth recording because it nearly
+went in. Place monsters so that every route from the entrance to the stair
+crosses at least six occupied hexes — expressible because §9.5.3 already stops a
+traveller dead on a pinned hex, so an occupied hex is a door rather than
+scenery, and enforceable with a 0-1 BFS and a repair pass. It guarantees the same
+six with no counter at all. What it cannot do is **say so**: a player never
+learns why a route was closed, a party that opens a throat gets no number for it,
+and "why can I not go down" has no answer on the screen. Six on a tally is the
+legible version of the same promise, and legible wins.)*
 
 #### 9.6.3 The contract — which dungeon, what for, and how hard
 
@@ -4685,7 +4765,7 @@ It is the largest thing in the document, and phasing it is not optional:
 
 | | |
 |---|---|
-| **1. The instance** | a session, a code, one 50×50 floor, seeded monsters, cleared state. No party, no guardian. Proves the second coordinate space. |
+| **1. The instance** | a session, a code, one 50×50 floor, seeded placement, the secret, and the six-kill gate (§9.6.2), cleared state. No party, no guardian. Proves the second coordinate space. |
 | **2. The descent** | guardians, stairs, ten floors, the session clock, death and respawn. **Playable solo, and worth shipping here.** |
 | **3. The party** | the §9.6.4 model, party positions exempt from the fog, and push. The biggest single piece. |
 | **4. The contracts** | categories, difficulties, unique weapons, keys, the session cap. |
