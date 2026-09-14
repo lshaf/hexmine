@@ -4456,8 +4456,14 @@ Two things follow, and both are the point:
 **What stocks a floor is the dungeon's own country** (§9.5.2), climbing tiers
 with depth. Four of the five dungeons belong to a biome and field that biome's
 five. **Beastwarren belongs to none** — §9.1 says it is where the things you hunt
-den — so it fields the hunt's own roster (§5.5) instead, which is the drawing
-already being right about what the place is.
+den — so it **pools all four countries** instead.
+
+*(It said the hunt's own roster, and building it is what showed that to be
+wrong. §5.5 spends a whole section making a hunt a MINE rather than a fight, and
+the eight animals accordingly carry no attack, no defense and no hp at all.
+Giving them a pair so they could stand on a floor would turn the hunting line's
+quarry into monsters, undoing the one thing that section was written to do. What
+dens in the beast dungeon is everything.)*
 
 **Where everything on a floor stands is drawn from the SESSION, never from the
 world.** The seed folds five things together once: the session code, when the
@@ -4526,12 +4532,45 @@ rather than a footnote to it.** A kill gate on a thin floor is the worst thing
 this section could do: it would send a player combing a fifty-by-fifty field at
 sight one to three looking for something to hit, which is precisely the failure
 the known stair exists to prevent, arriving through a number instead of through
-the dark. So the scatter is **thick** — six are met on the way, never hunted —
-and `DUNGEON_FLOOR_KILLS` against the floor's monster count is the ratio to
-watch whenever either is tuned. **There is a test worth writing and it is about
-the seed rather than the average: on every seed, six reachable inside a short
-walk of the entrance.** A density that is right on average and thin one time in
-fifty is a floor that strands somebody.
+the dark. So the scatter is **thick** (`DUNGEON_MONSTER_DENSITY`, 12% — about
+two hundred and ninety monsters to a floor), and six are met on the way rather
+than hunted.
+
+**Density alone does not do it, and measuring is what proved that.** At 12% a
+radius-eight disc around the landing holds seven monsters *on average*, and the
+average is not the promise: swept over two thousand seeds, **one in three
+hundred came up short of six**, and inside radius four one seed in three did.
+A floor that strands somebody one time in three hundred is a floor that strands
+somebody — and it fails in the worst way available, looking like a broken gate
+rather than a thin roll.
+
+So **six hexes are seeded outright**, in a band a short walk out
+(`Dungeons::seededHexes`). They are picked **by index rather than by rolling
+each hex**, which is what keeps the whole floor derivable: answering *is a
+monster here* stays one hash plus a six-entry membership test. Measured after:
+twenty thousand seeds, always exactly six, never past radius nine, corner
+landings included.
+
+**The test is about the seed and never the average**, and that is the general
+rule rather than a note about this one: a density right on average and thin one
+time in fifty is a floor that strands somebody.
+
+**Nothing about a floor is stored at all.** Where every monster stands is a pure
+function of the seed, so ten floors of twenty-five hundred hexes is **nought
+rows**. What gets written down is only what the hash cannot know: who is in,
+where they are standing, and what has fallen.
+
+**Memoised per floor seed, though**, because `monsterAt()` is asked once per hex
+of a sight disc while the landing, the stair and the cohort are one answer each
+per floor. Left unmemoised the stair alone cost up to twenty-four hashed retries
+on every hex query — measured at three and a half times the work, for nothing.
+
+**And the kill count is DERIVED too.** A cleared hex is a row, so *six have
+fallen on this floor* is `COUNT(*)` over them. A tally stored beside those rows
+would be a second opinion about one fact, which §12.1 already refuses for a quest
+goal — and the unique index on `(session, floor, col, row)` is what makes *never
+respawns* structural rather than a rule in code: two members closing on one hex
+at once is exactly the race a check loses and a key wins.
 
 *(A minimum cut was the alternative, and it is worth recording because it nearly
 went in. Place monsters so that every route from the entrance to the stair

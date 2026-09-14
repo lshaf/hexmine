@@ -658,7 +658,14 @@ class GameService
      * @param  array<string,mixed>  $monster
      * @return array<int,int> item id -> durability lost
      */
-    private function battleWear(
+    /**
+     * §9.5.6 -- the bill, split, and dealt out over the pieces that took it.
+     *
+     * Public because §9.6 fights too, and a dungeon that worked out its own
+     * wear would be a second schedule for one rule -- the same argument §9.5.9
+     * makes about the battle bench drawing what it simulates.
+     */
+    public function battleWear(
         array $items,
         array $monster,
         int $damageTaken,
@@ -2810,6 +2817,49 @@ class GameService
      * numbers the roll above already carries. Everything the fight COSTS, and
      * everything it PAYS, lands when it is collected.
      */
+    /**
+     * §9.5.4 -- everything about a fighter that a fight reads, in one place.
+     *
+     * `startBattle()` assembled this inline and nothing else could get at it,
+     * which was fine while a pack on a hex was the only fight in the game. §9.6
+     * adds a second place fights happen, and a dungeon that rebuilt the kit its
+     * own way would be a second opinion about what a character is worth --
+     * which is exactly what §9.5.9 says about the battle bench redrawing what it
+     * simulates, and the first thing a second opinion does is drift.
+     *
+     * Read at the moment of engagement, always: the kit that takes the fight is
+     * the kit that fights it, and swapping to a better sword while a clock runs
+     * buys nothing.
+     *
+     * @return array<string,mixed>
+     */
+    public function combatProfile(Character $character): array
+    {
+        $job = $this->battleJobLevel($character);
+        $bonuses = $this->bonuses($character, 'battle', $job['family']);
+        $tree = $this->battleTree($character, $job['family']);
+        $items = $this->itemRows($character);
+
+        $pair = Formulas::combatPair(
+            $items,
+            $job['level'],
+            $bonuses['power'],
+            $bonuses['defense'],
+            $tree['attack'],
+            $tree['defense'],
+        );
+
+        return [
+            'job' => $job,
+            'tree' => $tree,
+            'items' => $items,
+            'attack' => $pair['attack'],
+            'defense' => $pair['defense'],
+            'pool' => Formulas::battlePool($items),
+            'skills' => $this->armedSkills($character, (string) $job['family']),
+        ];
+    }
+
     public function startBattle(Character $character): GameJob
     {
         return DB::transaction(function () use ($character) {
@@ -3604,7 +3654,7 @@ class GameService
      *
      * @return array{name:string,slot:?string,lost:int,left:int,destroyed:bool}
      */
-    private function wearInFight(CharacterItem $item, int $amount): array
+    public function wearInFight(CharacterItem $item, int $amount): array
     {
         $def = Catalog::item($item->item_key);
         $before = (int) $item->durability;

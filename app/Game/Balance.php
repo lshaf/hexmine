@@ -2169,6 +2169,91 @@ final class Balance
         };
     }
 
+    // --------------------------------------------------------- §9.6 dungeons
+
+    /**
+     * §9.6.1 -- a session stands for twelve hours and then closes with everybody
+     * outside it.
+     *
+     * Twelve rather than three because a clock should end a run without shaping
+     * it: at three the session was the binding constraint on everything, and
+     * what binds now is durability and straps (§9.6.5), which are sinks §11.1 is
+     * balanced on. A clock is not. It also spans a night, which is the only
+     * answer this design has to getting six people to one centre-ring mouth.
+     */
+    public const DUNGEON_SESSION_MS = 12 * self::HOUR;
+
+    /** §9.6.1 -- two or more is the shape it is built for; one is a challenge. */
+    public const DUNGEON_PARTY_MAX = 6;
+
+    /** §9.6.2 -- a floor is fifty hexes a side. */
+    public const DUNGEON_FLOOR_SIZE = 50;
+
+    /** §9.6.2 -- ten of them, and the tenth guardian is the one that always pays a Core. */
+    public const DUNGEON_FLOORS = 10;
+
+    /**
+     * §9.6.2 -- six of a floor's monsters have to fall before the stair opens,
+     * summed across the roster, with the guardian as the sixth.
+     *
+     * Never per member: six is what the FLOOR costs, so six people paying one
+     * apiece is the same bargain the rest of §9.6 strikes, where what a party
+     * buys is that fewer of them have to do each thing.
+     */
+    public const DUNGEON_FLOOR_KILLS = 6;
+
+    /**
+     * §9.6.2 -- the share of a floor's hexes holding a monster.
+     *
+     * This is the constraint the kill gate puts on placement rather than a
+     * flavour value: a counter on a thin floor sends somebody combing
+     * twenty-five hundred hexes at sight one to three looking for something to
+     * hit. Six have to be met on the way and never hunted, and
+     * `DungeonsTest` pins that against the SEED rather than the average --
+     * a density right on average and thin one time in fifty is a floor that
+     * strands somebody.
+     */
+    public const DUNGEON_MONSTER_DENSITY = 0.12;
+
+    /** §9.6.2 -- 128 bits of CSPRNG, folded into every placement draw, handed to nobody. */
+    public const DUNGEON_SECRET_BYTES = 16;
+
+    /** §9.6.1 -- what a player types to join. Shareable, so it carries no authority of its own. */
+    public const DUNGEON_CODE_LENGTH = 6;
+
+    /**
+     * §9.6.8 -- the FLOOR-TEN guardian's rate, and floor one is a tenth of it.
+     *
+     * Ramped rather than flat, and that is one of the three things holding §2
+     * shut. A dropped legendary is mintable, so this is the first
+     * grind-to-external-value path the game has had: flat across ten guardians
+     * a hard session makes about 2.4 of them. Ramped it is roughly half that,
+     * and descending starts meaning something beyond another roll.
+     */
+    public const DUNGEON_LEGENDARY_CHANCE = 0.025;
+
+    /**
+     * §9.6.8 -- and unique, which is free of consequence.
+     *
+     * It is soulbound (§8.0), so it can never leave the game and it is not a
+     * faucet in the §2 sense at all. This is the one number in the section that
+     * may be generous.
+     */
+    public const DUNGEON_UNIQUE_CHANCE = 0.0025;
+
+    /** §9.6.3 -- hard is the same dungeon with the top two rungs doubled. */
+    public const DUNGEON_HARD_MULTIPLIER = 2;
+
+    /**
+     * §9.6.8 -- the second of the three guards, and §12.2's argument exactly:
+     * the cap is a RATE, not a total.
+     *
+     * The faucet's lifetime yield is wallets x weeks, and §2 has already priced
+     * both ends of that -- a one-time mint fee, and a balance held for seven
+     * continuous days before a wallet can act at all.
+     */
+    public const DUNGEON_SESSIONS_PER_WEEK = 3;
+
     /**
      * Development clock compression. Real timers are 30-60 minutes (§7.3), which
      * makes the game untestable by hand. Applied at the persistence boundary

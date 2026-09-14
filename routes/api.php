@@ -5,10 +5,11 @@ use App\Http\Controllers\Api\BattleController;
 use App\Http\Controllers\Api\BattleSimController;
 use App\Http\Controllers\Api\CharacterController;
 use App\Http\Controllers\Api\CraftingController;
+use App\Http\Controllers\Api\DungeonController;
 use App\Http\Controllers\Api\EquipmentController;
 use App\Http\Controllers\Api\GuildController;
-use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\HuntController;
+use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\MapController;
 use App\Http\Controllers\Api\MiningController;
 use App\Http\Controllers\Api\QuestController;
@@ -79,6 +80,18 @@ Route::middleware(ResolveCharacter::class)->group(function () {
     // the way a pack is, and the only question it asks is whether you brought a
     // bow, which a player can answer off their own belt.
     Route::post('/hunt', [HuntController::class, 'store']);
+
+    // §9.6 -- the dungeon. Every verb here is refused away from a mouth or away
+    // from a floor, so the routes carry no coordinates of their own: where you
+    // are is the session's business, not the request's.
+    Route::get('/dungeon', [DungeonController::class, 'show']);
+    Route::post('/dungeon', [DungeonController::class, 'open']);
+    Route::post('/dungeon/join', [DungeonController::class, 'join']);
+    Route::post('/dungeon/enter', [DungeonController::class, 'enter']);
+    Route::post('/dungeon/step', [DungeonController::class, 'step']);
+    Route::post('/dungeon/fight', [DungeonController::class, 'fight']);
+    Route::post('/dungeon/descend', [DungeonController::class, 'descend']);
+    Route::delete('/dungeon', [DungeonController::class, 'leave']);
 
     Route::get('/battle/preview', [BattleController::class, 'preview']);
     Route::post('/battle', [BattleController::class, 'store']);
