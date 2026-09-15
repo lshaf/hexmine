@@ -70,13 +70,33 @@ final class Dungeons
      * The pair is quoted at `SOLID_SCALE` like everything else solid (§7.3), and
      * these are the FLOOR-TEN figures: `guardian()` scales them down for the
      * floors above, so the tenth is the one the numbers were written for.
+     *
+     * **Every figure here is measured, not chosen.** §9.6.4's anchor is a single
+     * sentence -- solo, floor ten, best-in-slot, a coin flip -- so the hp is
+     * binary-searched against exactly that fighter (a legendary kit, job 30, a
+     * maxed pair tree) until it lands between 43% and 57%.
+     *
+     * They were eyeballed first, as "above tier four", and every one of them was
+     * unwinnable by ANY kit at ANY floor. Damage is `attack - defense`, so a
+     * guardian whose guard clears the best attack in the game collapses every
+     * round to the 1% chip, and 60 rounds of chip cannot clear five figures of
+     * hp. A monster tuned by eye against the tier below it does not come out
+     * hard; it comes out impossible, and it looks identical in a unit test that
+     * only checks the ladder climbs.
+     *
+     * The second pass is why the attacks are as high as they are. With a gentler
+     * bite the player survived to the bell and every loss was a DPS check --
+     * §9.5.5 says failing to put something down is being driven off, which is
+     * right for a wall on a road and wrong for the thing on the stair. At these
+     * figures no floor-ten fight in two hundred reaches round sixty: the pool
+     * decides it, which is what makes it a race.
      */
     public const GUARDIANS = [
-        'rootvault' => ['name' => 'The Taproot', 'profile' => 'carapace', 'attack' => 6400, 'defense' => 7200, 'hp' => 34000, 'wearBias' => 1.0, 'gold' => [180, 300], 'description' => 'It was the floor until it stood up, and the floor has not grown back.'],
-        'deepshaft' => ['name' => 'Shaft Nine', 'profile' => 'brute', 'attack' => 8800, 'defense' => 4200, 'hp' => 31000, 'wearBias' => 1.0, 'gold' => [180, 300], 'description' => 'Somebody sank a working here and something came up it.'],
-        'beastwarren' => ['name' => 'The Whelping Sire', 'profile' => 'swift', 'attack' => 7600, 'defense' => 5200, 'hp' => 29000, 'wearBias' => 1.6, 'gold' => [180, 300], 'description' => 'Everything else on the ten floors above is its. It has been waiting to be told.'],
-        'ashpit' => ['name' => 'Cinderthrone', 'profile' => 'brute', 'attack' => 9200, 'defense' => 4000, 'hp' => 32000, 'wearBias' => 1.0, 'gold' => [180, 300], 'description' => 'Still burning after whatever it was that put it out here.'],
-        'windhollow' => ['name' => 'The Long Draught', 'profile' => 'swift', 'attack' => 7200, 'defense' => 5600, 'hp' => 28000, 'wearBias' => 1.5, 'gold' => [180, 300], 'description' => 'You hear the floor empty of air before you see what took it.'],
+        'rootvault' => ['name' => 'The Taproot', 'profile' => 'carapace', 'attack' => 8900, 'defense' => 2500, 'hp' => 66000, 'wearBias' => 1.0, 'gold' => [180, 300], 'description' => 'It was the floor until it stood up, and the floor has not grown back.'],
+        'deepshaft' => ['name' => 'Shaft Nine', 'profile' => 'brute', 'attack' => 9600, 'defense' => 2050, 'hp' => 64000, 'wearBias' => 1.0, 'gold' => [180, 300], 'description' => 'Somebody sank a working here and something came up it.'],
+        'beastwarren' => ['name' => 'The Whelping Sire', 'profile' => 'swift', 'attack' => 8600, 'defense' => 2300, 'hp' => 81500, 'wearBias' => 1.6, 'gold' => [180, 300], 'description' => 'Everything else on the ten floors above is its. It has been waiting to be told.'],
+        'ashpit' => ['name' => 'Cinderthrone', 'profile' => 'brute', 'attack' => 9900, 'defense' => 2050, 'hp' => 59000, 'wearBias' => 1.0, 'gold' => [180, 300], 'description' => 'Still burning after whatever it was that put it out here.'],
+        'windhollow' => ['name' => 'The Long Draught', 'profile' => 'swift', 'attack' => 8700, 'defense' => 2350, 'hp' => 76000, 'wearBias' => 1.5, 'gold' => [180, 300], 'description' => 'You hear the floor empty of air before you see what took it.'],
     ];
 
     // ------------------------------------------------------------- the seed

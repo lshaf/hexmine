@@ -16,6 +16,7 @@ use App\Models\CharacterMaterial;
 use App\Models\CharacterQuest;
 use App\Models\CharacterSkill;
 use App\Models\CharacterSkillRank;
+use App\Models\DungeonMember;
 use App\Models\GameJob;
 use App\Models\Guild;
 use App\Models\GuildApplication;
@@ -2863,6 +2864,8 @@ class GameService
     public function startBattle(Character $character): GameJob
     {
         return DB::transaction(function () use ($character) {
+            $this->requireNotUnderground($character);
+
             $now = $this->now();
             $col = (int) $character->col;
             $row = (int) $character->row;
@@ -4183,6 +4186,32 @@ class GameService
      * the verb decides is the table the haul comes off (§4) and whether a tool
      * is required, and both of those are already settled by the preview.
      */
+    /**
+     * §9.6 -- you cannot be underground and out on the road at once.
+     *
+     * A session keeps its own coordinates on `dungeon_members` and leaves the
+     * character's world hex where it was, which is right -- a floor is a second
+     * coordinate space (§9.6), not a place on the map -- but it means every
+     * overworld verb still reads a perfectly valid hex and happily works it.
+     * Found by walking a character to floor two and then starting a
+     * two-hundred-hex journey across the world with them.
+     *
+     * The refusal belongs on the SERVER rather than on a dock that hides the
+     * buttons, because §16 makes the client a renderer: a hidden button is not a
+     * rule, it is a rule nobody is enforcing.
+     */
+    public function requireNotUnderground(Character $character): void
+    {
+        $inside = DungeonMember::where('character_id', $character->id)
+            ->whereNotNull('entered_at_ms')
+            ->whereHas('session', fn ($q) => $q->where('expires_at_ms', '>', $this->now()))
+            ->exists();
+
+        if ($inside) {
+            throw new GameException('You are in a dungeon. Walk out first.', 'underground');
+        }
+    }
+
     public function startMining(
         Character $character,
         int $col,
@@ -4190,6 +4219,8 @@ class GameService
         string $activity = Drops::MINING,
     ): GameJob {
         return DB::transaction(function () use ($character, $col, $row, $activity) {
+            $this->requireNotUnderground($character);
+
             $preview = $this->previewTile($character, $col, $row, $activity);
             if (! $preview['canMine']) {
                 throw new GameException($preview['reason'] ?? 'Cannot mine here.', 'blocked');
@@ -5982,6 +6013,8 @@ class GameService
 
     public function travelTo(Character $character, int $col, int $row): array
     {
+        $this->requireNotUnderground($character);
+
         // A mine pins you to the hex you are working. Dropping it is the way out,
         // and it forfeits the haul (§11.1) -- say so, or the lock reads as a bug.
         $mine = $this->miningTrip($character);

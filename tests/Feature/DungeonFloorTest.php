@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Game\Balance;
+use App\Game\BattleGear;
 use App\Game\Catalog;
 use App\Game\Dungeons;
+use App\Game\Formulas;
 use App\Game\HexGeometry;
 use App\Game\Monsters;
 use Tests\TestCase;
@@ -274,6 +276,108 @@ final class DungeonFloorTest extends TestCase
         }
 
         $this->assertCount(count(Catalog::DUNGEONS), Dungeons::GUARDIANS, 'a guardian with no dungeon');
+    }
+
+    /**
+     * §9.6.4's anchor, and the test that would have caught the worst bug in this
+     * section: **solo, floor ten, best-in-slot, a coin flip.**
+     *
+     * The guardians were first written by eye as "above tier four" and every one
+     * of them was unwinnable by every kit at every floor — because damage is
+     * `attack - defense`, and a guard above the best attack in the game turns
+     * every round into the 1% chip, which cannot clear five figures of hp inside
+     * sixty rounds. Nothing in a monotonic ladder test can see that: the numbers
+     * climbed perfectly and the fight was impossible.
+     *
+     * So this asserts the only thing that matters, which is that somebody can
+     * actually win.
+     */
+    public function test_the_deepest_guardian_is_a_coin_flip_for_the_best_kit(): void
+    {
+        [$best, $pool] = $this->bestInSlot();
+
+        foreach (array_keys(Dungeons::GUARDIANS) as $dungeon) {
+            $guardian = Dungeons::guardian($dungeon, 'easy', Balance::DUNGEON_FLOORS);
+
+            $this->assertLessThan(
+                $best['attack'],
+                $guardian['defense'],
+                "{$dungeon} guards above the best attack in the game: every round is the chip floor"
+            );
+
+            $wins = 0;
+            $bell = 0;
+            $runs = 120;
+
+            for ($seed = 0; $seed < $runs; $seed++) {
+                $fight = Formulas::resolveBattle(
+                    $best['attack'], $best['defense'], $pool, $guardian, $seed * 7919 + 13, [],
+                );
+
+                if ($fight['won']) {
+                    $wins++;
+                } elseif ($fight['rounds'] >= Balance::BATTLE_MAX_ROUNDS) {
+                    $bell++;
+                }
+            }
+
+            $rate = $wins / $runs;
+
+            $this->assertGreaterThan(0.25, $rate, "{$dungeon} floor ten is a wall, not a fight");
+            $this->assertLessThan(0.75, $rate, "{$dungeon} floor ten is a formality");
+
+            // §9.5.5 -- the bell is for a wall on a road. The thing on the stair
+            // should be decided by the pool, or the fight is a DPS check with
+            // no drama in it.
+            $this->assertLessThan($runs * 0.1, $bell, "{$dungeon} floor ten is decided by the bell");
+        }
+    }
+
+    /** And the first floor has to be winnable by a kit somebody could plausibly own. */
+    public function test_the_first_guardian_yields_to_a_mid_kit(): void
+    {
+        [$mid, $pool] = $this->kitOf('rare', 10, 0.08, 400);
+
+        foreach (array_keys(Dungeons::GUARDIANS) as $dungeon) {
+            $guardian = Dungeons::guardian($dungeon, 'easy', 1);
+            $wins = 0;
+
+            for ($seed = 0; $seed < 60; $seed++) {
+                if (Formulas::resolveBattle($mid['attack'], $mid['defense'], $pool, $guardian, $seed * 7919 + 13, [])['won']) {
+                    $wins++;
+                }
+            }
+
+            $this->assertGreaterThan(30, $wins, "{$dungeon} floor one turns away a rare kit");
+        }
+    }
+
+    /** A legendary kit, job maxed, pair tree maxed: the strongest a solo can be. */
+    private function bestInSlot(): array
+    {
+        return $this->kitOf('legendary', Balance::JOB_MAX_LEVEL, 0.15, Balance::SKILL_PAIR_CAP);
+    }
+
+    private function kitOf(string $rarity, int $jobLevel, float $bonus, int $tree): array
+    {
+        $bySlot = [];
+        foreach (BattleGear::ITEMS as $key => $def) {
+            if ($def['rarity'] !== $rarity || isset($bySlot[$def['slot']])) {
+                continue;
+            }
+            $bySlot[$def['slot']] = $key;
+        }
+
+        $items = [];
+        $pool = 0;
+
+        foreach ($bySlot as $key) {
+            $def = BattleGear::ITEMS[$key];
+            $items[] = ['key' => $key, 'equipped' => true, 'durability' => $def['maxDurability'], 'quality' => null, 'options' => []];
+            $pool += $def['maxDurability'];
+        }
+
+        return [Formulas::combatPair($items, $jobLevel, $bonus, $bonus, $tree, $tree), $pool];
     }
 
     /** §9.6.2 -- six opens the floor, and the guardian rouses at five. */

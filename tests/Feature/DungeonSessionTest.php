@@ -360,6 +360,42 @@ final class DungeonSessionTest extends TestCase
         $this->dungeons->open($character, $key, 'trinkets', 'easy');
     }
 
+    /**
+     * §9.6 -- underground is a second coordinate space, not a place on the map.
+     *
+     * A session leaves the character's world hex exactly where it was, which is
+     * correct and is also the trap: every overworld verb still reads a valid hex
+     * and works it. Found in a browser by walking a character to floor two and
+     * then sending them on a two-hundred-hex journey across the world.
+     */
+    public function test_the_overworld_is_closed_while_you_are_underground(): void
+    {
+        [$character, $key] = $this->atMouth('0xunder');
+        $this->dungeons->open($character, $key, 'tools', 'easy');
+
+        // At the mouth but not down yet: the world is still yours.
+        $this->game->requireNotUnderground($character);
+
+        $this->dungeons->enter($character);
+
+        foreach ([
+            'travel' => fn () => $this->game->travelTo($character, 10, 10),
+            'mine' => fn () => $this->game->startMining($character, (int) $character->col, (int) $character->row),
+            'fight' => fn () => $this->game->startBattle($character),
+        ] as $verb => $call) {
+            try {
+                $call();
+                $this->fail("{$verb} worked from inside a dungeon");
+            } catch (GameException $e) {
+                $this->assertStringContainsString('dungeon', strtolower($e->getMessage()), "{$verb} refused for the wrong reason");
+            }
+        }
+
+        // And walking out gives it back.
+        $this->dungeons->leave($character);
+        $this->game->requireNotUnderground($character);
+    }
+
     /** Drop `$n` monsters on a floor, starting at cohort index `$from`. */
     private function fell(DungeonSession $session, Character $by, int $floor, int $n, int $from = 0): void
     {
