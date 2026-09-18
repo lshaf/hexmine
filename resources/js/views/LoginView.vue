@@ -21,14 +21,14 @@
  * arriving rather than a flourish. Nothing else on the screen moves.
  */
 import { computed, onMounted, ref } from 'vue'
-import { loadSettings, login, WalletError, type WalletKind, type WaxSettings } from '@/wallet/wax'
+import { loadSettings, login, WalletError, type WaxSettings } from '@/wallet/wax'
 import { HEX_SIDE_PATH, HEX_TOP_PATH, tileToScreen } from '@/map/hexGeometry'
 import { BIOME_COLOR, COPPER, VELLUM_DIM, shade } from '@/theme/palette'
 
 const emit = defineEmits<{ (e: 'connected', wallet: string): void }>()
 
 const settings = ref<WaxSettings | null>(null)
-const busy = ref<WalletKind | null>(null)
+const busy = ref(false)
 const error = ref('')
 
 /**
@@ -85,25 +85,50 @@ onMounted(async () => {
   }
 })
 
-async function connect(kind: WalletKind): Promise<void> {
+/**
+ * One door, and WharfKit draws what is behind it.
+ *
+ * Which wallet is never asked here: the kit is handed every plugin the app
+ * supports and its own renderer puts the picker on screen. That is why this
+ * takes no argument -- a `kind` parameter would mean this view held a second
+ * copy of the wallet list, and the copy is the thing that goes stale.
+ *
+ * **The door does not lock while the picker is up.** WharfKit never says a
+ * picker was dismissed -- closing it leaves its own promise pending for good --
+ * so a button disabled on the click stays disabled until a reload. Locking on
+ * the wallet instead costs nothing: the picker is a modal covering the page, so
+ * there is no second click to guard against, and a player who closes it finds
+ * the door as they left it.
+ */
+async function connect(): Promise<void> {
   if (busy.value) return
 
-  busy.value = kind
   error.value = ''
-  stage.value = 'Waiting for your wallet…'
+
+  // Nothing is said while the picker is up, and that is deliberate. WharfKit's
+  // modal is covering the page with its own "Connect your wallet to login", so a
+  // line here would be the same sentence twice -- and since a dismissal is never
+  // reported, it is the copy that would still be sitting there afterwards
+  // telling a player to choose a wallet with nothing on screen to choose from.
+  //
+  // The rule is narrower than this screen: do not narrate a step you do not own.
+  stage.value = ''
 
   try {
-    stage.value = 'Sign the payment in your wallet.'
-    const wallet = await login(kind)
+    const wallet = await login(() => {
+      busy.value = true
+      stage.value = 'Sign the payment in your wallet.'
+    })
     stage.value = ''
     emit('connected', wallet)
   } catch (e) {
-    // A cancelled signature is a decision, not a fault. It gets the same quiet
-    // line as anything else, and the server's own words when the server spoke.
+    // A cancelled signature is a decision, not a fault -- and closing the picker
+    // is the same decision one step earlier. Both get the same quiet line, and
+    // the server's own words when the server spoke.
     error.value = e instanceof WalletError ? e.message : 'The login did not finish.'
     stage.value = ''
   } finally {
-    busy.value = null
+    busy.value = false
   }
 }
 </script>
@@ -115,7 +140,7 @@ async function connect(kind: WalletKind): Promise<void> {
         The claim. aria-hidden because it says nothing a screen reader needs:
         everything it means is in the copy beside it.
       -->
-      <div class="disc" :class="{ signing: busy !== null }" aria-hidden="true">
+      <div class="disc" :class="{ signing: busy }" aria-hidden="true">
         <svg viewBox="-82 -62 164 132" role="presentation">
           <g
             v-for="tile in tiles"
@@ -153,22 +178,12 @@ async function connect(kind: WalletKind): Promise<void> {
         </p>
 
         <div class="wallets">
-          <button
-            class="btn"
-            type="button"
-            :disabled="!settings || busy !== null"
-            @click="connect('cloudwallet')"
-          >
-            {{ busy === 'cloudwallet' ? 'Connecting…' : 'WAX Cloud Wallet' }}
+          <button class="btn" type="button" :disabled="!settings || busy" @click="connect">
+            {{ busy ? 'Connecting…' : 'Connect wallet' }}
           </button>
-          <button
-            class="btn ghost"
-            type="button"
-            :disabled="!settings || busy !== null"
-            @click="connect('anchor')"
-          >
-            {{ busy === 'anchor' ? 'Connecting…' : 'Anchor' }}
-          </button>
+          <p class="supported">
+            WAX Cloud Wallet · Anchor · Wombat · Scatter · TokenPocket
+          </p>
         </div>
 
         <p class="status" :class="{ bad: error !== '' }" role="status">
@@ -341,15 +356,20 @@ h1 {
   background: var(--vellum);
 }
 
-/* The second wallet is the same act with its weight taken off, not a different
-   kind of control -- so it is the same shape, quieter. */
-.wallets .ghost {
-  background: var(--ink-raised);
-  color: var(--vellum);
-}
-
-.wallets .ghost:hover:not(:disabled) {
-  background: var(--line);
+/*
+ * What is behind the door, named but not drawn as controls.
+ *
+ * A player deciding whether to press it wants to know their wallet is in there;
+ * they do not want to choose it twice, which is what a second row of buttons
+ * would ask. So it is a caption -- quiet, and the same list WharfKit is about
+ * to render properly.
+ */
+.supported {
+  margin: 10px 0 0;
+  color: var(--vellum-dim);
+  font-size: 10.5px;
+  line-height: 1.5;
+  letter-spacing: 0.04em;
 }
 
 .btn:disabled {

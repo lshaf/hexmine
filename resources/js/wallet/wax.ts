@@ -19,17 +19,23 @@
  * the rest of the client plays by: the server is the authority and this renders
  * what it is told (§16).
  *
- * One plugin per wallet rather than one kit per wallet: Anchor is a desktop app
- * that signs over a link, the Cloud Wallet is a popup, and past the plugin they
- * are the same session object making the same transfer.
+ * WHICH wallet is WharfKit's question, not ours. The kit is handed every plugin
+ * we support and `login()` is called with none of them named, so its own
+ * renderer draws the picker -- which is why there is one button on the door
+ * rather than one per wallet.
+ *
+ * That is worth stating as a rule, because the old shape looked harmless. Two
+ * buttons meant the door carried its own copy of the wallet list, and a copy is
+ * a thing that drifts: adding Wombat meant adding a plugin, a `WalletKind`, a
+ * button, a label and a busy state, and forgetting any one of them left a wallet
+ * that was installed and unreachable. **The plugin array is the list now.**
+ * Adding a wallet is a line in it and nothing in the view.
+ *
+ * Past the picker they are the same session object making the same transfer:
+ * Anchor signs over a link, the Cloud Wallet is a popup, Wombat and TokenPocket
+ * are extensions, and the server cannot tell and does not ask.
  */
 import type { Session, SessionKit } from '@wharfkit/session'
-
-/**
- * The two wallets, named by the ids their plugins carry -- so the kind a caller
- * asks for IS what SessionKit is handed, with nothing in between to map wrong.
- */
-export type WalletKind = 'anchor' | 'cloudwallet'
 
 /** What the server tells us about itself before anything is signed. */
 export interface WaxSettings {
@@ -131,19 +137,46 @@ async function sessionKit(): Promise<SessionKit> {
   }
 
   if (!kit) {
-    const [{ SessionKit }, { default: WebRenderer }, { WalletPluginAnchor }, { WalletPluginCloudWallet }] =
-      await Promise.all([
-        import('@wharfkit/session'),
-        import('@wharfkit/web-renderer'),
-        import('@wharfkit/wallet-plugin-anchor'),
-        import('@wharfkit/wallet-plugin-cloudwallet'),
-      ])
+    const [
+      { SessionKit },
+      { default: WebRenderer },
+      { WalletPluginAnchor },
+      { WalletPluginCloudWallet },
+      { WalletPluginWombat },
+      { WalletPluginScatter },
+      { WalletPluginTokenPocket },
+    ] = await Promise.all([
+      import('@wharfkit/session'),
+      import('@wharfkit/web-renderer'),
+      import('@wharfkit/wallet-plugin-anchor'),
+      import('@wharfkit/wallet-plugin-cloudwallet'),
+      import('@wharfkit/wallet-plugin-wombat'),
+      import('@wharfkit/wallet-plugin-scatter'),
+      import('@wharfkit/wallet-plugin-tokenpocket'),
+    ])
 
     kit = new SessionKit({
       appName: 'hexmine',
       chains: [{ id: settings.chain_id, url: settings.endpoint }],
       ui: new WebRenderer(),
-      walletPlugins: [new WalletPluginAnchor(), new WalletPluginCloudWallet()],
+
+      // The Cloud Wallet first because it is what most WAX players already have
+      // and needs nothing installed; the rest in the order somebody is likely to
+      // recognise them.
+      //
+      // `wallet-plugin-privatekey` is deliberately NOT here and must not be
+      // added. It works by asking a player to paste a private key into a web
+      // page, which is the exact thing every wallet in the list above exists to
+      // avoid having to do -- and putting it on the picker would teach the habit
+      // that phishes this game's players later. It is a test fixture, not a
+      // wallet.
+      walletPlugins: [
+        new WalletPluginCloudWallet(),
+        new WalletPluginAnchor(),
+        new WalletPluginWombat(),
+        new WalletPluginScatter(),
+        new WalletPluginTokenPocket(),
+      ],
     })
   }
 
@@ -156,22 +189,43 @@ async function sessionKit(): Promise<SessionKit> {
  * The whole flow is one call because it is one decision by the player: there is
  * no useful halfway state between "connected a wallet" and "logged in", and a
  * wallet connected but unpaid can do nothing at all.
+ *
+ * `onWallet` fires the moment a session exists, and it is what the door locks
+ * on. **It must not lock before that**, because the wallet step is WharfKit's
+ * and WharfKit does not report a dismissal: closing its picker leaves
+ * `kit.login()` pending forever. Its `cancelRequest()` only cancels registered
+ * *prompt* promises, and the wallet-selection step registers none -- so a door
+ * that disabled itself on the click would be dead until a reload, which is
+ * exactly what it did when this was first written.
+ *
+ * Nothing is needed to guard the gap. The picker is a modal that covers the
+ * page, so there is no second click to be had while it is up, and a player who
+ * closes it is looking at the door exactly as they left it.
  */
-export async function login(kind: WalletKind): Promise<string> {
+export async function login(onWallet?: (wallet: string) => void): Promise<string> {
   const wallets = await sessionKit()
 
   // §2 -- restore before asking. A wallet that has signed in here before is
   // already known to the kit, and putting it through the identity dance again
   // is a popup that answers a question nobody asked: the transfer below names
   // its own signer.
+  //
+  // `login()` is called with NOTHING named, which is what puts WharfKit's own
+  // picker on the screen. One chain is configured, so the only thing it asks is
+  // which wallet -- and a returning player never sees it at all, because the
+  // restore above has already answered.
   let session: Session
   try {
-    session = (await wallets.restore()) ?? (await wallets.login({ walletPlugin: kind })).session
+    session = (await wallets.restore()) ?? (await wallets.login()).session
   } catch (error) {
     throw new WalletError(reason(error, 'The wallet did not connect.'), 'wallet_cancelled')
   }
 
   const wallet = String(session.actor)
+
+  // Past the picker, and everything from here is ours: two round trips and a
+  // signature, none of which a player can dismiss.
+  onWallet?.(wallet)
 
   // Nothing about the wallet goes up with this. The server issues a memo for
   // this browser and finds out who paid by reading the payment.
