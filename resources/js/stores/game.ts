@@ -1320,6 +1320,17 @@ export const useGame = defineStore('game', () => {
   /** The replay is over: take the receipt, which is what actually pays out. */
   async function finishLiveBattle(): Promise<void> {
     const job = liveBattle.value
+
+    // §9.6.4 -- a dungeon fight is drawn by the same replay and settles
+    // differently: it was paid out inside the transaction that resolved it, so
+    // there is no job on a bench to collect. The id is the tell, because the
+    // replay it hands over is a shape rather than a row (see DungeonService).
+    if (pendingDungeon.value) {
+      settleDungeonFight()
+
+      return
+    }
+
     live.value = null
     if (job) await collect(job.id)
   }
@@ -1424,8 +1435,27 @@ export const useGame = defineStore('game', () => {
   async function fightDungeon(): Promise<void> {
     const result = await act(() => api.fightDungeon())
     if (!result) return
-    dungeonFight.value = result.fight
+
     dungeon.value = result.dungeon
+
+    // §9.5.9 -- the same replay a road pack opens, off the same component. The
+    // receipt is held back until it has run: what makes the exchange worth
+    // watching is that the drain on screen IS the repair bill, and handing over
+    // the outcome first would make the animation a formality.
+    pendingDungeon.value = result.fight
+    live.value = result.fight.replay
+  }
+
+  /** The fight whose replay is running, waiting to become a receipt. */
+  const pendingDungeon = ref<DungeonFight | null>(null)
+
+  /** §9.5.5 -- the replay is over; what it cost and paid is now the plate. */
+  function settleDungeonFight(): void {
+    live.value = null
+    if (pendingDungeon.value) {
+      dungeonFight.value = pendingDungeon.value
+      pendingDungeon.value = null
+    }
   }
 
   async function descendDungeon(): Promise<void> {
@@ -1710,7 +1740,7 @@ export const useGame = defineStore('game', () => {
     dungeon, dungeonFight, underground, dungeonTiles, dungeonUnderfoot,
     mouthOpen, openMouth, closeMouth,
     loadDungeon, openDungeon, joinDungeon, enterDungeon, stepDungeon,
-    fightDungeon, descendDungeon, leaveDungeon,
+    fightDungeon, descendDungeon, leaveDungeon, settleDungeonFight,
     here, hereCol, hereRow,
     travel, travelProgress, travelHexesWalked, travelRemainingMs,
     // helpers

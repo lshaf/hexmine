@@ -18,64 +18,169 @@
  * tiling, the same painter's sort (§13.2) — because a floor is hexes and the
  * game has one way of drawing hexes.
  */
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useGame } from '@/stores/game'
 import { HEX_SIDE_PATH, HEX_TOP_PATH, tileToScreen } from '@/map/hexGeometry'
 import { COPPER, GOLD, VELLUM, shade } from '@/theme/palette'
-import { monsterCrest } from '@/icons/combatants'
+import { monsterOnGround } from '@/map/props'
 
 const game = useGame()
 
 const session = computed(() => game.dungeon)
 
-/** The six neighbours and the hex underfoot, in the same offsets the map uses. */
-const NEIGHBOURS = [
-  [0, -1],
-  [1, -1],
-  [1, 0],
-  [0, 1],
-  [-1, 0],
-  [-1, -1],
-] as const
-
 const FLOOR_FILL = '#2a2724'
 
+/** How far around the walker the floor is drawn, fog and all. */
+const VIEW = 4
+
+/** Axial conversion, the same one the map and the server use. */
+function cube(col: number, row: number): [number, number, number] {
+  const x = col
+  const z = row - (col - (col & 1)) / 2
+
+  return [x, -x - z, z]
+}
+
+function hexAway(aCol: number, aRow: number, bCol: number, bRow: number): number {
+  const [ax, ay, az] = cube(aCol, aRow)
+  const [bx, by, bz] = cube(bCol, bRow)
+
+  return Math.max(Math.abs(ax - bx), Math.abs(ay - by), Math.abs(az - bz))
+}
+
 /**
+ * The floor around the walker, fogged past sight.
+ *
+ * §13.2's rule, arriving underground: **unscouted is a darker SOLID fill, never
+ * opacity** -- transparency ghosts through neighbouring hexes. So the ground
+ * out there is drawn, and what is standing on it is not: the payload describes
+ * only the disc (§9.6.2), and a hex with no description is one nobody has been
+ * near.
+ *
+ * It used to draw the seven described tiles and nothing else, which made a
+ * floor look like an island floating in the dark rather than a room you can see
+ * part of.
+ *
  * Painter's algorithm (§13.2): sorted by screen Y so a slab occludes the one
- * behind it. Drawn relative to the walker, because the disc travels with them.
+ * behind it.
  */
 const tiles = computed(() => {
   const d = session.value
   if (!d?.inside) return []
 
   const out = []
+  const size = d.size ?? 50
 
-  for (const tile of d.tiles ?? []) {
-    const dx = tile.col - d.col
-    const dy = tile.row - d.row
-    const here = dx === 0 && dy === 0
-    const stair = d.stair && tile.col === d.stair.col && tile.row === d.stair.row
+  for (let col = d.col - VIEW; col <= d.col + VIEW; col++) {
+    for (let row = d.row - VIEW; row <= d.row + VIEW; row++) {
+      if (col < 0 || row < 0 || col >= size || row >= size) continue
+      if (hexAway(d.col, d.row, col, row) > VIEW) continue
 
-    out.push({
-      key: `${tile.col},${tile.row}`,
-      col: tile.col,
-      row: tile.row,
-      here,
-      // A neighbour is a hex you may walk onto, monster and all -- §9.6.4 needs
-      // everybody fighting to be standing on one hex, so stepping into one is
-      // how a fight starts rather than something to be refused.
-      step: !here && NEIGHBOURS.some(([nx, ny]) => nx === dx && ny === dy),
-      stair: Boolean(stair),
-      monster: tile.monster,
-      ...tileToScreen(dx, dy),
-      fill: stair ? shade(COPPER, -0.55) : FLOOR_FILL,
-    })
+      const dx = col - d.col
+      const dy = row - d.row
+      const here = dx === 0 && dy === 0
+      const known = game.dungeonTiles.get(`${col},${row}`)
+      const stair = Boolean(d.stair && col === d.stair.col && row === d.stair.row)
+
+      const base = stair ? shade(COPPER, -0.55) : FLOOR_FILL
+
+      out.push({
+        key: `${col},${row}`,
+        col,
+        row,
+        here,
+        // Scouted is "the server described this hex", which is exactly the disc
+        // it answered with. Nothing else has to be recomputed.
+        scouted: known !== undefined,
+        stair,
+        monster: known?.monster ?? null,
+        ...tileToScreen(dx, dy),
+        fill: known !== undefined ? base : shade(base, -0.42),
+      })
+    }
   }
 
   return out.sort((a, b) => a.y - b.y)
 })
 
 const underfoot = computed(() => game.dungeonUnderfoot)
+
+/**
+ * §5.6 -- walk to a hex you picked, the way the overworld does.
+ *
+ * It was one step onto one of six neighbours, which is not how anybody walks
+ * anywhere else in this game: out in the world you point at ground and go. The
+ * server still only takes a hex at a time -- a step is a step, and each one
+ * costs its five seconds -- so the path is walked here, one press at a time,
+ * and it stops the moment anything interrupts.
+ *
+ * **It stops rather than pushing through.** Stepping onto a live monster pins
+ * you (§9.5.3), so the walk ends there with the fight in front of you rather
+ * than trying to continue past something that is looking at you.
+ */
+async function walkTo(col: number, row: number): Promise<void> {
+  const d = session.value
+  if (!d?.inside || walking.value || underfoot.value) return
+  if (col === d.col && row === d.row) return
+
+  walking.value = true
+
+  try {
+    // Recomputed each step against where we actually are, rather than plotting
+    // once: a step that is refused leaves the position unchanged, and a path
+    // held from before would walk on regardless.
+    for (let guard = 0; guard < 64; guard++) {
+      const at = session.value
+      if (!at?.inside) break
+      if (at.col === col && at.row === row) break
+      if (game.dungeonUnderfoot) break
+
+      const next = toward(at.col, at.row, col, row)
+      const before = `${at.col},${at.row}`
+
+      await game.stepDungeon(next[0], next[1])
+
+      const now = session.value
+      // Refused, for whatever reason the server gave. Stop rather than spin.
+      if (!now || `${now.col},${now.row}` === before) break
+
+      await new Promise((resolve) => setTimeout(resolve, stepMs.value))
+    }
+  } finally {
+    walking.value = false
+  }
+}
+
+const walking = ref(false)
+
+/** One hex of the line from here to there, in offset coordinates. */
+function toward(col: number, row: number, toCol: number, toRow: number): [number, number] {
+  const [ax, ay, az] = cube(col, row)
+  const [bx, by, bz] = cube(toCol, toRow)
+  const steps = Math.max(Math.abs(ax - bx), Math.abs(ay - by), Math.abs(az - bz))
+  const t = 1 / Math.max(1, steps)
+
+  let x = ax + (bx - ax) * t
+  let y = ay + (by - ay) * t
+  let z = az + (bz - az) * t
+
+  let rx = Math.round(x)
+  let ry = Math.round(y)
+  let rz = Math.round(z)
+
+  const dx = Math.abs(rx - x)
+  const dy = Math.abs(ry - y)
+  const dz = Math.abs(rz - z)
+
+  if (dx > dy && dx > dz) rx = -ry - rz
+  else if (dy > dz) ry = -rx - rz
+  else rz = -rx - ry
+
+  return [rx, rz + (rx - (rx & 1)) / 2]
+}
+
+/** How long a step takes, so the walk paces itself rather than racing the clock. */
+const stepMs = computed(() => Math.max(120, game.travelPerHexMs))
 
 /**
  * §9.6.8 -- what the last fight paid, and it has to be SEEN.
@@ -149,12 +254,18 @@ const toStair = computed(() => {
 })
 
 /**
- * §9.5.2 -- the profile owns the silhouette and the tier owns the hide, so a
- * crest needs both. The key is what picks the one mark that says which of them
- * it is.
+ * §13.2 -- the creature STANDS ON the hex; it is not framed inside one.
+ *
+ * It was a crest, which is a portrait in a hexagon of its own -- so a monster
+ * on a floor came out as a picture pasted into the tile's border rather than a
+ * thing standing on the ground. The map has never done that: a pack is the same
+ * silhouette, unframed and haloed, because the tile already is the frame.
+ *
+ * This is literally the map's own function, so a Moss Hound underground is the
+ * same drawing as a Moss Hound on a road.
  */
-function crest(monster: { key: string; profile: string; tier: number }): string {
-  return monsterCrest(monster.profile, monster.tier, 28, false, monster.key)
+function onGround(monster: { key: string; profile: string; tier: number }): string {
+  return monsterOnGround(monster.key, monster.profile, monster.tier, 7, 11, 24)
 }
 </script>
 
@@ -185,9 +296,9 @@ function crest(monster: { key: string; profile: string; tier: number }): string 
           v-for="tile in tiles"
           :key="tile.key"
           class="tile"
-          :class="{ walkable: tile.step && !underfoot && !waiting && !game.busy }"
+          :class="{ walkable: !tile.here && !underfoot && !waiting && !walking }"
           :transform="`translate(${tile.x},${tile.y})`"
-          @click="tile.step && !underfoot && !waiting && !game.busy && game.stepDungeon(tile.col, tile.row)"
+          @click="!tile.here && !underfoot && !waiting && !walking && walkTo(tile.col, tile.row)"
         >
           <path :d="HEX_SIDE_PATH" :fill="shade(tile.fill, -0.45)" />
           <path
@@ -205,7 +316,7 @@ function crest(monster: { key: string; profile: string; tier: number }): string 
           </g>
 
           <!-- §13.2 -- the halo says this is news. A guardian wears gold. -->
-          <g v-if="tile.monster" v-html="crest(tile.monster)" :transform="`translate(-14,-20)`" />
+          <g v-if="tile.monster" v-html="onGround(tile.monster)" />
         </g>
 
         <!-- The prospector, last, over their own hex. -->

@@ -144,6 +144,11 @@ class DungeonController extends GameController
             'inside' => $member->isInside(),
             'floor' => $member->floor,
             'floors' => Balance::DUNGEON_FLOORS,
+            // §9.6.2 -- how big a floor is, so the client can draw the ground
+            // AROUND the disc as fog rather than as nothing. The hexes are
+            // still only described inside sight; what this buys is knowing
+            // there is floor out there at all.
+            'size' => Balance::DUNGEON_FLOOR_SIZE,
             'col' => $member->col,
             'row' => $member->row,
             'busyUntil' => $member->busy_until_ms,

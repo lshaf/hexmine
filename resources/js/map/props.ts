@@ -1696,7 +1696,13 @@ function halo(body: string, color: string, width = 3): string {
   )
 }
 
-function monsterOnGround(
+/**
+ * Exported for §9.6's floors, which draw the same creature on the same kind of
+ * ground. A dungeon monster rendered as a framed CREST sat inside a hexagon
+ * border -- a portrait pasted onto a tile rather than a thing standing on it --
+ * and §13.2 is clear that the tile already is the frame.
+ */
+export function monsterOnGround(
   key: string | null,
   profile: string,
   tier: number,

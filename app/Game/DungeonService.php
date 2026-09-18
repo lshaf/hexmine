@@ -528,6 +528,46 @@ final class DungeonService
                 'rounds' => (int) $fight['rounds'],
                 'damageDealt' => (int) $fight['damageDealt'],
                 'log' => $fight['log'],
+                /*
+                 * §9.5.9 -- THE SAME REPLAY A ROAD FIGHT GETS.
+                 *
+                 * "One band, one cooldown rail, one skill row, drawn everywhere
+                 * a fight is." A dungeon fight that reported itself as a list of
+                 * numbers would be a second way of showing an exchange, and the
+                 * first thing a second opinion does is drift -- so this is
+                 * shaped as the battle JOB the replay already knows how to draw,
+                 * and the client hands it to the same component.
+                 *
+                 * Not a real row in `jobs_queue`: the fight is over, and a job
+                 * exists to be collected. What the replay needs is the rounds
+                 * and the two pools, and those are facts about a fight that has
+                 * already happened.
+                 */
+                'replay' => [
+                    'id' => 'dungeon-'.$session->id.'-'.$member->floor.'-'.$member->col.'-'.$member->row,
+                    'kind' => 'battle',
+                    'status' => 'active',
+                    'col' => $member->col,
+                    'row' => $member->row,
+                    'slot' => null,
+                    'quantity' => 1,
+                    'startedAt' => $now,
+                    'endsAt' => $now + Formulas::battleDurationMs((int) $fight['rounds']),
+                    'skill' => $profile['job']['job'] ?? 'swordhand',
+                    'monster' => $monster['key'] ?? null,
+                    'pool' => (int) $fight['pool'],
+                    'monsterHp' => (int) $monster['hp'],
+                    'roundMs' => Balance::BATTLE_ROUND_MS,
+                    'log' => $fight['log'],
+                    'skills' => array_map(static fn (array $skill): array => [
+                        'key' => $skill['key'],
+                        'name' => $skill['name'],
+                        'glyph' => $skill['glyph'],
+                        'cooldown' => $skill['cooldown'],
+                        'description' => $skill['description'],
+                        ...BattleSkills::summary($skill),
+                    ], $profile['skills']),
+                ],
                 // The party's share of it, and then the caller's own at the top
                 // level -- because a solo run is the common case and asking it
                 // to dig its own row out of a list of one is noise.

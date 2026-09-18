@@ -940,7 +940,24 @@ final class Formulas
 
         while ($foe > 0 && $living($side) !== [] && $round < Balance::BATTLE_MAX_ROUNDS) {
             $round++;
-            $entry = ['round' => $round, 'foe' => $foe, 'strikes' => [], 'answers' => []];
+            // §9.5.9 -- SHAPED LIKE A SOLO ROUND, deliberately.
+            //
+            // `hit`, `back`, `hp` and `foe` are what the replay draws, and the
+            // replay is one component drawn everywhere a fight is. A party log
+            // that carried only its own per-member detail would need a second
+            // replay to read it, which is exactly what that section forbids --
+            // so the party's totals go in the same four fields a road fight
+            // fills, and the member detail rides alongside for anything that
+            // wants it.
+            $entry = [
+                'round' => $round,
+                'hit' => 0,
+                'back' => 0,
+                'hp' => 0,
+                'foe' => $foe,
+                'strikes' => [],
+                'answers' => [],
+            ];
 
             // What is already alight goes on burning, once, before anybody
             // swings -- exactly as it does in a solo fight.
@@ -956,6 +973,7 @@ final class Formulas
 
                 if ($foe <= 0) {
                     $entry['foe'] = 0;
+                    $entry['hp'] = array_sum(array_map(static fn (array $m): int => $m['hp'], $side));
                     $log[] = $entry;
                     break;
                 }
@@ -981,6 +999,10 @@ final class Formulas
 
                 if ($fired !== null) {
                     $entry['strikes'][] = ['member' => $i, 'skill' => $fired['key']];
+                    // The replay names ONE skill a round, so the first to fire
+                    // is the one drawn -- a party can land several and the rail
+                    // has one slot. The full set stays in `strikes`.
+                    $entry['skill'] ??= $fired['key'];
 
                     $multiplier = (float) ($fired['multiplier'] ?? 1.0);
                     $pierce = (bool) ($fired['pierce'] ?? false);
@@ -1016,12 +1038,15 @@ final class Formulas
                 $hit = self::strike($swung, $guard, $seed + $i * 977, $round, 0, $multiplier, $steady);
                 $foe -= $hit;
                 $dealt += $hit;
+                $entry['hit'] += $hit;
 
                 if ($me['extra'] > 0 && $foe > 0) {
                     $again = self::strike($swung, $guard, $seed + $i * 977, $round, 2, 1.0, $steady);
                     $foe -= $again;
                     $dealt += $again;
                     $hit += $again;
+                    $entry['hit'] += $again;
+                    $entry['extra'] = ($entry['extra'] ?? 0) + $again;
                     $me['extra']--;
                 }
 
@@ -1035,6 +1060,7 @@ final class Formulas
             $entry['foe'] = max(0, $foe);
 
             if ($foe <= 0) {
+                $entry['hp'] = array_sum(array_map(static fn (array $m): int => $m['hp'], $side));
                 $log[] = $entry;
                 break;
             }
@@ -1042,6 +1068,7 @@ final class Formulas
             if ($stunned > 0) {
                 $stunned--;
                 $entry['held'] = true;
+                $entry['hp'] = array_sum(array_map(static fn (array $m): int => $m['hp'], $side));
                 $log[] = $entry;
 
                 continue;
@@ -1082,6 +1109,7 @@ final class Formulas
                 }
 
                 $entry['answers'][] = ['member' => $target, 'hit' => $back];
+                $entry['back'] += $back;
 
                 if ($me['riposte'] > 0) {
                     $foe -= $back;
@@ -1104,6 +1132,9 @@ final class Formulas
 
             $entry['foe'] = max(0, $foe);
             $entry['pools'] = array_map(static fn (array $m): int => $m['hp'], $side);
+            // The party is one side, so the bar is the party's pool. A solo run
+            // makes this identical to the solo resolver's own `hp`.
+            $entry['hp'] = array_sum($entry['pools']);
             $log[] = $entry;
         }
 
@@ -1113,6 +1144,10 @@ final class Formulas
             'won' => $won,
             'rounds' => $round,
             'damageDealt' => $dealt,
+            // The party's pool, so a caller can draw one bar without summing
+            // the roster itself.
+            'pool' => array_sum(array_map(static fn (array $m): int => max(0, (int) $m['pool']), $party)),
+            'damageTaken' => array_sum(array_map(static fn (array $m): int => $m['taken'], $side)),
             'foeLeft' => max(0, $foe),
             'log' => $log,
             'members' => array_map(static fn (array $m, int $i): array => [

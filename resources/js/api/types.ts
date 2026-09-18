@@ -1115,6 +1115,8 @@ export interface GameApi {
 }
 
 /** §9.6 -- a hex on a floor, as far as sight reaches. */
+import type { BattleJob } from '@/game/types'
+
 export interface DungeonTile {
   col: number
   row: number
@@ -1146,6 +1148,7 @@ export interface DungeonState {
   inside: boolean
   floor: number
   floors: number
+  size: number
   col: number
   row: number
   busyUntil: number | null
@@ -1176,6 +1179,14 @@ export interface DungeonShare {
 }
 
 export interface DungeonFight {
+  /**
+   * §9.5.9 -- the exchange, shaped as the job the replay already draws.
+   *
+   * A dungeon fight is not a different KIND of fight, so it is not drawn a
+   * different way: this goes straight to the same `BattleLive` a road pack
+   * opens.
+   */
+  replay: BattleJob
   won: boolean
   guardian: boolean
   party: number
