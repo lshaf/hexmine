@@ -182,7 +182,7 @@ async function connect(): Promise<void> {
             {{ busy ? 'Connecting…' : 'Connect wallet' }}
           </button>
           <p class="supported">
-            WAX Cloud Wallet · Anchor · Wombat · Scatter · TokenPocket
+            WAX Cloud Wallet · Anchor · Wombat · Nussio Wallet
           </p>
         </div>
 

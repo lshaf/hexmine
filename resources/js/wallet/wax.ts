@@ -32,8 +32,8 @@
  * Adding a wallet is a line in it and nothing in the view.
  *
  * Past the picker they are the same session object making the same transfer:
- * Anchor signs over a link, the Cloud Wallet is a popup, Wombat and TokenPocket
- * are extensions, and the server cannot tell and does not ask.
+ * Anchor signs over a link, the Cloud Wallet is a popup, Wombat and Nussio are
+ * extensions, and the server cannot tell and does not ask.
  */
 import type { Session, SessionKit } from '@wharfkit/session'
 
@@ -143,16 +143,14 @@ async function sessionKit(): Promise<SessionKit> {
       { WalletPluginAnchor },
       { WalletPluginCloudWallet },
       { WalletPluginWombat },
-      { WalletPluginScatter },
-      { WalletPluginTokenPocket },
+      { WalletPluginNussio },
     ] = await Promise.all([
       import('@wharfkit/session'),
       import('@wharfkit/web-renderer'),
       import('@wharfkit/wallet-plugin-anchor'),
       import('@wharfkit/wallet-plugin-cloudwallet'),
       import('@wharfkit/wallet-plugin-wombat'),
-      import('@wharfkit/wallet-plugin-scatter'),
-      import('@wharfkit/wallet-plugin-tokenpocket'),
+      import('nussio-wharfkit-plugin'),
     ])
 
     kit = new SessionKit({
@@ -162,7 +160,22 @@ async function sessionKit(): Promise<SessionKit> {
 
       // The Cloud Wallet first because it is what most WAX players already have
       // and needs nothing installed; the rest in the order somebody is likely to
-      // recognise them.
+      // recognise them, which is the only reason Nussio is last -- it is the
+      // newest, so it is the one fewest players are scanning for. Promoting it
+      // is a line.
+      //
+      // Scatter and TokenPocket were here and are gone: neither is a wallet WAX
+      // players still reach for, and a picker is the one screen where a dead
+      // option is worse than a missing one. Somebody who does not recognise a
+      // name assumes the fault is theirs and goes looking for the extension,
+      // which is a walk to nowhere -- so the list is what is actually in use,
+      // and it is meant to be pruned again when that changes.
+      //
+      // It is also the one plugin here not published under @wharfkit, which
+      // costs it nothing functionally: it implements the same `WalletPlugin`
+      // interface and the kit cannot tell the difference. It is worth knowing
+      // when a WharfKit upgrade breaks a plugin, because this is the one whose
+      // fix is ours rather than upstream's.
       //
       // `wallet-plugin-privatekey` is deliberately NOT here and must not be
       // added. It works by asking a player to paste a private key into a web
@@ -174,8 +187,7 @@ async function sessionKit(): Promise<SessionKit> {
         new WalletPluginCloudWallet(),
         new WalletPluginAnchor(),
         new WalletPluginWombat(),
-        new WalletPluginScatter(),
-        new WalletPluginTokenPocket(),
+        new WalletPluginNussio(),
       ],
     })
   }
@@ -279,8 +291,27 @@ export async function logout(): Promise<void> {
   await kit?.logout().catch(() => undefined)
 }
 
+/**
+ * The wallet's own words, with its class name taken off the front.
+ *
+ * A plugin is free to throw whatever it likes and some of them stringify as
+ * `NussioWalletError: Nussio Wallet is not installed in this browser.` -- the
+ * sentence is exactly right and the twenty characters in front of it are a
+ * symbol from somebody's source, which a player has no use for and no way to
+ * read as anything but a fault in the game.
+ *
+ * Only a leading `SomethingError:` goes, and only when a sentence follows it.
+ * Anything else the wallet said is passed through untouched: this is here to
+ * strip a label, never to rewrite a diagnosis.
+ */
 function reason(error: unknown, fallback: string): string {
-  const message = error instanceof Error ? error.message : ''
+  const message = (error instanceof Error ? error.message : '').trim()
 
-  return message.trim() === '' ? fallback : message
+  if (message === '') {
+    return fallback
+  }
+
+  const stripped = message.replace(/^[A-Z][A-Za-z0-9_]*Error:\s*/, '').trim()
+
+  return stripped === '' ? message : stripped
 }
