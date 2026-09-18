@@ -581,6 +581,7 @@ function hunted(): void {
         <template v-if="mouth">
           <span v-if="working || seam" class="rule" aria-hidden="true" />
           <HexAction
+            small
             icon="dungeon"
             label="Dungeon"
             :primary="true"
