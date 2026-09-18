@@ -15,10 +15,18 @@ Neither rung is reachable, and that is the point of defining them:
              tradeable drop is exactly the grind-to-external-value faucet §2
              exists to close. Three rolled options plus one fixed perk.
 
-The `weapon` slot is absent from both, and no longer because it is empty: §9.5.4
-fills it with three families whose whole ladder -- village to guild hall --
-lives in the catalog beside the tools. What is missing here is a UNIQUE weapon,
-which waits on dungeon loot (§14.3) the way every other unique does.
+The `weapon` slot appears at UNIQUE only, and that asymmetry is the point.
+§9.5.4 fills it with three families whose whole ladder -- village to guild hall,
+three grades at every rung -- lives in gen_battlegear.py beside the tools, so a
+legendary weapon has a home already. Unique does not: it has no recipe at all,
+so it is not a grade of that ladder and that file cannot emit it.
+
+Three of them rather than one, because the slot holds three FAMILIES and the
+family in it is the class (§9.5.4) -- so each carries its own `family`, or the
+best blade in the game would be the one weapon that levels nobody.
+
+They arrive with §9.6.8, which is the first thing in the game able to hand one
+over. Before a dungeon existed they would have been rows nothing could drop.
 
 The perks are NAMED, not costed. Loot tables and combat resolution are §14.3
 and §14.2, both undesigned, so each one states an intent the almanac shows as
@@ -159,7 +167,56 @@ def legendary_inputs(slot):
     }
 
 
+# ------------------------------------------------------------ unique weapons
+# §9.5.4 -- the weapon slot holds three FAMILIES rather than one thing, so its
+# top rung is three pieces and not one. Everything below unique already lives in
+# gen_battlegear.py, three families wide and three grades deep; this is the one
+# rung that file cannot emit, because unique is not a grade of a materials
+# ladder -- it has no recipe at all and drops, which is a different kind of
+# thing.
+#
+# They arrive now because §9.6.8 finally has somewhere to drop them from. Until
+# a dungeon existed a unique weapon was a row nothing in the game could ever
+# hand over, and the weapons contract would have been a category that rolls
+# legendary and nothing above it.
+#
+# The pair is a step past the legendary HIGH grade rather than past legendary
+# medium, because `high` is what a player would be carrying into the floor that
+# drops this: +15% on the medium pair is the top of the craftable ladder, and a
+# unique that merely matched it would be a trophy that is not an upgrade.
+#
+# family, key, name, attack, defense, perk, description
+UNIQUE_WEAPONS = [
+    ('shield', 'the_last_door', 'The Last Door', 17, 37,
+     'While it is on the arm, a lost fight leaves your bag alone.',
+     'Set down once in a doorway that is still standing. So is most of what was behind it.'),
+    ('sword', 'the_even_hand', 'The Even Hand', 22, 21,
+     'Its three skills come off cooldown together, once, on the round you first take a wound.',
+     'Balanced to the grain. The smith who made it could not say which edge was the front.'),
+    ('dagger', 'two_quiet_words', 'Two Quiet Words', 33, 9,
+     'A fight it opens is never heard: nothing else on the floor is roused by it.',
+     'One in each hand, and the second is the one nobody has ever reported.'),
+]
+
+
 def rows():
+    for family, key, name, attack, defense, perk, desc in UNIQUE_WEAPONS:
+        yield {
+            'key': key, 'name': name, 'slot': 'weapon', 'family': family,
+            'rarity': 'unique', 'tradeable': False,
+            'stat': None, 'value': None,
+            'attack': attack * SOLID_SCALE, 'defense': defense * SOLID_SCALE,
+            # A weapon is not line-locked, so it takes the palette of the family
+            # rather than of a biome: iron for the two that are blades, stone for
+            # the one that is a wall.
+            'palette': 'stone' if family == 'shield' else 'iron',
+            'station': None,
+            # A step past legendary `high` (288), the same way the worn uniques
+            # step past their own legendary.
+            'maxDurability': 310 * SOLID_SCALE,
+            'inputs': None, 'perk': perk, 'description': desc,
+        }
+
     for slot in SLOTS:
         biome = SLOTS[slot][0]
         lkey, lname, ldesc = LEGENDARY[slot]
@@ -220,12 +277,18 @@ def emit_php():
     for line in HEADER.split('\n'):
         o.write(f' * {line}\n'.rstrip() + '\n' if line else ' *\n')
     o.write(' */\nfinal class TopTier\n{\n')
-    o.write('    /** §8.0 -- legendary and unique, eight slots each bar the empty one. */\n')
+    o.write('    /** §8.0 -- legendary for eight slots, unique for those eight and the three weapon families. */\n')
     o.write('    public const ITEMS = [\n')
     for i in rows():
         parts = [
             f"'name' => {php_str(i['name'])}",
             f"'slot' => '{i['slot']}'",
+            # §9.5.4 -- the family in the slot IS the class: it decides which
+            # battle job levels and which three skills are armed. A unique
+            # weapon without one would be the only weapon in the game that
+            # teaches nobody, which reads as a bug the first time somebody
+            # carries the best blade in the world and stops levelling.
+            *([f"'family' => '{i['family']}'"] if i.get('family') else []),
             f"'rarity' => '{i['rarity']}'",
             f"'tradeable' => {'true' if i['tradeable'] else 'false'}",
         ]
@@ -263,6 +326,7 @@ def emit_ts():
             f"key: '{i['key']}'",
             f"name: {ts_str(i['name'])}",
             f"slot: '{i['slot']}'",
+            *([f"family: '{i['family']}'"] if i.get('family') else []),
             f"rarity: '{i['rarity']}'",
             f"tradeable: {'true' if i['tradeable'] else 'false'}",
         ]

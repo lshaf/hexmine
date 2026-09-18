@@ -354,8 +354,15 @@ class GameService
         return (int) ($character->materials()->where('material_key', $key)->value('quantity') ?? 0);
     }
 
-    /** Grant materials, honoring the §2 per-wallet cap. Returns units granted. */
-    private function addMaterial(Character $character, string $key, int $quantity): int
+    /**
+     * Grant materials, honoring the §2 per-wallet cap. Returns units granted.
+     *
+     * Public because §9.6.8's guardian table pays Tier 4 directly and must go
+     * through the same cap and the same strap arithmetic every other grant
+     * does. A dungeon writing rows itself is how a per-wallet cap quietly stops
+     * applying to the one place that hands out the capped things.
+     */
+    public function addMaterial(Character $character, string $key, int $quantity): int
     {
         $row = CharacterMaterial::firstOrNew([
             'character_id' => $character->id,
@@ -2834,6 +2841,119 @@ class GameService
      *
      * @return array<string,mixed>
      */
+    /**
+     * §9.5.8 -- everything a won fight pays, wherever the fight happened.
+     *
+     * `finishBattle()` did this inline and nothing else could reach it, which
+     * was fine while a pack on a hex was the only fight in the game. §9.6 adds
+     * a second place they happen, and a dungeon paying its own way would be a
+     * second drop table for one rule -- so the spoils, the looted kit and both
+     * kinds of XP come from here and the caller adds only what is its own.
+     *
+     * The gold is deliberately NOT here. A road fight scales it by `goldFind`
+     * off a stored payload and a guardian pays a band of its own (§9.6.8), so
+     * the one term the two genuinely disagree about stays with each of them.
+     *
+     * @param  array<string,mixed>  $monster
+     * @return array<string,mixed>
+     */
+    public function awardBattleRewards(
+        Character $character,
+        array $monster,
+        int $seed,
+        ?string $jobKey,
+        float $lootOption = 0.0,
+    ): array {
+        $spoils = [];
+        $lost = 0;
+        $leftBehind = null;
+
+        $jobXp = 0;
+        if ($jobKey !== null) {
+            $jobXp = Balance::JOB_XP_PER_BATTLE_TIER * (int) $monster['tier'];
+            $this->grantJobXp($character, $jobKey, $jobXp);
+        }
+
+        $characterXp = Balance::CHARACTER_XP_PER_BATTLE_TIER * (int) $monster['tier'];
+        $levels = $this->grantCharacterXp($character, $characterXp);
+
+        foreach (
+            Drops::battleSpoils(
+                $monster,
+                $seed,
+                Formulas::optionGain($this->itemRows($character), Catalog::OPTION_HAUL),
+                $this->seamFavour($character, null),
+            ) as $material => $quantity
+        ) {
+            $granted = $this->addMaterial($character, $material, $quantity);
+            if ($granted > 0) {
+                $spoils[$material] = $granted;
+            }
+            $lost += $quantity - $granted;
+        }
+
+        $looted = $this->takeLootedGear(
+            $character,
+            $monster,
+            $seed,
+            $leftBehind,
+            $this->extraRoll($character, $lootOption, 0x100E),
+        );
+
+        return [
+            'spoils' => $spoils,
+            'lost' => $lost,
+            'looted' => $looted,
+            'leftBehind' => $leftBehind,
+            'jobXp' => $jobXp,
+            'characterXp' => $characterXp,
+            'levels' => $levels,
+        ];
+    }
+
+    /**
+     * §9.6.8 -- hand over one named piece, rolled as an object.
+     *
+     * A guardian's legendary is not looted off its back like §9.5.8's kit: it
+     * is what the floor was hiding, so it arrives whole rather than at the
+     * 5-50% a corpse's gear does. Everything else about it is the same object
+     * any other piece is -- rolled lines (§8.0.1) and a rolled quality
+     * (§8.0.2), because two of one recipe are never the same thing.
+     *
+     * @return array<string,mixed>|null null when the bag had nowhere to put it
+     */
+    public function grantRolledItem(Character $character, string $key, int $seed, int $extraOption = 0): ?array
+    {
+        $def = Catalog::item($key);
+        if ($def === null || ! $this->hasFreeRow($character)) {
+            return null;
+        }
+
+        $options = $this->rollFor($character, $def, $extraOption);
+        $quality = Formulas::rollQuality($seed);
+        $max = Formulas::maxDurabilityFor($def, $options, 0.0, $quality);
+
+        $item = CharacterItem::create([
+            'character_id' => $character->id,
+            'item_key' => $key,
+            'durability' => $max,
+            'max_durability' => $max,
+            'equipped' => false,
+            'options' => $options,
+            'quality' => $quality,
+        ]);
+
+        return [
+            'key' => $key,
+            'name' => $def['name'],
+            'rarity' => $def['rarity'],
+            'durability' => $max,
+            'maxDurability' => $max,
+            'options' => $item->options,
+            'quality' => $quality,
+        ];
+    }
+
     public function combatProfile(Character $character): array
     {
         $job = $this->battleJobLevel($character);

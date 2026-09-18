@@ -4598,11 +4598,23 @@ Sixteen top-tier pieces against a flat table is a lottery nobody can aim at; a
 weapons run and a tools run are two different reasons to organise six people,
 and §4 already puts the same pressure on Shards for the same reason.
 
-**Weapons is the category with a hole in it.** `TopTier::ITEMS` covers eight
-slots and skips `weapon` on purpose, because battle gear runs its own ladder in
-`gen_battlegear.py` — which already emits **legendary** for all three families
-and stops there. So a weapons contract's unique roll currently has nothing to
-hand over, and the rung has to be generated before the category exists.
+**Weapons had a hole in it, and filling it is what finally gave the weapon slot
+a top rung.** `TopTier::ITEMS` covered eight slots and skipped `weapon`, because
+battle gear runs its own ladder in `gen_battlegear.py` — which emits
+**legendary** for all three families and stops there, since unique has no recipe
+and so is not a grade of a materials ladder at all. A weapons contract's unique
+roll had nothing to hand over.
+
+**Three of them now, one per family**, because the slot holds three families and
+§9.5.4 makes the family in it the class — each carries its own `family`, or the
+best blade in the game would be the one weapon that levels nobody. The pair is a
+step past the legendary **high** grade rather than past legendary medium: `high`
+is what a player is carrying into the floor that drops this, and a unique that
+merely matched it would be a trophy rather than an upgrade.
+
+*(They waited on exactly this. The generator's own header said so — "waits on
+dungeon loot the way every other unique does" — and until §9.6.8 existed they
+would have been rows nothing in the game could ever hand over.)*
 
 **Hard is the same dungeon with the rate doubled**, and it wants a key of its
 own (§9.6.7) so the harder run has a foot in the loop it feeds.

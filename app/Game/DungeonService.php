@@ -319,6 +319,10 @@ final class DungeonService
             }
 
             $gold = 0;
+            $rewards = [];
+            $prize = null;
+            $treasure = [];
+            $isGuardian = (bool) ($monster['guardian'] ?? false);
 
             if ($fight['won']) {
                 // §9.6.2 -- the row IS the state. Monsters never respawn, and the
@@ -331,7 +335,7 @@ final class DungeonService
                     'col' => $member->col,
                     'row' => $member->row,
                     'character_id' => $character->id,
-                    'guardian' => (bool) ($monster['guardian'] ?? false),
+                    'guardian' => $isGuardian,
                     'killed_at_ms' => $now,
                 ]);
 
@@ -342,6 +346,51 @@ final class DungeonService
                 );
                 $character->gold += $gold;
                 $character->save();
+
+                // §9.5.8 -- a monster on a floor pays exactly what it pays on a
+                // road, through the road's own call. A dungeon paying its own
+                // way would be a second drop table for one rule, and the first
+                // thing two tables do is disagree about a creature they share.
+                $rewards = $this->game->awardBattleRewards(
+                    $character,
+                    $monster,
+                    $seed,
+                    $profile['job']['job'] ?? null,
+                    (float) ($profile['tree']['loot'] ?? 0.0),
+                );
+
+                // §9.6.8 -- and the guardian pays the dungeon's own table on top.
+                // Only the guardian: that is what keeps the two faucets
+                // separable, so a floor of Moss Hounds cannot be farmed for
+                // anything a dungeon is the gate on.
+                if ($isGuardian) {
+                    $drop = DungeonDrops::guardian(
+                        $session->dungeon,
+                        $session->category,
+                        $session->difficulty,
+                        $member->floor,
+                        $seed,
+                    );
+
+                    foreach ($drop['materials'] as $key => $quantity) {
+                        $granted = $this->game->addMaterial($character, $key, $quantity);
+                        if ($granted > 0) {
+                            $treasure[$key] = $granted;
+                        }
+                    }
+
+                    if ($drop['item'] !== null) {
+                        // Harder packs roll better options rather than better
+                        // rarity (§9.5.8), and a guardian is the hardest thing
+                        // on the floor -- so the depth buys lines, never a rung.
+                        $prize = $this->game->grantRolledItem(
+                            $character,
+                            $drop['item'],
+                            $seed,
+                            intdiv($member->floor, 4),
+                        );
+                    }
+                }
             } else {
                 // §9.6.6 -- a loss puts you at the landing of the first floor with
                 // everything you were carrying. It takes nothing from the bag;
@@ -364,6 +413,19 @@ final class DungeonService
                 'log' => $fight['log'],
                 'wear' => $wear,
                 'gold' => $gold,
+                'guardian' => $isGuardian,
+                // §9.5.8's own, and then §9.6.8's on top of it. Kept apart in
+                // the payload for the same reason they are kept apart in the
+                // code: one is what the creature pays anywhere, and the other
+                // is what the dungeon pays for reaching it.
+                'spoils' => $rewards['spoils'] ?? [],
+                'looted' => $rewards['looted'] ?? null,
+                'leftBehind' => $rewards['leftBehind'] ?? null,
+                'jobXp' => $rewards['jobXp'] ?? 0,
+                'characterXp' => $rewards['characterXp'] ?? 0,
+                'levels' => $rewards['levels'] ?? 0,
+                'treasure' => $treasure,
+                'prize' => $prize,
                 'kills' => $kills,
                 'floorOpen' => Dungeons::floorOpen($kills),
                 'guardianRoused' => Dungeons::guardianRoused($kills),
