@@ -872,6 +872,287 @@ final class Formulas
     }
 
     /**
+     * §9.6.4 -- the same exchange with more than one person in it.
+     *
+     * **Only one of the three sums, and which one is the whole design.** Summing
+     * the pair outright is the obvious thing to do and it is catastrophic: six
+     * people's defense against one attack drives `attack - defense` under the
+     * floor, so the guardian chips for one unit a round forever and a six-party
+     * is unkillable. Offense adds because that is what a party is FOR; defense
+     * stays personal because six people standing together are not individually
+     * harder to hit.
+     *
+     * **The guardian answers once per LIVING member**, which is what keeps the
+     * bill per head flat -- otherwise a six-party would split one monster's
+     * output six ways and pay a third of what a duo pays for the same kill.
+     *
+     * **It swings at whoever is in the way**, weighted by defense. That is how
+     * §9.5.4's shieldbearer gets a job: it has the slowest kill and the most
+     * expensive win, which alone is a miserable thing to be. With no taunt
+     * button, because §9.5.9 says nothing in a fight is steered.
+     *
+     * **Down is not dead.** A member whose pool empties leaves the fight and the
+     * guardian answers one fewer time a round from then on -- a spiral that is
+     * visible in the pools rather than announced.
+     *
+     * State splits the way the fiction does. `stunned`, `sundered` and `burn`
+     * are the MONSTER's and are shared, because there is one monster. Cooldowns,
+     * `extra`, `riposte` and `stance` are each fighter's own, because there are
+     * several fighters.
+     *
+     * @param  list<array{attack:int,defense:int,pool:int,skills:array}>  $party
+     * @return array<string,mixed>
+     */
+    public static function resolvePartyBattle(array $party, array $monster, int $seed, bool $steady = false): array
+    {
+        if ($party === []) {
+            throw new GameException('Nobody closed with it.');
+        }
+
+        $foe = max(1, (int) ($monster['hp'] ?? 1));
+        $dealt = 0;
+        $round = 0;
+        $log = [];
+
+        // Monster-side, shared by everyone swinging at it.
+        $stunned = 0;
+        $sundered = 0;
+        $burn = null;
+
+        // Fighter-side, one set each.
+        $side = [];
+        foreach ($party as $i => $member) {
+            $side[$i] = [
+                'attack' => (int) $member['attack'],
+                'defense' => (int) $member['defense'],
+                'hp' => max(0, (int) $member['pool']),
+                'taken' => 0,
+                'skills' => $member['skills'] ?? [],
+                'used' => array_fill(0, count($member['skills'] ?? []), 0),
+                'extra' => 0,
+                'riposte' => 0,
+                'stance' => null,
+                'down' => max(0, (int) $member['pool']) <= 0,
+            ];
+        }
+
+        $living = static fn (array $s): array => array_keys(array_filter($s, static fn ($m) => ! $m['down']));
+
+        while ($foe > 0 && $living($side) !== [] && $round < Balance::BATTLE_MAX_ROUNDS) {
+            $round++;
+            $entry = ['round' => $round, 'foe' => $foe, 'strikes' => [], 'answers' => []];
+
+            // What is already alight goes on burning, once, before anybody
+            // swings -- exactly as it does in a solo fight.
+            if ($burn !== null) {
+                $seared = max(1, (int) round($burn['attack'] * $burn['tick']));
+                $foe -= $seared;
+                $dealt += $seared;
+                $entry['burn'] = $seared;
+
+                if (--$burn['left'] <= 0) {
+                    $burn = null;
+                }
+
+                if ($foe <= 0) {
+                    $entry['foe'] = 0;
+                    $log[] = $entry;
+                    break;
+                }
+            }
+
+            // 1. EVERY LIVING MEMBER STRIKES, AND THE HITS ADD.
+            foreach ($living($side) as $i) {
+                $me = &$side[$i];
+
+                $fired = null;
+                foreach ($me['skills'] as $s => $skill) {
+                    if ($round - $me['used'][$s] < (int) $skill['cooldown']) {
+                        continue;
+                    }
+                    $fired = $skill;
+                    $me['used'][$s] = $round;
+                    break;
+                }
+
+                $multiplier = 1.0;
+                $pierce = false;
+                $swung = $me['attack'];
+
+                if ($fired !== null) {
+                    $entry['strikes'][] = ['member' => $i, 'skill' => $fired['key']];
+
+                    $multiplier = (float) ($fired['multiplier'] ?? 1.0);
+                    $pierce = (bool) ($fired['pierce'] ?? false);
+
+                    if (isset($fired['guard'])) {
+                        $swung += (int) round($me['defense'] * (float) $fired['guard']);
+                    }
+                    if (isset($fired['ramp'])) {
+                        $multiplier += (float) $fired['ramp'] * $round;
+                    }
+                    if (isset($fired['stun'])) {
+                        $stunned = max($stunned, (int) $fired['stun']);
+                    }
+                    if (isset($fired['burn'])) {
+                        $burn = ['left' => (int) $fired['burn'], 'tick' => (float) $fired['tick'], 'attack' => $me['attack']];
+                    }
+                    if (isset($fired['strikes'])) {
+                        $me['extra'] = max($me['extra'], (int) $fired['strikes']);
+                    }
+                    if (isset($fired['riposte'])) {
+                        $me['riposte'] = max($me['riposte'], (int) $fired['riposte']);
+                    }
+                    if (isset($fired['sunder'])) {
+                        $sundered += (int) $fired['sunder'];
+                        $entry['sunder'] = $sundered;
+                    }
+                    if (isset($fired['stance'])) {
+                        $me['stance'] = ['left' => (int) $fired['stance'], 'share' => (float) $fired['share'], 'stored' => 0];
+                    }
+                }
+
+                $guard = $pierce ? 0 : max(0, (int) $monster['defense'] - $sundered);
+                $hit = self::strike($swung, $guard, $seed + $i * 977, $round, 0, $multiplier, $steady);
+                $foe -= $hit;
+                $dealt += $hit;
+
+                if ($me['extra'] > 0 && $foe > 0) {
+                    $again = self::strike($swung, $guard, $seed + $i * 977, $round, 2, 1.0, $steady);
+                    $foe -= $again;
+                    $dealt += $again;
+                    $hit += $again;
+                    $me['extra']--;
+                }
+
+                unset($me);
+
+                if ($foe <= 0) {
+                    break;
+                }
+            }
+
+            $entry['foe'] = max(0, $foe);
+
+            if ($foe <= 0) {
+                $log[] = $entry;
+                break;
+            }
+
+            if ($stunned > 0) {
+                $stunned--;
+                $entry['held'] = true;
+                $log[] = $entry;
+
+                continue;
+            }
+
+            // 2. AND IT ANSWERS ONCE PER LIVING MEMBER.
+            //
+            // Targets are drawn afresh each answer rather than once for the
+            // round, so a member who goes down partway through a round stops
+            // being hit inside it -- the alternative quietly kills people who
+            // were already out.
+            $answers = count($living($side));
+
+            for ($a = 0; $a < $answers; $a++) {
+                $alive = $living($side);
+                if ($alive === []) {
+                    break;
+                }
+
+                $target = self::whoIsInTheWay($side, $alive, $seed, $round, $a);
+                $me = &$side[$target];
+
+                $back = self::strike((int) $monster['attack'], $me['defense'], $seed + $target * 977, $round, 1 + $a * 7, 1.0, $steady);
+
+                if ($me['stance'] !== null) {
+                    $kept = (int) round($back * $me['stance']['share']);
+                    $back -= $kept;
+                    $me['stance']['stored'] += $kept;
+                }
+
+                $me['hp'] -= $back;
+                $me['taken'] += $back;
+
+                if ($me['hp'] <= 0) {
+                    $me['hp'] = 0;
+                    $me['down'] = true;
+                    $entry['downed'][] = $target;
+                }
+
+                $entry['answers'][] = ['member' => $target, 'hit' => $back];
+
+                if ($me['riposte'] > 0) {
+                    $foe -= $back;
+                    $dealt += $back;
+                    $me['riposte']--;
+                }
+
+                if ($me['stance'] !== null && --$me['stance']['left'] <= 0) {
+                    $foe -= $me['stance']['stored'];
+                    $dealt += $me['stance']['stored'];
+                    $me['stance'] = null;
+                }
+
+                unset($me);
+
+                if ($foe <= 0) {
+                    break;
+                }
+            }
+
+            $entry['foe'] = max(0, $foe);
+            $entry['pools'] = array_map(static fn (array $m): int => $m['hp'], $side);
+            $log[] = $entry;
+        }
+
+        $won = $foe <= 0;
+
+        return [
+            'won' => $won,
+            'rounds' => $round,
+            'damageDealt' => $dealt,
+            'foeLeft' => max(0, $foe),
+            'log' => $log,
+            'members' => array_map(static fn (array $m, int $i): array => [
+                'index' => $i,
+                'damageTaken' => min($m['taken'], max(0, (int) $party[$i]['pool'])),
+                'left' => $m['hp'],
+                'down' => $m['down'],
+            ], $side, array_keys($side)),
+        ];
+    }
+
+    /**
+     * §9.6.4 -- weighted by defense, because the one in the way is the one it
+     * swings at.
+     *
+     * This is the whole of how a shieldbearer earns a place in a party: no
+     * taunt, no threat table, just the plain fact that the armored one is
+     * standing in front. A member with no guard at all still has a weight of
+     * one, or a party of knifedancers would be untargetable.
+     */
+    private static function whoIsInTheWay(array $side, array $alive, int $seed, int $round, int $answer): int
+    {
+        $total = 0;
+        foreach ($alive as $i) {
+            $total += max(1, $side[$i]['defense']);
+        }
+
+        $roll = Hash::randInt(Hash::hash2($round * 31 + $answer, 0x7A46, $seed), 1, max(1, $total));
+
+        foreach ($alive as $i) {
+            $roll -= max(1, $side[$i]['defense']);
+            if ($roll <= 0) {
+                return $i;
+            }
+        }
+
+        return $alive[array_key_last($alive)];
+    }
+
+    /**
      * §9.5.5 -- how long the exchange takes on screen, in milliseconds.
      *
      * Derived from the fight rather than from the monster's tier: a rout is

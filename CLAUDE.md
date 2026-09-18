@@ -4814,24 +4814,30 @@ literally true.
 
 It is the largest thing in the document, and phasing it is not optional:
 
-| | |
-|---|---|
-| **1. The instance** | a session, a code, one 50×50 floor, seeded placement, the secret, and the six-kill gate (§9.6.2), cleared state. No party, no guardian. Proves the second coordinate space. |
-| **2. The descent** | guardians, stairs, ten floors, the session clock, death and respawn. **Playable solo, and worth shipping here.** |
-| **3. The party** | the §9.6.4 model, party positions exempt from the fog, and push. The biggest single piece. |
-| **4. The contracts** | categories, difficulties, unique weapons, keys, the session cap. |
-| **5. Repair inside** | the smallest, because §8.2 already permits it. |
+| | | |
+|---|---|---|
+| **1. The instance** | a session, a code, one 50×50 floor, seeded placement, the secret, and the six-kill gate (§9.6.2), cleared state | **built** |
+| **2. The descent** | guardians, stairs, ten floors, the session clock, death and respawn | **built** |
+| **3. The party** | the §9.6.4 model — offense sums, defense does not, the guardian answers once per living member | **built** |
+| **4. The contracts** | categories, difficulties, unique weapons, the session cap, §9.6.8's table | **built, bar the key** |
+| **5. Repair inside** | the smallest, because §8.2 already permits it | **built — it needed nothing** |
 
-**Party members see each other through the fog**, and step 3 cannot work without
-it. Sight is one hex to three (§5.6); "stand on the same hex to fight together"
-is impossible if you cannot see where anybody is. It is the same exemption a
-player's own corpse already has (§9.5.7) — bounded to one session rather than to
-one wallet.
+**Step 3 turned out not to need the realtime channel it was costed with**, and
+that is worth recording because the estimate was wrong in an instructive way. A
+party fight is resolved on the server in one transaction off one press: the
+roster on the hex is read, everybody swings, and everybody is paid. Nobody has
+to be *watching* for that to be correct. What push would buy is seeing each
+other move between fights, which is comfort rather than correctness — so it is
+still unbuilt and the feature works without it.
 
-**And there is no realtime in the game yet.** §16 has said SSE + POST since the
-start and `routes/` has no stream in it; packs push nothing and get away with it
-because a cleared flag can be discovered late. Six people sharing a floor cannot.
-Step 3 is where that bill comes due.
+**Party members seeing each other through the fog is the same kind of comfort**,
+and it is also still unbuilt. Converging on a guardian currently means agreeing
+where, rather than watching each other arrive.
+
+**What is genuinely left:** the key (§9.6.7), eviction at the twelve-hour bell —
+an expired session already stops being yours, so what is missing is housekeeping
+rather than a rule — and the whole client, which is the largest remaining piece
+by a distance and the reason none of this is reachable without an API call.
 
 ---
 

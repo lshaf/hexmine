@@ -262,6 +262,21 @@ final class DungeonService
      *
      * @return array<string,mixed>
      */
+    /**
+     * §9.6.4 -- settle whatever is standing on the hex, with everybody standing on it.
+     *
+     * **The roster on the hex is the party**, and nobody else: §9.6.4 says a
+     * fight is joined by whoever is there when it opens, which is what makes
+     * converging on a guardian a thing a party DOES rather than a lobby it
+     * fills in. Somebody two hexes away is not in this fight and does not pay
+     * for it.
+     *
+     * A member mid-step is left out rather than waited for. The alternative is a
+     * fight that blocks on somebody who wandered off, and §9.6.4 already makes
+     * the party's advantage composition rather than attendance.
+     *
+     * @return array<string,mixed>
+     */
     public function fight(Character $character): array
     {
         return DB::transaction(function () use ($character) {
@@ -277,7 +292,50 @@ final class DungeonService
                 throw new GameException('Nothing is standing here.');
             }
 
-            $profile = $this->game->combatProfile($character);
+            // Everybody on this hex, in a stable order so the seed means the
+            // same thing however the rows come back. The caller is always first
+            // -- it is their press, and the log reads better for it.
+            $onHex = $session->members()
+                ->whereNotNull('entered_at_ms')
+                ->where('floor', $member->floor)
+                ->where('col', $member->col)
+                ->where('row', $member->row)
+                ->lockForUpdate()
+                ->get()
+                ->reject(fn (DungeonMember $m) => $m->id !== $member->id && $m->isBusy($now))
+                ->sortBy(fn (DungeonMember $m) => $m->id === $member->id ? 0 : $m->id)
+                ->values();
+
+            $fighters = [];
+            foreach ($onHex as $row) {
+                $who = $row->character;
+                if ($who === null) {
+                    continue;
+                }
+
+                $profile = $this->game->combatProfile($who);
+
+                // §9.6.4 -- a BYSTANDER with an empty pool does not join. They
+                // would be a body drawing answers away from the people actually
+                // fighting, which is a party's worst bug: dead weight that makes
+                // the fight easier for everyone else.
+                //
+                // **The caller is in it regardless**, and that exception is
+                // §9.5.3 rather than a kindness. A pinned hex has exactly two
+                // exits and one of them is fighting -- so a prospector whose
+                // gear is gone must still be able to close, lose, and walk away.
+                // Excluding them for having nothing left would be the one thing
+                // that section forbids outright: a dead end with no way out.
+                if ($profile['pool'] <= 0 && $row->id !== $member->id) {
+                    continue;
+                }
+
+                $fighters[] = ['member' => $row, 'character' => $who, 'profile' => $profile];
+            }
+
+            if ($fighters === []) {
+                throw new GameException('There is nothing left to fight it with.');
+            }
 
             // §16 -- seeded server-side, and the session's secret is in it: two
             // members closing on two copies of one monster must not share a roll,
@@ -288,47 +346,36 @@ final class DungeonService
                 (int) hexdec(substr(hash('sha256', $session->secret.'|fight'), 0, 7)),
             );
 
-            $fight = Formulas::resolveBattle(
-                $profile['attack'],
-                $profile['defense'],
-                $profile['pool'],
+            // §9.6.4 -- the guardian's pool is scaled by the roster that is
+            // actually swinging, not by the roster on the books. Six people who
+            // signed up and one who walked to the stair is one person's fight.
+            if ($monster['guardian'] ?? false) {
+                $monster = Dungeons::guardian(
+                    $session->dungeon,
+                    $session->difficulty,
+                    $member->floor,
+                    count($fighters),
+                );
+            }
+
+            $fight = Formulas::resolvePartyBattle(
+                array_map(static fn (array $f): array => [
+                    'attack' => $f['profile']['attack'],
+                    'defense' => $f['profile']['defense'],
+                    'pool' => $f['profile']['pool'],
+                    'skills' => $f['profile']['skills'],
+                ], $fighters),
                 $monster,
                 $seed,
-                $profile['skills'],
             );
 
-            // §9.5.6 -- the same bill a road fight pays, off the same two calls.
-            $wear = [];
-            $share = $this->game->battleWear(
-                $profile['items'],
-                $monster,
-                (int) $fight['damageTaken'],
-                (float) ($profile['tree']['wear'] ?? 0.0),
-                (float) ($profile['tree']['weaponWear'] ?? 0.0),
-            );
-
-            $byId = [];
-            foreach ($character->items as $item) {
-                $byId[$item->id] = $item;
-            }
-
-            foreach ($share as $id => $amount) {
-                if (isset($byId[$id])) {
-                    $wear[] = $this->game->wearInFight($byId[$id], $amount);
-                }
-            }
-
-            $gold = 0;
-            $rewards = [];
-            $prize = null;
-            $treasure = [];
+            $won = (bool) $fight['won'];
             $isGuardian = (bool) ($monster['guardian'] ?? false);
 
-            if ($fight['won']) {
-                // §9.6.2 -- the row IS the state. Monsters never respawn, and the
-                // unique index is what makes that true rather than a rule in
-                // code: two members closing on one hex at once is exactly the
-                // race a check loses.
+            if ($won) {
+                // §9.6.2 -- the row IS the state, and it is written ONCE however
+                // many people swung: a hex is cleared or it is not, and the
+                // unique index is what makes that true rather than a rule.
                 DungeonClear::create([
                     'dungeon_session_id' => $session->id,
                     'floor' => $member->floor,
@@ -338,94 +385,146 @@ final class DungeonService
                     'guardian' => $isGuardian,
                     'killed_at_ms' => $now,
                 ]);
-
-                $gold = Hash::randInt(
-                    Hash::hash2($seed, 0x60D, 0x9061),
-                    (int) $monster['gold'][0],
-                    (int) $monster['gold'][1],
-                );
-                $character->gold += $gold;
-                $character->save();
-
-                // §9.5.8 -- a monster on a floor pays exactly what it pays on a
-                // road, through the road's own call. A dungeon paying its own
-                // way would be a second drop table for one rule, and the first
-                // thing two tables do is disagree about a creature they share.
-                $rewards = $this->game->awardBattleRewards(
-                    $character,
-                    $monster,
-                    $seed,
-                    $profile['job']['job'] ?? null,
-                    (float) ($profile['tree']['loot'] ?? 0.0),
-                );
-
-                // §9.6.8 -- and the guardian pays the dungeon's own table on top.
-                // Only the guardian: that is what keeps the two faucets
-                // separable, so a floor of Moss Hounds cannot be farmed for
-                // anything a dungeon is the gate on.
-                if ($isGuardian) {
-                    $drop = DungeonDrops::guardian(
-                        $session->dungeon,
-                        $session->category,
-                        $session->difficulty,
-                        $member->floor,
-                        $seed,
-                    );
-
-                    foreach ($drop['materials'] as $key => $quantity) {
-                        $granted = $this->game->addMaterial($character, $key, $quantity);
-                        if ($granted > 0) {
-                            $treasure[$key] = $granted;
-                        }
-                    }
-
-                    if ($drop['item'] !== null) {
-                        // Harder packs roll better options rather than better
-                        // rarity (§9.5.8), and a guardian is the hardest thing
-                        // on the floor -- so the depth buys lines, never a rung.
-                        $prize = $this->game->grantRolledItem(
-                            $character,
-                            $drop['item'],
-                            $seed,
-                            intdiv($member->floor, 4),
-                        );
-                    }
-                }
-            } else {
-                // §9.6.6 -- a loss puts you at the landing of the first floor with
-                // everything you were carrying. It takes nothing from the bag;
-                // what it costs is the pool, and the only thing that fills that
-                // is the repair stock you chose to bring down.
-                $this->sendToEntrance($member, $session);
             }
 
-            $member->busy_until_ms = $now + Formulas::battleDurationMs((int) $fight['rounds']);
-            $member->save();
+            // §9.6.4 -- NOTHING SPLITS. Every member rolls the table for
+            // themselves, which is what lets §9.6.8 quote a rate a player can
+            // read: a legendary is 2.5% for you whoever else was standing there.
+            // What a party divides is the fighting, never the paying.
+            $shares = [];
+
+            foreach ($fighters as $i => $f) {
+                $who = $f['character'];
+                $row = $f['member'];
+                $mine = $fight['members'][$i];
+                $taken = (int) $mine['damageTaken'];
+
+                // §9.5.6 -- each pays their own bill off their own damage, which
+                // is the whole reason the answers are individual.
+                $wear = [];
+                $share = $this->game->battleWear(
+                    $f['profile']['items'],
+                    $monster,
+                    $taken,
+                    (float) ($f['profile']['tree']['wear'] ?? 0.0),
+                    (float) ($f['profile']['tree']['weaponWear'] ?? 0.0),
+                );
+
+                $byId = [];
+                foreach ($who->items as $item) {
+                    $byId[$item->id] = $item;
+                }
+                foreach ($share as $id => $amount) {
+                    if (isset($byId[$id])) {
+                        $wear[] = $this->game->wearInFight($byId[$id], $amount);
+                    }
+                }
+
+                $gold = 0;
+                $rewards = [];
+                $treasure = [];
+                $prize = null;
+
+                if ($won) {
+                    $gold = Hash::randInt(
+                        Hash::hash2($seed + $i * 977, 0x60D, 0x9061),
+                        (int) $monster['gold'][0],
+                        (int) $monster['gold'][1],
+                    );
+                    $who->gold += $gold;
+                    $who->save();
+
+                    $rewards = $this->game->awardBattleRewards(
+                        $who,
+                        $monster,
+                        $seed + $i * 977,
+                        $f['profile']['job']['job'] ?? null,
+                        (float) ($f['profile']['tree']['loot'] ?? 0.0),
+                    );
+
+                    if ($isGuardian) {
+                        $drop = DungeonDrops::guardian(
+                            $session->dungeon,
+                            $session->category,
+                            $session->difficulty,
+                            $member->floor,
+                            $seed + $i * 977,
+                        );
+
+                        foreach ($drop['materials'] as $key => $quantity) {
+                            $granted = $this->game->addMaterial($who, $key, $quantity);
+                            if ($granted > 0) {
+                                $treasure[$key] = $granted;
+                            }
+                        }
+
+                        if ($drop['item'] !== null) {
+                            $prize = $this->game->grantRolledItem(
+                                $who,
+                                $drop['item'],
+                                $seed + $i * 977,
+                                intdiv($member->floor, 4),
+                            );
+                        }
+                    }
+                }
+
+                // §9.6.6 -- going DOWN is what sends you back, not the party
+                // losing. A member who survived a lost fight is still standing
+                // where they were, which is the honest reading of a rout: the
+                // ones who fell wake at the landing and the rest are still here.
+                if ($mine['down']) {
+                    $this->sendToEntrance($row, $session);
+                }
+
+                $row->busy_until_ms = $now + Formulas::battleDurationMs((int) $fight['rounds']);
+                $row->save();
+
+                $shares[] = [
+                    'character' => (int) $who->id,
+                    'name' => $who->name,
+                    'damageTaken' => $taken,
+                    'left' => (int) $mine['left'],
+                    'down' => (bool) $mine['down'],
+                    'wear' => $wear,
+                    'gold' => $gold,
+                    'spoils' => $rewards['spoils'] ?? [],
+                    'looted' => $rewards['looted'] ?? null,
+                    'leftBehind' => $rewards['leftBehind'] ?? null,
+                    'jobXp' => $rewards['jobXp'] ?? 0,
+                    'characterXp' => $rewards['characterXp'] ?? 0,
+                    'levels' => $rewards['levels'] ?? 0,
+                    'treasure' => $treasure,
+                    'prize' => $prize,
+                ];
+            }
 
             $kills = $session->killsOn($member->floor);
+            $me = $shares[0];
 
             return [
-                'won' => (bool) $fight['won'],
+                'won' => $won,
                 'monster' => $monster,
+                'guardian' => $isGuardian,
+                'party' => count($fighters),
                 'rounds' => (int) $fight['rounds'],
-                'damageTaken' => (int) $fight['damageTaken'],
                 'damageDealt' => (int) $fight['damageDealt'],
                 'log' => $fight['log'],
-                'wear' => $wear,
-                'gold' => $gold,
-                'guardian' => $isGuardian,
-                // §9.5.8's own, and then §9.6.8's on top of it. Kept apart in
-                // the payload for the same reason they are kept apart in the
-                // code: one is what the creature pays anywhere, and the other
-                // is what the dungeon pays for reaching it.
-                'spoils' => $rewards['spoils'] ?? [],
-                'looted' => $rewards['looted'] ?? null,
-                'leftBehind' => $rewards['leftBehind'] ?? null,
-                'jobXp' => $rewards['jobXp'] ?? 0,
-                'characterXp' => $rewards['characterXp'] ?? 0,
-                'levels' => $rewards['levels'] ?? 0,
-                'treasure' => $treasure,
-                'prize' => $prize,
+                // The party's share of it, and then the caller's own at the top
+                // level -- because a solo run is the common case and asking it
+                // to dig its own row out of a list of one is noise.
+                'members' => $shares,
+                'damageTaken' => $me['damageTaken'],
+                'wear' => $me['wear'],
+                'gold' => $me['gold'],
+                'spoils' => $me['spoils'],
+                'looted' => $me['looted'],
+                'leftBehind' => $me['leftBehind'],
+                'jobXp' => $me['jobXp'],
+                'characterXp' => $me['characterXp'],
+                'levels' => $me['levels'],
+                'treasure' => $me['treasure'],
+                'prize' => $me['prize'],
                 'kills' => $kills,
                 'floorOpen' => Dungeons::floorOpen($kills),
                 'guardianRoused' => Dungeons::guardianRoused($kills),
