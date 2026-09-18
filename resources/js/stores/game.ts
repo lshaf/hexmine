@@ -1352,6 +1352,24 @@ export const useGame = defineStore('game', () => {
    */
   const dungeon = ref<DungeonState | null>(null)
 
+  /**
+   * Whether the mouth panel is open.
+   *
+   * Driven by a dock press, the same as a settlement's -- it used to open by
+   * itself on arrival and be dismissible, which left no way back to it: a
+   * player who closed it once could not find the dungeon again. A place you
+   * walked five thousand hexes to needs a verb, not an interruption.
+   */
+  const mouthOpen = ref(false)
+
+  function openMouth(): void {
+    mouthOpen.value = true
+  }
+
+  function closeMouth(): void {
+    mouthOpen.value = false
+  }
+
   /** The last fight, kept until the plate is dismissed. */
   const dungeonFight = ref<DungeonFight | null>(null)
 
@@ -1690,6 +1708,7 @@ export const useGame = defineStore('game', () => {
     activeJobs, fieldJob, workFull, benchJobs, benchReady, benchHere, underfoot, selectedTile,
     currentSettlement, shopStock, sight, travelPerHexMs, travelEta,
     dungeon, dungeonFight, underground, dungeonTiles, dungeonUnderfoot,
+    mouthOpen, openMouth, closeMouth,
     loadDungeon, openDungeon, joinDungeon, enterDungeon, stepDungeon,
     fightDungeon, descendDungeon, leaveDungeon,
     here, hereCol, hereRow,

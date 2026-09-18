@@ -611,7 +611,23 @@ final class Drops
         )];
     }
 
-    public const LOOT_CHANCE = 0.18;
+    /**
+     * §9.5.8 -- how often a win pays the kit the monster was wearing.
+     *
+     * **The rarest thing a fight gives up, and it has to stay that way.** It was
+     * 0.18 and that made it the middle of the table rather than the bottom: the
+     * two rare spoils sit near a tenth, so gear was turning up nearly twice as
+     * often as the materials it is made of. A piece of equipment is worth more
+     * than any single material on the list and takes a whole strap (§7.6), so a
+     * table where it is the commonest scarce thing reads as backwards -- and it
+     * is the one drop a player already has a bench full of ways to get.
+     *
+     * Measured per win on a tier-1 forest monster: trophies 100%, the plate and
+     * ichor lines about 50%, the leaving 40%, the rare spoils near 10%, and this
+     * strictly under all of them. `DropRateTest` pins the ordering rather than
+     * the number, because what matters is that nothing overtakes it.
+     */
+    public const LOOT_CHANCE = 0.06;
 
     /** Tier -> the rungs it may have been wearing. Never past rare (§2). */
     public const LOOT_RUNGS = [
@@ -772,7 +788,6 @@ final class Drops
      * exception the code had to allow for.
      */
     private const HUNT_PARTS = Hunts::PARTS;
-
 
     /** §4 -- the tier-0 rubbish, every time. */
     private const HUNT_JUNK = Hunts::JUNK;

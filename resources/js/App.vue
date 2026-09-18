@@ -316,23 +316,15 @@ const station = computed(() => game.station)
  * you walked several thousand hexes to be here and the panel is the reason.
  * Dismissing it is per-hex, so stepping off and back on offers it again.
  */
-const mouthShut = ref('')
-
-const standingOn = computed(() => `${game.hereCol},${game.hereRow}`)
-
 const mouth = computed(() => {
   // Inside, the mouth is not where you are. The floor replaces the map, and a
   // panel about the door you came through would be a second screen describing
   // somewhere else -- which is exactly what it did: going down left the panel
   // sitting over the floor it had just opened.
-  if (game.underground) return undefined
+  if (game.underground || !game.mouthOpen) return undefined
 
-  return mouthShut.value === standingOn.value ? undefined : dungeonAt(game.hereCol, game.hereRow)
+  return dungeonAt(game.hereCol, game.hereRow)
 })
-
-function shutMouth(): void {
-  mouthShut.value = standingOn.value
-}
 
 /*
  * The bottom stack used to be MEASURED, and published as --stack-h so the
@@ -641,7 +633,7 @@ onMounted(() => {
         <PanelOverlay
           v-if="mouth && !panel && !station"
           :title="mouth.name"
-          @close="shutMouth()"
+          @close="game.closeMouth()"
         >
           <DungeonPanel :dungeon="mouth" />
         </PanelOverlay>

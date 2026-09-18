@@ -14,6 +14,7 @@
  */
 import { computed, ref, watch } from 'vue'
 import { useGame } from '@/stores/game'
+import { dungeonAt } from '@/game/worldgen'
 import { api } from '@/api/client'
 import { MONSTERS } from '@/game/monsters'
 import { carriedBattleJob, levelStanding } from '@/game/battle'
@@ -26,6 +27,11 @@ import type { BattlePreview } from '@/api/types'
 const game = useGame()
 
 const here = computed(() => game.currentSettlement)
+
+/** §9.6.1 -- the mouth under the character's feet, if they are on one. */
+const mouth = computed(() =>
+  game.underground ? undefined : dungeonAt(game.hereCol, game.hereRow),
+)
 
 /** The hex underfoot, costed by the server. Everything in the dock keys off it. */
 const underfoot = computed(() => game.underfoot)
@@ -567,6 +573,22 @@ function hunted(): void {
 
         <!-- Settlement-only. Absent in the field rather than grayed: the point
              is that these people are not out here. -->
+        <!--
+          §9.6.1 -- a dungeon is a PLACE, so the way in is a verb on the dock
+          beside the others rather than a panel that opens at you. Without it
+          there was no way back to the mouth at all once it had been dismissed.
+        -->
+        <template v-if="mouth">
+          <span v-if="working || seam" class="rule" aria-hidden="true" />
+          <HexAction
+            icon="dungeon"
+            label="Dungeon"
+            :primary="true"
+            :hint="`${mouth.name} — ten floors, and a roster of up to six`"
+            @activate="game.openMouth()"
+          />
+        </template>
+
         <template v-if="here">
           <span v-if="working || seam" class="rule" aria-hidden="true" />
           <HexAction small icon="trade" label="Trade" @activate="game.openPanel('shop')" />

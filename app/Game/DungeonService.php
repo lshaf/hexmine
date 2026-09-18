@@ -399,6 +399,24 @@ final class DungeonService
                 $mine = $fight['members'][$i];
                 $taken = (int) $mine['damageTaken'];
 
+                // §8.5 -- a battle draft was armed for exactly this, and the
+                // roll above already carries it: `combatProfile()` reads the
+                // `battle` bonuses into the pair, so the charge has been spent
+                // in fact and has to be spent on the row.
+                //
+                // **Win or lose**, and per FIGHTER rather than per fight, the
+                // same as a road pack. Each of them had their own bonuses read
+                // into their own attack and defense, so each of them used one.
+                //
+                // Leaving this out is what made a battle draft permanent
+                // underground: the bonus applied to every fight on every floor
+                // and was never consumed. §8.5 forbids that in as many words --
+                // nothing here may ever be permanent, because a permanent
+                // effect only accumulates -- and §11.1 counts the spending as
+                // the sink, so an uncollected charge is a sink that never
+                // collects.
+                $this->game->spendBuffs($who, 'battle');
+
                 // §9.5.6 -- each pays their own bill off their own damage, which
                 // is the whole reason the answers are individual.
                 $wear = [];
