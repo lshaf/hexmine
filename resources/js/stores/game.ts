@@ -19,6 +19,9 @@ import type {
   BattleSkillRow,
   BattleResult,
   CollectResult,
+  DungeonFight,
+  DungeonState,
+  DungeonTile,
   GuildDirectory,
   GuildDoor,
   GuildRole,
@@ -1108,6 +1111,11 @@ export const useGame = defineStore('game', () => {
     centerOnCharacter()
     await refreshMutations()
 
+    // §9.6 -- a session survives a reload, and a floor is not the map. Asked
+    // once at boot rather than polled: what changes it is this client's own
+    // presses, and every one of them answers with the new state.
+    await loadDungeon()
+
     booted.value = true
     setInterval(() => {
       tick.value++
@@ -1332,6 +1340,87 @@ export const useGame = defineStore('game', () => {
    * fuller copy with the roster on it.
    */
   const guilds = ref<GuildDirectory | null>(null)
+
+  // ------------------------------------------------------------ §9.6 dungeons
+
+  /**
+   * Where this prospector is in a dungeon, or null for "not in one".
+   *
+   * Held apart from `state` on purpose: a session is its own coordinate space
+   * (§9.6) and folding it into the player state would make every map read carry
+   * a floor it has no use for. The map does not know dungeons exist.
+   */
+  const dungeon = ref<DungeonState | null>(null)
+
+  /** The last fight, kept until the plate is dismissed. */
+  const dungeonFight = ref<DungeonFight | null>(null)
+
+  /** Inside a dungeon the world map is not what you are looking at. */
+  const underground = computed(() => dungeon.value?.inside === true)
+
+  /** §9.6.2 -- what is on a hex within sight, by key. */
+  const dungeonTiles = computed(() => {
+    const out = new Map<string, DungeonTile>()
+    for (const tile of dungeon.value?.tiles ?? []) {
+      out.set(`${tile.col},${tile.row}`, tile)
+    }
+    return out
+  })
+
+  /** §9.5.3 -- what is standing on the hex under your feet, if anything. */
+  const dungeonUnderfoot = computed(() => {
+    const d = dungeon.value
+    if (!d?.inside) return null
+    return dungeonTiles.value.get(`${d.col},${d.row}`)?.monster ?? null
+  })
+
+  async function loadDungeon(): Promise<void> {
+    try {
+      const result = await api.getDungeon()
+      absorb(result.state, true)
+      dungeon.value = result.data
+    } catch {
+      dungeon.value = null
+    }
+  }
+
+  async function openDungeon(key: string, category: string, difficulty: string): Promise<void> {
+    dungeon.value = await act(() => api.openDungeon(key, category, difficulty))
+  }
+
+  async function joinDungeon(code: string): Promise<void> {
+    dungeon.value = await act(() => api.joinDungeon(code))
+  }
+
+  async function enterDungeon(): Promise<void> {
+    dungeon.value = await act(() => api.enterDungeon())
+  }
+
+  async function stepDungeon(col: number, row: number): Promise<void> {
+    // Quiet: a step is not news, and a line of log per hex would bury the
+    // things that are (§13.3's own argument about what earns a colour).
+    const next = await act(() => api.stepDungeon(col, row), 'good', true)
+    if (next) dungeon.value = next
+  }
+
+  async function fightDungeon(): Promise<void> {
+    const result = await act(() => api.fightDungeon())
+    if (!result) return
+    dungeonFight.value = result.fight
+    dungeon.value = result.dungeon
+  }
+
+  async function descendDungeon(): Promise<void> {
+    const next = await act(() => api.descendDungeon())
+    if (next) dungeon.value = next
+  }
+
+  async function leaveDungeon(): Promise<void> {
+    await act(() => api.leaveDungeon())
+    dungeon.value = null
+    dungeonFight.value = null
+    await refreshState()
+  }
 
   async function loadGuilds(): Promise<void> {
     guilds.value = await api.getGuilds()
@@ -1600,6 +1689,9 @@ export const useGame = defineStore('game', () => {
     slate, saved,
     activeJobs, fieldJob, workFull, benchJobs, benchReady, benchHere, underfoot, selectedTile,
     currentSettlement, shopStock, sight, travelPerHexMs, travelEta,
+    dungeon, dungeonFight, underground, dungeonTiles, dungeonUnderfoot,
+    loadDungeon, openDungeon, joinDungeon, enterDungeon, stepDungeon,
+    fightDungeon, descendDungeon, leaveDungeon,
     here, hereCol, hereRow,
     travel, travelProgress, travelHexesWalked, travelRemainingMs,
     // helpers

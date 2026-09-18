@@ -1089,6 +1089,114 @@ export interface GameApi {
   saveRecipe(recipe: string): Promise<ActionResult<{ slate: string[] }>>
   /** §8.4 -- rub one off. Silent about a line that was not there. */
   dropRecipe(recipe: string): Promise<ActionResult<{ slate: string[] }>>
+
+  // ------------------------------------------------------------ §9.6 dungeons
+
+  /** Where you are in a session, if you are in one. Null when you are not. */
+  getDungeon(): Promise<{ data: DungeonState | null; state: PlayerState }>
+  /** §9.6.1 -- open one at the mouth under your feet. */
+  openDungeon(
+    dungeon: string,
+    category: string,
+    difficulty: string,
+  ): Promise<ActionResult<DungeonState>>
+  /** §9.6.1 -- walk in on somebody's code, standing at the same mouth. */
+  joinDungeon(code: string): Promise<ActionResult<DungeonState>>
+  /** §9.6.1 -- go down. The first one through locks the roster. */
+  enterDungeon(): Promise<ActionResult<DungeonState>>
+  /** §5.6 -- one hex, at five seconds a hex. */
+  stepDungeon(col: number, row: number): Promise<ActionResult<DungeonState>>
+  /** §9.6.4 -- settle whatever is on the hex, with everybody standing on it. */
+  fightDungeon(): Promise<ActionResult<{ fight: DungeonFight; dungeon: DungeonState }>>
+  /** §9.6.2 -- the stair, once six have fallen and the guardian is down. */
+  descendDungeon(): Promise<ActionResult<DungeonState>>
+  /** Walk out. The session goes on without you. */
+  leaveDungeon(): Promise<ActionResult<DungeonState | null>>
+}
+
+/** §9.6 -- a hex on a floor, as far as sight reaches. */
+export interface DungeonTile {
+  col: number
+  row: number
+  monster: {
+    key: string
+    name: string
+    tier: number
+    profile: string
+    guardian: boolean
+  } | null
+}
+
+/**
+ * §9.6 -- where you are in a session.
+ *
+ * `tiles` is bounded by sight and nothing else (§5.6): the secret stops a client
+ * DERIVING the floor, and this is the half that stops it being told. There is no
+ * field here for the layout, and there must never be one.
+ */
+export interface DungeonState {
+  code: string
+  dungeon: string
+  category: string
+  difficulty: string
+  expiresAt: number
+  locked: boolean
+  owner: boolean
+  roster: number
+  inside: boolean
+  floor: number
+  floors: number
+  col: number
+  row: number
+  busyUntil: number | null
+  kills?: number
+  killsNeeded?: number
+  floorOpen?: boolean
+  guardianRoused?: boolean
+  stair?: { col: number; row: number }
+  sight?: number
+  tiles?: DungeonTile[]
+}
+
+/** §9.6.4 -- one member's share of a fight: what it cost them and what it paid. */
+export interface DungeonShare {
+  character: number
+  name: string | null
+  damageTaken: number
+  left: number
+  down: boolean
+  gold: number
+  spoils: Record<string, number>
+  jobXp: number
+  characterXp: number
+  levels: number
+  treasure: Record<string, number>
+  prize: { key: string; name: string; rarity: string } | null
+  looted: { key: string; name: string; rarity: string } | null
+}
+
+export interface DungeonFight {
+  won: boolean
+  guardian: boolean
+  party: number
+  rounds: number
+  damageDealt: number
+  damageTaken: number
+  monster: { key?: string; name: string; tier: number; profile: string; guardian?: boolean }
+  members: DungeonShare[]
+  gold: number
+  spoils: Record<string, number>
+  treasure: Record<string, number>
+  prize: DungeonShare['prize']
+  looted: DungeonShare['looted']
+  characterXp: number
+  jobXp: number
+  kills: number
+  floorOpen: boolean
+  guardianRoused: boolean
+  floor: number
+  col: number
+  row: number
 }
 
 export class ApiError extends Error {

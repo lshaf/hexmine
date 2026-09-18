@@ -19,6 +19,7 @@
  */
 import { onMounted, onBeforeUnmount, computed, nextTick, ref } from 'vue'
 import { useGame } from '@/stores/game'
+import { dungeonAt } from '@/game/worldgen'
 import { logout } from '@/wallet/wax'
 import HexMap from '@/map/HexMap.vue'
 import StatusCluster from '@/shell/StatusCluster.vue'
@@ -45,6 +46,8 @@ import SkillsView from '@/views/SkillsView.vue'
 import QuestView from '@/views/QuestView.vue'
 import QuestRewardModal from '@/shell/QuestRewardModal.vue'
 import LoginView from '@/views/LoginView.vue'
+import DungeonPanel from '@/views/DungeonPanel.vue'
+import DungeonView from '@/views/DungeonView.vue'
 import { loadSettings } from '@/wallet/wax'
 
 const game = useGame()
@@ -301,6 +304,35 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onMenuKey))
 
 /** The station opens for whichever settlement the player is standing on. */
 const station = computed(() => game.station)
+
+/**
+ * §9.6.1 -- the mouth under your feet, if you are standing on one.
+ *
+ * Derived rather than fetched: a dungeon site is a pure function of the seed
+ * (§5), so the client already knows where all five are and asking the server
+ * where it is standing would be a round trip for something it can compute.
+ *
+ * It opens on arrival rather than on a press, the way claimable ground does:
+ * you walked several thousand hexes to be here and the panel is the reason.
+ * Dismissing it is per-hex, so stepping off and back on offers it again.
+ */
+const mouthShut = ref('')
+
+const standingOn = computed(() => `${game.hereCol},${game.hereRow}`)
+
+const mouth = computed(() => {
+  // Inside, the mouth is not where you are. The floor replaces the map, and a
+  // panel about the door you came through would be a second screen describing
+  // somewhere else -- which is exactly what it did: going down left the panel
+  // sitting over the floor it had just opened.
+  if (game.underground) return undefined
+
+  return mouthShut.value === standingOn.value ? undefined : dungeonAt(game.hereCol, game.hereRow)
+})
+
+function shutMouth(): void {
+  mouthShut.value = standingOn.value
+}
 
 /*
  * The bottom stack used to be MEASURED, and published as --stack-h so the
@@ -591,6 +623,27 @@ onMounted(() => {
           @close="game.closeClaim()"
         >
           <StationPanel :settlement="null" />
+        </PanelOverlay>
+      </Transition>
+
+      <!--
+        §9.6 -- inside, the floor IS the screen. A dungeon is a second
+        coordinate space, so what is behind this is not where you are: it
+        replaces the map rather than opening over it.
+      -->
+      <DungeonView />
+
+      <!--
+        §9.6.1 -- the mouth. A dungeon is a PLACE (§10.0.4), so its panel opens
+        on the hex the way a settlement's does, and nowhere else.
+      -->
+      <Transition name="fade">
+        <PanelOverlay
+          v-if="mouth && !panel && !station"
+          :title="mouth.name"
+          @close="shutMouth()"
+        >
+          <DungeonPanel :dungeon="mouth" />
         </PanelOverlay>
       </Transition>
 

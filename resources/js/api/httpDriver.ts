@@ -35,6 +35,8 @@ import type {
   ActionResult,
   BattleSkillRow,
   CollectResult,
+  DungeonFight,
+  DungeonState,
   GameApi,
   MapMutations,
   PlayerState,
@@ -292,6 +294,40 @@ export class HttpDriver implements GameApi {
 
   dropRecipe(recipe: string): Promise<ActionResult<{ slate: string[] }>> {
     return del<ActionResult<{ slate: string[] }>>(`/slate/${recipe}`)
+  }
+
+  // ------------------------------------------------------------ §9.6 dungeons
+
+  getDungeon() {
+    return request<{ data: DungeonState | null; state: PlayerState }>('/dungeon')
+  }
+
+  openDungeon(dungeon: string, category: string, difficulty: string) {
+    return post<ActionResult<DungeonState>>('/dungeon', { dungeon, category, difficulty })
+  }
+
+  joinDungeon(code: string) {
+    return post<ActionResult<DungeonState>>('/dungeon/join', { code })
+  }
+
+  enterDungeon() {
+    return post<ActionResult<DungeonState>>('/dungeon/enter')
+  }
+
+  stepDungeon(col: number, row: number) {
+    return post<ActionResult<DungeonState>>('/dungeon/step', { col, row })
+  }
+
+  fightDungeon() {
+    return post<ActionResult<{ fight: DungeonFight; dungeon: DungeonState }>>('/dungeon/fight')
+  }
+
+  descendDungeon() {
+    return post<ActionResult<DungeonState>>('/dungeon/descend')
+  }
+
+  leaveDungeon() {
+    return del<ActionResult<DungeonState | null>>('/dungeon')
   }
 
   craftItem(itemKey: string): Promise<ActionResult<Job>> {
