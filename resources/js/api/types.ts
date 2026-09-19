@@ -1163,6 +1163,26 @@ export interface DungeonState {
   tiles?: DungeonTile[]
   /** §5.6 -- the journey under way, shaped exactly as the overworld's. */
   walk?: TravelState | null
+  /**
+   * §9.6.9 -- the rest of the roster, through the fog.
+   *
+   * Bounded by the SESSION rather than by sight, which is the one exemption a
+   * floor has: §9.6.4 needs everybody on one hex to fight together, and that
+   * cannot be arranged by people who cannot see each other.
+   */
+  party?: DungeonMate[]
+}
+
+/** §9.6.9 -- where somebody else on the roster is standing. */
+export interface DungeonMate {
+  character: number
+  name: string | null
+  floor: number
+  col: number
+  row: number
+  /** On the floor you are on. A mate two storeys down is not on this map. */
+  here: boolean
+  walking: boolean
 }
 
 /** §9.6.4 -- one member's share of a fight: what it cost them and what it paid. */

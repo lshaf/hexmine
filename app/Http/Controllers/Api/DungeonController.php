@@ -204,16 +204,19 @@ class DungeonController extends GameController
         // that you know where it is, is not.
         $out['stair'] = ['col' => $sc, 'row' => $sr];
 
+        // §5.6 -- THE DISC FOLLOWS THE WALKER. Centred on where they are right
+        // now rather than on the hex they set off from, or a prospector three
+        // hexes into a road would be lighting the room behind them.
         $radius = $this->game->sightRadius($character);
         $tiles = [];
 
-        for ($col = $member->col - $radius; $col <= $member->col + $radius; $col++) {
-            for ($row = $member->row - $radius; $row <= $member->row + $radius; $row++) {
+        for ($col = $atCol - $radius; $col <= $atCol + $radius; $col++) {
+            for ($row = $atRow - $radius; $row <= $atRow + $radius; $row++) {
                 if (! Dungeons::inBounds($col, $row)) {
                     continue;
                 }
 
-                if (HexGeometry::distance($member->col, $member->row, $col, $row) > $radius) {
+                if (HexGeometry::distance($atCol, $atRow, $col, $row) > $radius) {
                     continue;
                 }
 
@@ -235,6 +238,48 @@ class DungeonController extends GameController
 
         $out['sight'] = $radius;
         $out['tiles'] = $tiles;
+
+        /*
+         * §9.6.9 -- THE ROSTER SEES EACH OTHER THROUGH THE FOG.
+         *
+         * The one exemption a floor has, and it is the same shape as §9.5.7's:
+         * your own corpse is drawn at any distance because a debt you cannot
+         * find is a fine with extra steps, and a party you cannot find is a
+         * party that cannot converge. §9.6.4 needs everybody on ONE HEX to
+         * fight together, which is impossible to arrange if you cannot see
+         * where anybody is.
+         *
+         * It is bounded by the session rather than by sight, and a session is
+         * six people who all chose to be in it -- so this is not the scanner
+         * §5.6 refuses. Nobody outside the roster appears here at all.
+         *
+         * Positions are DERIVED the same way the reader's own is, so somebody
+         * mid-journey is drawn where they actually are rather than where they
+         * set off from.
+         */
+        $party = [];
+
+        foreach ($session->members()->whereNotNull('entered_at_ms')->with('character')->get() as $mate) {
+            if ((int) $mate->id === (int) $member->id) {
+                continue;
+            }
+
+            [$mateCol, $mateRow] = $this->dungeons->walkingAt($mate, $now);
+
+            $party[] = [
+                'character' => (int) $mate->character_id,
+                'name' => $mate->character?->name,
+                'floor' => (int) $mate->floor,
+                'col' => $mateCol,
+                'row' => $mateRow,
+                // Drawn only when they are on the floor you are on: a mate two
+                // storeys down is on the roster and not on this map.
+                'here' => (int) $mate->floor === (int) $member->floor,
+                'walking' => $mate->isWalking($now),
+            ];
+        }
+
+        $out['party'] = $party;
 
         return $out;
     }

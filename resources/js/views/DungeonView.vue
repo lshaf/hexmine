@@ -24,7 +24,7 @@
  * a floor has a depth and a gate and a clock that a hex does not, and the dock,
  * because Descend and Walk out are verbs the overworld has no equivalent of.
  */
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useGame } from '@/stores/game'
 import HexMap from '@/map/HexMap.vue'
 
@@ -51,10 +51,33 @@ function hexAway(aCol: number, aRow: number, bCol: number, bRow: number): number
   return Math.max(Math.abs(ax - bx), Math.abs(ay - by), Math.abs(az - bz))
 }
 
-/** The camera, panned independently of the walker exactly as it is outside. */
+/**
+ * The camera, and it does NOT follow the walker.
+ *
+ * It used to be pinned to the prospector, so a floor could only ever be looked
+ * at from directly above whoever was reading it -- which is not how the map
+ * works outside, where panning costs nothing and the way back is a button. A
+ * floor is a room six people are in; being unable to look at the far end of it
+ * was the difference doing the most damage.
+ *
+ * Set once when a floor is entered and then left alone. `Here` recentres.
+ */
 const camera = ref<{ col: number; row: number } | null>(null)
 
 const centre = computed(() => camera.value ?? { col: session.value?.col ?? 0, row: session.value?.row ?? 0 })
+
+watch(
+  () => [session.value?.floor, session.value?.inside] as const,
+  () => {
+    camera.value = null
+  },
+)
+
+/** §9.6.9 -- the roster, on this floor, through the fog. */
+const mates = computed(() => (session.value?.party ?? []).filter((m) => m.here))
+
+/** Those who are not, so the dock can say so rather than the map lying by omission. */
+const elsewhere = computed(() => (session.value?.party ?? []).filter((m) => !m.here))
 
 const viewport = ref({ w: 900, h: 620 })
 
@@ -141,6 +164,21 @@ const onStair = computed(() => {
 })
 
 const underfoot = computed(() => game.dungeonUnderfoot)
+
+/**
+ * §9.6.2 -- what the floor is waiting for, in one sentence.
+ *
+ * Computed once and used by the row, the button and its tooltip, so the three
+ * cannot end up saying different things about the same gate.
+ */
+const gateSays = computed(() => {
+  const short = needed.value - kills.value
+
+  if (short <= 0) return 'The floor is done with you'
+  if (short === 1) return 'One more, and the guardian is it'
+
+  return `${short} more to clear`
+})
 
 const kills = computed(() => session.value?.kills ?? 0)
 const needed = computed(() => session.value?.killsNeeded ?? 6)
@@ -255,6 +293,7 @@ const receipt = computed(() => {
         :now="game.now"
         :carriers="[]"
         :worn="game.worn"
+        :mates="mates"
         @select="select"
         @recenter="camera = null"
         @resize="(w, h) => (viewport = { w, h })"
@@ -262,17 +301,32 @@ const receipt = computed(() => {
     </div>
 
     <div class="dock">
+      <!--
+        §9.6.2 -- THE GATE, said as one line rather than left to arithmetic.
+
+        It was a tally in the corner and a sentence in the dock that only
+        appeared once you were standing on the stair, so "why can I not go
+        down" was answered in two places and neither of them where you were
+        looking. One row now: how many have fallen, how many the floor wants,
+        and what that means -- drawn as pips, because six is a number you
+        should be able to count rather than read.
+      -->
+      <div class="gate-row">
+        <span class="pips" :aria-label="`${kills} of ${needed} cleared`">
+          <i v-for="n in needed" :key="n" :class="{ on: n <= kills, last: n === needed }" />
+        </span>
+        <span class="gate-says" :class="{ open: session.floorOpen }">{{ gateSays }}</span>
+      </div>
+
       <p v-if="underfoot" class="here-is">
         <span class="mob" :class="{ boss: underfoot.guardian }">{{ underfoot.name }}</span>
         <span class="mob-of">{{ underfoot.profile }} · tier {{ underfoot.tier }}</span>
       </p>
-      <p v-else-if="picked" class="here-is quiet">
+      <p v-else-if="picked && !session.walk" class="here-is quiet">
         {{ pickedName ?? 'Floor' }} · {{ pickedAway }} hexes off
       </p>
-      <p v-else-if="onStair && !session.floorOpen" class="here-is quiet">
-        The stair. {{ needed - kills }} more to clear before it opens.
-      </p>
-      <p v-else-if="onStair" class="here-is quiet">The stair, and the floor is done with you.</p>
+      <p v-else-if="session.walk" class="here-is quiet">Walking.</p>
+      <p v-else-if="onStair" class="here-is quiet">You are on the stair.</p>
       <p v-else class="here-is quiet">
         Open floor.<span v-if="toStair !== null"> The stair is {{ toStair }} hexes off.</span>
       </p>
@@ -298,20 +352,10 @@ const receipt = computed(() => {
           Walk {{ pickedAway }}
         </button>
 
-        <button
-          v-if="onStair && session.floorOpen && !underfoot"
-          class="btn"
-          type="button"
-          :disabled="game.busy || waiting"
-          @click="game.descendDungeon()"
-        >
-          Descend
-        </button>
-
         <!-- §5.6 -- stopping a journey is a verb the overworld has too. -->
         <button
           v-if="session.walk"
-          class="btn ghost"
+          class="btn"
           type="button"
           :disabled="game.busy"
           @click="game.stopDungeonWalk()"
@@ -319,10 +363,44 @@ const receipt = computed(() => {
           Stop
         </button>
 
-        <button class="btn ghost" type="button" :disabled="game.busy" @click="game.leaveDungeon()">
+        <!--
+          The way down, and it says WHY when it cannot be taken rather than
+          greying out and leaving you to work it out. A control that refuses
+          silently is a control that looks broken.
+        -->
+        <button
+          v-if="onStair && !underfoot"
+          class="btn down"
+          type="button"
+          :disabled="game.busy || waiting || !session.floorOpen"
+          :title="session.floorOpen ? 'Down to the next floor' : gateSays"
+          @click="game.descendDungeon()"
+        >
+          {{ session.floorOpen ? `Descend to ${session.floor + 1}` : `${needed - kills} more to clear` }}
+        </button>
+
+        <!--
+          §9.6 -- leaving. Set apart from the rest with a rule, the way §7's
+          wallet row is: everything else on this bar happens ON the floor, and
+          this one ends the run. It is not destructive -- the session stands and
+          the roster keeps going -- so it is quiet rather than ember.
+        -->
+        <span class="rule" aria-hidden="true" />
+        <button
+          class="btn out"
+          type="button"
+          :disabled="game.busy"
+          :title="`Leave ${session.dungeon}. The session stays open for the others.`"
+          @click="game.leaveDungeon()"
+        >
           Walk out
         </button>
       </div>
+
+      <p v-if="elsewhere.length" class="mates-elsewhere">
+        {{ elsewhere.map((m) => m.name ?? 'Someone').join(', ') }}
+        {{ elsewhere.length === 1 ? 'is' : 'are' }} on another floor.
+      </p>
 
       <ul v-if="receipt" class="receipt">
         <li v-for="row in receipt" :key="row.what" :class="{ prize: row.good }">{{ row.what }}</li>
@@ -461,9 +539,75 @@ const receipt = computed(() => {
   text-transform: capitalize;
 }
 
+/*
+ * §9.6.2 -- the gate, as a row you can count rather than a fraction to read.
+ *
+ * Pips, not a bar, for §7.6's own reason about the bag comb: an empty pip is
+ * the same shape as a full one, so what is LEFT is seen rather than subtracted.
+ * Six is a number a person counts at a glance and 4/6 is a number they parse.
+ */
+.gate-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0 0 10px;
+}
+
+.pips {
+  display: flex;
+  gap: 3px;
+}
+
+.pips i {
+  width: 9px;
+  height: 10px;
+  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+  background: var(--line);
+}
+
+.pips i.on {
+  background: var(--copper);
+}
+
+/* The sixth is the guardian (§9.6.2), so it is drawn as the one that is. */
+.pips i.last {
+  outline: 1px solid var(--ember);
+  outline-offset: 1px;
+}
+
+.pips i.last.on {
+  background: var(--ember);
+}
+
+.gate-says {
+  color: var(--vellum-dim);
+  font-size: 11px;
+}
+
+/* §13.3 -- sap is a thing worth crossing the screen for, and an open stair is. */
+.gate-says.open {
+  color: var(--sap);
+}
+
 .acts {
   display: flex;
+  align-items: center;
   gap: 8px;
+}
+
+/* §7 -- a rule, so leaving does not sit inline with the verbs that do not. */
+.rule {
+  flex: 0 0 auto;
+  width: 1px;
+  align-self: stretch;
+  background: var(--line);
+  margin-inline: 2px;
+}
+
+.mates-elsewhere {
+  margin: 9px 0 0;
+  color: var(--vellum-dim);
+  font-size: 10.5px;
 }
 
 .acts .btn {
@@ -481,6 +625,31 @@ const receipt = computed(() => {
 .acts .ghost {
   flex: 0 0 auto;
   padding-inline: 16px;
+  background: var(--ink-raised);
+  color: var(--vellum);
+}
+
+/*
+ * These two come AFTER `.acts .btn` on purpose. Both are the same specificity
+ * as it, so source order is what decides -- declared above it, "Walk out" came
+ * out as a full-width copper primary, which is the loudest possible reading of
+ * the one control that ends the run.
+ */
+.acts .down {
+  background: var(--gold);
+  color: var(--ink);
+}
+
+/* §13.3 -- quiet. Leaving is not destructive (the session stands and the
+   roster goes on), so it is not ember; it is simply not the thing to press. */
+.acts .out {
+  flex: 0 0 auto;
+  padding-inline: 16px;
+  background: transparent;
+  color: var(--vellum-dim);
+}
+
+.acts .out:hover:not(:disabled) {
   background: var(--ink-raised);
   color: var(--vellum);
 }

@@ -81,6 +81,16 @@ const props = defineProps<{
     armor: string | null
     weapon: { family: 'shield' | 'sword' | 'dagger'; rarity: string } | null
   }
+  /**
+   * §9.6.9 -- other people on this map, drawn through the fog.
+   *
+   * Empty out in the world, where §5.6 forbids exactly this: a live list of
+   * where everybody is standing would be the scanner that section refuses. It
+   * is safe inside a dungeon because the list is a SESSION -- at most six
+   * people who all chose to be in it -- and §9.6.4 cannot work without it,
+   * since fighting together means standing on one hex.
+   */
+  mates?: Array<{ character: number; name: string | null; col: number; row: number }>
 }>()
 
 const carrierAt = computed(() => {
@@ -657,6 +667,27 @@ const RARE_MARK = groundMark(6)
 /** §13.1 -- you, wearing the coat and carrying the weapon. */
 const prospector = computed(() => prospectorProp(props.worn.armor, props.worn.weapon))
 
+/**
+ * §9.6.9 -- a mate's mark.
+ *
+ * The same silhouette as your own and deliberately BARE: §13.1 gives the
+ * marker one reading and yours spends it on your own rung, so painting theirs
+ * would put two rarity readings on one screen and make the map a comparison
+ * rather than a position. What their kit is, is their business and the
+ * roster's -- what the map owes you is where they are.
+ */
+const mateMark = prospectorProp(null, null)
+
+const mateMarks = computed(() =>
+  (props.mates ?? []).map((mate) => ({
+    ...mate,
+    // ABSOLUTE, like `characterScreen` above. The camera lives in the svg's
+    // viewBox, so subtracting the centre here offsets the mark a second time
+    // and parks everybody near the origin.
+    ...tileToScreen(mate.col, mate.row),
+  })),
+)
+
 </script>
 
 <template>
@@ -850,6 +881,14 @@ const prospector = computed(() => prospectorProp(props.worn.armor, props.worn.we
            §13.1 -- and it wears what you are wearing: the coat's rung on the
            mantle, the weapon's family in the hand. It was a vellum pennant and
            a vellum ball, which said somebody is here and nothing about who. -->
+      <!-- §9.6.9 -- the rest of the roster. Drawn BEFORE you, so your own
+           marker is the one on top when two of you share a hex: the map is
+           read from where you are standing. -->
+      <g v-for="mate in mateMarks" :key="mate.character" class="mate">
+        <g :transform="`translate(${mate.x},${mate.y + 3}) ${markScale}`" v-html="mateMark" />
+        <text :x="mate.x" :y="mate.y - 15" class="mate-name">{{ mate.name }}</text>
+      </g>
+
       <g
         :transform="`translate(${characterScreen.x},${characterScreen.y + 3}) ${markScale}`"
         v-html="prospector"
@@ -859,6 +898,16 @@ const prospector = computed(() => prospectorProp(props.worn.armor, props.worn.we
 </template>
 
 <style scoped>
+.mate-name {
+  fill: var(--vellum-dim);
+  font-size: 7px;
+  text-anchor: middle;
+  paint-order: stroke;
+  stroke: var(--ink);
+  stroke-width: 2.5px;
+  pointer-events: none;
+}
+
 .map-wrap {
   position: relative;
   width: 100%;
