@@ -940,6 +940,14 @@ export interface Tile {
   pack?: Pack
   /** §5.5 -- the animal standing here. Forest and grassland only. */
   hunt?: Hunt
+  /**
+   * §9.6.2 -- the way down, drawn on the hex it is on.
+   *
+   * Its own field rather than reusing `dungeon`, because that one is the MOUTH
+   * on the overworld -- the glyph you see from four days away -- and a stair
+   * inside a floor is a different thing that wants a different mark.
+   */
+  stair?: boolean
   /** Elevation prop seed so mountains/trees render deterministically. */
   propSeed: number
 }

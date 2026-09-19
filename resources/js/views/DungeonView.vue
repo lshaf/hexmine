@@ -27,25 +27,15 @@
 import { computed, ref } from 'vue'
 import { useGame } from '@/stores/game'
 import HexMap from '@/map/HexMap.vue'
-import { BIOME_VARIANTS } from '@/game/variants'
-import type { Biome, Tile, VariantKey } from '@/game/types'
+
+import type { Tile } from '@/game/types'
 import { MONSTERS } from '@/game/monsters'
-import { DUNGEONS } from '@/game/catalog'
+import { VAULT } from '@/theme/palette'
+import { COL_STEP, visibleTiles } from '@/map/hexGeometry'
 
 const game = useGame()
 
 const session = computed(() => game.dungeon)
-
-/** §9.6.2 -- the country a mouth belongs to. Beastwarren belongs to none. */
-const biome = computed<Biome>(() => {
-  const key = session.value?.dungeon
-  const site = DUNGEONS.find((d) => d.key === key)
-
-  return (site?.biome as Biome) ?? 'mountain'
-})
-
-/** How far around the walker the floor is built. The map fogs it past sight. */
-const VIEW = 7
 
 function cube(col: number, row: number): [number, number, number] {
   const x = col
@@ -61,12 +51,25 @@ function hexAway(aCol: number, aRow: number, bCol: number, bRow: number): number
   return Math.max(Math.abs(ax - bx), Math.abs(ay - by), Math.abs(az - bz))
 }
 
+/** The camera, panned independently of the walker exactly as it is outside. */
+const camera = ref<{ col: number; row: number } | null>(null)
+
+const centre = computed(() => camera.value ?? { col: session.value?.col ?? 0, row: session.value?.row ?? 0 })
+
+const viewport = ref({ w: 900, h: 620 })
+
 /**
- * The floor as tiles the map can draw.
+ * THE WHOLE FLOOR, fogged -- not a patch around the walker.
  *
- * `dead` is true and there is no `material`, because a dungeon floor is not
- * ground you work -- §9.6 gives a floor monsters and a stair and nothing to
- * mine -- and that is exactly what dead ground already means to the renderer.
+ * Built for the camera's window the way the overworld builds its own (§5), so
+ * panning and zooming out show the floor as a floor rather than as a disc
+ * floating in nothing. The fog is the map's, off `sight`: ground is drawn
+ * everywhere and what is STANDING on it only inside the disc, which is the same
+ * split §5.6 draws outside.
+ *
+ * Clamped to the floor's bounds, so the edge of a fifty-by-fifty room is a real
+ * edge you can see rather than tiles trailing off into coordinates that do not
+ * exist.
  */
 const tiles = computed<Tile[]>(() => {
   const d = session.value
@@ -74,39 +77,50 @@ const tiles = computed<Tile[]>(() => {
 
   const out: Tile[] = []
   const size = d.size ?? 50
-  const variant = (BIOME_VARIANTS[biome.value]?.[0]?.key ?? biome.value) as VariantKey
+  const stair = d.stair ?? null
 
-  for (let col = d.col - VIEW; col <= d.col + VIEW; col++) {
-    for (let row = d.row - VIEW; row <= d.row + VIEW; row++) {
-      if (col < 0 || row < 0 || col >= size || row >= size) continue
-      if (hexAway(d.col, d.row, col, row) > VIEW) continue
+  // Divided by the scale, the way the store does it: `visibleTiles` works in
+  // map units and the viewport is measured in pixels.
+  const scale = game.view.px / COL_STEP
 
-      const known = game.dungeonTiles.get(`${col},${row}`)
-      const monster = known?.monster ?? null
+  for (const { col, row } of visibleTiles(
+    centre.value.col,
+    centre.value.row,
+    viewport.value.w / scale,
+    viewport.value.h / scale,
+  )) {
+    if (col < 0 || row < 0 || col >= size || row >= size) continue
 
-      out.push({
-        col,
-        row,
-        biome: biome.value,
-        variant,
-        ring: 'center',
-        dead: true,
-        hp: 0,
-        baseYield: 0,
-        extractions: 0,
-        slotsUsed: 0,
-        workers: 0,
-        taken: 0,
-        regrowsAt: 0,
-        // §9.5.1 -- the monster IS a pack as far as the map is concerned, which
-        // is what gets it drawn standing on the ground with its halo rather
-        // than framed in a crest.
-        pack: monster
-          ? { key: monster.key, bucket: 0, until: Number.MAX_SAFE_INTEGER }
-          : undefined,
-        propSeed: col * 73856093 + row * 19349663,
-      })
-    }
+    const known = game.dungeonTiles.get(`${col},${row}`)
+    const monster = known?.monster ?? null
+
+    out.push({
+      col,
+      row,
+      // §5.6 -- the BIOME is what a fogged hex is painted with, and the
+      // variant is what a scouted one gets. Both are the vault here, so the
+      // fog is the same stone one shade darker rather than a different place.
+      //
+      // Setting a real biome made fog LIGHTER than the ground you were standing
+      // on, because it fell back to mountain blue-grey -- the map saying "out
+      // there is a different country" about the next room along.
+      biome: VAULT as unknown as Tile['biome'],
+      variant: VAULT,
+      ring: 'center',
+      dead: false,
+      hp: 0,
+      baseYield: 0,
+      extractions: 0,
+      slotsUsed: 0,
+      workers: 0,
+      taken: 0,
+      regrowsAt: 0,
+      stair: Boolean(stair && col === stair.col && row === stair.row),
+      // §9.5.1 -- the monster IS a pack as far as the map is concerned, which
+      // is what gets it drawn standing on the ground with its halo.
+      pack: monster ? { key: monster.key, bucket: 0, until: Number.MAX_SAFE_INTEGER } : undefined,
+      propSeed: col * 73856093 + row * 19349663,
+    })
   }
 
   return out
@@ -147,13 +161,6 @@ const closesIn = computed(() => {
 
 // ------------------------------------------------------------------ walking
 
-const walking = ref(false)
-
-/** The camera, which pans independently of the walker exactly as it does outside. */
-const camera = ref<{ col: number; row: number } | null>(null)
-
-const centre = computed(() => camera.value ?? { col: session.value?.col ?? 0, row: session.value?.row ?? 0 })
-
 const picked = ref<{ col: number; row: number } | null>(null)
 
 function select(col: number, row: number): void {
@@ -161,67 +168,18 @@ function select(col: number, row: number): void {
 }
 
 /**
- * §5.6 -- point at ground and go, which is what the overworld does.
+ * §5.6 -- point at ground and go.
  *
- * The server takes one hex at a time, because a step is a step and each costs
- * its five seconds, so the path is walked a press at a time and stops the
- * moment anything interrupts -- a live monster pins you (§9.5.3), and the walk
- * ends with the fight in front of you rather than pushing past it.
+ * One call. The server walks the road and the marker animates along it, exactly
+ * as it does outside -- there is no loop here pacing itself a hex at a time,
+ * because that was the thing making a floor feel like a different game.
  */
 async function walk(): Promise<void> {
   const target = picked.value
-  const d = session.value
-  if (!target || !d?.inside || walking.value || underfoot.value) return
+  if (!target || underfoot.value) return
 
-  walking.value = true
-
-  try {
-    for (let guard = 0; guard < 80; guard++) {
-      const at = session.value
-      if (!at?.inside) break
-      if (at.col === target.col && at.row === target.row) break
-      if (game.dungeonUnderfoot) break
-
-      const before = `${at.col},${at.row}`
-      const next = toward(at.col, at.row, target.col, target.row)
-
-      await game.stepDungeon(next[0], next[1])
-
-      const now = session.value
-      if (!now || `${now.col},${now.row}` === before) break
-
-      await new Promise((resolve) => setTimeout(resolve, Math.max(110, game.travelPerHexMs)))
-    }
-  } finally {
-    walking.value = false
-    picked.value = null
-  }
-}
-
-/** One hex of the line from here to there, in offset coordinates. */
-function toward(col: number, row: number, toCol: number, toRow: number): [number, number] {
-  const [ax, ay, az] = cube(col, row)
-  const [bx, by, bz] = cube(toCol, toRow)
-  const steps = Math.max(Math.abs(ax - bx), Math.abs(ay - by), Math.abs(az - bz))
-  const t = 1 / Math.max(1, steps)
-
-  const x = ax + (bx - ax) * t
-  const y = ay + (by - ay) * t
-  const z = az + (bz - az) * t
-
-  let rx = Math.round(x)
-  let ry = Math.round(y)
-  let rz = Math.round(z)
-
-  const dx = Math.abs(rx - x)
-  const dy = Math.abs(ry - y)
-  const dz = Math.abs(rz - z)
-
-  if (dx > dy && dx > dz) rx = -ry - rz
-  else if (dy > dz) ry = -rx - rz
-  else rz = -rx - ry
-
-  return [rx, rz + (rx - (rx & 1)) / 2]
+  await game.walkDungeon(target.col, target.row)
+  picked.value = null
 }
 
 const pickedName = computed(() => {
@@ -293,12 +251,13 @@ const receipt = computed(() => {
         :px="game.view.px"
         :selected="picked"
         :jobs="[]"
-        :travel="null"
+        :travel="session.walk ?? null"
         :now="game.now"
         :carriers="[]"
         :worn="game.worn"
         @select="select"
         @recenter="camera = null"
+        @resize="(w, h) => (viewport = { w, h })"
       />
     </div>
 
@@ -330,13 +289,13 @@ const receipt = computed(() => {
         </button>
 
         <button
-          v-else-if="picked && pickedAway > 0"
+          v-else-if="picked && pickedAway > 0 && !session.walk"
           class="btn"
           type="button"
-          :disabled="game.busy || waiting || walking"
+          :disabled="game.busy || waiting"
           @click="walk"
         >
-          {{ walking ? 'Walking…' : `Walk ${pickedAway}` }}
+          Walk {{ pickedAway }}
         </button>
 
         <button
@@ -347,6 +306,17 @@ const receipt = computed(() => {
           @click="game.descendDungeon()"
         >
           Descend
+        </button>
+
+        <!-- §5.6 -- stopping a journey is a verb the overworld has too. -->
+        <button
+          v-if="session.walk"
+          class="btn ghost"
+          type="button"
+          :disabled="game.busy"
+          @click="game.stopDungeonWalk()"
+        >
+          Stop
         </button>
 
         <button class="btn ghost" type="button" :disabled="game.busy" @click="game.leaveDungeon()">

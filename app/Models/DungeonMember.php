@@ -22,6 +22,7 @@ class DungeonMember extends Model
 {
     protected $fillable = [
         'dungeon_session_id', 'character_id', 'floor', 'col', 'row', 'entered_at_ms', 'busy_until_ms',
+        'walk_to_col', 'walk_to_row', 'walk_started_ms', 'walk_ends_ms',
     ];
 
     protected $casts = [
@@ -30,6 +31,10 @@ class DungeonMember extends Model
         'row' => 'integer',
         'entered_at_ms' => 'integer',
         'busy_until_ms' => 'integer',
+        'walk_to_col' => 'integer',
+        'walk_to_row' => 'integer',
+        'walk_started_ms' => 'integer',
+        'walk_ends_ms' => 'integer',
     ];
 
     public function session(): BelongsTo
@@ -51,6 +56,13 @@ class DungeonMember extends Model
     /** Mid-step. Every verb inside refuses while this is true, the road included. */
     public function isBusy(int $now): bool
     {
-        return $this->busy_until_ms !== null && $now < $this->busy_until_ms;
+        return ($this->busy_until_ms !== null && $now < $this->busy_until_ms)
+            || $this->isWalking($now);
+    }
+
+    /** §9.6 -- on the road between two hexes of a floor. */
+    public function isWalking(int $now): bool
+    {
+        return $this->walk_ends_ms !== null && $now < $this->walk_ends_ms;
     }
 }

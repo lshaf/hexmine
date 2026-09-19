@@ -314,8 +314,12 @@ export class HttpDriver implements GameApi {
     return post<ActionResult<DungeonState>>('/dungeon/enter')
   }
 
-  stepDungeon(col: number, row: number) {
-    return post<ActionResult<DungeonState>>('/dungeon/step', { col, row })
+  walkDungeon(col: number, row: number) {
+    return post<ActionResult<DungeonState>>('/dungeon/walk', { col, row })
+  }
+
+  stopDungeonWalk() {
+    return del<ActionResult<DungeonState>>('/dungeon/walk')
   }
 
   fightDungeon() {

@@ -1425,12 +1425,28 @@ export const useGame = defineStore('game', () => {
     dungeon.value = await act(() => api.enterDungeon())
   }
 
-  async function stepDungeon(col: number, row: number): Promise<void> {
-    // Quiet: a step is not news, and a line of log per hex would bury the
-    // things that are (§13.3's own argument about what earns a colour).
-    const next = await act(() => api.stepDungeon(col, row), 'good', true)
+  async function walkDungeon(col: number, row: number): Promise<void> {
+    const next = await act(() => api.walkDungeon(col, row), 'good', true)
     if (next) dungeon.value = next
   }
+
+  async function stopDungeonWalk(): Promise<void> {
+    const next = await act(() => api.stopDungeonWalk(), 'good', true)
+    if (next) dungeon.value = next
+  }
+
+  /**
+   * §5.6 -- the walk lands on its own clock.
+   *
+   * Asked once when the journey ends rather than polled: the moment is exactly
+   * knowable, which is the same argument the map's own `nextChangeAt` makes.
+   */
+  watch(
+    () => [dungeon.value?.walk?.endsAt ?? 0, now.value] as const,
+    async ([endsAt, at]) => {
+      if (endsAt > 0 && at >= endsAt) await loadDungeon()
+    },
+  )
 
   async function fightDungeon(): Promise<void> {
     const result = await act(() => api.fightDungeon())
@@ -1739,8 +1755,8 @@ export const useGame = defineStore('game', () => {
     currentSettlement, shopStock, sight, travelPerHexMs, travelEta,
     dungeon, dungeonFight, underground, dungeonTiles, dungeonUnderfoot,
     mouthOpen, openMouth, closeMouth,
-    loadDungeon, openDungeon, joinDungeon, enterDungeon, stepDungeon,
-    fightDungeon, descendDungeon, leaveDungeon, settleDungeonFight,
+    loadDungeon, openDungeon, joinDungeon, enterDungeon, walkDungeon,
+    fightDungeon, descendDungeon, leaveDungeon, settleDungeonFight, stopDungeonWalk,
     here, hereCol, hereRow,
     travel, travelProgress, travelHexesWalked, travelRemainingMs,
     // helpers

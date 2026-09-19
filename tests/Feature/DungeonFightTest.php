@@ -115,7 +115,7 @@ final class DungeonFightTest extends TestCase
         [$col, $row] = $this->onAMonster($character, $session);
 
         $this->expectException(GameException::class);
-        $this->dungeons->step($character, $col + 1, $row);
+        $this->dungeons->walk($character, $col + 1, $row);
     }
 
     /** §9.5.6 -- a fight bills the kit, and it is the road's own bill. */

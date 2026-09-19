@@ -163,19 +163,25 @@ final class DungeonService
     }
 
     /**
-     * §5.6 -- one hex, and it costs what a hex costs out in the world.
+     * §5.6 -- walk to a hex, the way the overworld walks to one.
      *
-     * A step onto a live monster is allowed and is how a fight starts: §9.5.3
-     * pins you there, and §9.6.4 needs everybody who is fighting to be standing
-     * on one hex. Refusing the step would make a party fight impossible to
-     * arrange.
+     * A JOURNEY rather than a press per hex. It was one step at a time with the
+     * client pacing itself, and that is why the marker jumped from tile to tile
+     * while the overworld's slid along a road: the two were different kinds of
+     * movement. §5.6 already has the shape -- a departure, a destination, a
+     * clock, and a position derived along the line -- so a floor uses it.
+     *
+     * **The road ends at the first thing standing on it** (§9.5.3), decided
+     * here rather than by the walker noticing. A pack ahead stops the journey on
+     * its hex, which is exactly what a pack does out in the world.
      */
-    public function step(Character $character, int $col, int $row): DungeonMember
+    public function walk(Character $character, int $col, int $row): DungeonMember
     {
         return DB::transaction(function () use ($character, $col, $row) {
             $now = $this->game->now();
             $member = $this->memberOf($character, $now);
             $this->requireInside($member);
+            $this->settleWalk($member, $now);
             $this->requireIdle($member, $now);
             $this->requirePinFree($member, $now);
 
@@ -183,18 +189,120 @@ final class DungeonService
                 throw new GameException('That is not on this floor.');
             }
 
-            if (HexGeometry::distance($member->col, $member->row, $col, $row) !== 1) {
-                throw new GameException('One hex at a time.');
+            if ($col === $member->col && $row === $member->row) {
+                return $member;
             }
 
+            $session = $member->session;
+            $path = HexGeometry::line($member->col, $member->row, $col, $row);
+            array_shift($path);
+
+            // §9.5.3 -- the road ends where something is standing on it.
+            $stop = null;
+            foreach ($path as $i => $hex) {
+                if (! Dungeons::inBounds($hex['col'], $hex['row'])) {
+                    break;
+                }
+
+                $stop = $i;
+
+                if ($this->standingOn($session, $member->floor, $hex['col'], $hex['row']) !== null) {
+                    break;
+                }
+            }
+
+            if ($stop === null) {
+                throw new GameException('There is no way through.');
+            }
+
+            $end = $path[$stop];
+            $hexes = $stop + 1;
+            $perHex = Balance::scaled(Balance::TRAVEL_MS_PER_HEX);
+
             $member->fill([
-                'col' => $col,
-                'row' => $row,
-                'busy_until_ms' => $now + Balance::scaled(Balance::TRAVEL_MS_PER_HEX),
+                'walk_to_col' => $end['col'],
+                'walk_to_row' => $end['row'],
+                'walk_started_ms' => $now,
+                'walk_ends_ms' => $now + $hexes * $perHex,
             ])->save();
 
             return $member;
         });
+    }
+
+    /**
+     * Land a finished walk, and derive where a running one has got to.
+     *
+     * §5.6's own rule: the position is `path[floor(elapsed / perHex)]`, and both
+     * sides run the same arithmetic so the client's answer and the server's
+     * cannot disagree. Called at the top of every verb, so a walk that ended
+     * while nobody was looking is already landed by the time anything asks.
+     */
+    private function settleWalk(DungeonMember $member, int $now): void
+    {
+        if ($member->walk_ends_ms === null) {
+            return;
+        }
+
+        if ($now >= $member->walk_ends_ms) {
+            $member->fill([
+                'col' => $member->walk_to_col,
+                'row' => $member->walk_to_row,
+                'walk_to_col' => null,
+                'walk_to_row' => null,
+                'walk_started_ms' => null,
+                'walk_ends_ms' => null,
+            ])->save();
+        }
+    }
+
+    /** §5.6 -- stop where you are, which is a hex rather than a fraction of one. */
+    public function stopWalk(Character $character): DungeonMember
+    {
+        return DB::transaction(function () use ($character) {
+            $now = $this->game->now();
+            $member = $this->memberOf($character, $now);
+            $this->settleWalk($member, $now);
+
+            if ($member->walk_ends_ms === null) {
+                return $member;
+            }
+
+            [$col, $row] = $this->walkingAt($member, $now);
+
+            $member->fill([
+                'col' => $col,
+                'row' => $row,
+                'walk_to_col' => null,
+                'walk_to_row' => null,
+                'walk_started_ms' => null,
+                'walk_ends_ms' => null,
+            ])->save();
+
+            return $member;
+        });
+    }
+
+    /**
+     * §5.6 -- where a walker IS right now, which is not where they set off.
+     *
+     * The same derivation the client draws the marker with, so the two agree by
+     * construction rather than by being kept in step.
+     *
+     * @return array{0:int,1:int}
+     */
+    public function walkingAt(DungeonMember $member, int $now): array
+    {
+        if ($member->walk_ends_ms === null) {
+            return [$member->col, $member->row];
+        }
+
+        $path = HexGeometry::line($member->col, $member->row, $member->walk_to_col, $member->walk_to_row);
+        $perHex = max(1, Balance::scaled(Balance::TRAVEL_MS_PER_HEX));
+        $step = (int) floor(max(0, $now - (int) $member->walk_started_ms) / $perHex);
+        $at = $path[min($step, count($path) - 1)];
+
+        return [$at['col'], $at['row']];
     }
 
     /**
@@ -211,6 +319,9 @@ final class DungeonService
             $now = $this->game->now();
             $member = $this->memberOf($character, $now);
             $this->requireInside($member);
+            // §5.6 -- a walk that finished while nobody was looking is landed
+            // here, so every verb reads a hex rather than a road.
+            $this->settleWalk($member, $now);
             $this->requireIdle($member, $now);
             $this->requirePinFree($member, $now);
 
@@ -283,6 +394,9 @@ final class DungeonService
             $now = $this->game->now();
             $member = $this->memberOf($character, $now);
             $this->requireInside($member);
+            // §5.6 -- a walk that finished while nobody was looking is landed
+            // here, so every verb reads a hex rather than a road.
+            $this->settleWalk($member, $now);
             $this->requireIdle($member, $now);
 
             $session = $member->session;

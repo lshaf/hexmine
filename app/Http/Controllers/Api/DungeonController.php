@@ -72,7 +72,7 @@ class DungeonController extends GameController
         return $this->respond($character, $this->view($character), 'Down you go.');
     }
 
-    public function step(Request $request): JsonResponse
+    public function walk(Request $request): JsonResponse
     {
         $data = $request->validate([
             'col' => ['required', 'integer'],
@@ -80,7 +80,16 @@ class DungeonController extends GameController
         ]);
 
         $character = $this->character($request);
-        $this->dungeons->step($character, $data['col'], $data['row']);
+        $this->dungeons->walk($character, $data['col'], $data['row']);
+
+        return $this->respond($character, $this->view($character));
+    }
+
+    /** §5.6 -- stop where you are, which is a hex rather than a fraction of one. */
+    public function stop(Request $request): JsonResponse
+    {
+        $character = $this->character($request);
+        $this->dungeons->stopWalk($character);
 
         return $this->respond($character, $this->view($character));
     }
@@ -156,6 +165,30 @@ class DungeonController extends GameController
 
         if (! $member->isInside()) {
             return $out;
+        }
+
+        // §5.6 -- the disc follows the WALKER, so everything below is costed
+        // from where they are rather than from where they set off.
+        [$atCol, $atRow] = $this->dungeons->walkingAt($member, $now);
+        $out['col'] = $atCol;
+        $out['row'] = $atRow;
+
+        if ($member->walk_ends_ms !== null) {
+            $path = HexGeometry::line($member->col, $member->row, $member->walk_to_col, $member->walk_to_row);
+
+            // Shaped as the overworld's own TravelState, because the marker
+            // that animates it is the overworld's own marker.
+            $out['walk'] = [
+                'toCol' => (int) $member->walk_to_col,
+                'toRow' => (int) $member->walk_to_row,
+                'startedAt' => (int) $member->walk_started_ms,
+                'endsAt' => (int) $member->walk_ends_ms,
+                'perHexMs' => Balance::scaled(Balance::TRAVEL_MS_PER_HEX),
+                'hexes' => count($path) - 1,
+                'path' => array_map(static fn (array $h): array => [$h['col'], $h['row']], $path),
+                'destinationName' => null,
+                'stopsAt' => null,
+            ];
         }
 
         $kills = $session->killsOn($member->floor);

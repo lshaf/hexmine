@@ -17,6 +17,15 @@ import { MONSTER_VIEW, monsterBody } from '@/icons/combatants'
 import type { Biome, Rarity, SettlementTier, Tile, VariantKey, WaterKind } from '@/game/types'
 
 /** Escape nothing -- all values are numbers we generate. Kept tiny on purpose. */
+/**
+ * §9.6 -- the floor variant.
+ *
+ * Compared as a string rather than against `VariantKey`, because it is
+ * deliberately not a member of that union: it is the sixteen grades of the four
+ * countries, and five generated tables are exhaustive over it (see VAULT_TINT).
+ */
+const VAULT_VARIANT: string = 'vault'
+
 const poly = (points: string, fill: string, stroke?: string) =>
   `<polygon points="${points}" fill="${fill}"${stroke ? ` stroke="${stroke}" stroke-width="1"` : ''}/>`
 
@@ -1146,13 +1155,54 @@ function deadProps(
   return out
 }
 
+/**
+ * §9.6.2 -- the way down to the next floor.
+ *
+ * Not the dungeon MOUTH's glyph, which is the arch you see on the overworld
+ * from four days away (§5.6). This is the other end of that: a shaft cut into
+ * the floor you are standing on, so it reads as a hole rather than a doorway --
+ * steps falling away from the near edge and dark under them.
+ *
+ * Drawn in the same two-tone silhouette everything else on the map uses: solid
+ * fills, no alpha (§13.2), so it survives being half behind a monster.
+ */
+function stairProp(): string {
+  const stone = '#6a6a74'
+  const lip = '#8b8b96'
+  const dark = '#15151a'
+
+  return (
+    // The shaft, sunk into the hex.
+    poly('-14,3 -9,-6 9,-6 14,3 9,12 -9,12', dark) +
+    // Three treads falling away, narrowing as they go down.
+    poly('-11,4 11,4 9,7 -9,7', stone) +
+    poly('-9,7 9,7 7,10 -7,10', shade(stone, -0.22)) +
+    poly('-7,10 7,10 5,13 -5,13', shade(stone, -0.42)) +
+    // The near lip, which is what makes it read as a hole rather than a ramp.
+    poly('-14,3 -9,-6 9,-6 14,3', shade(dark, 0.14)) +
+    poly('-14,3 14,3 11,4 -11,4', lip)
+  )
+}
+
 export function tileProps(tile: Tile, depleted: boolean): string {
+  // §9.6.2 -- before the terrain: a stair is what the hex IS, the way a
+  // settlement or a hold is.
+  if (tile.stair) return stairProp()
   if (tile.dungeon) return dungeonProp()
   // §10.6 -- before the terrain, because a hold is what the hex IS now. It
   // stands on dead ground (§5.2), so what it replaces is a field of snags.
   if (tile.guildLand) return guildLandProp(tile.guildLand.glyphTier)
   if (tile.settlement) return settlementProp(tile.settlement.tier, tile.propSeed)
   if (tile.water) return waterProp(tile)
+
+  // §9.6 -- a dungeon floor grows nothing. Everything below this line is
+  // scenery that belongs to a COUNTRY -- trees, scree, tufts, snags -- and a
+  // vault is not one, so a floor got mountain rocks scattered over it purely
+  // because the prop table is keyed on a biome every tile has to name.
+  //
+  // What stands on a floor is what walked there, and that is drawn by the
+  // caller from `pack` like any other hex.
+  if ((tile.variant as string) === VAULT_VARIANT) return ''
 
   const base = variantColor(tile.variant)
   const seed = tile.propSeed

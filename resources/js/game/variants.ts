@@ -45,6 +45,22 @@ export const BIOME_VARIANTS: Record<Biome, VariantDef[]> = {
 }
 
 /** §13.2 -- the hex fill for a variant. Solid, never alpha. */
+/**
+ * §9.6 -- the ground inside a dungeon.
+ *
+ * Deliberately NOT a member of `VariantKey`. That union is the sixteen grades
+ * of the four countries, and five generated `Record<VariantKey, …>` tables are
+ * exhaustive over it -- adding a seventeenth key would force a snag silhouette,
+ * a prop list and a grade flag onto a thing that has none of those. A floor is
+ * not a grade of anywhere.
+ *
+ * So it rides beside the table rather than in it, and `variantColor` falls
+ * through to here. Cut stone, because a floor under Rootvault rendering as
+ * forest green said "you are outdoors in a wood" about a place ten storeys
+ * under one.
+ */
+export const VAULT_TINT = '#3a3a42'
+
 export const VARIANT_TINT: Record<VariantKey, string> = {
   forest: '#5f8058',
   forest_uncommon: '#6b8a4e',

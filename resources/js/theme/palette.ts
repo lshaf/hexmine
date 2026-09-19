@@ -3,7 +3,7 @@
  * the map causes ghost-hex artefacts through neighbors, so every shade a tile
  * needs is precomputed to an opaque hex string here.
  */
-import { VARIANT_TINT } from '@/game/variants'
+import { VARIANT_TINT, VAULT_TINT } from '@/game/variants'
 import type { Biome, VariantKey, WaterKind } from '@/game/types'
 
 export const INK = '#141b18'
@@ -95,7 +95,10 @@ export const waterColor = (biome: Biome, kind: WaterKind): string => {
  * go on looking like the safe ground next to it.
  */
 export const variantColor = (variant: VariantKey): string =>
-  VARIANT_TINT[variant] ?? BIOME_COLOR[variant as Biome]
+  VARIANT_TINT[variant] ?? (variant === VAULT ? VAULT_TINT : BIOME_COLOR[variant as Biome])
+
+/** §9.6 -- the variant a dungeon floor wears. See VAULT_TINT for why it is loose. */
+export const VAULT = 'vault' as VariantKey
 
 /**
  * §13.3 -- a depleted tile uses a darker, desaturated variant of its OWN

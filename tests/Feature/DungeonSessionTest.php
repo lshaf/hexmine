@@ -181,29 +181,85 @@ final class DungeonSessionTest extends TestCase
         $this->assertNull($this->dungeons->standingOn($session->fresh(), 1, $col, $row));
     }
 
-    /** §5.6 -- a step is one hex and it costs what a hex costs. */
-    public function test_a_step_is_one_hex_and_costs_the_clock(): void
+    /**
+     * §5.6 -- walking a floor is a JOURNEY, the same shape the overworld uses.
+     *
+     * It was a press per hex, which is what made a floor feel like a different
+     * game: the marker jumped tile to tile while the overworld's slid along a
+     * road. A walk now has a departure, a destination and a clock, and the
+     * position is derived along the line.
+     *
+     * **Asserted against the journey that actually started, not the one asked
+     * for**, and that distinction cost a red test. §9.6.2 seeds six monsters
+     * within a short walk of the landing, so a road pointed four hexes out is
+     * quite likely to end after one -- which is §9.5.3 working, not a bug. A
+     * test that assumes a clear path is testing the seed.
+     */
+    public function test_walking_a_floor_is_a_journey(): void
     {
         [$character, $key] = $this->atMouth('0xstep');
         $this->dungeons->open($character, $key, 'tools', 'easy');
         $member = $this->dungeons->enter($character);
 
-        $target = [$member->col + 1, $member->row];
+        $from = [$member->col, $member->row];
 
-        try {
-            $this->dungeons->step($character, $member->col + 4, $member->row);
-            $this->fail('walked four hexes in one step');
-        } catch (GameException) {
-        }
+        // Toward the middle of the floor, so the road is never off the edge.
+        $middle = intdiv(Balance::DUNGEON_FLOOR_SIZE, 2);
+        $walking = $this->dungeons->walk($character, $middle, $middle);
 
-        $moved = $this->dungeons->step($character, ...$target);
-        $this->assertSame($target[0], $moved->col);
-        $this->assertNotNull($moved->busy_until_ms);
-        $this->assertTrue($moved->isBusy($this->game->now()));
+        $this->assertNotNull($walking->walk_ends_ms, 'no journey was started');
+        $this->assertGreaterThan($walking->walk_started_ms, $walking->walk_ends_ms);
+        $this->assertTrue($walking->isWalking($this->game->now()));
 
-        // And every verb refuses while the step is still being taken.
+        // §5.6 -- the hex of record stays the departure until it lands, and
+        // where the walker IS is derived along the line.
+        $this->assertSame($from, [$walking->col, $walking->row]);
+        $this->assertSame($from, $this->dungeons->walkingAt($walking, $walking->walk_started_ms));
+        $this->assertSame(
+            [(int) $walking->walk_to_col, (int) $walking->walk_to_row],
+            $this->dungeons->walkingAt($walking, $walking->walk_ends_ms),
+        );
+
+        // And every verb refuses while the road is under way.
         $this->expectException(GameException::class);
-        $this->dungeons->step($character, $moved->col + 1, $moved->row);
+        $this->dungeons->walk($character, $middle, $middle);
+    }
+
+    /** §9.5.3 -- the road ends at the first thing standing on it. */
+    public function test_a_walk_stops_at_what_is_in_the_way(): void
+    {
+        [$character, $key] = $this->atMouth('0xblocked');
+        $session = $this->dungeons->open($character, $key, 'tools', 'easy');
+        $member = $this->dungeons->enter($character);
+        $session = $session->fresh();
+
+        // Straight at one of the six the floor guarantees (§9.6.2).
+        [$col, $row] = Dungeons::seededHexes($session->floorSeed(1))[0];
+
+        $walking = $this->dungeons->walk($character, $col, $row);
+        $end = [(int) $walking->walk_to_col, (int) $walking->walk_to_row];
+
+        $this->assertNotNull(
+            $this->dungeons->standingOn($session, 1, $end[0], $end[1]),
+            'the road ended somewhere with nothing on it',
+        );
+    }
+
+    /** §5.6 -- stopping leaves you on a hex, never between two. */
+    public function test_stopping_a_walk_lands_on_a_hex(): void
+    {
+        [$character, $key] = $this->atMouth('0xstop');
+        $this->dungeons->open($character, $key, 'tools', 'easy');
+        $this->dungeons->enter($character);
+
+        $middle = intdiv(Balance::DUNGEON_FLOOR_SIZE, 2);
+        $this->dungeons->walk($character, $middle, $middle);
+
+        $stopped = $this->dungeons->stopWalk($character);
+
+        $this->assertNull($stopped->walk_ends_ms, 'still on the road after stopping');
+        $this->assertFalse($stopped->isWalking($this->game->now()));
+        $this->assertTrue(Dungeons::inBounds($stopped->col, $stopped->row));
     }
 
     /**

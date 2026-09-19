@@ -88,7 +88,8 @@ Route::middleware(ResolveCharacter::class)->group(function () {
     Route::post('/dungeon', [DungeonController::class, 'open']);
     Route::post('/dungeon/join', [DungeonController::class, 'join']);
     Route::post('/dungeon/enter', [DungeonController::class, 'enter']);
-    Route::post('/dungeon/step', [DungeonController::class, 'step']);
+    Route::post('/dungeon/walk', [DungeonController::class, 'walk']);
+    Route::delete('/dungeon/walk', [DungeonController::class, 'stop']);
     Route::post('/dungeon/fight', [DungeonController::class, 'fight']);
     Route::post('/dungeon/descend', [DungeonController::class, 'descend']);
     Route::delete('/dungeon', [DungeonController::class, 'leave']);

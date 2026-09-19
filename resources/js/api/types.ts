@@ -1104,8 +1104,10 @@ export interface GameApi {
   joinDungeon(code: string): Promise<ActionResult<DungeonState>>
   /** §9.6.1 -- go down. The first one through locks the roster. */
   enterDungeon(): Promise<ActionResult<DungeonState>>
-  /** §5.6 -- one hex, at five seconds a hex. */
-  stepDungeon(col: number, row: number): Promise<ActionResult<DungeonState>>
+  /** §5.6 -- walk to a hex, at five seconds a hex. A journey, not a press per hex. */
+  walkDungeon(col: number, row: number): Promise<ActionResult<DungeonState>>
+  /** §5.6 -- stop on the hex you have reached. */
+  stopDungeonWalk(): Promise<ActionResult<DungeonState>>
   /** §9.6.4 -- settle whatever is on the hex, with everybody standing on it. */
   fightDungeon(): Promise<ActionResult<{ fight: DungeonFight; dungeon: DungeonState }>>
   /** §9.6.2 -- the stair, once six have fallen and the guardian is down. */
@@ -1159,6 +1161,8 @@ export interface DungeonState {
   stair?: { col: number; row: number }
   sight?: number
   tiles?: DungeonTile[]
+  /** §5.6 -- the journey under way, shaped exactly as the overworld's. */
+  walk?: TravelState | null
 }
 
 /** §9.6.4 -- one member's share of a fight: what it cost them and what it paid. */
